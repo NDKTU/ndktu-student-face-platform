@@ -202,7 +202,7 @@ export default function MavzuDetailPage() {
                                             navigate(`/lessons/${lesson.id}`);
                                         }
                                     }}
-                                    className="rounded-xl border border-border bg-background p-3 flex items-center justify-between gap-3 hover:border-primary hover:bg-accent/50 transition cursor-pointer"
+                                    className="rounded-xl border border-border/60 bg-card p-3 flex items-center justify-between gap-3 hover:border-primary/30 hover:shadow-sm hover:bg-accent/20 transition duration-300 cursor-pointer"
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -282,7 +282,7 @@ export default function MavzuDetailPage() {
                             {topicResources.map((res) => (
                                 <div
                                     key={res.id}
-                                    className="rounded-xl border border-border bg-background p-4 flex flex-col gap-2"
+                                    className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-2 hover:shadow-sm hover:border-primary/20 transition-all duration-300"
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <p className="text-sm flex-1 whitespace-pre-wrap">{res.main_text}</p>

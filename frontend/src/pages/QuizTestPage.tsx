@@ -553,7 +553,7 @@ const QuizTestPage = () => {
                     )}
 
                     <div className={cn(
-                        "flex items-center gap-2 rounded-lg px-4 py-2 text-lg font-mono font-bold transition-all duration-300",
+                        "flex items-center gap-2 rounded-xl px-4 py-2 text-lg font-mono font-bold transition-all duration-300 shadow-sm",
                         timeWarning ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-200" : "bg-muted text-foreground"
                     )}>
                         <Clock className={cn("h-5 w-5", timeWarning ? "animate-spin-slow" : "")} />
@@ -571,12 +571,14 @@ const QuizTestPage = () => {
                         <button
                             key={q.id}
                             onClick={() => setCurrentQuestionIndex(index)}
-                            className={`h-8 w-8 rounded-full text-xs font-medium transition-all ${isCurrent
-                                ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
-                                : isAnswered
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-muted text-muted-foreground hover:bg-accent'
-                                }`}
+                            className={cn(
+                                "h-8 w-8 rounded-full text-xs font-semibold transition-all duration-200",
+                                isCurrent
+                                    ? "bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.5)] scale-105"
+                                    : isAnswered
+                                        ? "bg-green-500/15 text-green-600 border border-green-500/30 dark:bg-green-500/10 dark:text-green-400"
+                                        : "bg-card border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                            )}
                         >
                             {index + 1}
                         </button>
@@ -605,15 +607,19 @@ const QuizTestPage = () => {
                                 <button
                                     key={option.key}
                                     onClick={() => handleSelectAnswer(currentQuestion.id, option.key)}
-                                    className={`flex items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${isSelected
-                                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                        : 'border-border hover:border-primary/50 hover:bg-accent/50'
-                                        }`}
+                                    className={cn(
+                                        "flex items-start gap-3 rounded-xl border border-border/80 p-4 text-left transition-all duration-200",
+                                        isSelected
+                                            ? "border-primary bg-primary/5 shadow-[0_0_12px_rgba(99,102,241,0.05)]"
+                                            : "border-border/60 hover:border-primary/30 hover:bg-accent/20"
+                                    )}
                                 >
-                                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${isSelected
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted text-muted-foreground'
-                                        }`}>
+                                    <span className={cn(
+                                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200",
+                                        isSelected
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted text-muted-foreground"
+                                    )}>
                                         {option.key}
                                     </span>
                                     <span

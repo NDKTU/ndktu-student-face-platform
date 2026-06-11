@@ -81,42 +81,51 @@ export function QuizVideoMonitoring({
 
             <div className={`relative transition-all duration-500 ease-in-out transform ${(state.isActive || hasError) ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
                 
-                {/* Minimalist Icon Bubble */}
-                <div className={`relative w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 transition-all duration-500 ${
-                    hasError ? 'border-red-500 text-red-500 bg-red-50' :
-                    !state.isConnected ? 'border-gray-200 text-gray-400 bg-white' :
-                    isIssue ? 'border-red-500 text-red-500 bg-red-50' :
-                    isOk ? 'border-green-500 text-green-500 bg-green-50' :
-                    'border-primary/30 text-primary bg-primary/5'
+                {/* Futuristic HUD Scanner Circle */}
+                <div className={`relative w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-500 backdrop-blur-md ${
+                    hasError ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]' :
+                    !state.isConnected ? 'border-slate-300 text-slate-400 bg-slate-500/10 shadow-sm' :
+                    isIssue ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' :
+                    isOk ? 'border-green-500 text-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)]' :
+                    'border-primary/50 text-primary bg-primary/10 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
                 }`}>
+                    {/* Scanner scanline animation */}
+                    {state.isConnected && !hasError && (
+                        <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
+                            <div className="w-full h-0.5 bg-current opacity-40 absolute top-0 left-0 animate-[bounce_2s_infinite]" />
+                        </div>
+                    )}
                     {hasError ? (
                         <AlertTriangle className="h-7 w-7 text-red-500" />
                     ) : !state.isConnected ? (
-                        <UserSearch className="h-7 w-7 animate-pulse" />
+                        <UserSearch className="h-7 w-7 animate-pulse text-slate-400" />
                     ) : isIssue ? (
-                        <UserX className="h-7 w-7 animate-bounce" />
+                        <UserX className="h-7 w-7 animate-bounce text-red-500" />
                     ) : (
-                        <UserCheck className={`h-7 w-7 ${isOk ? 'scale-110' : ''} transition-transform duration-500`} />
+                        <UserCheck className={`h-7 w-7 ${isOk ? 'scale-110' : ''} transition-transform duration-500 text-green-500`} />
                     )}
 
                     {/* Warning Counter Badge */}
                     {warnings > 0 && !hasError && (
-                        <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-white shadow-sm">
+                        <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-white shadow-md">
                             {warnings}
                         </div>
                     )}
                 </div>
 
-                {/* Warning Text Banner */}
+                {/* Glassmorphic Warning Banner */}
                 {showWarningText && !hasError && (
-                    <div className="absolute bottom-full mb-4 right-0 w-64 bg-red-600 text-white p-3 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="flex items-start gap-2">
-                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <div className="absolute bottom-full mb-4 right-0 w-72 bg-red-950/90 backdrop-blur-md border border-red-500/30 text-white p-3.5 rounded-xl shadow-[0_10px_30px_rgba(239,68,68,0.2)] animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-start gap-3">
+                            <div className="bg-red-500/20 p-1.5 rounded-lg text-red-400 shrink-0">
+                                <AlertTriangle className="h-4 w-4" />
+                            </div>
                             <div>
-                                <p className="text-[11px] font-extrabold uppercase tracking-tight">Ogohlantirish {warnings}/3</p>
-                                <p className="text-[10px] leading-tight opacity-90 mt-0.5">
+                                <p className="text-xs font-black uppercase tracking-wider text-red-400">Ogohlantirish {warnings} / 3</p>
+                                <p className="text-[11px] leading-relaxed text-red-200 mt-1">
                                     {state.lastFaceCount > 1 ? 'Ekranda begona shaxs aniqlandi!' : 'Shaxsingizni tasdiqlashda xatolik!'}
-                                    <br/>3 tadan so'ng test avtomatik to'xtatiladi.
+                                    <br/>
+                                    <span className="font-semibold text-white">Diqqat! 3 ta ogohlantirishdan so'ng test avtomatik to'xtatiladi.</span>
                                 </p>
                             </div>
                         </div>

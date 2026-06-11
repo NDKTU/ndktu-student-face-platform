@@ -166,7 +166,7 @@ export default function LessonDetailPage() {
                             {lessonResources.map(res => (
                                 <div
                                     key={res.id}
-                                    className="rounded-xl border border-border bg-background p-4 flex flex-col gap-2"
+                                    className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-2 hover:shadow-sm hover:border-primary/20 transition-all duration-300"
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <p className="text-sm flex-1 whitespace-pre-wrap">{res.main_text}</p>
@@ -259,7 +259,7 @@ export default function LessonDetailPage() {
                                     return (
                                         <div
                                             key={a.id}
-                                            className="rounded-xl border border-border bg-background p-3 flex items-center justify-between gap-3"
+                                            className="rounded-xl border border-border/60 bg-card p-3 flex items-center justify-between gap-3 hover:shadow-sm hover:border-primary/20 transition-all duration-300"
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-medium truncate">{a.title}</p>
@@ -330,7 +330,7 @@ export default function LessonDetailPage() {
                                                 <select
                                                     value={r.attendance}
                                                     onChange={(e) => updateRow(idx, { attendance: e.target.value as LessonAttendance })}
-                                                    className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                                                    className="w-full rounded-xl border border-border/60 bg-card px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200"
                                                 >
                                                     {ATTENDANCE_OPTIONS.map(opt => (
                                                         <option key={opt.value} value={opt.value}>{opt.label}</option>

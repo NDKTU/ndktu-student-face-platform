@@ -83,7 +83,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                                                 title={isCollapsed ? item.name : undefined}
                                                 onClick={() => setMobileOpen(false)}
                                                 className={cn(
-                                                    'relative flex items-center rounded-xl text-sm font-medium transition-all duration-150',
+                                                    'group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200',
                                                     isCollapsed
                                                         ? 'h-9 w-9 justify-center mx-auto'
                                                         : 'h-9 gap-3 px-3',
@@ -92,10 +92,10 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                                                         : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                                 )}
                                             >
-                                                {isActive && !isCollapsed && (
-                                                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-primary" />
+                                                {isActive && (
+                                                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.5)]" />
                                                 )}
-                                                <item.icon className={cn('h-4 w-4 shrink-0', isActive && 'text-primary')} />
+                                                <item.icon className={cn('h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110', isActive && 'text-primary')} />
                                                 {!isCollapsed && <span>{item.name}</span>}
                                             </Link>
                                         );

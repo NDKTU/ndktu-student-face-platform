@@ -197,7 +197,7 @@ const HemisSyncPage = () => {
                                     <GraduationCap className="w-4 h-4" /> Fakultet Tanlash
                                 </label>
                                 <select 
-                                    className="w-full h-11 px-3 rounded-xl border bg-card/50 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all cursor-pointer ring-offset-2 ring-primary/5"
+                                    className="w-full h-11 px-3 rounded-xl border border-border/60 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
                                     value={selectedFacultyId || ''}
                                     onChange={(e) => {
                                         setSelectedFacultyId(Number(e.target.value) || undefined);
@@ -222,7 +222,7 @@ const HemisSyncPage = () => {
                                     <Users className="w-4 h-4" /> Guruh Tanlash
                                 </label>
                                 <select 
-                                    className="w-full h-11 px-3 rounded-xl border bg-card/50 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all cursor-pointer ring-offset-2 ring-primary/5"
+                                    className="w-full h-11 px-3 rounded-xl border border-border/60 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
                                     value={selectedGroupId || ''}
                                     onChange={(e) => setSelectedGroupId(Number(e.target.value) || undefined)}
                                 >

@@ -16,7 +16,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card: React.FC<CardProps> = ({ className, children, ...props }) => (
     <div
-        className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)}
+        className={cn('rounded-xl border border-border/50 bg-card text-card-foreground shadow-sm/50 transition-all duration-300', className)}
         {...props}
     >
         {children}

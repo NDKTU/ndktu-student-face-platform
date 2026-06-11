@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @theme {
   --color-background: var(--background);
@@ -29,47 +29,47 @@
   --radius-sm: calc(var(--radius) - 4px);
 
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Fraunces', Georgia, serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 @layer base {
   :root {
-    /* Warm off-white background */
-    --background: hsl(60 9% 97%);
-    --foreground: hsl(230 30% 12%);
+    /* Clean slate-blue background for LMS */
+    --background: hsl(220 20% 97%);
+    --foreground: hsl(224 71% 4%);
 
     --card: hsl(0 0% 100%);
-    --card-foreground: hsl(230 30% 12%);
+    --card-foreground: hsl(224 71% 4%);
 
     --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(230 30% 12%);
+    --popover-foreground: hsl(224 71% 4%);
 
-    /* Blue primary */
-    --primary: hsl(221 83% 53%);
+    /* Premium academic indigo primary */
+    --primary: hsl(244 80% 60%);
     --primary-foreground: hsl(0 0% 100%);
 
-    --secondary: hsl(60 9% 93%);
-    --secondary-foreground: hsl(230 30% 20%);
+    --secondary: hsl(220 14% 96%);
+    --secondary-foreground: hsl(224 71% 12%);
 
-    --muted: hsl(60 6% 94%);
-    --muted-foreground: hsl(230 12% 46%);
+    --muted: hsl(220 14% 94%);
+    --muted-foreground: hsl(220 9% 46%);
 
-    --accent: hsl(221 85% 95%);
-    --accent-foreground: hsl(221 83% 40%);
+    --accent: hsl(244 80% 96%);
+    --accent-foreground: hsl(244 80% 36%);
 
-    --destructive: hsl(0 65% 42%);
+    --destructive: hsl(346 80% 50%);
     --destructive-foreground: hsl(0 0% 100%);
 
-    --success: hsl(155 43% 30%);
+    --success: hsl(142 70% 45%);
     --success-foreground: hsl(0 0% 100%);
 
     --warning: hsl(42 84% 42%);
     --warning-foreground: hsl(0 0% 100%);
 
-    --border: hsl(220 13% 88%);
-    --input: hsl(220 13% 88%);
-    --ring: hsl(221 83% 53%);
+    --border: hsl(220 13% 90%);
+    --input: hsl(220 13% 90%);
+    --ring: hsl(244 80% 60%);
 
     /* 12px radius for cards, 8px for inputs/buttons */
     --radius: 0.75rem;
@@ -79,51 +79,52 @@
     --navbar-height: 3.5rem;
 
     /* Grade colors */
-    --grade-5: hsl(213 65% 38%);
-    --grade-4: hsl(221 83% 45%);
+    --grade-5: hsl(244 80% 45%);
+    --grade-4: hsl(224 85% 45%);
     --grade-3: hsl(42 84% 38%);
-    --grade-low: hsl(0 65% 42%);
+    --grade-low: hsl(346 80% 45%);
   }
 
   .dark {
-    --background: hsl(230 20% 8%);
-    --foreground: hsl(60 9% 93%);
+    /* Deep graphite background */
+    --background: hsl(224 71% 4%);
+    --foreground: hsl(220 20% 98%);
 
-    --card: hsl(230 20% 11%);
-    --card-foreground: hsl(60 9% 93%);
+    --card: hsl(224 71% 7%);
+    --card-foreground: hsl(220 20% 98%);
 
-    --popover: hsl(230 20% 11%);
-    --popover-foreground: hsl(60 9% 93%);
+    --popover: hsl(224 71% 7%);
+    --popover-foreground: hsl(220 20% 98%);
 
-    --primary: hsl(221 83% 65%);
-    --primary-foreground: hsl(230 20% 8%);
+    --primary: hsl(244 80% 68%);
+    --primary-foreground: hsl(224 71% 4%);
 
-    --secondary: hsl(230 15% 16%);
-    --secondary-foreground: hsl(60 9% 88%);
+    --secondary: hsl(224 30% 12%);
+    --secondary-foreground: hsl(220 20% 94%);
 
-    --muted: hsl(230 15% 14%);
-    --muted-foreground: hsl(230 10% 55%);
+    --muted: hsl(224 30% 10%);
+    --muted-foreground: hsl(220 10% 60%);
 
-    --accent: hsl(221 50% 16%);
-    --accent-foreground: hsl(221 83% 70%);
+    --accent: hsl(244 80% 18%);
+    --accent-foreground: hsl(244 80% 80%);
 
-    --destructive: hsl(0 60% 52%);
+    --destructive: hsl(346 80% 55%);
     --destructive-foreground: hsl(0 0% 100%);
 
-    --success: hsl(155 40% 48%);
+    --success: hsl(142 70% 50%);
     --success-foreground: hsl(0 0% 100%);
 
     --warning: hsl(42 80% 50%);
     --warning-foreground: hsl(0 0% 100%);
 
-    --border: hsl(230 15% 18%);
-    --input: hsl(230 15% 18%);
-    --ring: hsl(221 83% 65%);
+    --border: hsl(224 30% 15%);
+    --input: hsl(224 30% 15%);
+    --ring: hsl(244 80% 68%);
 
-    --grade-5: hsl(213 70% 55%);
-    --grade-4: hsl(221 83% 55%);
+    --grade-5: hsl(244 80% 68%);
+    --grade-4: hsl(224 85% 55%);
     --grade-3: hsl(42 80% 50%);
-    --grade-low: hsl(0 60% 52%);
+    --grade-low: hsl(346 80% 55%);
   }
 }
 
@@ -177,7 +178,7 @@
   }
 
   .page-title {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: var(--font-display);
     @apply text-2xl font-semibold tracking-tight text-foreground;
   }
 
@@ -186,7 +187,7 @@
   }
 
   .font-display {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: var(--font-display);
   }
 
   .font-mono {
@@ -203,18 +204,15 @@
   }
 
   .badge-success {
-    background-color: hsl(var(--grade-4) / 0.12);
-    color: hsl(var(--grade-4));
+    @apply bg-success/15 text-success;
   }
 
   .badge-destructive {
-    background-color: hsl(var(--grade-low) / 0.12);
-    color: hsl(var(--grade-low));
+    @apply bg-destructive/15 text-destructive;
   }
 
   .badge-warning {
-    background-color: hsl(var(--grade-3) / 0.12);
-    color: hsl(var(--grade-3));
+    @apply bg-warning/15 text-warning;
   }
 
   .badge-muted {
