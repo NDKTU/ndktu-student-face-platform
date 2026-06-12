@@ -37,16 +37,16 @@ export const SIDEBAR_SECTION_ORDER = [
 
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
-    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: 'Foydalanuvchilar' },
+    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
     tutor:         { label: 'Tyutorlar',        href: '/tutors',      icon: UserCog,       section: 'Foydalanuvchilar' },
-    student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap, section: 'Foydalanuvchilar' },
+    student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
 
     role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
     permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Ruxsatlar tizimi' },
 
-    faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: 'Boshqaruv' },
-    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: 'Boshqaruv' },
-    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound,    section: 'Boshqaruv' },
+    faculty:       { label: 'Fakultetlarni boshqarish', href: '/faculties', icon: Building2, section: 'Boshqaruv' },
+    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
+    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound },
     subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Boshqaruv' },
     sinf:          { label: 'Sinflar',          href: '/sinfs',       icon: GraduationCap, section: 'Boshqaruv' },
     academic_year: { label: "O'quv yili",       href: '/academic-years', icon: Calendar,   section: 'Boshqaruv' },

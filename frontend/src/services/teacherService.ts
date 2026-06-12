@@ -58,9 +58,9 @@ export interface TeacherAssignedGroupsResponse {
 }
 
 export const teacherService = {
-    getTeachers: async (page = 1, limit = 10, full_name?: string) => {
+    getTeachers: async (page = 1, limit = 10, full_name?: string, kafedra_id?: number) => {
         const response = await api.get<TeacherListResponse>('/teacher/', {
-            params: { page, limit, full_name },
+            params: { page, limit, full_name, kafedra_id },
         });
         return response.data;
     },

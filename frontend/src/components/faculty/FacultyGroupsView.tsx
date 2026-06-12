@@ -16,9 +16,10 @@ interface FacultyGroupsViewProps {
     faculty: Faculty;
     onBack: () => void;
     onOpenGroup: (group: Group) => void;
+    hideHeader?: boolean;
 }
 
-export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup }: FacultyGroupsViewProps) => {
+export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup, hideHeader }: FacultyGroupsViewProps) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -39,19 +40,22 @@ export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup }: FacultyGroup
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-2">
-                    <Crumbs items={[
-                        { label: 'Fakultetlar', onClick: onBack },
-                        { label: faculty.name },
-                    ]} />
-                    <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Orqaga
-                        </Button>
-                        <h1 className="text-xl font-semibold tracking-tight capitalize">{faculty.name} — guruhlar</h1>
+                {!hideHeader && (
+                    <div className="space-y-2">
+                        <Crumbs items={[
+                            { label: 'Fakultetlar', onClick: onBack },
+                            { label: faculty.name },
+                        ]} />
+                        <div className="flex items-center gap-3">
+                            <Button variant="ghost" size="sm" onClick={onBack}>
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Orqaga
+                            </Button>
+                            <h1 className="text-xl font-semibold tracking-tight capitalize">{faculty.name} — guruhlar</h1>
+                        </div>
                     </div>
-                </div>
+                )}
+                {hideHeader && <div />}
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input

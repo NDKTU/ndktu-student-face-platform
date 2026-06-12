@@ -6,15 +6,15 @@ import type { ProctoringMode } from '@/services/quizService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { 
-    Loader2, 
-    PlayCircle, 
-    ChevronLeft, 
-    ChevronRight, 
-    CheckCircle, 
-    XCircle, 
-    Trophy, 
-    Clock, 
+import {
+    Loader2,
+    PlayCircle,
+    ChevronLeft,
+    ChevronRight,
+    CheckCircle,
+    XCircle,
+    Trophy,
+    Clock,
     ArrowLeft,
     AlertTriangle
 } from 'lucide-react';
@@ -177,7 +177,7 @@ const QuizTestPage = () => {
             },
             onError: (error: any) => {
                 console.error('Failed to submit quiz', error);
-                
+
                 // If it was a cheating submission, we still want to show the results phase
                 // even if the backend call failed (e.g., due to duplicate submission)
                 if (isCurrentlyCheating) {
@@ -195,7 +195,7 @@ const QuizTestPage = () => {
                 }
             }
         });
-    // Bug#4 fix: added cheatingImageUrl to dependency list to avoid stale closure
+        // Bug#4 fix: added cheatingImageUrl to dependency list to avoid stale closure
     }, [quizData, answers, user, endQuizMutation, cheatingDetected, cheatingReason, cheatingImageUrl]);
 
     // Timer — Bug#12 fix: use a ref to prevent duplicate submit on cheating race condition
@@ -542,7 +542,7 @@ const QuizTestPage = () => {
                         </p>
                     </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                     {isAdmin && (
                         <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">

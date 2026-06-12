@@ -13,14 +13,17 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 import type { Group } from '@/services/groupService';
 import type { Student } from '@/services/studentService';
 import { FacultyModal } from '@/components/faculty/FacultyModal';
-import { FacultyGroupsView } from '@/components/faculty/FacultyGroupsView';
+import { FacultyDetailsView } from '@/components/faculty/FacultyDetailsView';
+import { KafedraTeachersView } from '@/components/faculty/KafedraTeachersView';
 import { GroupStudentsView } from '@/components/faculty/GroupStudentsView';
 import { StudentDetailView } from '@/components/faculty/StudentDetailView';
+import type { Kafedra } from '@/services/kafedraService';
 
 type View =
     | { level: 'faculties' }
-    | { level: 'groups'; faculty: Faculty }
-    | { level: 'students'; faculty: Faculty; group: Group }
+    | { level: 'faculty-details'; faculty: Faculty }
+    | { level: 'kafedra-teachers'; faculty: Faculty; kafedra: Kafedra }
+    | { level: 'group-students'; faculty: Faculty; group: Group }
     | { level: 'student-detail'; faculty: Faculty; group: Group; student: Student };
 
 const FacultyPage = () => {
@@ -100,22 +103,33 @@ const FacultyPage = () => {
         }
     };
 
-    if (view.level === 'groups') {
+    if (view.level === 'faculty-details') {
         return (
-            <FacultyGroupsView
+            <FacultyDetailsView
                 faculty={view.faculty}
                 onBack={() => setView({ level: 'faculties' })}
-                onOpenGroup={(group) => setView({ level: 'students', faculty: view.faculty, group })}
+                onOpenKafedra={(kafedra) => setView({ level: 'kafedra-teachers', faculty: view.faculty, kafedra })}
+                onOpenGroup={(group) => setView({ level: 'group-students', faculty: view.faculty, group })}
             />
         );
     }
-    if (view.level === 'students') {
+    if (view.level === 'kafedra-teachers') {
+        return (
+            <KafedraTeachersView
+                faculty={view.faculty}
+                kafedra={view.kafedra}
+                onBackToFaculty={() => setView({ level: 'faculty-details', faculty: view.faculty })}
+                onBackToFaculties={() => setView({ level: 'faculties' })}
+            />
+        );
+    }
+    if (view.level === 'group-students') {
         return (
             <GroupStudentsView
                 faculty={view.faculty}
                 group={view.group}
                 onBackToFaculties={() => setView({ level: 'faculties' })}
-                onBackToGroups={() => setView({ level: 'groups', faculty: view.faculty })}
+                onBackToGroups={() => setView({ level: 'faculty-details', faculty: view.faculty })}
                 onOpenStudent={(student) => setView({ level: 'student-detail', faculty: view.faculty, group: view.group, student })}
             />
         );
@@ -127,8 +141,8 @@ const FacultyPage = () => {
                 group={view.group}
                 student={view.student}
                 onBackToFaculties={() => setView({ level: 'faculties' })}
-                onBackToGroups={() => setView({ level: 'groups', faculty: view.faculty })}
-                onBackToStudents={() => setView({ level: 'students', faculty: view.faculty, group: view.group })}
+                onBackToGroups={() => setView({ level: 'faculty-details', faculty: view.faculty })}
+                onBackToStudents={() => setView({ level: 'group-students', faculty: view.faculty, group: view.group })}
             />
         );
     }
@@ -180,7 +194,7 @@ const FacultyPage = () => {
                                     <TableRow
                                         key={faculty.id}
                                         className="cursor-pointer"
-                                        onClick={() => setView({ level: 'groups', faculty })}
+                                        onClick={() => setView({ level: 'faculty-details', faculty })}
                                     >
                                         <TableCell>{faculty.id}</TableCell>
                                         <TableCell className="font-medium capitalize">{faculty.name}</TableCell>

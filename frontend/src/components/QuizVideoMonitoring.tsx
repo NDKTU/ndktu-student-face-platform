@@ -80,15 +80,14 @@ export function QuizVideoMonitoring({
             <video ref={videoRef} className="hidden" playsInline muted autoPlay />
 
             <div className={`relative transition-all duration-500 ease-in-out transform ${(state.isActive || hasError) ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
-                
+
                 {/* Futuristic HUD Scanner Circle */}
-                <div className={`relative w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-500 backdrop-blur-md ${
-                    hasError ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]' :
-                    !state.isConnected ? 'border-slate-300 text-slate-400 bg-slate-500/10 shadow-sm' :
-                    isIssue ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' :
-                    isOk ? 'border-green-500 text-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)]' :
-                    'border-primary/50 text-primary bg-primary/10 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
-                }`}>
+                <div className={`relative w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-500 backdrop-blur-md ${hasError ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]' :
+                        !state.isConnected ? 'border-slate-300 text-slate-400 bg-slate-500/10 shadow-sm' :
+                            isIssue ? 'border-red-500 text-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' :
+                                isOk ? 'border-green-500 text-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)]' :
+                                    'border-primary/50 text-primary bg-primary/10 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+                    }`}>
                     {/* Scanner scanline animation */}
                     {state.isConnected && !hasError && (
                         <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
@@ -124,7 +123,7 @@ export function QuizVideoMonitoring({
                                 <p className="text-xs font-black uppercase tracking-wider text-red-400">Ogohlantirish {warnings} / 3</p>
                                 <p className="text-[11px] leading-relaxed text-red-200 mt-1">
                                     {state.lastFaceCount > 1 ? 'Ekranda begona shaxs aniqlandi!' : 'Shaxsingizni tasdiqlashda xatolik!'}
-                                    <br/>
+                                    <br />
                                     <span className="font-semibold text-white">Diqqat! 3 ta ogohlantirishdan so'ng test avtomatik to'xtatiladi.</span>
                                 </p>
                             </div>
