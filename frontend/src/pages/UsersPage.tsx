@@ -23,6 +23,7 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useAssignRoles }
 import { useRoles } from '@/hooks/useReferenceData';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageTabs } from '@/components/ui/PageTabs';
 
 const userSchema = z.object({
     username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -31,6 +32,13 @@ const userSchema = z.object({
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
+
+const USER_TABS = [
+    { label: 'Tizim foydalanuvchilari', href: '/users' },
+    { label: 'Talabalar', href: '/students' },
+    { label: "O'qituvchilar", href: '/teachers' },
+    { label: 'Tyutorlar', href: '/tutors' },
+];
 
 const UsersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -104,6 +112,7 @@ const UsersPage = () => {
 
     return (
         <div className="space-y-6">
+            <PageTabs tabs={USER_TABS} />
             {/* Page header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>

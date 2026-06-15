@@ -11,12 +11,18 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { labelFor, parsePermission } from '@/constants/resources';
+import { PageTabs } from '@/components/ui/PageTabs';
 
 const permissionSchema = z.object({
     name: z.string().min(1, 'Permission name is required'),
 });
 
 type PermissionFormValues = z.infer<typeof permissionSchema>;
+
+const ACCESS_TABS = [
+    { label: 'Rollar', href: '/roles' },
+    { label: 'Ruxsatlar', href: '/permissions' },
+];
 
 const PermissionsPage = () => {
     const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -91,6 +97,7 @@ const PermissionsPage = () => {
 
     return (
         <div className="space-y-6">
+            <PageTabs tabs={ACCESS_TABS} />
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">Ruxsatlar</h1>

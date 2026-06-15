@@ -24,6 +24,14 @@ import { HemisImportModal } from '@/components/HemisImportModal';
 import { ChangeGroupModal } from '@/components/ChangeGroupModal';
 import { StudentMovementsModal } from '@/components/StudentMovementsModal';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageTabs } from '@/components/ui/PageTabs';
+
+const USER_TABS = [
+    { label: 'Tizim foydalanuvchilari', href: '/users' },
+    { label: 'Talabalar', href: '/students' },
+    { label: "O'qituvchilar", href: '/teachers' },
+    { label: 'Tyutorlar', href: '/tutors' },
+];
 
 const StudentsPage = () => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -96,6 +104,7 @@ const StudentsPage = () => {
 
     return (
         <div className="space-y-6">
+            <PageTabs tabs={USER_TABS} />
             {/* Page header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>

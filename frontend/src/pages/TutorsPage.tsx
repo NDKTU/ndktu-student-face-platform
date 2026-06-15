@@ -35,6 +35,7 @@ import type {
     TutorUpdateRequest,
 } from '@/services/tutorService';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageTabs } from '@/components/ui/PageTabs';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,13 @@ const tutorUpdateSchema = z.object({
 
 type TutorCreateFormValues = z.infer<typeof tutorCreateSchema>;
 type TutorUpdateFormValues = z.infer<typeof tutorUpdateSchema>;
+
+const USER_TABS = [
+    { label: 'Tizim foydalanuvchilari', href: '/users' },
+    { label: 'Talabalar', href: '/students' },
+    { label: "O'qituvchilar", href: '/teachers' },
+    { label: 'Tyutorlar', href: '/tutors' },
+];
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
@@ -131,6 +139,7 @@ const TutorsPage = () => {
 
     return (
         <div className="space-y-6">
+            <PageTabs tabs={USER_TABS} />
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">Tyutorlar</h1>
