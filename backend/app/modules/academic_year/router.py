@@ -16,6 +16,8 @@ from .schemas import (
     AcademicYearListResponse,
     AcademicYearResponse,
     AcademicYearUpdateRequest,
+    SemesterUpdateRequest,
+    SemesterResponse
 )
 
 if TYPE_CHECKING:
@@ -86,3 +88,17 @@ async def delete_year(
     _: "User" = Depends(PermissionRequired("delete:academic_year")),
 ):
     await get_academic_year_repository.delete_year(session=session, year_id=year_id)
+
+
+@router.put(
+    "/semester/{semester_id}",
+    response_model=SemesterResponse,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def update_semester(
+    semester_id: int,
+    data: SemesterUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:academic_year")),
+):
+    return await get_academic_year_repository.update_semester(session=session, semester_id=semester_id, data=data)

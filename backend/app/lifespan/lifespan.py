@@ -12,12 +12,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    redis = aioredis.from_url(settings.redis.url, encoding="utf8", decode_responses=True)
+    from core.redis_client import redis_client
 
     try:
         # Verify connection
-        await redis.ping()
+        await redis_client.ping()
         logger.info("Successfully connected to Redis")
 
         # Initialize Database Data (Roles & Permissions)
@@ -26,7 +25,7 @@ async def lifespan(app: FastAPI):
 
             await init_db(app, session)
 
-        await FastAPILimiter.init(redis)
+        await FastAPILimiter.init(redis_client)
         logger.info("Initialized FastAPILimiter")
 
     except Exception as e:
@@ -39,5 +38,5 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    await redis.close()
+    await redis_client.close()
     logger.info("Closed Redis connection")

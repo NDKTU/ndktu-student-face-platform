@@ -9,7 +9,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    pass
+    from app.modules.quiz.models.quiz import Quiz
 
 
 class AcademicYear(Base, IdIntPk, TimestampMixin):
@@ -38,8 +38,13 @@ class Semester(Base, IdIntPk, TimestampMixin):
     number: Mapped[int] = mapped_column(Integer, nullable=False)
     start_date: Mapped[date_type] = mapped_column(Date, nullable=False)
     end_date: Mapped[date_type] = mapped_column(Date, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     academic_year: Mapped["AcademicYear"] = relationship("AcademicYear", back_populates="semesters")
+    
+    quizzes: Mapped[list["Quiz"]] = relationship(
+        "Quiz", back_populates="semester", cascade="all, delete-orphan"
+    )
 
     def __str__(self):
         return f"{self.academic_year_id}-{self.number}"

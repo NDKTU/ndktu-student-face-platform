@@ -3,6 +3,7 @@ import {
     academicYearService,
     type AcademicYearCreateRequest,
     type AcademicYearUpdateRequest,
+    type SemesterUpdateRequest,
 } from '@/services/academicYearService';
 
 export const useAcademicYears = (
@@ -48,5 +49,18 @@ export const useDeleteAcademicYear = () => {
     return useMutation({
         mutationFn: (id: number) => academicYearService.delete(id),
         onSuccess: () => qc.invalidateQueries({ queryKey: ['academic-years'] }),
+    });
+};
+
+export const useUpdateSemester = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: SemesterUpdateRequest }) =>
+            academicYearService.updateSemester(id, data),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['academic-years'] });
+            // Might need to invalidate specific academic year as well if we had its ID,
+            // but invalidating all list is fine.
+        },
     });
 };

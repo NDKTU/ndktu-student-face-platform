@@ -6,6 +6,7 @@ export interface Semester {
     number: number;
     start_date: string;
     end_date: string;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -39,11 +40,17 @@ export interface AcademicYearCreateRequest {
     start_date: string;
     end_date: string;
     is_active?: boolean;
-    semesters: SemesterCreateRequest[];
+    semesters?: SemesterCreateRequest[];
 }
 
 export interface AcademicYearUpdateRequest {
     name?: string;
+    start_date?: string;
+    end_date?: string;
+    is_active?: boolean;
+}
+
+export interface SemesterUpdateRequest {
     start_date?: string;
     end_date?: string;
     is_active?: boolean;
@@ -68,5 +75,9 @@ export const academicYearService = {
     },
     delete: async (id: number) => {
         await api.delete(`/academic-year/${id}`);
+    },
+    updateSemester: async (semesterId: number, data: SemesterUpdateRequest) => {
+        const response = await api.put<Semester>(`/academic-year/semester/${semesterId}`, data);
+        return response.data;
     },
 };

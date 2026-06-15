@@ -11,6 +11,7 @@ import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
+import { useAcademicYears } from '@/hooks/useAcademicYear';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import type { Teacher } from '@/services/teacherService';
 import { quizSchema, type QuizFormValues } from '@/schemas/quiz';
@@ -86,6 +87,20 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         label: t.full_name,
     }));
 
+    const { data: academicYearsData } = useAcademicYears(undefined, isOpen);
+    
+    const semesterOptions = academicYearsData?.years
+        ?.flatMap(year => year.semesters.map(semester => ({
+            value: semester.id.toString(),
+            label: `${year.name} - ${semester.number}-semestr`,
+            isActive: semester.is_active,
+        })))
+        // Optional: sort active first or label them
+        .map(opt => ({
+            ...opt,
+            label: opt.isActive ? `★ ${opt.label} (Faol)` : opt.label,
+        })) || [];
+
     useEffect(() => {
         if (!isOpen) return;
         if (quiz) {
@@ -97,10 +112,30 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 user_id: quiz.user_id ? quiz.user_id.toString() : '',
                 group_id: quiz.group_id ? quiz.group_id.toString() : '',
                 subject_id: quiz.subject_id ? quiz.subject_id.toString() : '',
+                semester_id: quiz.semester_id ? quiz.semester_id.toString() : '',
                 is_active: quiz.is_active,
                 proctoring_mode: quiz.proctoring_mode ?? 'standard',
             });
         } else {
+            // Find semester matching current date, fallback to active semester
+            const today = new Date();
+            let defaultSemester = semesterOptions.find(opt => {
+                const year = academicYearsData?.years.find(y => 
+                    y.semesters.some(s => s.id.toString() === opt.value)
+                );
+                const semester = year?.semesters.find(s => s.id.toString() === opt.value);
+                if (semester && semester.start_date && semester.end_date) {
+                    const start = new Date(semester.start_date);
+                    const end = new Date(semester.end_date);
+                    return today >= start && today <= end;
+                }
+                return false;
+            });
+            
+            if (!defaultSemester) {
+                defaultSemester = semesterOptions.find(opt => opt.isActive);
+            }
+
             reset({
                 title: '',
                 question_number: '10',
@@ -109,11 +144,12 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 user_id: isTeacher && user?.id ? user.id.toString() : '',
                 group_id: '',
                 subject_id: '',
+                semester_id: defaultSemester ? defaultSemester.value : '',
                 is_active: false,
                 proctoring_mode: 'standard',
             });
         }
-    }, [quiz, reset, isOpen, isTeacher, user]);
+    }, [quiz, reset, isOpen, isTeacher, user, academicYearsData]);
 
     useEffect(() => {
         if (isOpen && !quiz && !isTeacher) {
@@ -135,6 +171,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             user_id: resolvedUserId,
             group_id: data.group_id && data.group_id !== '' ? parseInt(data.group_id, 10) : null,
             subject_id: data.subject_id && data.subject_id !== '' ? parseInt(data.subject_id, 10) : null,
+            semester_id: data.semester_id && data.semester_id !== '' ? parseInt(data.semester_id, 10) : null,
             is_active: data.is_active,
             proctoring_mode: data.proctoring_mode,
         };
@@ -281,6 +318,24 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         )}
                     />
                     {errors.group_id && <p className="text-sm text-red-500">{errors.group_id.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Semestr</label>
+                    <Controller
+                        name="semester_id"
+                        control={control}
+                        render={({ field }) => (
+                            <Combobox
+                                options={semesterOptions}
+                                value={field.value || ''}
+                                onChange={field.onChange}
+                                placeholder="Semestrni tanlang (Majburiy emas)"
+                                searchPlaceholder="Qidirish..."
+                            />
+                        )}
+                    />
+                    {errors.semester_id && <p className="text-sm text-red-500">{errors.semester_id.message}</p>}
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">

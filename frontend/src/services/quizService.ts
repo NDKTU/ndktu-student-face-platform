@@ -11,6 +11,7 @@ export interface Quiz {
     user_id?: number;
     group_id?: number;
     subject_id?: number;
+    semester_id?: number;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
     attempt?: number | null;
@@ -26,6 +27,7 @@ export interface QuizCreateRequest {
     user_id?: number | null;
     group_id?: number | null;
     subject_id?: number | null;
+    semester_id?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
     attempt?: number | null;

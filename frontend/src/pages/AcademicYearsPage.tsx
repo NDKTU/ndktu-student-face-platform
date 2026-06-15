@@ -11,6 +11,7 @@ import {
     useCreateAcademicYear,
     useUpdateAcademicYear,
     useDeleteAcademicYear,
+    useUpdateSemester,
 } from '@/hooks/useAcademicYear';
 import type { AcademicYear } from '@/services/academicYearService';
 
@@ -22,6 +23,7 @@ export default function AcademicYearsPage() {
     const createMut = useCreateAcademicYear();
     const updateMut = useUpdateAcademicYear();
     const deleteMut = useDeleteAcademicYear();
+    const updateSemesterMut = useUpdateSemester();
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<AcademicYear | null>(null);
@@ -34,19 +36,33 @@ export default function AcademicYearsPage() {
     const [sem2Start, setSem2Start] = useState('');
     const [sem2End, setSem2End] = useState('');
     const [formError, setFormError] = useState('');
+    
+    // Semester editing state
+    const [editSemesterModalOpen, setEditSemesterModalOpen] = useState(false);
+    const [editingSemester, setEditingSemester] = useState<{id: number, number: number, start_date: string, end_date: string, is_active: boolean} | null>(null);
+    const [semesterFormError, setSemesterFormError] = useState('');
 
     const [deleteTarget, setDeleteTarget] = useState<AcademicYear | null>(null);
 
     const openCreate = () => {
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11
+        
+        // If it's before August (month 7), the current academic year is (currentYear-1)-(currentYear).
+        // If it's August or later, it's (currentYear)-(currentYear+1)
+        const startYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+        const endYear = startYear + 1;
+        
         setEditing(null);
-        setName('');
-        setStartDate('');
-        setEndDate('');
+        setName(`${startYear}-${endYear}`);
+        setStartDate(`${startYear}-09-01`);
+        setEndDate(`${endYear}-06-30`);
         setIsActive(false);
-        setSem1Start('');
-        setSem1End('');
-        setSem2Start('');
-        setSem2End('');
+        setSem1Start(`${startYear}-09-01`);
+        setSem1End(`${startYear + 1}-01-31`);
+        setSem2Start(`${startYear + 1}-02-01`);
+        setSem2End(`${endYear}-06-30`);
         setFormError('');
         setModalOpen(true);
     };
@@ -59,6 +75,35 @@ export default function AcademicYearsPage() {
         setIsActive(y.is_active);
         setFormError('');
         setModalOpen(true);
+    };
+
+    const openEditSemester = (s: {id: number, number: number, start_date: string, end_date: string, is_active: boolean}) => {
+        setEditingSemester(s);
+        setSemesterFormError('');
+        setEditSemesterModalOpen(true);
+    };
+
+    const handleSemesterSubmit = () => {
+        if (!editingSemester) return;
+        if (!editingSemester.start_date || !editingSemester.end_date) {
+            setSemesterFormError('Sanalarni kiriting');
+            return;
+        }
+
+        updateSemesterMut.mutate(
+            {
+                id: editingSemester.id,
+                data: {
+                    start_date: editingSemester.start_date,
+                    end_date: editingSemester.end_date,
+                    is_active: editingSemester.is_active
+                }
+            },
+            {
+                onSuccess: () => setEditSemesterModalOpen(false),
+                onError: () => setSemesterFormError('Xatolik yuz berdi')
+            }
+        );
     };
 
     const handleSubmit = () => {
@@ -178,11 +223,42 @@ export default function AcademicYearsPage() {
                                 </div>
                                 <div className="space-y-1 pt-1">
                                     {y.semesters.map((s) => (
-                                        <div key={s.id} className="text-xs flex justify-between">
-                                            <span className="text-muted-foreground">{s.number}-semestr</span>
-                                            <span>
-                                                {s.start_date} — {s.end_date}
-                                            </span>
+                                        <div key={s.id} className="text-xs flex items-center justify-between py-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground font-medium">{s.number}-semestr</span>
+                                                {s.is_active && (
+                                                    <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[9px] font-bold text-green-600 uppercase">
+                                                        Faol
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span>
+                                                    {s.start_date} — {s.end_date}
+                                                </span>
+                                                {isAdmin && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => openEditSemester(s)}
+                                                            className="rounded p-1 text-muted-foreground hover:bg-accent"
+                                                            title="Semestrni tahrirlash"
+                                                        >
+                                                            <Pencil className="h-3 w-3" />
+                                                        </button>
+                                                        {!s.is_active && (
+                                                            <Button 
+                                                                variant="outline" 
+                                                                size="sm" 
+                                                                className="h-6 text-[10px] px-2 bg-secondary/50 hover:bg-secondary"
+                                                                onClick={() => updateSemesterMut.mutate({ id: s.id, data: { is_active: true }})}
+                                                                disabled={updateSemesterMut.isPending}
+                                                            >
+                                                                Faollashtirish
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                     {y.semesters.length === 0 && (
@@ -270,6 +346,43 @@ export default function AcademicYearsPage() {
                         <Button onClick={handleSubmit} disabled={isPending}>
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {editing ? 'Saqlash' : "Qo'shish"}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={editSemesterModalOpen}
+                onClose={() => setEditSemesterModalOpen(false)}
+                title={`${editingSemester?.number || 1}-semestrni tahrirlash`}
+            >
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-sm font-medium block mb-1">Boshlanish</label>
+                            <Input 
+                                type="date" 
+                                value={editingSemester?.start_date || ''} 
+                                onChange={(e) => setEditingSemester(prev => prev ? {...prev, start_date: e.target.value} : null)} 
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium block mb-1">Tugash</label>
+                            <Input 
+                                type="date" 
+                                value={editingSemester?.end_date || ''} 
+                                onChange={(e) => setEditingSemester(prev => prev ? {...prev, end_date: e.target.value} : null)} 
+                            />
+                        </div>
+                    </div>
+                    {semesterFormError && <p className="text-sm text-destructive">{semesterFormError}</p>}
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setEditSemesterModalOpen(false)} disabled={updateSemesterMut.isPending}>
+                            Bekor qilish
+                        </Button>
+                        <Button onClick={handleSemesterSubmit} disabled={updateSemesterMut.isPending}>
+                            {updateSemesterMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Saqlash
                         </Button>
                     </div>
                 </div>

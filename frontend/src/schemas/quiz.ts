@@ -14,6 +14,7 @@ export const quizSchema = z.object({
     user_id: z.string().optional(),
     group_id: z.string().optional(),
     subject_id: z.string().optional(),
+    semester_id: z.string().optional(),
     is_active: z.boolean(),
     proctoring_mode: z.enum(['face', 'standard']),
 });

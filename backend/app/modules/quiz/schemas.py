@@ -14,6 +14,7 @@ class QuizCreateRequest(BaseModel):
     user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    semester_id: Optional[int] = None
     is_active: bool = False
     proctoring_mode: ProctoringMode = "standard"
 
@@ -37,6 +38,7 @@ class QuizCreateResponse(BaseModel):
     user_id: Optional[int]
     group_id: Optional[int]
     subject_id: Optional[int]
+    semester_id: Optional[int]
     created_at: datetime
     updated_at: datetime
 
@@ -50,6 +52,7 @@ class QuizListRequest(BaseModel):
     user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    semester_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None
 

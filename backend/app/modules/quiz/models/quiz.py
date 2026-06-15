@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.modules.subject.models.subject import Subject
     from app.modules.user.models.user import User
     from app.modules.user_answers.model import UserAnswers
+    from app.modules.academic_year.model import Semester
 
 
 class Quiz(Base, IdIntPk, TimestampMixin):
@@ -31,6 +32,10 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         ForeignKey("subjects.id", ondelete="SET NULL"),
         nullable=True,
     )
+    semester_id: Mapped[int | None] = mapped_column(
+        ForeignKey("semesters.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     title: Mapped[str] = mapped_column(nullable=False)
     question_number: Mapped[int] = mapped_column(nullable=False)
@@ -45,6 +50,8 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     group: Mapped["Group"] = relationship("Group", back_populates="quizzes")
 
     subject: Mapped["Subject"] = relationship("Subject", back_populates="quizzes")
+    
+    semester: Mapped["Semester"] = relationship("Semester", back_populates="quizzes")
 
     quiz_questions: Mapped[list["QuizQuestion"]] = relationship(
         "QuizQuestion",
@@ -73,3 +80,4 @@ class Quiz(Base, IdIntPk, TimestampMixin):
             "title": self.title,
             "questions": [qq.question.to_dict() for qq in self.quiz_questions],
         }
+

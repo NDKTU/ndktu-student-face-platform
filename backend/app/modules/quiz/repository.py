@@ -26,6 +26,31 @@ logger = logging.getLogger(__name__)
 
 class QuizRepository:
     async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest) -> Quiz:
+        # If no semester is provided, auto-calculate from current date
+        semester_id = data.semester_id
+        if not semester_id:
+            from datetime import date
+            from app.modules.academic_year.models import Semester, AcademicYear
+            today = date.today()
+            
+            # Find a semester where today falls between start_date and end_date
+            stmt = select(Semester).join(AcademicYear).where(
+                Semester.start_date <= today,
+                Semester.end_date >= today
+            ).order_by(Semester.is_active.desc()).limit(1)
+            
+            res = await session.execute(stmt)
+            active_semester = res.scalar_one_or_none()
+            
+            # Fallback to the globally active semester if today doesn't match any dates
+            if not active_semester:
+                fallback_stmt = select(Semester).where(Semester.is_active == True).limit(1)
+                res_fallback = await session.execute(fallback_stmt)
+                active_semester = res_fallback.scalar_one_or_none()
+                
+            if active_semester:
+                semester_id = active_semester.id
+
         new_quiz = Quiz(
             title=data.title,
             question_number=data.question_number,
@@ -36,6 +61,7 @@ class QuizRepository:
             user_id=data.user_id,
             group_id=data.group_id,
             subject_id=data.subject_id,
+            semester_id=semester_id,
         )
         session.add(new_quiz)
 
@@ -100,11 +126,19 @@ class QuizRepository:
 
         # Students always see quizzes for their group — even if they also have a Teacher role
         if is_student:
+            from app.modules.academic_year.model import AcademicYear, Semester
+            
+            stmt = stmt.join(Quiz.semester).join(Semester.academic_year)
+            
             student_stmt = select(Student.group_id).where(Student.user_id == current_user.id)
             student_result = await session.execute(student_stmt)
             student_group_id = student_result.scalar_one_or_none()
             if student_group_id:
-                stmt = stmt.where(Quiz.group_id == student_group_id)
+                stmt = stmt.where(
+                    Quiz.group_id == student_group_id,
+                    Semester.is_active == True,
+                    AcademicYear.is_active == True
+                )
             else:
                 stmt = stmt.where(Quiz.id == -1)  # no group → no quizzes
 
@@ -165,8 +199,13 @@ class QuizRepository:
         count_stmt = select(func.count()).select_from(Quiz)
 
         if is_student:
+            from app.modules.academic_year.model import AcademicYear, Semester
             if student_group_id:
-                count_stmt = count_stmt.where(Quiz.group_id == student_group_id)
+                count_stmt = count_stmt.join(Quiz.semester).join(Semester.academic_year).where(
+                    Quiz.group_id == student_group_id,
+                    Semester.is_active == True,
+                    AcademicYear.is_active == True
+                )
             else:
                 count_stmt = count_stmt.where(Quiz.id == -1)
         elif is_teacher and teacher_filter is not None:
@@ -205,6 +244,8 @@ class QuizRepository:
         quiz.user_id = data.user_id
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
+        if data.semester_id is not None:
+            quiz.semester_id = data.semester_id
 
         await session.commit()
         await session.refresh(quiz)
@@ -266,6 +307,7 @@ class QuizRepository:
             user_id=quiz.user_id,
             group_id=quiz.group_id,
             subject_id=quiz.subject_id,
+            semester_id=quiz.semester_id,
             attempt=2,
         )
         session.add(new_quiz)

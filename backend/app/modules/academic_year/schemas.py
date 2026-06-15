@@ -17,10 +17,17 @@ class SemesterResponse(BaseModel):
     number: int
     start_date: date_type
     end_date: date_type
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SemesterUpdateRequest(BaseModel):
+    start_date: Optional[date_type] = None
+    end_date: Optional[date_type] = None
+    is_active: Optional[bool] = None
 
 
 class AcademicYearCreateRequest(BaseModel):
