@@ -54,7 +54,7 @@ export const Login: React.FC = () => {
         try {
             setError(null);
             const response = await api.post('/user/login', data);
-            await login(response.data.access_token, response.data.refresh_token);
+            await login(response.data.access_token);
             navigate(from, { replace: true });
         } catch (err: any) {
             console.error(err);
@@ -70,7 +70,7 @@ export const Login: React.FC = () => {
         try {
             setError(null);
             const response = await hemisService.login(data);
-            await login(response.access_token, response.refresh_token);
+            await login(response.access_token);
             navigate(from, { replace: true });
         } catch (err: any) {
             console.error(err);

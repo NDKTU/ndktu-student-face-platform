@@ -9,7 +9,7 @@ interface AuthContextType {
     permissions: ReadonlySet<string>;
     hasPermission: (name: string) => boolean;
     hasAnyPermission: (...names: string[]) => boolean;
-    login: (token: string, refreshToken: string) => Promise<void>;
+    login: (token: string) => Promise<void>;
     logout: () => void;
     refreshMe: () => Promise<void>;
 }
@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (token) {
             fetchUser();
         } else {
@@ -53,12 +53,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // and on a 60s interval so that admin updates propagate without re-login.
     useEffect(() => {
         const onForbidden = () => {
-            if (localStorage.getItem('token')) fetchUser();
+            if (sessionStorage.getItem('token')) fetchUser();
         };
         window.addEventListener('app:refresh-me', onForbidden);
 
         const interval = setInterval(() => {
-            if (localStorage.getItem('token')) fetchUser();
+            if (sessionStorage.getItem('token')) fetchUser();
         }, 60_000);
 
         const onForbiddenToast = () => {
@@ -74,15 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
-    const login = async (token: string, refreshToken: string) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('refresh_token', refreshToken);
+    const login = async (token: string) => {
+        sessionStorage.setItem('token', token);
         await fetchUser();
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('token');
         setUser(null);
         // Bug#14 fix: always clear loading state on explicit logout
         setIsLoading(false);

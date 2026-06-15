@@ -14,7 +14,6 @@ class HemisLoginRequest(BaseModel):
 class HemisLoginResponse(BaseModel):
     type: str = "Bearer"
     access_token: str
-    refresh_token: str
 
 
 class HemisTransactionResponse(BaseModel):

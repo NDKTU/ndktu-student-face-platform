@@ -199,4 +199,3 @@ class UserLoginRequest(BaseModel):
 class UserLoginResponse(BaseModel):
     type: str = "Bearer"
     access_token: str
-    refresh_token: str

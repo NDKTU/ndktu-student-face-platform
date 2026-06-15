@@ -38,20 +38,20 @@ class UserService:
             )
         return parts[1].strip()
 
-    async def create_session_tokens(self, user_id: int) -> tuple[str, str]:
-        """Creates access/refresh tokens with a unique session_id and registers them in Redis."""
+    async def create_session_token(self, user_id: int) -> str:
+        """Creates access token with a unique jti and registers it in Redis."""
         import uuid
-        session_id = str(uuid.uuid4())
-        access_token = self.create_access_token({"user_id": user_id, "session_id": session_id})
-        refresh_token = self.create_refresh_token({"user_id": user_id, "session_id": session_id})
+        jti = str(uuid.uuid4())
+        access_token = self.create_access_token({"user_id": user_id, "jti": jti})
 
-        # Store session_id in Redis to enforce Single Active Session
+        # Store jti in Redis to enforce Single Active Session
+        # TTL is the same as the access token expiration
         await redis_client.set(
             f"user:session:{user_id}", 
-            session_id, 
-            ex=settings.jwt.refresh_token_expires_days * 86400
+            jti, 
+            ex=settings.jwt.access_token_expires_minutes * 60
         )
-        return access_token, refresh_token
+        return access_token
 
     async def login(self, session: AsyncSession, data: UserLoginRequest) -> UserLoginResponse:
         user = await self.get_user_by_username(session, data.username)
@@ -62,66 +62,20 @@ class UserService:
         if not verify_password(data.password, user.password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
 
-        access_token, refresh_token = await self.create_session_tokens(user.id)
+        access_token = await self.create_session_token(user.id)
 
-        return UserLoginResponse(type="Bearer", access_token=access_token, refresh_token=refresh_token)
-
-    async def refresh(self, session: AsyncSession, refresh_token: str) -> UserLoginResponse:
-        token = self._strip_bearer(refresh_token)
-        payload = self.token_decode(token, secret_key=settings.jwt.refresh_token_secret)
-
-        token_type = payload.get("type")
-        if token_type is not None and token_type != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Wrong token type (expected refresh)",
-            )
-            
-        user_id = payload["user_id"]
-        session_id = payload.get("session_id")
-        
-        # Verify session_id against Redis
-        if session_id:
-            stored_session_id = await redis_client.get(f"user:session:{user_id}")
-            if stored_session_id != session_id:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Boshqa qurilmadan profilga kirilgan. Joriy sessiya yakunlandi."
-                )
-
-        user = await self.get_user_by_id(session, user_id)
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-            )
-
-        # Keep the same session_id during refresh
-        new_session_id = session_id or str(uuid.uuid4())
-        access_token = self.create_access_token({"user_id": user.id, "session_id": new_session_id})
-        new_refresh_token = self.create_refresh_token({"user_id": user.id, "session_id": new_session_id})
-        
-        await redis_client.set(
-            f"user:session:{user.id}", 
-            new_session_id, 
-            ex=settings.jwt.refresh_token_expires_days * 86400
-        )
-        
-        logger.info(f"Token refreshed for user_id={user.id}")
-
-        return UserLoginResponse(type="Bearer", access_token=access_token, refresh_token=new_refresh_token)
+        return UserLoginResponse(type="Bearer", access_token=access_token)
 
     async def get_current_user(self, session: AsyncSession, token: str) -> User:
         token = self._strip_bearer(token)
         payload = self.token_decode(token)
         user_id = payload["user_id"]
-        session_id = payload.get("session_id")
+        jti = payload.get("jti")
 
         # Single Active Session Check via Redis
-        if session_id:
-            stored_session_id = await redis_client.get(f"user:session:{user_id}")
-            if stored_session_id != session_id:
+        if jti:
+            stored_jti = await redis_client.get(f"user:session:{user_id}")
+            if stored_jti != jti:
                 logger.warning(f"User {user_id} session mismatch. Possibly logged in from another device.")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

@@ -42,7 +42,10 @@ import RolePermissionsPage from '@/pages/RolePermissionsPage';
 import PermissionsPage from '@/pages/PermissionsPage';
 
 
+import { useIdleTimeout } from '@/hooks/useIdleTimeout';
+
 const ProtectedRoute = () => {
+  useIdleTimeout();
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {

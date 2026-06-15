@@ -2,19 +2,6 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/env';
 
 const api = axios.create({
-    baseURL: API_BASE_URL, // Backend API base URL (e.g., http://localhost:8000/api)
-    timeout: 10000, // 10s — prevents indefinite hang when backend is unreachable (otherwise ProtectedRoute spinner sticks forever and the user never reaches /login)
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Bare axios instance used ONLY for the token-refresh call. It must NOT pass
-// through the auth interceptor, otherwise a 401 on /user/refresh would
-// recursively trigger another refresh, push the refresh into failedQueue, and
-// deadlock forever (symptom: infinite spinner on protected pages when both
-// tokens have expired).
-const refreshClient = axios.create({
     baseURL: API_BASE_URL,
     timeout: 10000,
     headers: {
@@ -24,7 +11,7 @@ const refreshClient = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -38,24 +25,9 @@ api.interceptors.request.use(
     }
 );
 
-let isRefreshing = false;
-let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
-
-const processQueue = (error: unknown, token: string | null = null) => {
-    failedQueue.forEach((prom) => {
-        if (error) {
-            prom.reject(error);
-        } else {
-            prom.resolve(token);
-        }
-    });
-    failedQueue = [];
-};
-
 let lastForbiddenAlert = 0;
 const notifyForbidden = () => {
     const now = Date.now();
-    // Throttle alerts so a single 403 doesn't spam the user
     if (now - lastForbiddenAlert < 3000) return;
     lastForbiddenAlert = now;
     window.dispatchEvent(new CustomEvent('app:forbidden'));
@@ -68,57 +40,17 @@ api.interceptors.response.use(
 
         if (error.response?.status === 403) {
             notifyForbidden();
-            // Re-fetch /user/me so stale frontend permissions get refreshed
             window.dispatchEvent(new CustomEvent('app:refresh-me'));
             return Promise.reject(error);
         }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
-            const refreshToken = localStorage.getItem('refresh_token');
-
-            if (!refreshToken) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('refresh_token');
-                window.location.href = '/login';
-                return Promise.reject(error);
-            }
-
-            if (isRefreshing) {
-                return new Promise((resolve, reject) => {
-                    failedQueue.push({ resolve, reject });
-                }).then((token) => {
-                    originalRequest.headers.Authorization = `Bearer ${token}`;
-                    return api(originalRequest);
-                }).catch((err) => Promise.reject(err));
-            }
-
             originalRequest._retry = true;
-            isRefreshing = true;
-
-            try {
-                const response = await refreshClient.post('/user/refresh', null, {
-                    headers: { Authorization: `Bearer ${refreshToken}` },
-                });
-                const newToken = response.data.access_token;
-                const newRefreshToken = response.data.refresh_token;
-
-                localStorage.setItem('token', newToken);
-                if (newRefreshToken) {
-                    localStorage.setItem('refresh_token', newRefreshToken);
-                }
-
-                processQueue(null, newToken);
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                return api(originalRequest);
-            } catch (refreshError) {
-                processQueue(refreshError, null);
-                localStorage.removeItem('token');
-                localStorage.removeItem('refresh_token');
-                window.location.href = '/login';
-                return Promise.reject(refreshError);
-            } finally {
-                isRefreshing = false;
-            }
+            
+            // Remove token and redirect on 401
+            sessionStorage.removeItem('token');
+            window.location.href = '/login';
+            return Promise.reject(error);
         }
 
         return Promise.reject(error);

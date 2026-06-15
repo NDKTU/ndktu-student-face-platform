@@ -42,7 +42,7 @@ class HemisLoginService:
 
         if user and user.password:
             if verify_password(data.password, user.password):
-                access_token, refresh_token = await auth_service.create_session_tokens(user.id)
+                access_token = await auth_service.create_session_token(user.id)
 
                 student_id = await student_repository.get_id_by_user_id(session, user.id)
                 await self._log_transaction(
@@ -55,7 +55,7 @@ class HemisLoginService:
                     ip_address=ip_address,
                     user_agent=user_agent,
                 )
-                return HemisLoginResponse(access_token=access_token, refresh_token=refresh_token)
+                return HemisLoginResponse(access_token=access_token)
             else:
                 logger.warning(
                     f"Local login failed for user {data.login} (password mismatch), attempting Hemis fallback."
@@ -128,7 +128,7 @@ class HemisLoginService:
         me_data = await self._fetch_hemis_data(data.login, data.password)
         user = await self.save_user_data(session, data.login, data.password, me_data)
 
-        access_token, refresh_token = await auth_service.create_session_tokens(user.id)
+        access_token = await auth_service.create_session_token(user.id)
 
         student_id = await student_repository.get_id_by_user_id(session, user.id)
         await self._log_transaction(
@@ -142,7 +142,7 @@ class HemisLoginService:
             user_agent=user_agent,
         )
 
-        return HemisLoginResponse(access_token=access_token, refresh_token=refresh_token)
+        return HemisLoginResponse(access_token=access_token)
 
     # ------------------------------------------------------------------ #
     #  ADMIN PREVIEW & SYNC
