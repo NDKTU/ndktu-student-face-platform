@@ -1,17 +1,22 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { userService } from '@/services/userService';
+import { getToken, clearToken } from '@/services/tokenStorage';
 
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 минут
+// 15 минут. Должно быть <= серверного session_idle_minutes (30 мин), чтобы клиент
+// выходил первым и мягко, до того как сервер инвалидирует скользящую сессию.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export function useIdleTimeout() {
   const navigate = useNavigate();
-  const idleTimer = useRef<NodeJS.Timeout | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Функция для очистки сессии и редиректа
   const handleLogout = useCallback(() => {
-    console.log('Выход из-за неактивности');
-    sessionStorage.removeItem('token');
-    
+    // Best-effort серверный отзыв сессии, затем очистка токена и редирект.
+    userService.logout().catch(() => { /* токен всё равно очищаем ниже */ });
+    clearToken();
+
     // Перенаправляем на логин с параметром, чтобы показать красивое сообщение
     navigate('/login?idle=1');
   }, [navigate]);
@@ -27,7 +32,7 @@ export function useIdleTimeout() {
 
   useEffect(() => {
     // Проверяем, залогинен ли пользователь (есть ли токен)
-    const token = sessionStorage.getItem('token');
+    const token = getToken();
     if (!token) return;
 
     // Запускаем таймер первый раз при монтировании компонента

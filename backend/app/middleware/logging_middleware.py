@@ -1,10 +1,10 @@
 import logging
 import time
 
-import jwt
-from core.config import settings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
+from app.modules.user.service import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -18,34 +18,21 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         start_time = time.time()
 
-        # Extract User Info
+        # Extract User Info (только для логирования: без enforce сессии и без продления TTL).
         user_info = "Anonymous"
         auth_header = request.headers.get("Authorization")
         if auth_header:
-            logger.debug(f"Auth header found: {auth_header[:10]}...")
-
             token = auth_header
             if token.startswith("Bearer "):
                 token = token.replace("Bearer ", "")
 
             try:
-                # Decode with verification using settings
-                payload = jwt.decode(
-                    token,
-                    settings.jwt.access_token_secret,
-                    algorithms=[settings.jwt.algorithm],
-                )
+                # Переиспользуем единый декодер; он бросает HTTPException на невалидном/истёкшем.
+                payload = auth_service.token_decode(token)
                 user_id = payload.get("user_id")
-
-                if user_id:
-                    user_info = f"User({user_id})"
-                    logger.debug(f"User extracted: {user_id}")
-                else:
-                    logger.debug(f"Token decoded but user_id missing. Payload keys: {list(payload.keys())}")
-
-            except jwt.PyJWTError as e:
+                user_info = f"User({user_id})" if user_id else "Anonymous"
+            except Exception:
                 user_info = "InvalidToken"
-                logger.debug(f"Token validation failed: {str(e)}")
         else:
             logger.debug("No Authorization header found")
 

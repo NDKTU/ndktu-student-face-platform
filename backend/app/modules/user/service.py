@@ -7,6 +7,7 @@ from core.config import settings
 from core.utils.password_hash import verify_password
 from core.redis_client import redis_client
 from fastapi import HTTPException, status
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
+    @staticmethod
+    def _session_key(user_id: int) -> str:
+        return f"user:session:{user_id}"
+
     @staticmethod
     def _strip_bearer(header_value: str) -> str:
         """Extract the raw JWT token from an ``Authorization`` header."""
@@ -40,18 +45,69 @@ class UserService:
 
     async def create_session_token(self, user_id: int) -> str:
         """Creates access token with a unique jti and registers it in Redis."""
-        import uuid
         jti = str(uuid.uuid4())
         access_token = self.create_access_token({"user_id": user_id, "jti": jti})
 
-        # Store jti in Redis to enforce Single Active Session
-        # TTL is the same as the access token expiration
-        await redis_client.set(
-            f"user:session:{user_id}", 
-            jti, 
-            ex=settings.jwt.access_token_expires_minutes * 60
-        )
+        # Store jti in Redis to enforce Single Active Session.
+        # TTL = скользящее idle-окно; продлевается при каждом запросе в validate_session.
+        try:
+            await redis_client.set(
+                self._session_key(user_id),
+                jti,
+                ex=settings.jwt.session_idle_minutes * 60,
+            )
+        except RedisError:
+            logger.exception("Redis unavailable while creating session for user %s", user_id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service temporarily unavailable",
+            )
         return access_token
+
+    async def validate_session(self, token: str) -> int:
+        """Decode the token, enforce Single Active Session and slide the idle TTL.
+
+        Единая точка проверки сессии для всех защищённых роутов. Возвращает user_id
+        или бросает 401 (невалидный токен / завершённая сессия) либо 503 (Redis недоступен).
+        """
+        token = self._strip_bearer(token)
+        payload = self.token_decode(token)
+        user_id = payload.get("user_id")
+        jti = payload.get("jti")
+
+        if user_id is None or not jti:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+
+        try:
+            stored_jti = await redis_client.get(self._session_key(user_id))
+            if stored_jti != jti:
+                # Ключ отсутствует (logout / idle-expire) или захвачен другим устройством.
+                logger.warning("User %s session invalid (logout/idle or another device).", user_id)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Boshqa qurilmadan profilga kirilgan. Joriy sessiya yakunlandi.",
+                )
+            # Скользящий idle-таймаут: продлеваем TTL на каждом аутентифицированном запросе.
+            await redis_client.expire(self._session_key(user_id), settings.jwt.session_idle_minutes * 60)
+        except RedisError:
+            logger.exception("Redis unavailable while validating session for user %s", user_id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service temporarily unavailable",
+            )
+
+        return user_id
+
+    async def logout(self, user_id: int) -> None:
+        """Revoke the current session server-side by dropping its Redis key."""
+        try:
+            await redis_client.delete(self._session_key(user_id))
+        except RedisError:
+            # Logout не должен падать из-за Redis — клиент всё равно очистит токен.
+            logger.warning("Redis unavailable during logout for user %s", user_id)
 
     async def login(self, session: AsyncSession, data: UserLoginRequest) -> UserLoginResponse:
         user = await self.get_user_by_username(session, data.username)
@@ -67,20 +123,8 @@ class UserService:
         return UserLoginResponse(type="Bearer", access_token=access_token)
 
     async def get_current_user(self, session: AsyncSession, token: str) -> User:
-        token = self._strip_bearer(token)
-        payload = self.token_decode(token)
-        user_id = payload["user_id"]
-        jti = payload.get("jti")
-
-        # Single Active Session Check via Redis
-        if jti:
-            stored_jti = await redis_client.get(f"user:session:{user_id}")
-            if stored_jti != jti:
-                logger.warning(f"User {user_id} session mismatch. Possibly logged in from another device.")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Boshqa qurilmadan profilga kirilgan. Joriy sessiya yakunlandi."
-                )
+        # Декод + проверка Single Active Session + продление idle-TTL в одном месте.
+        user_id = await self.validate_session(token)
 
         stmt = (
             select(User)

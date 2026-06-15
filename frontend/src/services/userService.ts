@@ -9,6 +9,11 @@ export interface UserListResponse {
 }
 
 export const userService = {
+    // Отзывает текущую сессию на сервере (удаляет jti из Redis).
+    logout: async (): Promise<void> => {
+        await api.post('/user/logout');
+    },
+
     getUsers: async (page = 1, limit = 10, username?: string) => {
         const response = await api.get<UserListResponse>('/user/', {
             params: { page, limit, username },

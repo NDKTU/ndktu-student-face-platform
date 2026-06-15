@@ -1,11 +1,8 @@
 import logging
 
-import jwt
-from core.config import settings
 from core.db_helper import db_helper
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
-from jwt import PyJWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -15,32 +12,23 @@ from app.modules.role.models.role import Role
 from app.modules.role.models.role_permission import RolePermission
 from app.modules.user.models.user import User
 from app.modules.user.models.user_role import UserRole
+from app.modules.user.service import auth_service
 
 logger = logging.getLogger(__name__)
 
-# Используем заголовок Authorization
-api_key_header = APIKeyHeader(name="Authorization")
+# auto_error=False: при отсутствии заголовка возвращаем 401 (а не дефолтный 403),
+# чтобы фронтовый интерсептор корректно редиректил на /login.
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-async def get_current_user_id(token: str = Depends(api_key_header)):
-    # Если токен приходит как "Bearer <token>", нужно убрать префикс
-    if token.startswith("Bearer "):
-        token = token.replace("Bearer ", "")
-
-    try:
-        payload = jwt.decode(token, settings.jwt.access_token_secret, algorithms=[settings.jwt.algorithm])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: user_id missing",
-            )
-        return user_id
-    except PyJWTError:
+async def get_current_user_id(token: str | None = Depends(api_key_header)) -> int:
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Missing Authorization header",
         )
+    # Единая валидация: декод + Single Active Session + продление скользящего idle-TTL.
+    return await auth_service.validate_session(token)
 
 
 class PermissionRequired:

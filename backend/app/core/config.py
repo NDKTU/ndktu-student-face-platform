@@ -20,8 +20,13 @@ class ServerConfig(BaseModel):
 class JwtConfig(BaseModel):
     access_token_secret: str
     refresh_token_secret: str
+    # Абсолютный потолок жизни токена (по подписи exp). Реальный таймаут сессии
+    # теперь определяется скользящим idle-TTL в Redis (session_idle_minutes).
     access_token_expires_minutes: int
     refresh_token_expires_days: int
+    # Idle-окно скользящей Redis-сессии: TTL ключа user:session:{user_id}
+    # продлевается при каждом аутентифицированном запросе.
+    session_idle_minutes: int = 30
     algorithm: str
 
 

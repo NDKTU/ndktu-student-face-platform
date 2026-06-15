@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import api from '@/services/api';
+import { userService } from '@/services/userService';
+import { getToken, setToken, clearToken } from '@/services/tokenStorage';
 import type { User } from '@/types/auth';
 
 interface AuthContextType {
@@ -41,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     useEffect(() => {
-        const token = sessionStorage.getItem('token');
+        const token = getToken();
         if (token) {
             fetchUser();
         } else {
@@ -53,12 +55,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // and on a 60s interval so that admin updates propagate without re-login.
     useEffect(() => {
         const onForbidden = () => {
-            if (sessionStorage.getItem('token')) fetchUser();
+            if (getToken()) fetchUser();
         };
         window.addEventListener('app:refresh-me', onForbidden);
 
         const interval = setInterval(() => {
-            if (sessionStorage.getItem('token')) fetchUser();
+            if (getToken()) fetchUser();
         }, 60_000);
 
         const onForbiddenToast = () => {
@@ -75,12 +77,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = async (token: string) => {
-        sessionStorage.setItem('token', token);
+        setToken(token);
         await fetchUser();
     };
 
     const logout = () => {
-        sessionStorage.removeItem('token');
+        // Best-effort серверный отзыв сессии (удаляет jti из Redis); не блокируем UI.
+        userService.logout().catch(() => { /* токен всё равно очищаем ниже */ });
+        clearToken();
         setUser(null);
         // Bug#14 fix: always clear loading state on explicit logout
         setIsLoading(false);

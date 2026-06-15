@@ -10,7 +10,6 @@ export interface HemisLoginRequest {
 
 export interface HemisLoginResponse {
     access_token: string;
-    refresh_token: string;
     type: string;
     // Add other fields if returned by the backend
 }

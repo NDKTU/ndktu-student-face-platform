@@ -32,6 +32,14 @@ export const Login: React.FC = () => {
 
     const from = location.state?.from?.pathname || '/';
 
+    // Сообщение о причине выхода (выставляется useIdleTimeout / интерсептором api).
+    const params = new URLSearchParams(location.search);
+    const notice = params.get('idle') === '1'
+        ? 'Faolligingiz bo\'lmagani uchun tizimdan chiqdingiz. Iltimos, qaytadan kiring.'
+        : params.get('reason') === 'session'
+            ? 'Boshqa qurilmadan profilga kirilgani uchun joriy sessiya yakunlandi.'
+            : null;
+
     const {
         register: registerStaff,
         handleSubmit: handleSubmitStaff,
@@ -166,6 +174,12 @@ export const Login: React.FC = () => {
                             Talabalar
                         </button>
                     </div>
+
+                    {notice && !error && (
+                        <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 border border-amber-500/20">
+                            {notice}
+                        </div>
+                    )}
 
                     {error && (
                         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">

@@ -30,24 +30,29 @@ class QuizRepository:
         semester_id = data.semester_id
         if not semester_id:
             from datetime import date
-            from app.modules.academic_year.models import Semester, AcademicYear
+            from app.modules.academic_year.model import Semester, AcademicYear
+            from app.modules.academic_year.repository import get_academic_year_repository
             today = date.today()
-            
+
             # Find a semester where today falls between start_date and end_date
             stmt = select(Semester).join(AcademicYear).where(
                 Semester.start_date <= today,
                 Semester.end_date >= today
             ).order_by(Semester.is_active.desc()).limit(1)
-            
+
             res = await session.execute(stmt)
             active_semester = res.scalar_one_or_none()
-            
+
             # Fallback to the globally active semester if today doesn't match any dates
             if not active_semester:
                 fallback_stmt = select(Semester).where(Semester.is_active == True).limit(1)
                 res_fallback = await session.execute(fallback_stmt)
                 active_semester = res_fallback.scalar_one_or_none()
-                
+
+            # Final fallback: no semester exists yet — auto-create the current academic year
+            if not active_semester:
+                active_semester = await get_academic_year_repository.ensure_current_period(session)
+
             if active_semester:
                 semester_id = active_semester.id
 

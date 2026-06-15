@@ -272,6 +272,12 @@ class UserRepository:
 
         await session.commit()
 
+        # Отзываем текущую сессию: старые токены инвалидируются, пользователь
+        # перелогинивается с обновлёнными учётными данными.
+        from .service import auth_service
+
+        await auth_service.logout(current_user.id)
+
         # Re-fetch the user to avoid MissingGreenlet errors on response serialization
         from sqlalchemy.orm import selectinload
 

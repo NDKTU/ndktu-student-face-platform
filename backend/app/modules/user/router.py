@@ -50,6 +50,15 @@ async def get_me(
     return await auth_service.get_current_user(session=session, token=authorization)
 
 
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    current_user=Depends(PermissionRequired("user:me")),
+):
+    # Отзываем сессию на сервере: удаляем jti из Redis → все токены пользователя
+    # становятся невалидными (validate_session вернёт 401).
+    await auth_service.logout(current_user.id)
+
+
 @router.put("/me/credentials", response_model=UserCreateResponse)
 async def update_my_credentials(
     data: UserChangeCredentialsRequest,

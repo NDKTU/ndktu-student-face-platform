@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/config/env';
+import { getToken, clearToken } from '@/services/tokenStorage';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -11,7 +12,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        const token = sessionStorage.getItem('token');
+        const token = getToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -46,10 +47,13 @@ api.interceptors.response.use(
 
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
-            
-            // Remove token and redirect on 401
-            sessionStorage.removeItem('token');
-            window.location.href = '/login';
+
+            // Remove token and redirect on 401.
+            clearToken();
+            // Различаем вытеснение другой сессией, чтобы показать понятное сообщение.
+            const detail: string = error.response?.data?.detail ?? '';
+            const kickedBySession = detail.includes('Joriy sessiya yakunlandi');
+            window.location.href = kickedBySession ? '/login?reason=session' : '/login';
             return Promise.reject(error);
         }
 
