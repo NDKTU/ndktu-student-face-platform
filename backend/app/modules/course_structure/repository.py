@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.course_structure.models import Module, Topic
-from app.modules.sinf.model import Sinf
+from app.modules.course.model import Course
 from app.modules.user.models.user import User
 
 from .schemas import (
@@ -28,15 +28,15 @@ class CourseStructureRepository:
     async def _is_admin(self, user: User) -> bool:
         return any(r.name.lower() == "admin" for r in (user.roles or []))
 
-    async def _check_sinf_access(self, session: AsyncSession, sinf_id: int, user: User) -> None:
-        stmt = select(Sinf).where(Sinf.id == sinf_id)
-        sinf = (await session.execute(stmt)).scalar_one_or_none()
-        if not sinf:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinf not found")
-        if not await self._is_admin(user) and sinf.teacher_id != user.id:
+    async def _check_course_access(self, session: AsyncSession, course_id: int, user: User) -> None:
+        stmt = select(Course).where(Course.id == course_id)
+        course = (await session.execute(stmt)).scalar_one_or_none()
+        if not course:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        if not await self._is_admin(user) and course.teacher_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Sinf owner or admin can manage course structure",
+                detail="Only Course owner or admin can manage course structure",
             )
 
     async def _check_module_access(self, session: AsyncSession, module_id: int, user: User) -> Module:
@@ -44,7 +44,7 @@ class CourseStructureRepository:
         module = (await session.execute(stmt)).scalar_one_or_none()
         if not module:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Module not found")
-        await self._check_sinf_access(session, module.sinf_id, user)
+        await self._check_course_access(session, module.course_id, user)
         return module
 
     async def _check_topic_access(self, session: AsyncSession, topic_id: int, user: User) -> Topic:
@@ -57,11 +57,11 @@ class CourseStructureRepository:
 
     # ── Modules ─────────────────────────────────────────────────────────────
 
-    async def list_modules(self, session: AsyncSession, sinf_id: int) -> ModuleListResponse:
+    async def list_modules(self, session: AsyncSession, course_id: int) -> ModuleListResponse:
         stmt = (
             select(Module)
             .options(selectinload(Module.topics))
-            .where(Module.sinf_id == sinf_id)
+            .where(Module.course_id == course_id)
             .order_by(Module.order_index)
         )
         modules = (await session.execute(stmt)).scalars().all()
@@ -70,9 +70,9 @@ class CourseStructureRepository:
     async def create_module(
         self, session: AsyncSession, data: ModuleCreateRequest, current_user: User
     ) -> ModuleResponse:
-        await self._check_sinf_access(session, data.sinf_id, current_user)
+        await self._check_course_access(session, data.course_id, current_user)
         module = Module(
-            sinf_id=data.sinf_id,
+            course_id=data.course_id,
             name=data.name,
             description=data.description,
             order_index=data.order_index,
@@ -107,18 +107,18 @@ class CourseStructureRepository:
         await session.commit()
 
     async def reorder_modules(
-        self, session: AsyncSession, sinf_id: int, data: ReorderRequest, current_user: User
+        self, session: AsyncSession, course_id: int, data: ReorderRequest, current_user: User
     ) -> ModuleListResponse:
-        await self._check_sinf_access(session, sinf_id, current_user)
+        await self._check_course_access(session, course_id, current_user)
         ids = [item.id for item in data.items]
-        stmt = select(Module).where(Module.id.in_(ids), Module.sinf_id == sinf_id)
+        stmt = select(Module).where(Module.id.in_(ids), Module.course_id == course_id)
         modules = {m.id: m for m in (await session.execute(stmt)).scalars().all()}
         for item in data.items:
             m = modules.get(item.id)
             if m:
                 m.order_index = item.order_index
         await session.commit()
-        return await self.list_modules(session, sinf_id)
+        return await self.list_modules(session, course_id)
 
     # ── Topics ──────────────────────────────────────────────────────────────
 

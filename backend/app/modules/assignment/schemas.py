@@ -14,7 +14,7 @@ class SubmissionFile(BaseModel):
 
 
 class AssignmentCreateRequest(BaseModel):
-    sinf_id: int
+    course_id: int
     topic_id: Optional[int] = None
     lesson_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
@@ -47,7 +47,7 @@ class AssignmentStats(BaseModel):
 
 class AssignmentResponse(BaseModel):
     id: int
-    sinf_id: int
+    course_id: int
     topic_id: Optional[int] = None
     lesson_id: Optional[int] = None
     created_by_user_id: Optional[int] = None
@@ -66,7 +66,7 @@ class AssignmentResponse(BaseModel):
 
 
 class AssignmentListRequest(BaseModel):
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     lesson_id: Optional[int] = None
     page: int = 1

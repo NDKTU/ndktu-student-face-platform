@@ -41,7 +41,7 @@ class ResourceCreateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: Optional[int] = None
     lesson_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     main_text: str
     links: List[ResourceLink] = []
@@ -55,7 +55,7 @@ class ResourceUpdateRequest(BaseModel):
     group_id: Optional[int] = None
     subject_teacher_id: Optional[int] = None
     lesson_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
 
 
@@ -64,7 +64,7 @@ class ResourceResponse(BaseModel):
     subject_teacher_id: int
     group_id: Optional[int] = None
     lesson_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     main_text: str
     links: List[ResourceLink]
@@ -81,7 +81,7 @@ class ResourceListRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: Optional[int] = None
     lesson_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
 
     page: int = 1

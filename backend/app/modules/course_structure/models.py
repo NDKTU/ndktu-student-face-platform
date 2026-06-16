@@ -8,20 +8,20 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.sinf.model import Sinf
+    from app.modules.course.model import Course
 
 
 class Module(Base, IdIntPk, TimestampMixin):
     __tablename__ = "course_modules"
 
-    sinf_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("sinfs.id", ondelete="CASCADE"), nullable=False, index=True
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    sinf: Mapped["Sinf"] = relationship("Sinf")
+    course: Mapped["Course"] = relationship("Course")
     topics: Mapped[list["Topic"]] = relationship(
         "Topic",
         back_populates="module",

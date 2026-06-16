@@ -37,11 +37,11 @@ topic_router = APIRouter(prefix="/topic")
 
 @module_router.get("/", response_model=ModuleListResponse)
 async def list_modules(
-    sinf_id: int,
+    course_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: "User" = Depends(PermissionRequired("read:module")),
 ):
-    return await get_course_structure_repository.list_modules(session=session, sinf_id=sinf_id)
+    return await get_course_structure_repository.list_modules(session=session, course_id=course_id)
 
 
 @module_router.post(
@@ -79,15 +79,15 @@ async def delete_module(
     await get_course_structure_repository.delete_module(session=session, module_id=module_id, current_user=current_user)
 
 
-@module_router.put("/reorder/{sinf_id}", response_model=ModuleListResponse)
+@module_router.put("/reorder/{course_id}", response_model=ModuleListResponse)
 async def reorder_modules(
-    sinf_id: int,
+    course_id: int,
     data: ReorderRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("update:module")),
 ):
     return await get_course_structure_repository.reorder_modules(
-        session=session, sinf_id=sinf_id, data=data, current_user=current_user
+        session=session, course_id=course_id, data=data, current_user=current_user
     )
 
 

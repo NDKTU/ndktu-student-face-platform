@@ -9,6 +9,7 @@ from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.faculty.model import Faculty
+    from app.modules.speciality.model import Speciality
     from app.modules.teacher.model import Teacher
 
 
@@ -21,6 +22,7 @@ class Kafedra(Base, IdIntPk, TimestampMixin):
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="kafedras")
 
     teachers: Mapped[list["Teacher"]] = relationship("Teacher", back_populates="kafedra")
+    specialities: Mapped[list["Speciality"]] = relationship("Speciality", back_populates="kafedra")
 
     def __str__(self):
         return self.name

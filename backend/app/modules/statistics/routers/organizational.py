@@ -11,7 +11,7 @@ from ..repository import get_statistics_repository
 from ..schemas import (
     KafedraStatsResponse,
     LeaderboardResponse,
-    SinfStatsResponse,
+    CourseStatsResponse,
     SubjectStatsResponse,
 )
 
@@ -60,14 +60,14 @@ async def kafedra_stats(
     return await get_statistics_repository.get_kafedra_stats(session=session, kafedra_id=kafedra_id, filters=filters)
 
 
-@router.get("/sinf/{sinf_id}", response_model=SinfStatsResponse)
-async def sinf_stats(
-    sinf_id: int,
+@router.get("/course/{course_id}", response_model=CourseStatsResponse)
+async def course_stats(
+    course_id: int,
     filters: StatsFilters = Depends(stats_filters),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("read:statistics")),
 ):
-    return await get_statistics_repository.get_sinf_stats(session=session, sinf_id=sinf_id, filters=filters)
+    return await get_statistics_repository.get_course_stats(session=session, course_id=course_id, filters=filters)
 
 
 @router.get("/leaderboard", response_model=LeaderboardResponse)

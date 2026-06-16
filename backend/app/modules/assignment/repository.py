@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.datetime_utils import to_naive_utc as _to_naive_utc
 from app.core.datetime_utils import utcnow_naive as _utcnow
 from app.modules.assignment.models import Assignment, AssignmentSubmission
-from app.modules.sinf.model import Sinf, SinfGroup
+from app.modules.course.model import Course, CourseGroup
 from app.modules.student.model import Student
 from app.modules.teacher.model import Teacher
 from app.modules.user.models.user import User
@@ -37,32 +37,32 @@ class AssignmentRepository:
     async def _is_student(self, user: User) -> bool:
         return any(r.name.lower() == "student" for r in (user.roles or []))
 
-    async def _check_sinf_owner(self, session: AsyncSession, sinf_id: int, user: User) -> Sinf:
-        stmt = select(Sinf).where(Sinf.id == sinf_id)
-        sinf = (await session.execute(stmt)).scalar_one_or_none()
-        if not sinf:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinf not found")
-        if not await self._is_admin(user) and sinf.teacher_id != user.id:
+    async def _check_course_owner(self, session: AsyncSession, course_id: int, user: User) -> Course:
+        stmt = select(Course).where(Course.id == course_id)
+        course = (await session.execute(stmt)).scalar_one_or_none()
+        if not course:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        if not await self._is_admin(user) and course.teacher_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Sinf owner or admin can manage assignments",
+                detail="Only Course owner or admin can manage assignments",
             )
-        return sinf
+        return course
 
-    async def _student_in_sinf(self, session: AsyncSession, sinf_id: int, user_id: int) -> bool:
+    async def _student_in_course(self, session: AsyncSession, course_id: int, user_id: int) -> bool:
         stmt = (
             select(Student.id)
-            .join(SinfGroup, SinfGroup.group_id == Student.group_id)
-            .where(SinfGroup.sinf_id == sinf_id, Student.user_id == user_id)
+            .join(CourseGroup, CourseGroup.group_id == Student.group_id)
+            .where(CourseGroup.course_id == course_id, Student.user_id == user_id)
         )
         return (await session.execute(stmt)).scalar_one_or_none() is not None
 
     async def _serialize_assignment(self, session: AsyncSession, a: Assignment) -> AssignmentResponse:
-        # Stats: count students in sinf, submitted, graded, late
+        # Stats: count students in course, submitted, graded, late
         total_students_stmt = (
             select(func.count(Student.id))
-            .join(SinfGroup, SinfGroup.group_id == Student.group_id)
-            .where(SinfGroup.sinf_id == a.sinf_id)
+            .join(CourseGroup, CourseGroup.group_id == Student.group_id)
+            .where(CourseGroup.course_id == a.course_id)
         )
         total_students = (await session.execute(total_students_stmt)).scalar() or 0
 
@@ -75,7 +75,7 @@ class AssignmentRepository:
 
         return AssignmentResponse(
             id=a.id,
-            sinf_id=a.sinf_id,
+            course_id=a.course_id,
             topic_id=a.topic_id,
             lesson_id=a.lesson_id,
             created_by_user_id=a.created_by_user_id,
@@ -101,10 +101,10 @@ class AssignmentRepository:
     async def create_assignment(
         self, session: AsyncSession, data: AssignmentCreateRequest, current_user: User
     ) -> AssignmentResponse:
-        await self._check_sinf_owner(session, data.sinf_id, current_user)
+        await self._check_course_owner(session, data.course_id, current_user)
 
         a = Assignment(
-            sinf_id=data.sinf_id,
+            course_id=data.course_id,
             topic_id=data.topic_id,
             lesson_id=data.lesson_id,
             created_by_user_id=current_user.id,
@@ -127,7 +127,7 @@ class AssignmentRepository:
         a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-        await self._check_sinf_owner(session, a.sinf_id, current_user)
+        await self._check_course_owner(session, a.course_id, current_user)
 
         for field in (
             "topic_id",
@@ -153,7 +153,7 @@ class AssignmentRepository:
         a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-        await self._check_sinf_owner(session, a.sinf_id, current_user)
+        await self._check_course_owner(session, a.course_id, current_user)
         await session.delete(a)
         await session.commit()
 
@@ -163,9 +163,9 @@ class AssignmentRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
 
         if await self._is_student(current_user):
-            in_sinf = await self._student_in_sinf(session, a.sinf_id, current_user.id)
-            if not in_sinf:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Sinf")
+            in_course = await self._student_in_course(session, a.course_id, current_user.id)
+            if not in_course:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Course")
 
         return await self._serialize_assignment(session, a)
 
@@ -176,21 +176,21 @@ class AssignmentRepository:
         count_stmt = select(func.count()).select_from(Assignment)
 
         if await self._is_student(current_user):
-            # Student sees only assignments from sinfs they belong to
-            student_sinfs_stmt = (
-                select(SinfGroup.sinf_id)
-                .join(Student, Student.group_id == SinfGroup.group_id)
+            # Student sees only assignments from courses they belong to
+            student_courses_stmt = (
+                select(CourseGroup.course_id)
+                .join(Student, Student.group_id == CourseGroup.group_id)
                 .where(Student.user_id == current_user.id)
             )
-            sinf_ids = (await session.execute(student_sinfs_stmt)).scalars().all()
-            if not sinf_ids:
+            course_ids = (await session.execute(student_courses_stmt)).scalars().all()
+            if not course_ids:
                 return AssignmentListResponse(total=0, page=request.page, limit=request.limit, assignments=[])
-            stmt = stmt.where(Assignment.sinf_id.in_(sinf_ids))
-            count_stmt = count_stmt.where(Assignment.sinf_id.in_(sinf_ids))
+            stmt = stmt.where(Assignment.course_id.in_(course_ids))
+            count_stmt = count_stmt.where(Assignment.course_id.in_(course_ids))
 
-        if request.sinf_id:
-            stmt = stmt.where(Assignment.sinf_id == request.sinf_id)
-            count_stmt = count_stmt.where(Assignment.sinf_id == request.sinf_id)
+        if request.course_id:
+            stmt = stmt.where(Assignment.course_id == request.course_id)
+            count_stmt = count_stmt.where(Assignment.course_id == request.course_id)
         if request.topic_id:
             stmt = stmt.where(Assignment.topic_id == request.topic_id)
             count_stmt = count_stmt.where(Assignment.topic_id == request.topic_id)
@@ -244,9 +244,9 @@ class AssignmentRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
 
         if await self._is_student(current_user):
-            in_sinf = await self._student_in_sinf(session, a.sinf_id, current_user.id)
-            if not in_sinf:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Sinf")
+            in_course = await self._student_in_course(session, a.course_id, current_user.id)
+            if not in_course:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Course")
 
         existing_stmt = select(AssignmentSubmission).where(
             AssignmentSubmission.assignment_id == assignment_id,
@@ -313,7 +313,7 @@ class AssignmentRepository:
         a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-        await self._check_sinf_owner(session, a.sinf_id, current_user)
+        await self._check_course_owner(session, a.course_id, current_user)
 
         stmt = (
             select(AssignmentSubmission)
@@ -350,7 +350,7 @@ class AssignmentRepository:
         a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-        await self._check_sinf_owner(session, a.sinf_id, current_user)
+        await self._check_course_owner(session, a.course_id, current_user)
 
         stmt = select(AssignmentSubmission).where(
             AssignmentSubmission.assignment_id == assignment_id,

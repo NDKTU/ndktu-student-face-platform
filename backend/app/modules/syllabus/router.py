@@ -20,36 +20,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Syllabus"], prefix="/syllabus")
 
 
-@router.get("/{sinf_id}", response_model=SyllabusResponse)
+@router.get("/{course_id}", response_model=SyllabusResponse)
 async def get_syllabus(
-    sinf_id: int,
+    course_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: "User" = Depends(PermissionRequired("read:syllabus")),
 ):
-    s = await get_syllabus_repository.get(session=session, sinf_id=sinf_id)
+    s = await get_syllabus_repository.get(session=session, course_id=course_id)
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Syllabus not found")
     return s
 
 
 @router.put(
-    "/{sinf_id}",
+    "/{course_id}",
     response_model=SyllabusResponse,
     dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
 async def upsert_syllabus(
-    sinf_id: int,
+    course_id: int,
     data: SyllabusUpsertRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("update:syllabus")),
 ):
-    return await get_syllabus_repository.upsert(session=session, sinf_id=sinf_id, data=data, current_user=current_user)
+    return await get_syllabus_repository.upsert(session=session, course_id=course_id, data=data, current_user=current_user)
 
 
-@router.delete("/{sinf_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_syllabus(
-    sinf_id: int,
+    course_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("delete:syllabus")),
 ):
-    await get_syllabus_repository.delete(session=session, sinf_id=sinf_id, current_user=current_user)
+    await get_syllabus_repository.delete(session=session, course_id=course_id, current_user=current_user)

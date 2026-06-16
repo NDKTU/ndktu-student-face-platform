@@ -9,10 +9,10 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.modules.course.model import Course
     from app.modules.course_structure.models import Topic
     from app.modules.group.models.group import Group
     from app.modules.lesson.model import Lesson
-    from app.modules.sinf.model import Sinf
     from app.modules.subject.models.subject_teacher import SubjectTeacher
 
 
@@ -40,9 +40,9 @@ class Resource(Base, IdIntPk, TimestampMixin):
         index=True,
     )
 
-    sinf_id: Mapped[int | None] = mapped_column(
+    course_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey("sinfs.id", ondelete="SET NULL"),
+        ForeignKey("courses.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -66,7 +66,7 @@ class Resource(Base, IdIntPk, TimestampMixin):
 
     lesson: Mapped["Lesson | None"] = relationship("Lesson")
 
-    sinf: Mapped["Sinf | None"] = relationship("Sinf", back_populates="resources")
+    course: Mapped["Course | None"] = relationship("Course", back_populates="resources")
 
     topic: Mapped["Topic | None"] = relationship("Topic")
 

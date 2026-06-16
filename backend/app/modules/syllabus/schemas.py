@@ -25,7 +25,7 @@ class SyllabusUpsertRequest(BaseModel):
 
 class SyllabusResponse(BaseModel):
     id: int
-    sinf_id: int
+    course_id: int
     goals: Optional[str] = None
     learning_outcomes: Optional[str] = None
     prerequisites: Optional[str] = None

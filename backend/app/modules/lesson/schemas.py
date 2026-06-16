@@ -31,7 +31,7 @@ class LessonGroupInfo(BaseModel):
 class LessonCreateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: int
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
     topic: str = Field(min_length=1, max_length=255)
@@ -42,7 +42,7 @@ class LessonCreateRequest(BaseModel):
 class LessonUpdateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
     topic: Optional[str] = Field(default=None, min_length=1, max_length=255)
@@ -54,7 +54,7 @@ class LessonResponse(BaseModel):
     id: int
     subject_teacher_id: int
     group_id: int
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     lesson_type: Optional[str] = None
     topic: str
@@ -71,7 +71,7 @@ class LessonResponse(BaseModel):
 class LessonListRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: Optional[int] = None
-    sinf_id: Optional[int] = None
+    course_id: Optional[int] = None
     topic_id: Optional[int] = None
     date_from: Optional[date_type] = None
     date_to: Optional[date_type] = None

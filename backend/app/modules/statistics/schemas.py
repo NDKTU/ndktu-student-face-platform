@@ -289,8 +289,8 @@ class KafedraStatsResponse(BaseModel):
     average_grade: float
 
 
-class SinfStatsResponse(BaseModel):
-    sinf_id: int
+class CourseStatsResponse(BaseModel):
+    course_id: int
     name: str
     subject_id: Optional[int]
     teacher_id: Optional[int]

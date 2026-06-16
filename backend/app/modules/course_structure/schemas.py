@@ -36,7 +36,7 @@ class TopicResponse(BaseModel):
 
 
 class ModuleCreateRequest(BaseModel):
-    sinf_id: int
+    course_id: int
     name: str = Field(min_length=1, max_length=255)
     description: Optional[str] = None
     order_index: int = 0
@@ -50,7 +50,7 @@ class ModuleUpdateRequest(BaseModel):
 
 class ModuleResponse(BaseModel):
     id: int
-    sinf_id: int
+    course_id: int
     name: str
     description: Optional[str] = None
     order_index: int

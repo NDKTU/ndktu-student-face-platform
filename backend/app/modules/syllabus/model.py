@@ -9,14 +9,14 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.sinf.model import Sinf
+    from app.modules.course.model import Course
 
 
 class Syllabus(Base, IdIntPk, TimestampMixin):
     __tablename__ = "syllabuses"
 
-    sinf_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("sinfs.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
     )
 
     goals: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -31,7 +31,7 @@ class Syllabus(Base, IdIntPk, TimestampMixin):
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    sinf: Mapped["Sinf"] = relationship("Sinf")
+    course: Mapped["Course"] = relationship("Course")
 
     def __str__(self):
-        return f"Syllabus {self.id} (sinf={self.sinf_id})"
+        return f"Syllabus {self.id} (course={self.course_id})"

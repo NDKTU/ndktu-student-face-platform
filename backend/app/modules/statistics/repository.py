@@ -15,7 +15,7 @@ from app.modules.question.model import Question
 from app.modules.quiz.models.quiz import Quiz
 from app.modules.quiz.models.quiz_questions import QuizQuestion
 from app.modules.result.model import Result
-from app.modules.sinf.model import Sinf, SinfGroup
+from app.modules.course.model import Course, CourseGroup
 from app.modules.student.model import Student
 from app.modules.subject.models.subject import Subject
 from app.modules.teacher.model import Teacher
@@ -74,7 +74,7 @@ from .schemas import (
     RepeatOffendersResponse,
     SemesterProgressionResponse,
     SemesterRow,
-    SinfStatsResponse,
+    CourseStatsResponse,
     SubjectStatsResponse,
     SuspectQuizRow,
     SuspectQuizzesResponse,
@@ -841,14 +841,14 @@ class StatisticsRepository:
             average_grade=float(avg or 0.0),
         )
 
-    async def get_sinf_stats(self, session: AsyncSession, sinf_id: int, filters: StatsFilters) -> SinfStatsResponse:
-        sinf = (await session.execute(select(Sinf).where(Sinf.id == sinf_id))).scalar_one_or_none()
-        if not sinf:
-            raise HTTPException(status_code=404, detail="Sinf not found")
+    async def get_course_stats(self, session: AsyncSession, course_id: int, filters: StatsFilters) -> CourseStatsResponse:
+        course = (await session.execute(select(Course).where(Course.id == course_id))).scalar_one_or_none()
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
 
         group_ids = [
             gid
-            for (gid,) in (await session.execute(select(SinfGroup.group_id).where(SinfGroup.sinf_id == sinf_id))).all()
+            for (gid,) in (await session.execute(select(CourseGroup.group_id).where(CourseGroup.course_id == course_id))).all()
         ]
 
         attempts = 0
@@ -858,18 +858,18 @@ class StatisticsRepository:
             stmt = (
                 select(func.count(Result.id), func.avg(Result.grade))
                 .select_from(Result)
-                .where(and_(Result.group_id.in_(group_ids), Result.subject_id == sinf.subject_id))
+                .where(and_(Result.group_id.in_(group_ids), Result.subject_id == course.subject_id))
             )
             stmt = apply_result_filters(stmt, f)
             row = (await session.execute(stmt)).one()
             attempts = int(row[0] or 0)
             avg = float(row[1] or 0.0)
 
-        return SinfStatsResponse(
-            sinf_id=sinf.id,
-            name=sinf.name,
-            subject_id=sinf.subject_id,
-            teacher_id=sinf.teacher_id,
+        return CourseStatsResponse(
+            course_id=course.id,
+            name=course.name,
+            subject_id=course.subject_id,
+            teacher_id=course.teacher_id,
             group_count=len(group_ids),
             attempts=attempts,
             average_grade=avg,

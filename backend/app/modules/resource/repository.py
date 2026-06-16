@@ -9,8 +9,8 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.modules.group.models.group_teachers import GroupTeacher
 from app.modules.resource.model import Resource
-from app.modules.sinf.model import SinfGroup
-from app.modules.sinf.repository import get_sinf_repository
+from app.modules.course.model import CourseGroup
+from app.modules.course.repository import get_course_repository
 from app.modules.student.model import Student
 from app.modules.subject.models.subject_teacher import SubjectTeacher
 from app.modules.teacher.model import Teacher
@@ -95,32 +95,32 @@ class ResourceRepository:
         is_teacher = await self._is_role(current_user, "teacher")
 
         subject_teacher_id = data.subject_teacher_id
-        sinf_id = data.sinf_id
+        course_id = data.course_id
         target_group_id = data.group_id
 
-        if sinf_id is not None:
-            sinf = await get_sinf_repository.get_sinf_orm(session, sinf_id)
-            if not is_admin and sinf.teacher_id != current_user.id:
+        if course_id is not None:
+            course = await get_course_repository.get_course_orm(session, course_id)
+            if not is_admin and course.teacher_id != current_user.id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Teacher is not the owner of this Sinf",
+                    detail="Teacher is not the owner of this Course",
                 )
             if target_group_id is not None:
-                sg_stmt = select(SinfGroup.id).where(
-                    SinfGroup.sinf_id == sinf.id, SinfGroup.group_id == target_group_id
+                cg_stmt = select(CourseGroup.id).where(
+                    CourseGroup.course_id == course.id, CourseGroup.group_id == target_group_id
                 )
-                if (await session.execute(sg_stmt)).scalar_one_or_none() is None:
+                if (await session.execute(cg_stmt)).scalar_one_or_none() is None:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="group_id does not belong to this Sinf",
+                        detail="group_id does not belong to this Course",
                     )
-            subject_teacher = await get_sinf_repository.get_or_create_subject_teacher_for_sinf(session, sinf)
+            subject_teacher = await get_course_repository.get_or_create_subject_teacher_for_course(session, course)
             subject_teacher_id = subject_teacher.id
         else:
             if subject_teacher_id is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="subject_teacher_id is required when sinf_id is not provided",
+                    detail="subject_teacher_id is required when course_id is not provided",
                 )
             st_stmt = select(SubjectTeacher).where(SubjectTeacher.id == subject_teacher_id)
             subject_teacher_obj = (await session.execute(st_stmt)).scalar_one_or_none()
@@ -148,7 +148,7 @@ class ResourceRepository:
             subject_teacher_id=subject_teacher_id,
             group_id=target_group_id,
             lesson_id=data.lesson_id,
-            sinf_id=sinf_id,
+            course_id=course_id,
             topic_id=data.topic_id,
             main_text=data.main_text,
             links=[link.model_dump() for link in data.links],
@@ -241,8 +241,8 @@ class ResourceRepository:
             stmt = stmt.where(Resource.group_id == request.group_id)
         if request.lesson_id is not None:
             stmt = stmt.where(Resource.lesson_id == request.lesson_id)
-        if request.sinf_id is not None:
-            stmt = stmt.where(Resource.sinf_id == request.sinf_id)
+        if request.course_id is not None:
+            stmt = stmt.where(Resource.course_id == request.course_id)
         if request.topic_id is not None:
             stmt = stmt.where(Resource.topic_id == request.topic_id)
 
@@ -261,8 +261,8 @@ class ResourceRepository:
             count_stmt = count_stmt.where(Resource.group_id == request.group_id)
         if request.lesson_id is not None:
             count_stmt = count_stmt.where(Resource.lesson_id == request.lesson_id)
-        if request.sinf_id is not None:
-            count_stmt = count_stmt.where(Resource.sinf_id == request.sinf_id)
+        if request.course_id is not None:
+            count_stmt = count_stmt.where(Resource.course_id == request.course_id)
         if request.topic_id is not None:
             count_stmt = count_stmt.where(Resource.topic_id == request.topic_id)
 
@@ -296,11 +296,11 @@ class ResourceRepository:
         is_teacher = await self._is_role(current_user, "teacher")
 
         if not is_admin and is_teacher:
-            if resource.sinf_id is not None:
-                if not await get_sinf_repository.user_owns_sinf(session, resource.sinf_id, current_user.id):
+            if resource.course_id is not None:
+                if not await get_course_repository.user_owns_course(session, resource.course_id, current_user.id):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Teacher is not the owner of this Sinf",
+                        detail="Teacher is not the owner of this Course",
                     )
             else:
                 if not await self._teacher_owns_subject_teacher(session, current_user.id, resource.subject_teacher_id):
@@ -336,8 +336,8 @@ class ResourceRepository:
             resource.subject_teacher_id = data.subject_teacher_id
         if data.lesson_id is not None:
             resource.lesson_id = data.lesson_id
-        if data.sinf_id is not None:
-            resource.sinf_id = data.sinf_id
+        if data.course_id is not None:
+            resource.course_id = data.course_id
         if data.topic_id is not None:
             resource.topic_id = data.topic_id
 
@@ -371,11 +371,11 @@ class ResourceRepository:
         is_teacher = await self._is_role(current_user, "teacher")
 
         if not is_admin and is_teacher:
-            if resource.sinf_id is not None:
-                if not await get_sinf_repository.user_owns_sinf(session, resource.sinf_id, current_user.id):
+            if resource.course_id is not None:
+                if not await get_course_repository.user_owns_course(session, resource.course_id, current_user.id):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Teacher is not the owner of this Sinf",
+                        detail="Teacher is not the owner of this Course",
                     )
             elif not await self._teacher_owns_subject_teacher(session, current_user.id, resource.subject_teacher_id):
                 raise HTTPException(

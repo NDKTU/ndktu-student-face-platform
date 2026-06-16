@@ -12,15 +12,15 @@ from app.core.mixins.time_stamp_mixin import TimestampMixin
 if TYPE_CHECKING:
     from app.modules.course_structure.models import Topic
     from app.modules.lesson.model import Lesson
-    from app.modules.sinf.model import Sinf
+    from app.modules.course.model import Course
     from app.modules.user.models.user import User
 
 
 class Assignment(Base, IdIntPk, TimestampMixin):
     __tablename__ = "assignments"
 
-    sinf_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("sinfs.id", ondelete="CASCADE"), nullable=False, index=True
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
     topic_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("course_topics.id", ondelete="SET NULL"), nullable=True, index=True
@@ -38,7 +38,7 @@ class Assignment(Base, IdIntPk, TimestampMixin):
     allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allowed_file_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
-    sinf: Mapped["Sinf"] = relationship("Sinf")
+    course: Mapped["Course"] = relationship("Course")
     topic: Mapped["Topic | None"] = relationship("Topic")
     lesson: Mapped["Lesson | None"] = relationship("Lesson")
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_user_id])
