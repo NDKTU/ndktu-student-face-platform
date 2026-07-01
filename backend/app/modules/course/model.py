@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from app.modules.group.models.group import Group
     from app.modules.kafedra.model import Kafedra
     from app.modules.lesson.model import Lesson
-    from app.modules.resource.model import Resource
     from app.modules.speciality.model import Speciality
     from app.modules.subject.models.subject import Subject
     from app.modules.user.models.user import User
@@ -84,10 +83,6 @@ class Course(Base, IdIntPk, TimestampMixin):
 
     lessons: Mapped[list["Lesson"]] = relationship(
         "Lesson",
-        back_populates="course",
-    )
-    resources: Mapped[list["Resource"]] = relationship(
-        "Resource",
         back_populates="course",
     )
 

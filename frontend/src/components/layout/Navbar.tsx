@@ -23,7 +23,6 @@ const ROUTE_LABELS: Record<string, string> = {
     'quiz-test':         'Test ishlash',
     'results':           'Natijalar',
     'profile':           'Profil',
-    'resources':         'Resurslar',
     'teacher-ranking':   'Reyting',
     'yakuniy':           'Yakuniy',
     'hemis-transactions':'HEMIS',

@@ -8,7 +8,6 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.resource.model import Resource
     from app.modules.subject.models.subject import Subject
     from app.modules.teacher.model import Teacher
 
@@ -21,9 +20,6 @@ class SubjectTeacher(Base, IdIntPk, TimestampMixin):
 
     subject: Mapped["Subject"] = relationship("Subject", back_populates="subject_teachers")
     teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="subject_teachers")
-    resources: Mapped[list["Resource"]] = relationship(
-        "Resource", back_populates="subject_teacher", cascade="all, delete-orphan"
-    )
 
     def __str__(self):
         return f"{self.subject.name} - {self.teacher.name}"

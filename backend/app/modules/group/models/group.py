@@ -11,11 +11,9 @@ if TYPE_CHECKING:
     from app.modules.faculty.model import Faculty
     from app.modules.group.models.group_teachers import GroupTeacher
     from app.modules.quiz.models.quiz import Quiz
-    from app.modules.resource.model import Resource
     from app.modules.result.model import Result
     from app.modules.speciality.model import Speciality
     from app.modules.student.model import Student
-    from app.modules.tutor.models.tutor_groups import TutorGroup
 
 
 class Group(Base, IdIntPk, TimestampMixin):
@@ -41,12 +39,6 @@ class Group(Base, IdIntPk, TimestampMixin):
     group_teachers: Mapped[list["GroupTeacher"]] = relationship(
         "GroupTeacher", back_populates="group", cascade="all, delete-orphan"
     )
-
-    tutor_groups: Mapped[list["TutorGroup"]] = relationship(
-        "TutorGroup", back_populates="group", cascade="all, delete-orphan"
-    )
-
-    resources: Mapped[list["Resource"]] = relationship("Resource", back_populates="group")
 
     def __str__(self):
         return self.name

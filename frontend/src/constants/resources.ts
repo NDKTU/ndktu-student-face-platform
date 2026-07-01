@@ -1,7 +1,6 @@
 import {
     Users,
     GraduationCap,
-    UserCog,
     Shield,
     Key,
     BookOpen,
@@ -38,7 +37,6 @@ export const SIDEBAR_SECTION_ORDER = [
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
-    tutor:         { label: 'Tyutorlar',        href: '/tutors',      icon: UserCog,       section: 'Foydalanuvchilar' },
     student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
 
     role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
@@ -48,7 +46,6 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
     group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound },
     subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Boshqaruv' },
-    sinf:          { label: 'Sinflar',          href: '/sinfs',       icon: GraduationCap, section: 'Boshqaruv' },
     academic_year: { label: "O'quv yili",       href: '/academic-years', icon: Calendar,   section: 'Boshqaruv' },
 
     quiz:          { label: 'Testlar',          href: '/quizzes',     icon: BookOpen,      section: 'Testlar' },
@@ -59,7 +56,6 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Testlar' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Testlar' },
-    resource:      { label: 'Resurslar',        href: '/resources',   icon: BookOpen },
 
     me:            { label: 'Profil' },
     statistics:    { label: 'Statistika', icon: LineChart },

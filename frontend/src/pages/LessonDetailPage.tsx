@@ -3,18 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLesson, useLessonResults, useUpsertLessonResults } from '@/hooks/useLessons';
 import { useGroupStudents } from '@/hooks/useGroups';
-import { useResources, useDeleteResource } from '@/hooks/useResources';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { LessonResourceModal } from '@/components/LessonResourceModal';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
-import { ArrowLeft, Clock, Loader2, Save, Plus, Pencil, Trash2, ExternalLink, FileText, Image as ImageIcon, Link2 } from 'lucide-react';
+import { ArrowLeft, Clock, Loader2, Save, Plus, Pencil, Trash2 } from 'lucide-react';
 import type { LessonAttendance, LessonResultUpsertItem } from '@/services/lessonService';
-import type { ResourceResponse } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 
 type Row = {
@@ -46,19 +43,12 @@ export default function LessonDetailPage() {
     const { data: resultsData } = useLessonResults(lessonId);
 
     const upsertMutation = useUpsertLessonResults();
-    const deleteResourceMutation = useDeleteResource();
-
-    const { data: resourcesData } = useResources(1, 100, undefined, undefined, lessonId);
-    const lessonResources = resourcesData?.resources ?? [];
 
     const { data: assignmentsData } = useAssignments(lessonId ? { lesson_id: lessonId, limit: 100 } : undefined);
     const lessonAssignments = lessonId ? assignmentsData?.assignments ?? [] : [];
     const deleteAssignmentMutation = useDeleteAssignment();
 
     const [rows, setRows] = useState<Row[]>([]);
-    const [resourceModalOpen, setResourceModalOpen] = useState(false);
-    const [editingResource, setEditingResource] = useState<ResourceResponse | null>(null);
-    const [resourceToDelete, setResourceToDelete] = useState<ResourceResponse | null>(null);
     const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
     const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
     const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
@@ -142,96 +132,6 @@ export default function LessonDetailPage() {
                     <p className="text-sm text-foreground/80">{lesson.description}</p>
                 )}
             </div>
-
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Resurslar</CardTitle>
-                    {canEdit && (
-                        <Button
-                            size="sm"
-                            onClick={() => { setEditingResource(null); setResourceModalOpen(true); }}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Resurs qo'shish
-                        </Button>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {lessonResources.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-muted-foreground">
-                            Bu darsga hali resurs biriktirilmagan.
-                        </p>
-                    ) : (
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {lessonResources.map(res => (
-                                <div
-                                    key={res.id}
-                                    className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-2 hover:shadow-sm hover:border-primary/20 transition-all duration-300"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <p className="text-sm flex-1 whitespace-pre-wrap">{res.main_text}</p>
-                                        {canEdit && (
-                                            <div className="flex shrink-0 gap-1">
-                                                <button
-                                                    onClick={() => { setEditingResource(res); setResourceModalOpen(true); }}
-                                                    className="rounded p-1 hover:bg-accent text-muted-foreground hover:text-foreground"
-                                                    title="Tahrirlash"
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setResourceToDelete(res)}
-                                                    className="rounded p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                                                    title="O'chirish"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {res.links.length > 0 && (
-                                        <div className="flex flex-col gap-1">
-                                            {res.links.map((l, i) => (
-                                                <a
-                                                    key={i}
-                                                    href={l.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-primary hover:underline flex items-center gap-1.5"
-                                                >
-                                                    <Link2 className="h-3 w-3" />
-                                                    <span className="truncate">{l.title || l.url}</span>
-                                                    <ExternalLink className="h-3 w-3 opacity-60" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {(res.files ?? []).length > 0 && (
-                                        <div className="flex flex-col gap-1 mt-1">
-                                            {(res.files ?? []).map((f, i) => (
-                                                <a
-                                                    key={i}
-                                                    href={f.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-primary hover:underline flex items-center gap-1.5"
-                                                >
-                                                    {f.type === 'image'
-                                                        ? <ImageIcon className="h-3 w-3 shrink-0" />
-                                                        : <FileText className="h-3 w-3 shrink-0" />
-                                                    }
-                                                    <span className="truncate">{f.name}</span>
-                                                    <ExternalLink className="h-3 w-3 opacity-60 shrink-0" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
 
             {lesson.sinf_id && (
                 <Card>
@@ -407,28 +307,6 @@ export default function LessonDetailPage() {
                     )}
                 </CardContent>
             </Card>
-
-            <LessonResourceModal
-                isOpen={resourceModalOpen}
-                onClose={() => { setResourceModalOpen(false); setEditingResource(null); }}
-                target={{ kind: 'lesson', lesson }}
-                editing={editingResource}
-            />
-
-            <ConfirmDialog
-                isOpen={!!resourceToDelete}
-                onClose={() => setResourceToDelete(null)}
-                onConfirm={() => {
-                    if (!resourceToDelete) return;
-                    deleteResourceMutation.mutate(resourceToDelete.id, {
-                        onSuccess: () => setResourceToDelete(null),
-                    });
-                }}
-                title="Resursni o'chirish"
-                description="Ushbu resursni o'chirmoqchimisiz?"
-                confirmText="O'chirish"
-                cancelText="Bekor qilish"
-            />
 
             {lesson.sinf_id && (
                 <AssignmentFormModal

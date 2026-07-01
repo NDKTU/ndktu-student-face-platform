@@ -13,17 +13,13 @@ from .psychology.router import router as psychology_router
 from .question.router import router as question_router
 from .quiz.router import router as quiz_router
 from .quiz_process.router import router as quiz_process_router
-from .resource.router import router as resource_router
 from .result.router import router as result_router
 from .role.router import router as role_router
-from .sinf.router import router as sinf_router
 from .statistics.router import router as statistics_router
 from .student.router import router as student_router
 from .student_movement.router import router as student_movement_router
 from .subject.router import router as subject_router
-from .syllabus.router import router as syllabus_router
 from .teacher.router import router as teacher_router
-from .tutor.router import router as tutor_router
 from .user.router import router as user_router
 from .user_answers.router import router as user_answers_router
 from .yakuniy.router import router as yakuniy_router
@@ -47,13 +43,9 @@ router.include_router(user_answers_router)
 router.include_router(subject_router)
 router.include_router(student_router)
 router.include_router(yakuniy_router)
-router.include_router(resource_router)
 router.include_router(psychology_router)
-router.include_router(tutor_router)
 router.include_router(lesson_router)
-router.include_router(sinf_router)
 router.include_router(academic_year_router)
 router.include_router(course_structure_router)
-router.include_router(syllabus_router)
 router.include_router(assignment_router)
 router.include_router(student_movement_router)

@@ -147,7 +147,6 @@ class TestResultListRequest(BaseModel):
     user_id: Optional[int] = None
     faculty_id: Optional[int] = None
     group_id: Optional[int] = None
-    tutor_id: Optional[int] = None
     page: int = 1
     limit: int = 20
 

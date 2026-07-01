@@ -15,7 +15,6 @@ from app.modules.psychology.model import (
     PsychologyResult,
 )
 from app.modules.student.model import Student
-from app.modules.tutor.models.tutor_groups import TutorGroup
 from app.modules.user.models.user import User
 
 from .schemas import (
@@ -279,7 +278,7 @@ class PsychologyRepository:
             stmt = stmt.where(PsychologyResult.user_id == user_id)
             count_stmt = count_stmt.where(PsychologyResult.user_id == user_id)
 
-        needs_org_join = bool(request.faculty_id or request.group_id or request.tutor_id)
+        needs_org_join = bool(request.faculty_id or request.group_id)
         if needs_org_join:
             stmt = (
                 stmt.join(User, User.id == PsychologyResult.user_id)
@@ -298,10 +297,6 @@ class PsychologyRepository:
             if request.group_id:
                 stmt = stmt.where(Group.id == request.group_id)
                 count_stmt = count_stmt.where(Group.id == request.group_id)
-            if request.tutor_id:
-                tutor_group_subq = select(TutorGroup.group_id).where(TutorGroup.tutor_id == request.tutor_id)
-                stmt = stmt.where(Student.group_id.in_(tutor_group_subq))
-                count_stmt = count_stmt.where(Student.group_id.in_(tutor_group_subq))
 
         stmt = stmt.offset(request.offset).limit(request.limit)
 

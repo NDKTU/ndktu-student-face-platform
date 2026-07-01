@@ -10,7 +10,6 @@ import QuizzesPage from '@/pages/QuizzesPage';
 import ActiveQuizzesPage from '@/pages/ActiveQuizzesPage';
 import ResultsPage from '@/pages/ResultsPage';
 import TeachersPage from '@/pages/TeachersPage';
-import TutorsPage from '@/pages/TutorsPage';
 import HemisSyncPage from '@/pages/HemisSyncPage';
 import FacultyPage from '@/pages/FacultyPage';
 import KafedraPage from '@/pages/KafedraPage';
@@ -26,16 +25,12 @@ import TeacherSubjectsPage from '@/pages/TeacherSubjectsPage';
 import TeacherRankingPage from '@/pages/TeacherRankingPage';
 import StatisticsPage from '@/pages/StatisticsPage';
 import YakuniyPage from '@/pages/YakuniyPage';
-import ResourcesPage from '@/pages/ResourcesPage';
 import PsychologyPage from '@/pages/PsychologyPage';
 import PsychologyTestPage from '@/pages/PsychologyTestPage';
 import PsychologyResultsPage from '@/pages/PsychologyResultsPage';
 import StudentPsychologyPage from '@/pages/StudentPsychologyPage';
 import LessonsPage from '@/pages/LessonsPage';
 import LessonDetailPage from '@/pages/LessonDetailPage';
-import SinfsPage from '@/pages/SinfsPage';
-import SinfDetailPage from '@/pages/SinfDetailPage';
-import MavzuDetailPage from '@/pages/MavzuDetailPage';
 import AcademicYearsPage from '@/pages/AcademicYearsPage';
 import RolesPage from '@/pages/RolesPage';
 import RolePermissionsPage from '@/pages/RolePermissionsPage';
@@ -124,7 +119,6 @@ function App() {
                 <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                 <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
                 <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
-                <Route path="/tutors" element={<PermissionRoute permission="read:tutor"><TutorsPage /></PermissionRoute>} />
                 <Route path="/teacher-ranking" element={<PermissionRoute permission={['read:statistics', 'read:teacher']}><TeacherRankingPage /></PermissionRoute>} />
                 <Route path="/statistics" element={<PermissionRoute permission="read:statistics"><StatisticsPage /></PermissionRoute>} />
 
@@ -135,7 +129,6 @@ function App() {
                 <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
                 <Route path="/yakuniy" element={<PermissionRoute permission="read:yakuniy"><YakuniyPage /></PermissionRoute>} />
 
-                <Route path="/resources" element={<PermissionRoute permission="read:resource"><ResourcesPage /></PermissionRoute>} />
                 <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                 <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />
                 <Route path="/psychology" element={<PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute>} />
@@ -143,9 +136,6 @@ function App() {
                 <Route path="/psychology/results" element={<PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute>} />
                 <Route path="/psychology/student" element={<StudentRoute><StudentPsychologyPage /></StudentRoute>} />
 
-                <Route path="/sinfs" element={<PermissionRoute permission="read:sinf"><SinfsPage /></PermissionRoute>} />
-                <Route path="/sinfs/:id" element={<PermissionRoute permission="read:sinf"><SinfDetailPage /></PermissionRoute>} />
-                <Route path="/sinfs/:sinfId/mavzu/:topicId" element={<PermissionRoute permission="read:sinf"><MavzuDetailPage /></PermissionRoute>} />
                 <Route path="/academic-years" element={<PermissionRoute permission="read:academic_year"><AcademicYearsPage /></PermissionRoute>} />
 
                 <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />

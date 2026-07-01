@@ -95,7 +95,6 @@ export const useMyResults = (params?: {
     method_id?: number;
     faculty_id?: number;
     group_id?: number;
-    tutor_id?: number;
     page?: number;
 }) =>
     useQuery({

@@ -37,7 +37,6 @@ const USER_TABS = [
     { label: 'Tizim foydalanuvchilari', href: '/users' },
     { label: 'Talabalar', href: '/students' },
     { label: "O'qituvchilar", href: '/teachers' },
-    { label: 'Tyutorlar', href: '/tutors' },
 ];
 
 const UsersPage = () => {

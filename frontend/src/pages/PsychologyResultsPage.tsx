@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useMyResults, useMethods, useDeleteResult } from '@/hooks/usePsychology';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
-import { useTutors } from '@/hooks/useTutors';
 import { useAuth } from '@/context/AuthContext';
 import PermissionGate from '@/components/auth/PermissionGate';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -82,7 +81,6 @@ export default function PsychologyResultsPage() {
     const [methodFilter, setMethodFilter] = useState<number | undefined>(undefined);
     const [facultyFilter, setFacultyFilter] = useState<string>('');
     const [groupFilter, setGroupFilter] = useState<string>('');
-    const [tutorFilter, setTutorFilter] = useState<string>('');
     const [selected, setSelected] = useState<TestResultResponse | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const deleteResult = useDeleteResult();
@@ -98,22 +96,15 @@ export default function PsychologyResultsPage() {
         facultyFilter ? Number(facultyFilter) : undefined,
         hasPermission('read:group'),
     );
-    const { data: tutorsData } = useTutors(1, 100, '', hasPermission('read:tutor'));
-
     const facultyOptions = facultiesData?.faculties.map(f => ({ value: String(f.id), label: f.name })) ?? [];
     const groupOptions = groupsData?.groups.map(g => ({ value: String(g.id), label: g.name })) ?? [];
-    const tutorOptions = tutorsData?.tutors.map(t => ({
-        value: String(t.id),
-        label: `${t.last_name} ${t.first_name}`.trim(),
-    })) ?? [];
 
-    const hasActiveFilter = !!(methodFilter || facultyFilter || groupFilter || tutorFilter);
+    const hasActiveFilter = !!(methodFilter || facultyFilter || groupFilter);
 
     const { data, isLoading, isError } = useMyResults({
         method_id: methodFilter,
         faculty_id: facultyFilter ? Number(facultyFilter) : undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
-        tutor_id: tutorFilter ? Number(tutorFilter) : undefined,
         page,
     });
 
@@ -175,17 +166,6 @@ export default function PsychologyResultsPage() {
                         </div>
                     </PermissionGate>
 
-                    <PermissionGate permission="read:tutor">
-                        <div className="w-[200px]">
-                            <Combobox
-                                options={tutorOptions}
-                                value={tutorFilter}
-                                onChange={value => { setTutorFilter(value); setPage(1); }}
-                                placeholder="Barcha tyutorlar"
-                            />
-                        </div>
-                    </PermissionGate>
-
                     {hasActiveFilter && (
                         <Button
                             variant="ghost"
@@ -194,7 +174,6 @@ export default function PsychologyResultsPage() {
                                 setMethodFilter(undefined);
                                 setFacultyFilter('');
                                 setGroupFilter('');
-                                setTutorFilter('');
                                 setPage(1);
                             }}
                         >

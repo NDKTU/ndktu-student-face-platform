@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from app.modules.role.models.role import Role
     from app.modules.student.model import Student
     from app.modules.teacher.model import Teacher
-    from app.modules.tutor.models.tutor import Tutor
     from app.modules.user_answers.model import UserAnswers
     from app.modules.yakuniy.model import Yakuniy
 
@@ -42,8 +41,6 @@ class User(Base, IdIntPk, TimestampMixin):
     user_answers: Mapped[list["UserAnswers"]] = relationship("UserAnswers", back_populates="user")
 
     teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="user")
-
-    tutor: Mapped["Tutor"] = relationship("Tutor", back_populates="user", uselist=False)
 
     group_teachers: Mapped[list["GroupTeacher"]] = relationship(
         "GroupTeacher", back_populates="teacher", cascade="all, delete-orphan"

@@ -161,7 +161,6 @@ export const psychologyService = {
         method_id?: number;
         faculty_id?: number;
         group_id?: number;
-        tutor_id?: number;
         page?: number;
         limit?: number;
     }) => {

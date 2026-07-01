@@ -24,19 +24,13 @@ __all__ = [
     "GroupTeacher",
     "Yakuniy",
     "HemisTransaction",
-    "Resource",
     "PsychologyMethod",
-    "Tutor",
-    "TutorGroup",
     "Lesson",
     "LessonResult",
-    "Sinf",
-    "SinfGroup",
     "AcademicYear",
     "Semester",
     "Module",
     "Topic",
-    "Syllabus",
     "Assignment",
     "AssignmentSubmission",
     "StudentMovement",
@@ -58,19 +52,14 @@ from app.modules.psychology.model import (
 from app.modules.question.model import Question
 from app.modules.quiz.models.quiz import Quiz
 from app.modules.quiz.models.quiz_questions import QuizQuestion
-from app.modules.resource.model import Resource
 from app.modules.result.model import Result
 from app.modules.role.models.role import Role
 from app.modules.role.models.role_permission import RolePermission
-from app.modules.sinf.model import Sinf, SinfGroup
 from app.modules.student.model import Student
 from app.modules.student_movement.model import StudentMovement
 from app.modules.subject.models.subject import Subject
 from app.modules.subject.models.subject_teacher import SubjectTeacher
-from app.modules.syllabus.model import Syllabus
 from app.modules.teacher.model import Teacher
-from app.modules.tutor.models.tutor import Tutor
-from app.modules.tutor.models.tutor_groups import TutorGroup
 from app.modules.user.models.user import User
 from app.modules.user.models.user_role import UserRole
 from app.modules.user_answers.model import UserAnswers
