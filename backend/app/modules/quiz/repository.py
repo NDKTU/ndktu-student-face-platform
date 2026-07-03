@@ -6,6 +6,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.employee.model import Employee
 from app.modules.group.models.group_teachers import GroupTeacher
 from app.modules.question.model import Question
 from app.modules.quiz.models.quiz import Quiz
@@ -157,7 +158,8 @@ class QuizRepository:
             st_stmt = (
                 select(SubjectTeacher.subject_id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .where(Teacher.user_id == current_user.id)
+                .join(Employee, Teacher.employee_id == Employee.id)
+                .where(Employee.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()

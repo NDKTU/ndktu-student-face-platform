@@ -32,7 +32,7 @@ export const TeacherActivityTab = () => {
         () =>
             teachersData?.teachers.map((t) => ({
                 value: t.id.toString(),
-                label: t.full_name,
+                label: t.employee?.full_name ?? '',
             })) ?? [],
         [teachersData]
     );

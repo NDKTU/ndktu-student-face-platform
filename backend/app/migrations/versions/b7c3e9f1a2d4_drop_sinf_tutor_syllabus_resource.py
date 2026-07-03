@@ -26,11 +26,27 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Drop the removed feature tables (children first)."""
     op.drop_table("resources")
+
+    # Sever FK columns on tables that survive this migration but referenced
+    # sinfs.id, before sinfs itself can be dropped.
+    op.drop_constraint("fk_lessons_sinf_id", "lessons", type_="foreignkey")
+    op.drop_index(op.f("ix_lessons_sinf_id"), table_name="lessons")
+    op.drop_column("lessons", "sinf_id")
+
+    op.drop_constraint("course_modules_sinf_id_fkey", "course_modules", type_="foreignkey")
+    op.drop_index(op.f("ix_course_modules_sinf_id"), table_name="course_modules")
+    op.drop_column("course_modules", "sinf_id")
+
+    op.drop_constraint("assignments_sinf_id_fkey", "assignments", type_="foreignkey")
+    op.drop_index(op.f("ix_assignments_sinf_id"), table_name="assignments")
+    op.drop_column("assignments", "sinf_id")
+
     op.drop_table("sinf_groups")
+    # syllabuses.sinf_id references sinfs.id, so it must go before sinfs.
+    op.drop_table("syllabuses")
     op.drop_table("sinfs")
     op.drop_table("tutor_groups")
     op.drop_table("tutors")
-    op.drop_table("syllabuses")
 
 
 def downgrade() -> None:
@@ -114,6 +130,25 @@ def downgrade() -> None:
     )
     op.create_index(op.f("ix_sinf_groups_sinf_id"), "sinf_groups", ["sinf_id"], unique=False)
     op.create_index(op.f("ix_sinf_groups_group_id"), "sinf_groups", ["group_id"], unique=False)
+
+    # Restore the sinf_id FK columns on tables that survived the upgrade.
+    op.add_column("lessons", sa.Column("sinf_id", sa.Integer(), nullable=True))
+    op.create_index(op.f("ix_lessons_sinf_id"), "lessons", ["sinf_id"], unique=False)
+    op.create_foreign_key(
+        "fk_lessons_sinf_id", "lessons", "sinfs", ["sinf_id"], ["id"], ondelete="SET NULL"
+    )
+
+    op.add_column("course_modules", sa.Column("sinf_id", sa.Integer(), nullable=False))
+    op.create_index(op.f("ix_course_modules_sinf_id"), "course_modules", ["sinf_id"], unique=False)
+    op.create_foreign_key(
+        "course_modules_sinf_id_fkey", "course_modules", "sinfs", ["sinf_id"], ["id"], ondelete="CASCADE"
+    )
+
+    op.add_column("assignments", sa.Column("sinf_id", sa.Integer(), nullable=False))
+    op.create_index(op.f("ix_assignments_sinf_id"), "assignments", ["sinf_id"], unique=False)
+    op.create_foreign_key(
+        "assignments_sinf_id_fkey", "assignments", "sinfs", ["sinf_id"], ["id"], ondelete="CASCADE"
+    )
 
     op.create_table(
         "resources",

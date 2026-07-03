@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherService, type TeacherCreateRequest, type TeacherFullCreateRequest } from '@/services/teacherService';
+import { teacherService, type TeacherCreateRequest, type TeacherUpdateRequest } from '@/services/teacherService';
 
 export const useTeachers = (page = 1, limit = 10, full_name?: string, enabled: boolean = true, kafedra_id?: number) => {
     return useQuery({
@@ -28,20 +28,10 @@ export const useCreateTeacher = () => {
     });
 };
 
-export const useCreateTeacherWithUser = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: TeacherFullCreateRequest) => teacherService.createTeacherWithUser(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        },
-    });
-};
-
 export const useUpdateTeacher = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: TeacherCreateRequest }) =>
+        mutationFn: ({ id, data }: { id: number; data: TeacherUpdateRequest }) =>
             teacherService.updateTeacher(id, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['teachers'] });

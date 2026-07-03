@@ -3,27 +3,27 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_create_teacher(auth_client, test_kafedra):
-    # Create a user for the teacher
-    user_payload = {
+    # Create an employee (User + profile + role) for the teacher
+    employee_payload = {
         "username": "teacher_create_user",
         "password": "password123",
-        "roles": [{"name": "Admin"}],
-    }
-    user_response = await auth_client.post("/user/", json=user_payload)
-    assert user_response.status_code == 201
-    user_data = user_response.json()
-
-    payload = {
         "first_name": "Alice",
         "last_name": "Johnson",
         "third_name": "Marie",
+        "roles": [{"name": "Admin"}],
+    }
+    employee_response = await auth_client.post("/employee/", json=employee_payload)
+    assert employee_response.status_code == 201
+    employee_data = employee_response.json()
+
+    payload = {
         "kafedra_id": test_kafedra["id"],
-        "user_id": user_data["id"],
+        "employee_id": employee_data["id"],
     }
     response = await auth_client.post("/teacher/", json=payload)
     assert response.status_code == 201
     data = response.json()
-    assert data["first_name"] == payload["first_name"]
+    assert data["employee"]["first_name"] == employee_payload["first_name"]
     assert data["kafedra_id"] == payload["kafedra_id"]
     assert "id" in data
 
@@ -34,7 +34,7 @@ async def test_get_teacher(auth_client, test_teacher):
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == test_teacher["id"]
-    assert data["full_name"] is not None
+    assert data["employee"]["full_name"] is not None
 
 
 @pytest.mark.asyncio
@@ -47,18 +47,20 @@ async def test_list_teachers(auth_client, test_teacher):
 
 
 @pytest.mark.asyncio
-async def test_update_teacher(auth_client, test_teacher):
-    payload = {
-        "first_name": "Updated Alice",
-        "last_name": "Updated Johnson",
-        "third_name": "Marie",
-        "kafedra_id": test_teacher["kafedra_id"],
-        "user_id": test_teacher["user_id"],
-    }
+async def test_update_teacher(auth_client, test_teacher, test_faculty):
+    # employee_id is immutable after creation — update_teacher only reassigns kafedra
+    new_kafedra_response = await auth_client.post(
+        "/kafedra/", json={"name": "Another Kafedra", "faculty_id": test_faculty["id"]}
+    )
+    assert new_kafedra_response.status_code == 201
+    new_kafedra = new_kafedra_response.json()
+
+    payload = {"kafedra_id": new_kafedra["id"]}
     response = await auth_client.put(f"/teacher/{test_teacher['id']}", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["first_name"] == payload["first_name"]
+    assert data["kafedra_id"] == new_kafedra["id"]
+    assert data["employee"]["id"] == test_teacher["employee_id"]
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class TeacherKafedraInfo(BaseModel):
@@ -36,41 +36,48 @@ class TeacherSubjectTeacherInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherUserInfo(BaseModel):
+class TeacherEmployeeUserInfo(BaseModel):
     id: int
     username: str
     group_teachers: list[TeacherUserGroupTeacherInfo] = []
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherCreateRequest(BaseModel):
-    first_name: str
-    last_name: str
-    third_name: str
-    kafedra_id: int
-    user_id: int
-
-    @field_validator("first_name", "last_name", "third_name", mode="before")
-    @classmethod
-    def must_not_be_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Field cannot be empty")
-        return v.strip()
-
-
-class TeacherCreateResponse(BaseModel):
+class TeacherEmployeeInfo(BaseModel):
     id: int
     user_id: int
     first_name: str
     last_name: str
     third_name: str
     full_name: str
+    phone_number: Optional[str] = None
+    image_url: Optional[str] = None
+    user: Optional[TeacherEmployeeUserInfo] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeacherCreateRequest(BaseModel):
+    employee_id: int
+    kafedra_id: int
+
+
+class TeacherUpdateRequest(BaseModel):
+    """Teacher's own identity (employee_id) is immutable after creation —
+    only the kafedra assignment can change. Personal info lives on Employee
+    and is edited via the employee endpoints."""
+
+    kafedra_id: int
+
+
+class TeacherCreateResponse(BaseModel):
+    id: int
+    employee_id: int
     kafedra_id: int
     created_at: datetime
     updated_at: datetime
 
     kafedra: Optional[TeacherKafedraInfo] = None
-    user: Optional[TeacherUserInfo] = None
+    employee: Optional[TeacherEmployeeInfo] = None
     subject_teachers: list[TeacherSubjectTeacherInfo] = []
 
     model_config = ConfigDict(
@@ -110,6 +117,20 @@ class TeacherSubjectAssignRequest(BaseModel):
     subject_ids: list[int]
 
 
+def _flatten_employee(data: Any) -> Any:
+    """Shared before-validator: copies personal/user fields from
+    `teacher.employee.*` onto the flat response shape these "my profile"
+    endpoints have always returned."""
+    if hasattr(data, "employee") and data.employee is not None:
+        employee = data.employee
+        data.__dict__["user_id"] = employee.user_id
+        data.__dict__["first_name"] = employee.first_name
+        data.__dict__["last_name"] = employee.last_name
+        data.__dict__["third_name"] = employee.third_name
+        data.__dict__["full_name"] = employee.full_name
+    return data
+
+
 class TeacherAssignedSubjectsResponse(BaseModel):
     id: int
     user_id: int
@@ -120,6 +141,11 @@ class TeacherAssignedSubjectsResponse(BaseModel):
     subject_teachers: list[TeacherSubjectTeacherInfo]
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_employee(cls, data: Any) -> Any:
+        return _flatten_employee(data)
 
 
 class TeacherAssignedGroupsResponse(BaseModel):
@@ -136,9 +162,10 @@ class TeacherAssignedGroupsResponse(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def extract_group_teachers(cls, data: Any) -> Any:
-        # When built from ORM object, groups are on teacher.user.group_teachers
-        if hasattr(data, "user") and data.user is not None:
-            data.__dict__["group_teachers"] = data.user.group_teachers
+        data = _flatten_employee(data)
+        # Groups live on teacher.employee.user.group_teachers
+        if hasattr(data, "employee") and data.employee is not None and data.employee.user is not None:
+            data.__dict__["group_teachers"] = data.employee.user.group_teachers
         return data
 
 

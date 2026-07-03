@@ -6,7 +6,9 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy import and_, case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.modules.employee.model import Employee
 from app.modules.faculty.model import Faculty
 from app.modules.group.models.group import Group
 from app.modules.kafedra.model import Kafedra
@@ -270,7 +272,11 @@ class StatisticsRepository:
         )
 
     async def get_teacher_stats(self, session: AsyncSession, teacher_id: int) -> TeacherStatisticsResponse:
-        teacher = (await session.execute(select(Teacher).where(Teacher.id == teacher_id))).scalar_one_or_none()
+        teacher = (
+            await session.execute(
+                select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
+            )
+        ).scalar_one_or_none()
         if not teacher:
             raise HTTPException(status_code=404, detail="Teacher not found")
 
@@ -282,14 +288,15 @@ class StatisticsRepository:
             )
             .join(Result.quiz)
             .join(Quiz.user)
-            .join(User.teacher)
+            .join(User.employee)
+            .join(Employee.teacher)
             .where(Teacher.id == teacher_id)
         )
         stats = (await session.execute(stats_stmt)).one()
 
         return TeacherStatisticsResponse(
             teacher_id=teacher.id,
-            full_name=f"{teacher.first_name} {teacher.last_name}",
+            full_name=f"{teacher.employee.first_name} {teacher.employee.last_name}",
             total_quizzes_created=stats.quizzes_created or 0,
             total_results=stats.total_results or 0,
             average_grade=float(stats.avg_grade or 0.0),
@@ -822,7 +829,8 @@ class StatisticsRepository:
             await session.execute(
                 select(func.count(distinct(Quiz.id)))
                 .select_from(Quiz)
-                .join(Teacher, Teacher.user_id == Quiz.user_id)
+                .join(Employee, Employee.user_id == Quiz.user_id)
+                .join(Teacher, Teacher.employee_id == Employee.id)
                 .where(Teacher.kafedra_id == kafedra_id)
             )
         ).scalar() or 0
@@ -905,14 +913,15 @@ class StatisticsRepository:
             stmt = (
                 select(
                     Teacher.id,
-                    Teacher.full_name,
+                    Employee.full_name,
                     func.count(Result.id),
                     func.avg(Result.grade),
                 )
                 .select_from(Result)
                 .join(Quiz, Quiz.id == Result.quiz_id)
-                .join(Teacher, Teacher.user_id == Quiz.user_id)
-                .group_by(Teacher.id, Teacher.full_name)
+                .join(Employee, Employee.user_id == Quiz.user_id)
+                .join(Teacher, Teacher.employee_id == Employee.id)
+                .group_by(Teacher.id, Employee.full_name)
             )
         else:
             raise HTTPException(status_code=400, detail="level must be one of: faculty, group, subject, teacher")
@@ -1254,12 +1263,17 @@ class StatisticsRepository:
     async def get_teacher_question_quality(
         self, session: AsyncSession, teacher_id: int
     ) -> TeacherQuestionQualityResponse:
-        teacher = (await session.execute(select(Teacher).where(Teacher.id == teacher_id))).scalar_one_or_none()
+        teacher = (
+            await session.execute(
+                select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
+            )
+        ).scalar_one_or_none()
         if not teacher:
             raise HTTPException(status_code=404, detail="Teacher not found")
+        employee_user_id = teacher.employee.user_id
 
         question_count = (
-            await session.execute(select(func.count(Question.id)).where(Question.user_id == teacher.user_id))
+            await session.execute(select(func.count(Question.id)).where(Question.user_id == employee_user_id))
         ).scalar() or 0
 
         # Average correct % across all answers to questions authored by this teacher.
@@ -1268,7 +1282,7 @@ class StatisticsRepository:
             select(func.count(UserAnswers.id), correct_expr)
             .select_from(UserAnswers)
             .join(Question, Question.id == UserAnswers.question_id)
-            .where(Question.user_id == teacher.user_id)
+            .where(Question.user_id == employee_user_id)
         )
         total, correct = (await session.execute(agg_stmt)).one()
         total = int(total or 0)
@@ -1283,14 +1297,18 @@ class StatisticsRepository:
     async def get_teacher_activity_timeline(
         self, session: AsyncSession, teacher_id: int, granularity: str = "month"
     ) -> TeacherActivityResponse:
-        teacher = (await session.execute(select(Teacher).where(Teacher.id == teacher_id))).scalar_one_or_none()
+        teacher = (
+            await session.execute(
+                select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
+            )
+        ).scalar_one_or_none()
         if not teacher:
             raise HTTPException(status_code=404, detail="Teacher not found")
 
         period = _date_trunc(granularity, Quiz.created_at).label("period")
         stmt = (
             select(period, func.count(Quiz.id))
-            .where(Quiz.user_id == teacher.user_id)
+            .where(Quiz.user_id == teacher.employee.user_id)
             .group_by("period")
             .order_by("period")
         )
@@ -1308,7 +1326,11 @@ class StatisticsRepository:
         )
 
     async def get_teacher_proctoring_summary(self, session: AsyncSession, teacher_id: int) -> TeacherProctoringResponse:
-        teacher = (await session.execute(select(Teacher).where(Teacher.id == teacher_id))).scalar_one_or_none()
+        teacher = (
+            await session.execute(
+                select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
+            )
+        ).scalar_one_or_none()
         if not teacher:
             raise HTTPException(status_code=404, detail="Teacher not found")
 
@@ -1317,7 +1339,7 @@ class StatisticsRepository:
             select(func.count(Result.id), cheat_expr)
             .select_from(Result)
             .join(Quiz, Quiz.id == Result.quiz_id)
-            .where(Quiz.user_id == teacher.user_id)
+            .where(Quiz.user_id == teacher.employee.user_id)
         )
         row = (await session.execute(stmt)).one()
         total = int(row[0] or 0)

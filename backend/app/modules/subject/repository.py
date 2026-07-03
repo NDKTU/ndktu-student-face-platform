@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.employee.model import Employee
 from app.modules.subject.models.subject import Subject
 from app.modules.subject.models.subject_teacher import SubjectTeacher
 from app.modules.teacher.model import Teacher
@@ -69,7 +70,8 @@ class SubjectRepository:
             st_stmt = (
                 select(SubjectTeacher.subject_id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .where(Teacher.user_id == current_user.id)
+                .join(Employee, Teacher.employee_id == Employee.id)
+                .where(Employee.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()

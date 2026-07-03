@@ -22,6 +22,7 @@ from .schemas import (
     TeacherListResponse,
     TeacherRankingResponse,
     TeacherSubjectAssignRequest,
+    TeacherUpdateRequest,
 )
 
 if TYPE_CHECKING:
@@ -78,7 +79,7 @@ async def list_teachers(
 )
 async def update_teacher(
     teacher_id: int,
-    data: TeacherCreateRequest,
+    data: TeacherUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:teacher")),
 ):

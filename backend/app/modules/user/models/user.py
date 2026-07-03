@@ -8,6 +8,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.modules.employee.model import Employee
     from app.modules.group.models.group_teachers import GroupTeacher
     from app.modules.hemis.model import HemisTransaction
     from app.modules.question.model import Question
@@ -15,7 +16,6 @@ if TYPE_CHECKING:
     from app.modules.result.model import Result
     from app.modules.role.models.role import Role
     from app.modules.student.model import Student
-    from app.modules.teacher.model import Teacher
     from app.modules.user_answers.model import UserAnswers
     from app.modules.yakuniy.model import Yakuniy
 
@@ -40,7 +40,7 @@ class User(Base, IdIntPk, TimestampMixin):
 
     user_answers: Mapped[list["UserAnswers"]] = relationship("UserAnswers", back_populates="user")
 
-    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="user")
+    employee: Mapped["Employee"] = relationship("Employee", back_populates="user")
 
     group_teachers: Mapped[list["GroupTeacher"]] = relationship(
         "GroupTeacher", back_populates="teacher", cascade="all, delete-orphan"

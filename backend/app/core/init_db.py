@@ -128,6 +128,8 @@ async def init_db(app: FastAPI, session: AsyncSession):
         # Teacher gets questions, quizzes, statistics, results, subjects, lessons,
         # academic_year (read only), lesson results. Lesson ownership is enforced inside its
         # repository (teachers can only CRUD lessons for groups they own).
+        # Note: create/read/update/delete:employee are intentionally admin-only — no
+        # keyword below matches "employee", so they only land on Admin via admin_perms.
         admin_only_perms = {
             "create:academic_year",
             "update:academic_year",
@@ -167,6 +169,8 @@ async def init_db(app: FastAPI, session: AsyncSession):
             teacher_perms.add("read:role")
         if "user:me" in discovered_permissions:
             teacher_perms.add("user:me")
+        if "employee:me" in discovered_permissions:
+            teacher_perms.add("employee:me")
 
         # Student gets read-only quiz/result + quiz process + user:me + read:psychology
         # + read:assignment / create+read:submission for homework workflow
@@ -193,10 +197,12 @@ async def init_db(app: FastAPI, session: AsyncSession):
 
         user_perms = {"user:me"} if "user:me" in discovered_permissions else set()
 
-        # Psixologik: full access only to psychology endpoints + user:me for own profile.
+        # Psixologik: full access only to psychology endpoints + user:me/employee:me for own profile.
         psixologik_perms = {p for p in discovered_permissions if "psychology" in p}
         if "user:me" in discovered_permissions:
             psixologik_perms.add("user:me")
+        if "employee:me" in discovered_permissions:
+            psixologik_perms.add("employee:me")
 
         ROLE_PERMISSIONS_MAP = {
             "Admin": admin_perms,

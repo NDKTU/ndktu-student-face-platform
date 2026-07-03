@@ -181,9 +181,9 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                                         onClick={() => handleViewTeacher(teacher)}
                                     >
                                         <TableCell className="font-medium">
-                                            <div className="capitalize">{teacher.full_name || teacher.user?.username || 'Noma\'lum'}</div>
+                                            <div className="capitalize">{teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}</div>
                                         </TableCell>
-                                        <TableCell>{teacher.user?.username || '-'}</TableCell>
+                                        <TableCell>{teacher.employee?.user?.username || '-'}</TableCell>
                                         <TableCell>{new Date(teacher.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
@@ -252,7 +252,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                             </ul>
                             <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
-                    ) : `Siz haqiqatan ham "${teacherToDelete?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
+                    ) : `Siz haqiqatan ham "${teacherToDelete?.employee?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"

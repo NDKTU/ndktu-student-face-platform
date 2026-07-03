@@ -3,15 +3,20 @@ export interface Kafedra {
     name: string;
 }
 
-export interface Teacher {
+export interface EmployeeTeacherInfo {
+    id: number;
+    kafedra: Kafedra | null;
+}
+
+export interface Employee {
     id: number;
     first_name: string;
     last_name: string;
-    middle_name: string;
     third_name: string;
     full_name: string;
-    kafedra_id: number;
-    kafedra: Kafedra;
+    phone_number: string | null;
+    image_url: string | null;
+    teacher?: EmployeeTeacherInfo | null;
 }
 
 export interface Group {
@@ -59,7 +64,7 @@ export interface User {
     username: string;
     is_active: boolean;
     roles: UserRole[];
-    teacher?: Teacher;
+    employee?: Employee;
     student?: Student;
     created_at: string;
     updated_at: string;

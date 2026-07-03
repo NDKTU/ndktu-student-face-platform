@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.course.model import Course, CourseGroup
+from app.modules.employee.model import Employee
 from app.modules.subject.models.subject import Subject
 from app.modules.subject.models.subject_teacher import SubjectTeacher
 from app.modules.teacher.model import Teacher
@@ -39,7 +40,7 @@ class CourseRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Subject {subject_id} not found")
 
     async def _serialize(self, session: AsyncSession, course: Course) -> CourseResponse:
-        teacher_full_name_stmt = select(Teacher.full_name).where(Teacher.user_id == course.teacher_id)
+        teacher_full_name_stmt = select(Employee.full_name).where(Employee.user_id == course.teacher_id)
         teacher_full_name = (await session.execute(teacher_full_name_stmt)).scalar_one_or_none()
 
         return CourseResponse(
@@ -238,7 +239,9 @@ class CourseRepository:
         return await self._load_with_relations(session, course_id)
 
     async def get_or_create_subject_teacher_for_course(self, session: AsyncSession, course: Course) -> SubjectTeacher:
-        teacher_stmt = select(Teacher).where(Teacher.user_id == course.teacher_id)
+        teacher_stmt = (
+            select(Teacher).join(Employee, Teacher.employee_id == Employee.id).where(Employee.user_id == course.teacher_id)
+        )
         teacher = (await session.execute(teacher_stmt)).scalar_one_or_none()
         if not teacher:
             raise HTTPException(

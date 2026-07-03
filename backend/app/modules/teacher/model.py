@@ -8,20 +8,15 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.modules.employee.model import Employee
     from app.modules.kafedra.model import Kafedra
     from app.modules.subject.models.subject_teacher import SubjectTeacher
-    from app.modules.user.models.user import User
 
 
 class Teacher(Base, IdIntPk, TimestampMixin):
     __tablename__ = "teachers"
     kafedra_id: Mapped[int] = mapped_column(ForeignKey("kafedras.id"))
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-
-    last_name: Mapped[str] = mapped_column()
-    first_name: Mapped[str] = mapped_column()
-    third_name: Mapped[str] = mapped_column()
-    full_name: Mapped[str] = mapped_column(unique=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), unique=True)
 
     kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="teachers")
 
@@ -30,7 +25,7 @@ class Teacher(Base, IdIntPk, TimestampMixin):
         back_populates="teacher",
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="teacher")
+    employee: Mapped["Employee"] = relationship("Employee", back_populates="teacher")
 
     def __str__(self):
-        return self.full_name
+        return self.employee.full_name if self.employee else f"Teacher {self.id}"

@@ -1,43 +1,43 @@
 import api from './api';
 
-export interface Teacher {
+export interface TeacherEmployeeInfo {
     id: number;
     user_id: number;
     first_name: string;
     last_name: string;
     third_name: string;
     full_name: string;
+    phone_number: string | null;
+    image_url: string | null;
+    user?: {
+        id: number;
+        username: string;
+        group_teachers?: { group_id: number; group: { id: number; name: string } }[];
+    };
+}
+
+export interface Teacher {
+    id: number;
+    employee_id: number;
     kafedra_id: number;
     kafedra?: {
         id: number;
         name: string;
         faculty_id?: number;
     };
-    user?: {
-        id: number;
-        username: string;
-        group_teachers?: { group_id: number; group: { id: number; name: string } }[];
-    };
+    employee?: TeacherEmployeeInfo;
     subject_teachers?: { subject_id: number; subject: { id: number; name: string } }[];
     created_at: string;
     updated_at: string;
 }
 
 export interface TeacherCreateRequest {
-    first_name: string;
-    last_name: string;
-    third_name: string;
     kafedra_id: number;
-    user_id: number;
+    employee_id: number;
 }
 
-export interface TeacherFullCreateRequest {
-    first_name: string;
-    last_name: string;
-    third_name: string;
+export interface TeacherUpdateRequest {
     kafedra_id: number;
-    username: string;
-    password: string;
 }
 
 export interface TeacherListResponse {
@@ -75,27 +75,7 @@ export const teacherService = {
         return response.data;
     },
 
-    createTeacherWithUser: async (data: TeacherFullCreateRequest) => {
-        // Step 1: Create user with Teacher role
-        const userResponse = await api.post('/user/', {
-            username: data.username,
-            password: data.password,
-            roles: [{ name: 'Teacher' }],
-        });
-        const user_id: number = userResponse.data.id;
-
-        // Step 2: Create teacher linked to that user
-        const teacherResponse = await api.post('/teacher/', {
-            first_name: data.first_name,
-            last_name: data.last_name,
-            third_name: data.third_name,
-            kafedra_id: data.kafedra_id,
-            user_id,
-        });
-        return teacherResponse.data;
-    },
-
-    updateTeacher: async (id: number, data: TeacherCreateRequest) => {
+    updateTeacher: async (id: number, data: TeacherUpdateRequest) => {
         const response = await api.put(`/teacher/${id}`, data);
         return response.data;
     },

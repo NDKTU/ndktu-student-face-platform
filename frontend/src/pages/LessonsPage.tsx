@@ -53,7 +53,7 @@ export default function LessonsPage() {
         return (teachersData?.teachers ?? []).flatMap(t =>
             (t.subject_teachers ?? []).map((st: any) => ({
                 value: st.id.toString(),
-                label: `${t.full_name} / ${st.subject?.name ?? '?'}`,
+                label: `${t.employee?.full_name ?? ''} / ${st.subject?.name ?? '?'}`,
             }))
         );
     }, [isTeacher, isAdmin, teachersData, assignedSubjectsData]);

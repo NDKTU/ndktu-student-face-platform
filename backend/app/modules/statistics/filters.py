@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import Select
 from sqlalchemy.sql import ColumnElement
 
+from app.modules.employee.model import Employee
 from app.modules.group.models.group import Group
 from app.modules.quiz.models.quiz import Quiz
 from app.modules.result.model import Result
@@ -69,10 +70,11 @@ def apply_result_filters(
         stmt = stmt.join(Group, Group.id == Result.group_id).where(Group.faculty_id == filters.faculty_id)
 
     if filters.kafedra_id is not None:
-        # Result -> Quiz -> User (creator) -> Teacher.kafedra_id
+        # Result -> Quiz -> User (creator) -> Employee -> Teacher.kafedra_id
         stmt = (
             stmt.join(Quiz, Quiz.id == Result.quiz_id)
-            .join(Teacher, Teacher.user_id == Quiz.user_id)
+            .join(Employee, Employee.user_id == Quiz.user_id)
+            .join(Teacher, Teacher.employee_id == Employee.id)
             .where(Teacher.kafedra_id == filters.kafedra_id)
         )
 

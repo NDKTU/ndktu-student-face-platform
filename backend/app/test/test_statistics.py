@@ -19,7 +19,7 @@ async def test_statistics_endpoints(
     # 2. Quiz created by User (test_user), who is linked to the Teacher
 
     # Use the user linked to the teacher for quiz creation
-    teacher_user_id = test_teacher["user_id"]
+    teacher_user_id = test_teacher["employee"]["user_id"]
 
     # Create Quiz
     quiz = Quiz(

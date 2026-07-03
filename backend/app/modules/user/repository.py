@@ -6,6 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.employee.model import Employee
 from app.modules.role.models.role import Role
 from app.modules.student.model import Student
 from app.modules.teacher.model import Teacher
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class UserRepository:
-    async def create_user(self, session: AsyncSession, data: UserCreateRequest) -> User:
+    async def create_user(self, session: AsyncSession, data: UserCreateRequest, commit: bool = True) -> User:
         # Проверка на существование
         stmt_check = select(User).where(User.username == data.username)
         result_check = await session.execute(stmt_check)
@@ -51,6 +52,13 @@ class UserRepository:
         )
 
         session.add(new_user)
+
+        if not commit:
+            # Caller (e.g. EmployeeRepository) owns the transaction and will
+            # commit once after adding its own dependent rows.
+            await session.flush()
+            return new_user
+
         try:
             await session.commit()
             await session.refresh(new_user, attribute_names=["roles"])
@@ -77,7 +85,7 @@ class UserRepository:
         # 1. Запрос на получение моделей
         stmt = select(User).options(
             selectinload(User.roles),
-            selectinload(User.teacher).selectinload(Teacher.kafedra),
+            selectinload(User.employee).selectinload(Employee.teacher).selectinload(Teacher.kafedra),
             selectinload(User.student).selectinload(Student.group),
         )
 
@@ -153,7 +161,11 @@ class UserRepository:
                 await session.execute(select(func.count(StudentModel.id)).where(StudentModel.user_id == user_id))
             ).scalar() or 0
             teacher_count = (
-                await session.execute(select(func.count(TeacherModel.id)).where(TeacherModel.user_id == user_id))
+                await session.execute(
+                    select(func.count(TeacherModel.id))
+                    .join(Employee, TeacherModel.employee_id == Employee.id)
+                    .where(Employee.user_id == user_id)
+                )
             ).scalar() or 0
 
             total = result_count + quiz_count + student_count + teacher_count
@@ -194,9 +206,18 @@ class UserRepository:
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizModel).where(QuizModel.id.in_(quiz_ids)))
 
-        # 3. Student & Teacher records
+        # 3. Student, Teacher & Employee records (Teacher before Employee: FK order)
         await session.execute(delete(StudentModel).where(StudentModel.user_id == user_id))
-        await session.execute(delete(TeacherModel).where(TeacherModel.user_id == user_id))
+        teacher_ids = (
+            await session.execute(
+                select(TeacherModel.id)
+                .join(Employee, TeacherModel.employee_id == Employee.id)
+                .where(Employee.user_id == user_id)
+            )
+        ).scalars().all()
+        if teacher_ids:
+            await session.execute(delete(TeacherModel).where(TeacherModel.id.in_(teacher_ids)))
+        await session.execute(delete(Employee).where(Employee.user_id == user_id))
 
         # 4. Role assignments (usually handled by SQLAlchemy relationship if set up, but safe to delete user)
 

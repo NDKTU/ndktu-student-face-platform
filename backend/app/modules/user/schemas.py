@@ -117,13 +117,21 @@ class KafedraResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherDetailResponse(BaseModel):
+class EmployeeTeacherInfo(BaseModel):
+    id: int
+    kafedra: KafedraResponse | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmployeeDetailResponse(BaseModel):
     id: int
     first_name: str
     last_name: str
     third_name: str
     full_name: str
-    kafedra: KafedraResponse | None = None
+    phone_number: str | None = None
+    image_url: str | None = None
+    teacher: EmployeeTeacherInfo | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -156,7 +164,7 @@ class StudentDetailResponse(BaseModel):
 
 
 class UserDetailResponse(UserCreateResponse):
-    teacher: TeacherDetailResponse | None = None
+    employee: EmployeeDetailResponse | None = None
     student: StudentDetailResponse | None = None
 
 
@@ -164,7 +172,7 @@ class UserMeResponse(BaseModel):
     id: int
     username: str
     roles: list[RoleWithPermissionsResponse]
-    teacher: TeacherDetailResponse | None = None
+    employee: EmployeeDetailResponse | None = None
     student: StudentDetailResponse | None = None
     created_at: datetime
     updated_at: datetime

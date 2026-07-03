@@ -9,8 +9,8 @@ from app.core.datetime_utils import to_naive_utc as _to_naive_utc
 from app.core.datetime_utils import utcnow_naive as _utcnow
 from app.modules.assignment.models import Assignment, AssignmentSubmission
 from app.modules.course.model import Course, CourseGroup
+from app.modules.employee.model import Employee
 from app.modules.student.model import Student
-from app.modules.teacher.model import Teacher
 from app.modules.user.models.user import User
 
 from .schemas import (
@@ -328,7 +328,7 @@ class AssignmentRepository:
         for sub in items:
             resp = await self._serialize_submission(sub)
             if resp.user and sub.user:
-                t_stmt = select(Teacher.full_name).where(Teacher.user_id == sub.user.id)
+                t_stmt = select(Employee.full_name).where(Employee.user_id == sub.user.id)
                 full = (await session.execute(t_stmt)).scalar_one_or_none()
                 if full:
                     resp = resp.model_copy(

@@ -10,6 +10,7 @@ import QuizzesPage from '@/pages/QuizzesPage';
 import ActiveQuizzesPage from '@/pages/ActiveQuizzesPage';
 import ResultsPage from '@/pages/ResultsPage';
 import TeachersPage from '@/pages/TeachersPage';
+import EmployeesPage from '@/pages/EmployeesPage';
 import HemisSyncPage from '@/pages/HemisSyncPage';
 import FacultyPage from '@/pages/FacultyPage';
 import KafedraPage from '@/pages/KafedraPage';
@@ -119,6 +120,7 @@ function App() {
                 <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                 <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
                 <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
+                <Route path="/employees" element={<PermissionRoute permission="read:employee"><EmployeesPage /></PermissionRoute>} />
                 <Route path="/teacher-ranking" element={<PermissionRoute permission={['read:statistics', 'read:teacher']}><TeacherRankingPage /></PermissionRoute>} />
                 <Route path="/statistics" element={<PermissionRoute permission="read:statistics"><StatisticsPage /></PermissionRoute>} />
 

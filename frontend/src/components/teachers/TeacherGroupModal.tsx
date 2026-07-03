@@ -41,7 +41,7 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
 
     useEffect(() => {
         if (teacher && isOpen) {
-            setSelectedGroupIds(teacher.user?.group_teachers?.map((g: any) => g.group_id) || []);
+            setSelectedGroupIds(teacher.employee?.user?.group_teachers?.map((g: any) => g.group_id) || []);
             setSearchQuery('');
             setDebouncedSearch('');
         }
@@ -52,15 +52,15 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
     };
 
     const handleSave = () => {
-        if (!teacher || !teacher.user) return;
-        assignGroupsMutation.mutate({ user_id: teacher.user.id, group_ids: selectedGroupIds }, {
+        if (!teacher || !teacher.employee?.user) return;
+        assignGroupsMutation.mutate({ user_id: teacher.employee.user.id, group_ids: selectedGroupIds }, {
             onSuccess: () => onClose(),
             onError: () => alert("Guruhlarni biriktirishda xatolik yuz berdi"),
         });
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.full_name} ga guruhlarni biriktirish`}>
+        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.employee?.full_name} ga guruhlarni biriktirish`}>
             <div className="space-y-4">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

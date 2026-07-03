@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from .academic_year.router import router as academic_year_router
 from .assignment.router import router as assignment_router
 from .course_structure.router import router as course_structure_router
+from .employee.router import router as employee_router
 from .faculty.router import router as faculty_router
 from .group.router import router as group_router
 from .hemis.router import router as hemis_router
@@ -32,6 +33,7 @@ router.include_router(permission_router)
 router.include_router(faculty_router)
 router.include_router(kafedra_router)
 router.include_router(group_router)
+router.include_router(employee_router)
 router.include_router(teacher_router)
 router.include_router(question_router)
 router.include_router(quiz_router)

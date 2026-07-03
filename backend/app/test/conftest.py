@@ -183,21 +183,21 @@ async def test_group(auth_client, test_faculty):
 
 @pytest_asyncio.fixture
 async def test_teacher(auth_client, test_kafedra):
-    user_payload = {
+    employee_payload = {
         "username": "teacher_fixture_user",
         "password": "password123",
-        "roles": [{"name": "Admin"}],
-    }
-    user_response = await auth_client.post("/user/", json=user_payload)
-    assert user_response.status_code == 201
-    user_data = user_response.json()
-
-    payload = {
         "first_name": "John",
         "last_name": "Doe",
         "third_name": "Smith",
+        "roles": [{"name": "Admin"}],
+    }
+    employee_response = await auth_client.post("/employee/", json=employee_payload)
+    assert employee_response.status_code == 201
+    employee_data = employee_response.json()
+
+    payload = {
         "kafedra_id": test_kafedra["id"],
-        "user_id": user_data["id"],
+        "employee_id": employee_data["id"],
     }
     response = await auth_client.post("/teacher/", json=payload)
     assert response.status_code == 201

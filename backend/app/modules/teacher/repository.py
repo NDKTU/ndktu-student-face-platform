@@ -5,6 +5,7 @@ from sqlalchemy import Float, asc, case, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.employee.model import Employee
 from app.modules.faculty.model import Faculty
 from app.modules.group.models.group import Group
 from app.modules.group.models.group_teachers import GroupTeacher
@@ -27,33 +28,46 @@ from .schemas import (
     TeacherRankingResponse,
     TeacherRankItem,
     TeacherSubjectAssignRequest,
+    TeacherUpdateRequest,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class TeacherRepository:
-    def _generate_full_name(self, first_name: str, last_name: str, third_name: str) -> str:
-        return f"{last_name} {first_name} {third_name}"
+    @staticmethod
+    def _eager_load_options():
+        # Built lazily (not at class-body/import time) so this doesn't force
+        # SQLAlchemy to configure all mappers before every model module has
+        # been imported by the app.
+        return (
+            selectinload(Teacher.kafedra),
+            selectinload(Teacher.employee)
+            .selectinload(Employee.user)
+            .selectinload(User.group_teachers)
+            .selectinload(GroupTeacher.group),
+            selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
+        )
 
     async def create_teacher(self, session: AsyncSession, data: TeacherCreateRequest) -> Teacher:
-        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
+        employee = (
+            await session.execute(select(Employee).where(Employee.id == data.employee_id))
+        ).scalar_one_or_none()
+        if not employee:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
-        stmt_check = select(Teacher).where(Teacher.full_name == full_name)
-        result_check = await session.execute(stmt_check)
-        if result_check.scalar_one_or_none():
+        existing = (
+            await session.execute(select(Teacher).where(Teacher.employee_id == data.employee_id))
+        ).scalar_one_or_none()
+        if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Teacher '{full_name}' already exists",
+                detail="This employee already has a Teacher profile",
             )
 
         new_teacher = Teacher(
-            first_name=data.first_name,
-            last_name=data.last_name,
-            third_name=data.third_name,
-            full_name=full_name,
             kafedra_id=data.kafedra_id,
-            user_id=data.user_id,
+            employee_id=data.employee_id,
         )
         session.add(new_teacher)
 
@@ -61,15 +75,7 @@ class TeacherRepository:
             await session.commit()
             await session.refresh(new_teacher)
             # Eager load relationships for response
-            stmt = (
-                select(Teacher)
-                .options(
-                    selectinload(Teacher.kafedra),
-                    selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group),
-                    selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
-                )
-                .where(Teacher.id == new_teacher.id)
-            )
+            stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == new_teacher.id)
             result = await session.execute(stmt)
             new_teacher = result.scalar_one()
         except Exception:
@@ -81,15 +87,7 @@ class TeacherRepository:
         return new_teacher
 
     async def get_teacher(self, session: AsyncSession, teacher_id: int) -> Teacher:
-        stmt = (
-            select(Teacher)
-            .options(
-                selectinload(Teacher.kafedra),
-                selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group),
-                selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
-            )
-            .where(Teacher.id == teacher_id)
-        )
+        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
         teacher = result.scalar_one_or_none()
 
@@ -99,17 +97,18 @@ class TeacherRepository:
         return teacher
 
     async def list_teachers(self, session: AsyncSession, request: TeacherListRequest) -> TeacherListResponse:
-        stmt = select(Teacher).options(
-            selectinload(Teacher.kafedra),
-            selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group),
-            selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
-        )
+        stmt = select(Teacher).options(*self._eager_load_options())
+        count_stmt = select(func.count()).select_from(Teacher)
 
         if request.full_name:
-            stmt = stmt.where(Teacher.full_name.ilike(f"%{request.full_name}%"))
+            stmt = stmt.join(Teacher.employee).where(Employee.full_name.ilike(f"%{request.full_name}%"))
+            count_stmt = count_stmt.join(Teacher.employee).where(
+                Employee.full_name.ilike(f"%{request.full_name}%")
+            )
 
         if request.kafedra_id:
             stmt = stmt.where(Teacher.kafedra_id == request.kafedra_id)
+            count_stmt = count_stmt.where(Teacher.kafedra_id == request.kafedra_id)
 
         stmt = stmt.order_by(desc(Teacher.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
@@ -117,52 +116,20 @@ class TeacherRepository:
         result = await session.execute(stmt)
         teachers = result.scalars().all()
 
-        count_stmt = select(func.count()).select_from(Teacher)
-        if request.full_name:
-            count_stmt = count_stmt.where(Teacher.full_name.ilike(f"%{request.full_name}%"))
-        if request.kafedra_id:
-            count_stmt = count_stmt.where(Teacher.kafedra_id == request.kafedra_id)
-
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
 
         return TeacherListResponse(total=total, page=request.page, limit=request.limit, teachers=teachers)
 
-    async def update_teacher(self, session: AsyncSession, teacher_id: int, data: TeacherCreateRequest) -> Teacher:
-        stmt = (
-            select(Teacher)
-            .options(
-                selectinload(Teacher.kafedra),
-                selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group),
-                selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
-            )
-            .where(Teacher.id == teacher_id)
-        )
+    async def update_teacher(self, session: AsyncSession, teacher_id: int, data: TeacherUpdateRequest) -> Teacher:
+        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
         teacher = result.scalar_one_or_none()
 
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
-
-        if full_name != teacher.full_name:
-            # Check unique name excluding current
-            stmt_check = select(Teacher).where(Teacher.full_name == full_name, Teacher.id != teacher_id)
-            existing = (await session.execute(stmt_check)).scalar_one_or_none()
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Teacher name already taken",
-                )
-
-        teacher.first_name = data.first_name
-        teacher.last_name = data.last_name
-        teacher.third_name = data.third_name
-        teacher.full_name = full_name
-
-        if data.kafedra_id is not None:
-            teacher.kafedra_id = data.kafedra_id
+        teacher.kafedra_id = data.kafedra_id
 
         await session.commit()
         await session.refresh(teacher)
@@ -176,12 +143,14 @@ class TeacherRepository:
         from app.modules.quiz.models.quiz import Quiz
         from app.modules.subject.models.subject_teacher import SubjectTeacher
 
-        stmt = select(Teacher).where(Teacher.id == teacher_id)
+        stmt = select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
         teacher = result.scalar_one_or_none()
 
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+        employee_user_id = teacher.employee.user_id
 
         if not force:
             st_count = (
@@ -191,14 +160,14 @@ class TeacherRepository:
             ).scalar() or 0
             gt_count = (
                 await session.execute(
-                    select(func.count(GroupTeacher.id)).where(GroupTeacher.teacher_id == teacher.user_id)
+                    select(func.count(GroupTeacher.id)).where(GroupTeacher.teacher_id == employee_user_id)
                 )
             ).scalar() or 0
             quiz_count = (
-                await session.execute(select(func.count(Quiz.id)).where(Quiz.user_id == teacher.user_id))
+                await session.execute(select(func.count(Quiz.id)).where(Quiz.user_id == employee_user_id))
             ).scalar() or 0
             question_count = (
-                await session.execute(select(func.count(Question.id)).where(Question.user_id == teacher.user_id))
+                await session.execute(select(func.count(Question.id)).where(Question.user_id == employee_user_id))
             ).scalar() or 0
 
             total = st_count + gt_count + quiz_count + question_count
@@ -224,7 +193,7 @@ class TeacherRepository:
 
         # Aggressive delete
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
-        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.user_id == teacher.user_id))).scalars().all()
+        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.user_id == employee_user_id))).scalars().all()
         if quiz_ids:
             from app.modules.quiz.models.quiz_questions import QuizQuestion
             from app.modules.result.model import Result
@@ -234,10 +203,10 @@ class TeacherRepository:
             await session.execute(delete(Quiz).where(Quiz.id.in_(quiz_ids)))
 
         # 2. Questions
-        await session.execute(delete(Question).where(Question.user_id == teacher.user_id))
+        await session.execute(delete(Question).where(Question.user_id == employee_user_id))
 
         # 3. Group Assignments
-        await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id == teacher.user_id))
+        await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id == employee_user_id))
 
         # 4. Subject Assignments (handled by SQLAlchemy cascade)
 
@@ -329,8 +298,9 @@ class TeacherRepository:
     async def get_assigned_subjects_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
             select(Teacher)
+            .join(Teacher.employee)
             .options(selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject))
-            .where(Teacher.user_id == user_id)
+            .where(Employee.user_id == user_id)
         )
 
         result = await session.execute(stmt)
@@ -347,8 +317,14 @@ class TeacherRepository:
     async def get_assigned_groups_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
             select(Teacher)
-            .options(selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group))
-            .where(Teacher.user_id == user_id)
+            .join(Teacher.employee)
+            .options(
+                selectinload(Teacher.employee)
+                .selectinload(Employee.user)
+                .selectinload(User.group_teachers)
+                .selectinload(GroupTeacher.group)
+            )
+            .where(Employee.user_id == user_id)
         )
 
         result = await session.execute(stmt)
@@ -431,7 +407,7 @@ class TeacherRepository:
 
         columns = [
             Teacher.id.label("teacher_id"),
-            Teacher.full_name,
+            Employee.full_name,
             Teacher.kafedra_id,
             Kafedra.name.label("kafedra_name"),
             Kafedra.faculty_id,
@@ -444,9 +420,10 @@ class TeacherRepository:
 
         stmt = (
             select(*columns)
+            .join(Employee, Teacher.employee_id == Employee.id)
             .outerjoin(Kafedra, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(Faculty, Kafedra.faculty_id == Faculty.id)
-            .outerjoin(GroupTeacher, Teacher.user_id == GroupTeacher.teacher_id)
+            .outerjoin(GroupTeacher, Employee.user_id == GroupTeacher.teacher_id)
             .outerjoin(Result, GroupTeacher.group_id == Result.group_id)
         )
 
@@ -459,7 +436,7 @@ class TeacherRepository:
 
         stmt = stmt.group_by(
             Teacher.id,
-            Teacher.full_name,
+            Employee.full_name,
             Teacher.kafedra_id,
             Kafedra.name,
             Kafedra.faculty_id,
@@ -548,7 +525,8 @@ class TeacherRepository:
             )
             .outerjoin(Kafedra, Kafedra.faculty_id == Faculty.id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
+            .outerjoin(Employee, Teacher.employee_id == Employee.id)
+            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Employee.user_id)
             .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
             .group_by(Faculty.id, Faculty.name)
             .order_by(desc("rank_score"))
@@ -610,7 +588,8 @@ class TeacherRepository:
             )
             .outerjoin(Faculty, Faculty.id == Kafedra.faculty_id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
+            .outerjoin(Employee, Teacher.employee_id == Employee.id)
+            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Employee.user_id)
             .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
             .group_by(Kafedra.id, Kafedra.name, Kafedra.faculty_id, Faculty.name)
             .order_by(desc("rank_score"))

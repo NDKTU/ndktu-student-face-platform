@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.employee.model import Employee
 from app.modules.group.models.group_teachers import GroupTeacher
 from app.modules.lesson.model import Lesson, LessonResult
 from app.modules.course.model import Course, CourseGroup
@@ -35,9 +36,10 @@ class LessonRepository:
         stmt = (
             select(SubjectTeacher.id)
             .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+            .join(Employee, Teacher.employee_id == Employee.id)
             .where(
                 SubjectTeacher.id == subject_teacher_id,
-                Teacher.user_id == user_id,
+                Employee.user_id == user_id,
             )
         )
         result = await session.execute(stmt)
@@ -195,7 +197,8 @@ class LessonRepository:
             st_stmt = (
                 select(SubjectTeacher.id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .where(Teacher.user_id == current_user.id)
+                .join(Employee, Teacher.employee_id == Employee.id)
+                .where(Employee.user_id == current_user.id)
             )
             allowed_subject_teacher_ids = (await session.execute(st_stmt)).scalars().all()
 

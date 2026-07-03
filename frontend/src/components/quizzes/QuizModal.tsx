@@ -83,8 +83,8 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         : allGroups.map(g => ({ value: g.id.toString(), label: g.name }));
 
     const teacherOptions = (searchTeachersData?.teachers || teachers).map(t => ({
-        value: t.user_id.toString(),
-        label: t.full_name,
+        value: (t.employee?.user_id ?? '').toString(),
+        label: t.employee?.full_name ?? '',
     }));
 
     const { data: academicYearsData } = useAcademicYears(undefined, isOpen);
@@ -256,7 +256,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     <div className="space-y-1">
                         <label className="text-sm font-medium">O'qituvchi</label>
                         <p className="text-sm bg-muted rounded px-3 py-2">
-                            {teachers.find(t => t.user_id === user?.id)?.full_name || user?.username || '-'}
+                            {teachers.find(t => t.employee?.user_id === user?.id)?.employee?.full_name || user?.username || '-'}
                         </p>
                     </div>
                 ) : (

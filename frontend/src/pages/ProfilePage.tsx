@@ -84,8 +84,8 @@ const ProfilePage = () => {
                         </div>
                         <div className="space-y-2">
                              <h2 className="text-xl font-bold break-words">
-                                {user.teacher 
-                                    ? `${user.teacher.last_name} ${user.teacher.first_name}`
+                                {user.employee
+                                    ? `${user.employee.last_name} ${user.employee.first_name}`
                                     : user.student
                                         ? `${user.student.last_name} ${user.student.first_name}`
                                         : user.username
@@ -111,25 +111,27 @@ const ProfilePage = () => {
                                 </div>
                             </div>
                             
-                             {/* Teacher Specific Details */}
-                            {user.teacher && (
+                             {/* Employee Specific Details */}
+                            {user.employee && (
                                 <>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                                            <Calendar className="h-3.5 w-3.5" />
-                                            Kafedra
-                                        </label>
-                                        <div className="text-base font-semibold">
-                                           {user.teacher.kafedra?.name || 'Mavjud emas'}
+                                    {user.employee.teacher && (
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                                <Calendar className="h-3.5 w-3.5" />
+                                                Kafedra
+                                            </label>
+                                            <div className="text-base font-semibold">
+                                               {user.employee.teacher.kafedra?.name || 'Mavjud emas'}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                      <div className="space-y-1 md:col-span-2">
                                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                                             <User className="h-3.5 w-3.5" />
                                             F.I.O
                                         </label>
                                         <div className="text-base font-semibold">
-                                           {user.teacher.last_name} {user.teacher.first_name} {user.teacher.third_name}
+                                           {user.employee.last_name} {user.employee.first_name} {user.employee.third_name}
                                         </div>
                                     </div>
                                 </>

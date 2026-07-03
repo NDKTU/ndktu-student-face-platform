@@ -16,6 +16,7 @@ import {
     BarChart2,
     Calendar,
     LineChart,
+    Briefcase,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export const SIDEBAR_SECTION_ORDER = [
 
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
+    employee:      { label: 'Xodimlar',         href: '/employees',   icon: Briefcase,     section: 'Foydalanuvchilar' },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
     student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
 

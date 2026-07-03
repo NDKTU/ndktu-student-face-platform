@@ -10,12 +10,16 @@ __all__ = [
     "RolePermission",
     "Permission",
     "Student",
+    "Employee",
     "Faculty",
     "Kafedra",
     "Group",
     "Teacher",
     "Subject",
     "SubjectTeacher",
+    "Speciality",
+    "Course",
+    "CourseGroup",
     "Question",
     "Quiz",
     "QuizQuestion",
@@ -38,7 +42,9 @@ __all__ = [
 
 from app.modules.academic_year.model import AcademicYear, Semester
 from app.modules.assignment.models import Assignment, AssignmentSubmission
+from app.modules.course.model import Course, CourseGroup
 from app.modules.course_structure.models import Module, Topic
+from app.modules.employee.model import Employee
 from app.modules.faculty.model import Faculty
 from app.modules.group.models.group import Group
 from app.modules.group.models.group_teachers import GroupTeacher
@@ -55,6 +61,7 @@ from app.modules.quiz.models.quiz_questions import QuizQuestion
 from app.modules.result.model import Result
 from app.modules.role.models.role import Role
 from app.modules.role.models.role_permission import RolePermission
+from app.modules.speciality.model import Speciality
 from app.modules.student.model import Student
 from app.modules.student_movement.model import StudentMovement
 from app.modules.subject.models.subject import Subject

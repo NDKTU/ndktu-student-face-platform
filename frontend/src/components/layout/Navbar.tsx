@@ -13,6 +13,7 @@ const ROUTE_LABELS: Record<string, string> = {
     '':                  'Dashboard',
     'users':             'Foydalanuvchilar',
     'teachers':          "O'qituvchilar",
+    'employees':         'Xodimlar',
     'students':          'Talabalar',
     'faculties':         'Fakultetlar',
     'kafedras':          'Kafedralar',

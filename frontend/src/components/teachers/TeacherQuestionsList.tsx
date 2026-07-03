@@ -49,7 +49,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
         pageSize,
         debouncedSearch,
         subject.id,
-        teacher.user_id,
+        teacher.employee!.user_id,
     );
 
     const deleteQuestionMutation = useDeleteQuestion();
@@ -91,7 +91,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
         if (window.confirm(`Haqiqatan ham "${subject.name}" faniga va ushbu o'qituvchiga tegishli BARCHA savollarni o'chirmoqchimisiz?`)) {
             bulkDeleteMutation.mutate({
                 subject_id: subject.id,
-                user_id: teacher.user_id,
+                user_id: teacher.employee!.user_id,
             }, {
                 onSuccess: (data: any) => {
                     alert(`${data.deleted_count} ta savol o'chirildi`);
@@ -117,7 +117,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                     </Button>
                     <div>
                         <h1 className="text-xl font-semibold tracking-tight">
-                            {teacher.full_name} — {subject.name}
+                            {teacher.employee!.full_name} — {subject.name}
                         </h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">Savollar ro'yxati</p>
                     </div>
@@ -134,7 +134,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                     </div>
                     <Button
                         variant="outline"
-                        onClick={() => downloadExcelMutation.mutate({ subject_id: subject.id, user_id: teacher.user_id })}
+                        onClick={() => downloadExcelMutation.mutate({ subject_id: subject.id, user_id: teacher.employee!.user_id })}
                         disabled={downloadExcelMutation.isPending}
                     >
                         {downloadExcelMutation.isPending ? (
