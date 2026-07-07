@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import api from '@/services/api';
 import { hemisService } from '@/services/hemisService';
 import { BookOpen, GraduationCap, Users } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 const staffLoginSchema = z.object({
     username: z.string().min(1, 'Foydalanuvchi nomi kiritilishi shart'),
@@ -65,9 +66,11 @@ export const Login: React.FC = () => {
             await login(response.data.access_token);
             navigate(from, { replace: true });
         } catch (err: any) {
-            console.error(err);
+            logger.error('Staff login failed', err);
             if (err.response?.status === 401 || err.response?.status === 400) {
                 setError('Login yoki parol noto\'g\'ri');
+            } else if (err.response?.status === 429) {
+                setError('Urinishlar soni ko\'p. Keyinroq urinib ko\'ring.');
             } else {
                 setError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
             }
@@ -81,7 +84,7 @@ export const Login: React.FC = () => {
             await login(response.access_token);
             navigate(from, { replace: true });
         } catch (err: any) {
-            console.error(err);
+            logger.error('Student login failed', err);
             if (err.response?.status === 401 || err.response?.status === 400 || err.response?.status === 404) {
                 setError('Ma\'lumotlar noto\'g\'ri yoki talaba topilmadi.');
             } else if (err.response?.status === 429) {

@@ -12,9 +12,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [theme, setTheme] = useState<Theme>(() => {
-        const storedTheme = localStorage.getItem('theme') as Theme;
-        if (storedTheme) {
-            return storedTheme;
+        try {
+            const storedTheme = localStorage.getItem('theme') as Theme;
+            if (storedTheme) {
+                return storedTheme;
+            }
+        } catch {
+            // localStorage blocked (strict tracking-protection, private
+            // browsing, site-data policy) — fall through to system preference.
         }
         // Check system preference
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -27,7 +32,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(theme);
-        localStorage.setItem('theme', theme);
+        try {
+            localStorage.setItem('theme', theme);
+        } catch {
+            // Storage unavailable — theme just won't persist across reloads.
+        }
     }, [theme]);
 
     const toggleTheme = () => {

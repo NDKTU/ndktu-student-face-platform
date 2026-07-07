@@ -26,21 +26,16 @@ api.interceptors.request.use(
     }
 );
 
-let lastForbiddenAlert = 0;
-const notifyForbidden = () => {
-    const now = Date.now();
-    if (now - lastForbiddenAlert < 3000) return;
-    lastForbiddenAlert = now;
-    window.dispatchEvent(new CustomEvent('app:forbidden'));
-};
-
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
         if (error.response?.status === 403) {
-            notifyForbidden();
+            // Re-fetch /user/me so a role/permission change made by an admin
+            // propagates without a full re-login. Each page's own inline
+            // isError state (React Query) surfaces the failure — no global
+            // blocking alert here.
             window.dispatchEvent(new CustomEvent('app:refresh-me'));
             return Promise.reject(error);
         }

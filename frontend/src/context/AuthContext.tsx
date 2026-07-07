@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import api from '@/services/api';
 import { userService } from '@/services/userService';
 import { getToken, setToken, clearToken } from '@/services/tokenStorage';
+import { logger } from '@/utils/logger';
 import type { User } from '@/types/auth';
 
 interface AuthContextType {
@@ -34,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
                 // 429 / 5xx / network error: don't kick the user out, leave
                 // user=null so route guards may show a spinner or render fallback.
-                console.error('Failed to fetch user (non-auth error)', status, error);
+                logger.error('Failed to fetch user (non-auth error)', error, { status });
                 setUser(null);
             }
         } finally {
@@ -63,15 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (getToken()) fetchUser();
         }, 60_000);
 
-        const onForbiddenToast = () => {
-            // Lightweight visible feedback; replaces silent console.error on 403
-            alert("Sizda bu amalni bajarish uchun ruxsat yo'q");
-        };
-        window.addEventListener('app:forbidden', onForbiddenToast);
-
         return () => {
             window.removeEventListener('app:refresh-me', onForbidden);
-            window.removeEventListener('app:forbidden', onForbiddenToast);
             clearInterval(interval);
         };
     }, []);

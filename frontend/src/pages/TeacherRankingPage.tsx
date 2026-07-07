@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Trophy, Loader2, Medal, Crown, Building2, Layers, Search, X, FilterX, FileSpreadsheet } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import {
@@ -245,7 +246,7 @@ const TeachersPanel = () => {
             writeFile(wb, `Oqituvchilar_reytingi_${date.replace(/\./g, '-')}.xlsx`);
 
         } catch (error) {
-            console.error("Excel eksportda xatolik:", error);
+            logger.error("Excel eksportda xatolik:", error);
             alert("Eksport qilishda xatolik yuz berdi.");
         } finally {
             setIsExporting(false);

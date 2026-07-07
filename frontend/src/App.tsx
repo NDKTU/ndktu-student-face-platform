@@ -24,20 +24,20 @@ import UserAnswersPage from '@/pages/UserAnswersPage';
 import TeacherGroupsPage from '@/pages/TeacherGroupsPage';
 import TeacherSubjectsPage from '@/pages/TeacherSubjectsPage';
 import TeacherRankingPage from '@/pages/TeacherRankingPage';
-import YakuniyPage from '@/pages/YakuniyPage';
 import PsychologyPage from '@/pages/PsychologyPage';
 import PsychologyTestPage from '@/pages/PsychologyTestPage';
 import PsychologyResultsPage from '@/pages/PsychologyResultsPage';
 import StudentPsychologyPage from '@/pages/StudentPsychologyPage';
 import LessonsPage from '@/pages/LessonsPage';
 import LessonDetailPage from '@/pages/LessonDetailPage';
-import AcademicYearsPage from '@/pages/AcademicYearsPage';
 import RolesPage from '@/pages/RolesPage';
 import RolePermissionsPage from '@/pages/RolePermissionsPage';
 import PermissionsPage from '@/pages/PermissionsPage';
 
 
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
+import { useGlobalErrorLogger } from '@/hooks/useGlobalErrorLogger';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const ProtectedRoute = () => {
   useIdleTimeout();
@@ -72,13 +72,6 @@ const PermissionRoute = ({ permission, children }: { permission: string | string
   return children;
 };
 
-const StudentRoute = ({ children }: { children: React.ReactElement }) => {
-  const { user } = useAuth();
-  const isStudent = (user?.roles ?? []).some((r) => r.name.toLowerCase() === 'student');
-  if (!isStudent) return <Navigate to="/" replace />;
-  return children;
-};
-
 const DashboardRedirect = () => {
   const { user } = useAuth();
   const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
@@ -90,7 +83,7 @@ const DashboardRedirect = () => {
   }
 
   if (isStudent) {
-    return <Navigate to="/quiz-test" replace />;
+    return <Navigate to="/profile" replace />;
   }
 
   if (isTeacher) {
@@ -101,11 +94,13 @@ const DashboardRedirect = () => {
 };
 
 function App() {
+  useGlobalErrorLogger();
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Router>
-          <Routes>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
+            <Routes>
             <Route path="/login" element={<Login />} />
 
             <Route element={<ProtectedRoute />}>
@@ -127,16 +122,13 @@ function App() {
                 <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
                 <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />
                 <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
-                <Route path="/yakuniy" element={<PermissionRoute permission="read:yakuniy"><YakuniyPage /></PermissionRoute>} />
 
                 <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                 <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />
                 <Route path="/psychology" element={<PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute>} />
                 <Route path="/psychology/test/:methodId" element={<PermissionRoute permission="read:psychology"><PsychologyTestPage /></PermissionRoute>} />
                 <Route path="/psychology/results" element={<PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute>} />
-                <Route path="/psychology/student" element={<StudentRoute><StudentPsychologyPage /></StudentRoute>} />
-
-                <Route path="/academic-years" element={<PermissionRoute permission="read:academic_year"><AcademicYearsPage /></PermissionRoute>} />
+                <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
 
                 <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
                 <Route path="/teacher-groups" element={<PermissionRoute permission="read:group"><TeacherGroupsPage /></PermissionRoute>} />
@@ -154,10 +146,11 @@ function App() {
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

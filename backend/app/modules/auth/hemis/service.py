@@ -167,7 +167,7 @@ class HemisLoginService:
 
         # User — repo hashes internally and stores both hash + plaintext
         user = await get_user_repository.get_or_create_for_hemis(session, username, password)
-        await get_user_repository.ensure_role(session, user, "Student")
+        await get_user_repository.ensure_role(session, user, "student")
 
         # Student
         await student_repository.upsert_for_hemis(session, user.id, group.id, faculty.name, me_data)

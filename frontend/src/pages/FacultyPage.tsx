@@ -18,6 +18,7 @@ import { KafedraTeachersView } from '@/components/faculty/KafedraTeachersView';
 import { GroupStudentsView } from '@/components/faculty/GroupStudentsView';
 import { StudentDetailView } from '@/components/faculty/StudentDetailView';
 import type { Kafedra } from '@/services/kafedraService';
+import { logger } from '@/utils/logger';
 
 type View =
     | { level: 'faculties' }
@@ -48,7 +49,7 @@ const FacultyPage = () => {
             setFaculties(data.faculties);
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
-            console.error('Failed to fetch faculties', error);
+            logger.error('Failed to fetch faculties', error);
         } finally {
             setIsLoading(false);
         }
@@ -81,7 +82,7 @@ const FacultyPage = () => {
             if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                 setCascadeWarnings(error.response.data.detail.warnings || []);
             } else {
-                console.error("Fakultetni o'chirishda xatolik", error);
+                logger.error("Fakultetni o'chirishda xatolik", error);
                 alert("O'chirishda xatolik yuz berdi");
                 setIsDeleteModalOpen(false);
                 setFacultyToDelete(null);

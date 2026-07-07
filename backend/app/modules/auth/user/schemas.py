@@ -195,7 +195,7 @@ class UserLoginRequest(BaseModel):
     def validate_username(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Username cannot be empty")
-        return value.strip()
+        return value.strip().lower()
 
     @field_validator("password", mode="before")
     def validate_password(cls, value: str) -> str:

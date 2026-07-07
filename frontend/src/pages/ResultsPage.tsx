@@ -336,15 +336,15 @@ const ResultsPage = () => {
 
     useEffect(() => { setCurrentPage(1); }, [selectedGroup, selectedSubject, selectedQuiz, selectedGrade, usernameSearch, sortDir]);
 
-    const { data: resultsData, isLoading: isResultsLoading } = useResults(
+    const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError } = useResults(
         currentPage, pageSize, undefined, parsedGrade, parsedGroup, parsedSubject, parsedQuiz,
         usernameSearch || undefined, sortDir,
         !isAuthLoading
     );
 
-    const { data: groupsData }   = useGroups(1, 1000, '');
-    const { data: subjectsData } = useSubjects(1, 1000, '');
-    const { data: quizzesData }  = useQuizzes(1, 1000);
+    const { data: groupsData }   = useGroups(1, 1000, '', undefined, undefined, isAdminOrTeacher);
+    const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher);
+    const { data: quizzesData }  = useQuizzes(1, 1000, undefined, undefined, undefined, undefined, undefined, undefined, isAdminOrTeacher);
 
     const groups        = groupsData?.groups || [];
     const subjectOptions = subjectsData?.subjects.map(s => ({ value: String(s.id), label: s.name })) || [];
@@ -530,6 +530,8 @@ const ResultsPage = () => {
                 <div className="flex justify-center py-16">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+            ) : isResultsError ? (
+                <p className="py-16 text-center text-sm text-destructive">Xatolik yuz berdi</p>
             ) : results.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                     <FileText className="h-10 w-10 mb-3 opacity-20" />

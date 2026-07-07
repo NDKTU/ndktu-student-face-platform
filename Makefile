@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs backup backup-database backup-logs backup-images restore merge deploy
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy
 
 .DEFAULT_GOAL := help
 
@@ -17,6 +17,8 @@ help:
 	@echo "make frontend-logs    - View frontend logs"
 	@echo "make backend-logs     - View backend logs"
 	@echo "make face-logs        - View face detection logs"
+	@echo "make monitoring-logs  - View Loki/Promtail/Grafana logs"
+	@echo "                        Grafana dashboard: http://localhost:3001"
 	@echo ""
 	@echo "BACKUP & RESTORE:"
 	@echo "────────────────"
@@ -54,6 +56,10 @@ backend-logs:
 # View face detection logs
 face-logs:
 	docker compose logs -f face-detection
+
+# View monitoring stack logs (loki, promtail, grafana)
+monitoring-logs:
+	docker compose logs -f loki promtail grafana
 
 # Backup everything (database, logs, and images)
 backup: backup-database backup-logs backup-images

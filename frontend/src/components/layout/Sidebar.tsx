@@ -22,6 +22,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         'Boshqaruv': false,
         'Foydalanuvchilar': true,
         'Testlar': false,
+        'Psixologiya': false,
         'Ruxsatlar tizimi': false,
         'Test': true // for students
     });

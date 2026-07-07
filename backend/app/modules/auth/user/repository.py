@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Role, Student, Teacher, User
+from app.modules.auth.model import Employee, Permission, Role, Student, Teacher, User
 
 from .schemas import (
     UserCreateRequest,
@@ -321,12 +321,28 @@ class UserRepository:
         return user
 
     async def ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
-        role_stmt = select(Role).where(Role.name == role_name)
+        normalized_name = role_name.strip().lower()
+        role_stmt = (
+            select(Role)
+            .where(func.lower(Role.name) == normalized_name)
+            .options(selectinload(Role.permissions))
+        )
         role = (await session.execute(role_stmt)).scalar_one_or_none()
         if not role:
-            role = Role(name=role_name)
+            role = Role(name=normalized_name)
             session.add(role)
             await session.flush()
+
+            # Newly-created roles start with only the "user:me" permission so a
+            # freshly provisioned account can at least fetch its own profile
+            # instead of 403-ing immediately after login. An Admin grants the
+            # rest via the Roles/Permissions UI.
+            perm_stmt = select(Permission).where(Permission.name == "user:me")
+            permission = (await session.execute(perm_stmt)).scalar_one_or_none()
+            if permission:
+                role.permissions.append(permission)
+                await session.flush()
+
         if role not in user.roles:
             user.roles.append(role)
 

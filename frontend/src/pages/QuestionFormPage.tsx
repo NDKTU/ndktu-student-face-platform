@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { logger } from '@/utils/logger';
 import type { QuestionCreateRequest } from '@/services/questionService';
 import { questionService } from '@/services/questionService';
 import { useAuth } from '@/context/AuthContext';
@@ -98,7 +99,7 @@ const QuestionFormPage = () => {
                 );
             }
         } catch (error) {
-            console.error('Image upload failed', error);
+            logger.error('Image upload failed', error);
             alert('Rasm yuklashda xatolik yuz berdi');
         }
     };
@@ -144,7 +145,7 @@ const QuestionFormPage = () => {
         };
 
         const onError = (error: unknown) => {
-            console.error('Failed to save question', error);
+            logger.error('Failed to save question', error);
             alert('Failed to save question');
         }
 

@@ -1,0 +1,100 @@
+{
+  "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0,211,255,1)", "name": "Annotations & Alerts", "type": "dashboard" }] },
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["backend", "logs"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "title": "Backend \u2014 Logs",
+  "uid": "nsumt-logs",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Total Log Lines",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": { "colorMode": "background", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "targets": [{ "expr": "sum(count_over_time({job=\"backend\"}[$__range]))", "legendFormat": "Total", "refId": "A" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Error Lines",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": { "colorMode": "background", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "targets": [{ "expr": "sum(count_over_time({job=\"backend\", level=\"ERROR\"}[$__range]))", "legendFormat": "Errors", "refId": "A" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Warning Lines",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": { "colorMode": "background", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] } }, "overrides": [] },
+      "targets": [{ "expr": "sum(count_over_time({job=\"backend\", level=\"WARNING\"}[$__range]))", "legendFormat": "Warnings", "refId": "A" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Info Lines",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": { "colorMode": "background", "graphMode": "area", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "targets": [{ "expr": "sum(count_over_time({job=\"backend\", level=\"INFO\"}[$__range]))", "legendFormat": "Info", "refId": "A" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Log Volume by Level",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": { "tooltip": { "mode": "multi", "sort": "none" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 15, "drawStyle": "bars", "barAlignment": 0 }, "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "ERROR" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "WARNING" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "INFO" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "DEBUG" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] }
+        ]
+      },
+      "targets": [
+        { "expr": "sum(count_over_time({job=\"backend\", level=\"ERROR\"}[$__interval]))", "legendFormat": "ERROR", "refId": "A" },
+        { "expr": "sum(count_over_time({job=\"backend\", level=\"WARNING\"}[$__interval]))", "legendFormat": "WARNING", "refId": "B" },
+        { "expr": "sum(count_over_time({job=\"backend\", level=\"INFO\"}[$__interval]))", "legendFormat": "INFO", "refId": "C" },
+        { "expr": "sum(count_over_time({job=\"backend\", level=\"DEBUG\"}[$__interval]))", "legendFormat": "DEBUG", "refId": "D" }
+      ]
+    },
+    {
+      "id": 6, "type": "logs", "title": "All Backend Logs",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [{ "expr": "{job=\"backend\"}", "legendFormat": "", "refId": "A", "maxLines": 500 }]
+    },
+    {
+      "id": 7, "type": "logs", "title": "Errors Only",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "loki", "uid": "nsumt-loki" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [{ "expr": "{job=\"backend\", level=\"ERROR\"}", "legendFormat": "", "refId": "A", "maxLines": 200 }]
+    }
+  ]
+}

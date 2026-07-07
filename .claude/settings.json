@@ -29,7 +29,12 @@
       "Bash(curl -s -i -X POST http://localhost:3000/api/user/login -H \"Content-Type: application/json\" -d '{}')",
       "Bash(curl -s http://localhost:8000/health)",
       "Bash(curl -s -i http://localhost:3000/api/user/me)",
-      "Bash(curl -s -i -N -H \"Connection: Upgrade\" -H \"Upgrade: websocket\" -H \"Sec-WebSocket-Version: 13\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" \"http://localhost:3000/v1/video/stream\" --max-time 3)"
+      "Bash(curl -s -i -N -H \"Connection: Upgrade\" -H \"Upgrade: websocket\" -H \"Sec-WebSocket-Version: 13\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" \"http://localhost:3000/v1/video/stream\" --max-time 3)",
+      "Bash(pkill -f \"app/main.py\")",
+      "mcp__playwright__browser_evaluate",
+      "Bash(curl -s -o /dev/null -w \"frontend health: %{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(docker cp *)",
+      "Bash(docker exec database psql -U bekzod -d basic_database -c ' *)"
     ],
     "additionalDirectories": [
       "/tmp/pptx_preview"

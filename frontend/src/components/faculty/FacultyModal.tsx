@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { facultyService, type Faculty } from '@/services/facultyService';
 import { facultySchema, type FacultyFormValues } from '@/schemas/faculty';
+import { logger } from '@/utils/logger';
 
 interface FacultyModalProps {
     isOpen: boolean;
@@ -31,7 +32,7 @@ export const FacultyModal = ({ isOpen, onClose, faculty, onSuccess }: FacultyMod
                 : await facultyService.createFaculty(data);
             onSuccess(result);
         } catch (error) {
-            console.error('Fakultetni saqlashda xatolik', error);
+            logger.error('Fakultetni saqlashda xatolik', error);
             alert('Fakultetni saqlashda xatolik');
         }
     };

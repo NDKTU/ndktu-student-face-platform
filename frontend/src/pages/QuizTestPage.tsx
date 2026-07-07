@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/utils/logger';
 import { useAuth } from '@/context/AuthContext';
 import { type StartQuizResponse, type EndQuizResponse } from '@/services/quizProcessService';
 import type { ProctoringMode } from '@/services/quizService';
@@ -19,7 +20,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { useStartQuiz, useSubmitAnswer, useEndQuiz } from '@/hooks/useQuizProcess';
-import { useQuizzes } from '@/hooks/useQuizzes';
+import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
 import { FACE_DETECTION_SERVICE_URL } from '@/config/env';
@@ -50,7 +51,7 @@ const QuizTestPage = () => {
     // Start phase
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
-    const { data: quizzesData, isLoading: isLoadingQuizzes, isFetching: isFetchingQuizzes } = useQuizzes(currentPage, pageSize);
+    const { data: quizzesData, isLoading: isLoadingQuizzes, isFetching: isFetchingQuizzes, isError: isQuizzesError } = useActiveQuizzes(currentPage, pageSize);
     const [selectedQuiz, setSelectedQuiz] = useState<{ id: number; title: string } | null>(null);
     const [pin, setPin] = useState('');
     const [startError, setStartError] = useState('');
@@ -159,7 +160,7 @@ const QuizTestPage = () => {
             answer: answerValue,
         }, {
             onError: (error) => {
-                console.error('Failed to submit answer', error);
+                logger.error('Failed to submit answer', error);
             },
         });
     };
@@ -186,7 +187,7 @@ const QuizTestPage = () => {
                 setPhase('results');
             },
             onError: (error: any) => {
-                console.error('Failed to submit quiz', error);
+                logger.error('Failed to submit quiz', error);
 
                 // If it was a cheating submission, we still want to show the results phase
                 // even if the backend call failed (e.g., due to duplicate submission)
@@ -262,7 +263,7 @@ const QuizTestPage = () => {
                     handleSubmit(true, reason);
                 }
             } catch (error) {
-                console.error('Failed to upload cheating evidence:', error);
+                logger.error('Failed to upload cheating evidence:', error);
                 handleSubmit(true, reason);
             }
         } else {
@@ -294,6 +295,8 @@ const QuizTestPage = () => {
                             <div className="flex h-40 items-center justify-center">
                                 <Loader2 className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                             </div>
+                        ) : isQuizzesError ? (
+                            <p className="py-8 text-center text-sm text-destructive">Xatolik yuz berdi</p>
                         ) : activeQuizzes.length === 0 ? (
                             <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
                                 <PlayCircle className="h-12 w-12 mb-4 opacity-20" />

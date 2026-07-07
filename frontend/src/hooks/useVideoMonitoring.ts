@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 
 export interface VideoMonitoringConfig {
     faceDetectionServiceUrl: string;
@@ -91,7 +92,7 @@ export function useVideoMonitoring(config: VideoMonitoringConfig) {
             });
 
             await videoRef.current.play().catch((err) => {
-                console.warn('Detached monitoring video playback failed:', err);
+                logger.warn('Detached monitoring video playback failed:', err);
             });
 
             setState((prev: VideoMonitoringState) => ({ ...prev, hasPermission: true, isActive: true, error: null }));
@@ -160,13 +161,13 @@ export function useVideoMonitoring(config: VideoMonitoringConfig) {
                         }
                     }
                 } catch (error) {
-                    console.error('Error parsing face detection response:', error);
+                    logger.error('Error parsing face detection response:', error);
                 }
             };
 
             ws.onerror = (error: Event) => {
                 const errorMsg = 'WebSocket error: Unable to connect to face detection service';
-                console.error(errorMsg, error);
+                logger.error(errorMsg, error);
                 setState((prev: VideoMonitoringState) => ({
                     ...prev,
                     isConnected: false,

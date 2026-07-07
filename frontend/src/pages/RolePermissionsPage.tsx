@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, Save, ShieldAlert } from 'lucide-react';
 import { roleService } from '@/services/roleService';
 import { permissionService, type Permission } from '@/services/permissionService';
 import { useAssignPermissions } from '@/hooks/useReferenceData';
+import { logger } from '@/utils/logger';
 import {
     RESOURCES,
     ACTIONS,
@@ -134,7 +135,7 @@ const RolePermissionsPage = () => {
             await refreshMe();
             setHasChanges(false);
         } catch (error) {
-            console.error('Failed to save permissions', error);
+            logger.error('Failed to save permissions', error);
             alert("Saqlashda xatolik yuz berdi");
         }
     };

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { Pagination } from '@/components/ui/Pagination';
 import type { User, Role } from '@/types/auth';
 import { Button } from '@/components/ui/Button';
@@ -305,7 +306,7 @@ const UserModal = ({
                     onSuccess(updatedUser);
                 },
                 onError: (error) => {
-                    console.error('Failed to update user', error);
+                    logger.error('Failed to update user', error);
                     alert('Foydalanuvchini yangilashda xatolik yuz berdi');
                 }
             });
@@ -324,7 +325,7 @@ const UserModal = ({
             createMutation.mutate(payload, {
                 onSuccess: (newUser: any) => onSuccess(newUser),
                 onError: (error: any) => {
-                    console.error('Failed to create user', error);
+                    logger.error('Failed to create user', error);
                     alert('Foydalanuvchi yaratishda xatolik yuz berdi');
                 }
             });

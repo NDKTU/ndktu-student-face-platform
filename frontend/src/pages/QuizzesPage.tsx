@@ -10,6 +10,7 @@ import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
+import { logger } from '@/utils/logger';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
@@ -153,7 +154,7 @@ const QuizzesPage = () => {
                 setIsUpdatingStatus(null);
             },
             onError: (error: unknown) => {
-                console.error('Failed to update quiz status', error);
+                logger.error('Failed to update quiz status', error);
                 alert('Test holatini yangilashda xatolik yuz berdi');
             },
         });

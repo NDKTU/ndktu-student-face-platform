@@ -20,6 +20,12 @@ os.makedirs(settings.question_upload_dir, exist_ok=True)
 os.makedirs(settings.profile_upload_dir, exist_ok=True)
 os.makedirs(settings.evidence_dir, exist_ok=True)
 os.makedirs(settings.course_resource_upload_dir, exist_ok=True)
+
+# Legacy alias: uploads/ used to be nested one level deeper under uploads/questions/.
+# Already-stored URLs still reference /uploads/questions/..., so this mount (registered
+# before the main one, since Starlette matches mounts by prefix in order) keeps them
+# resolving from the same, now-flattened, directory.
+app.mount("/uploads/questions", StaticFiles(directory=settings.absolute_upload_dir), name="uploads_legacy")
 app.mount("/uploads", StaticFiles(directory=settings.absolute_upload_dir), name="uploads")
 
 # Legacy alias: cheating evidence used to live outside uploads/ at a separate

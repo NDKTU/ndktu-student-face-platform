@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logger } from '@/utils/logger';
 import { Pagination } from '@/components/ui/Pagination';
 import { roleService, type Role } from '@/services/roleService';
 import { Button } from '@/components/ui/Button';
@@ -50,7 +51,7 @@ const RolesPage = () => {
             setRoles(data.roles);
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
-            console.error('Failed to fetch roles', error);
+            logger.error('Failed to fetch roles', error);
         } finally {
             setIsLoading(false);
         }
@@ -79,7 +80,7 @@ const RolesPage = () => {
             setIsDeleteModalOpen(false);
             setRoleToDelete(null);
         } catch (error) {
-            console.error('Failed to delete role', error);
+            logger.error('Failed to delete role', error);
         }
     };
 
@@ -248,7 +249,7 @@ const RoleModal = ({ isOpen, onClose, role, onSuccess }: {
             }
             onSuccess(result);
         } catch (error) {
-            console.error('Failed to save role', error);
+            logger.error('Failed to save role', error);
             alert('Rolni saqlashda xatolik');
         }
     };

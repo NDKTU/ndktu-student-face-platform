@@ -1,0 +1,72 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: backend_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: backend
+          __path__: /var/log/app/**/*.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (?P<level>\w+)\s*\| (?P<logger>[^ |]+) \| (?P<source>[^ ]+:\d+) \| (?P<func>\S+) \| (?P<message>.+)$'
+
+      - labels:
+          level:
+          logger:
+
+      - timestamp:
+          source: timestamp
+          format: "2006-01-02 15:04:05"
+
+      - output:
+          source: message
+
+  - job_name: frontend_access_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: frontend_access
+          __path__: /var/log/frontend/access.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - \S+ \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) [^"]+" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)"'
+
+      - labels:
+          status:
+          method:
+
+      - timestamp:
+          source: time_local
+          format: "02/Jan/2006:15:04:05 -0700"
+
+  - job_name: frontend_error_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: frontend_error
+          __path__: /var/log/frontend/error.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<time_local>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\]'
+
+      - labels:
+          level:
+
+      - timestamp:
+          source: time_local
+          format: "2006/01/02 15:04:05"

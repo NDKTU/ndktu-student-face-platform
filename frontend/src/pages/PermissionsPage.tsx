@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logger } from '@/utils/logger';
 import { permissionService, type Permission } from '@/services/permissionService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -40,7 +41,7 @@ const PermissionsPage = () => {
             const data = await permissionService.getPermissions(1, 1000, debouncedSearch);
             setPermissions(data.permissions);
         } catch (error) {
-            console.error('Failed to fetch permissions', error);
+            logger.error('Failed to fetch permissions', error);
         } finally {
             setIsLoading(false);
         }
@@ -68,7 +69,7 @@ const PermissionsPage = () => {
             setIsDeleteModalOpen(false);
             setPermissionToDelete(null);
         } catch (error) {
-            console.error('Failed to delete permission', error);
+            logger.error('Failed to delete permission', error);
         }
     };
 
@@ -208,7 +209,7 @@ const PermissionModal = ({ isOpen, onClose, permission, onSuccess }: {
             }
             onSuccess(result);
         } catch (error) {
-            console.error('Failed to save permission', error);
+            logger.error('Failed to save permission', error);
             alert('Failed to save permission');
         }
     };

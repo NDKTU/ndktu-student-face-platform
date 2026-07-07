@@ -1,8 +1,9 @@
+import json
 import logging
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -86,6 +87,19 @@ from .user.service import auth_service
 logger = logging.getLogger(__name__)
 
 
+async def login_rate_limit_identifier(request: Request) -> str:
+    """Key the login rate limit by IP + attempted username, so unrelated
+    users behind the same NAT/reverse proxy don't share one bucket."""
+    body = await request.body()
+    try:
+        username = str(json.loads(body).get("username", "")).strip().lower()
+    except (json.JSONDecodeError, AttributeError):
+        username = ""
+    forwarded = request.headers.get("X-Forwarded-For")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    return f"{ip}:{username}:{request.scope['path']}"
+
+
 # ============================================================================
 #  USER
 # ============================================================================
@@ -98,7 +112,7 @@ user_router = APIRouter(
 @user_router.post(
     "/login",
     response_model=UserLoginResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=login_rate_limit_identifier))],
 )
 async def login(data: UserLoginRequest, session: AsyncSession = Depends(db_helper.session_getter)):
     return await auth_service.login(session=session, data=data)

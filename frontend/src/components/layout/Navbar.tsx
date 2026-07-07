@@ -25,7 +25,6 @@ const ROUTE_LABELS: Record<string, string> = {
     'results':           'Natijalar',
     'profile':           'Profil',
     'teacher-ranking':   'Reyting',
-    'yakuniy':           'Yakuniy',
 };
 
 const getPageLabel = (pathname: string) => {

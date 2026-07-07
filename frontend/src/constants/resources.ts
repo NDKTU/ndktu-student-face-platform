@@ -14,8 +14,8 @@ import {
     PlayCircle,
     Trophy,
     BarChart2,
-    Calendar,
     Briefcase,
+    User,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -31,12 +31,13 @@ export const SIDEBAR_SECTION_ORDER = [
     'Boshqaruv',
     'Foydalanuvchilar',
     'Testlar',
+    'Psixologiya',
     'Ruxsatlar tizimi',
 ] as const;
 
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
-    employee:      { label: 'Xodimlar',         href: '/employees',   icon: Briefcase,     section: 'Foydalanuvchilar' },
+    employee:      { label: 'Xodimlar',         href: '/employees',   icon: Briefcase },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
     student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
 
@@ -46,17 +47,15 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     faculty:       { label: 'Fakultetlarni boshqarish', href: '/faculties', icon: Building2, section: 'Boshqaruv' },
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
     group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound },
-    subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Boshqaruv' },
-    academic_year: { label: "O'quv yili",       href: '/academic-years', icon: Calendar,   section: 'Boshqaruv' },
+    subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Testlar' },
 
     quiz:          { label: 'Testlar',          href: '/quizzes',     icon: BookOpen,      section: 'Testlar' },
     active_quiz:   { label: 'Faol testlar',     href: '/active-quizzes', icon: PlayCircle, section: 'Testlar' },
     question:      { label: 'Savollar',         href: '/questions',   icon: FileQuestion,  section: 'Testlar' },
     result:        { label: 'Natijalar',        href: '/results',     icon: FileText,      section: 'Testlar' },
-    yakuniy:       { label: 'Yakuniy',          href: '/yakuniy',     icon: ClipboardList, section: 'Testlar' },
     lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen },
-    psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Testlar' },
-    psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Testlar' },
+    psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Psixologiya' },
+    psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Psixologiya' },
 
     me:            { label: 'Profil' },
     quiz_process:  { label: 'Test jarayoni' },
@@ -103,23 +102,41 @@ const ALWAYS_VISIBLE: SidebarSection = {
     ],
 };
 
-const STUDENT_SECTIONS: SidebarSection[] = [
-    {
-        label: 'Test',
-        items: [
-            { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle },
-            { name: 'Natijalar', href: '/results', icon: FileText },
-            { name: 'Psixologiya', href: '/psychology/student', icon: Brain },
-        ],
-    },
+const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
+    label: 'Umumiy',
+    items: [
+        { name: 'Profil', href: '/profile', icon: User },
+    ],
+};
+
+interface StudentSidebarItem extends SidebarItem {
+    permission: string;
+}
+
+const STUDENT_TEST_ITEMS: StudentSidebarItem[] = [
+    { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, permission: 'quiz_process:start_quiz' },
+    { name: 'Natijalar', href: '/results', icon: FileText, permission: 'read:result' },
+    { name: 'Psixologiya', href: '/psychology/student', icon: Brain, permission: 'read:psychology' },
 ];
+
+const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {
+    const sections: SidebarSection[] = [STUDENT_ALWAYS_VISIBLE];
+
+    const items = STUDENT_TEST_ITEMS.filter((item) => permissions.has(item.permission))
+        .map(({ name, href, icon }) => ({ name, href, icon }));
+    if (items.length) {
+        sections.push({ label: 'Test', items });
+    }
+
+    return sections;
+};
 
 export const buildSidebar = (
     permissions: ReadonlySet<string>,
     roleNames: ReadonlyArray<string>
 ): SidebarSection[] => {
     const isStudent = roleNames.some((r) => r.toLowerCase() === 'student');
-    if (isStudent) return STUDENT_SECTIONS;
+    if (isStudent) return buildStudentSidebar(permissions);
 
     const grouped: Record<string, SidebarItem[]> = {};
 
