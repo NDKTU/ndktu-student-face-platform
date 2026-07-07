@@ -8,14 +8,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.group.models.group import Group
+from app.modules.organization_structure.model import Group
 from app.modules.psychology.model import (
     PsychologyMethod,
     PsychologyQuestion,
     PsychologyResult,
 )
-from app.modules.student.model import Student
-from app.modules.user.models.user import User
+from app.modules.auth.model import Student
+from app.modules.auth.model import User
 
 from .schemas import (
     MethodCreateRequest,

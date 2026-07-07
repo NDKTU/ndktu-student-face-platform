@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.modules.user_answers.model import UserAnswers
+from app.modules.quiz.model import UserAnswers
 
 
 @pytest.mark.asyncio
@@ -30,17 +30,24 @@ async def test_end_quiz_check_correct_answer(auth_client, test_subject, test_gro
         "option_b": "WrongChoice1",
         "option_c": "WrongChoice2",
         "option_d": "WrongChoice3",
+        "correct_option": "a",
     }
-    q_resp = await auth_client.post("/question/", json=q_payload)
-    question_id = q_resp.json()["id"]
+    await auth_client.post("/question/", json=q_payload)
 
-    end_payload = {
-        "quiz_id": quiz_id,
-        "user_id": user_id,
-        "answers": [{"question_id": question_id, "answer": "WrongChoice1"}],
-    }
+    start_resp = await auth_client.post("/quiz_process/start_quiz", json={"quiz_id": quiz_id, "pin": "1111"})
+    assert start_resp.status_code == 200
+    start_data = start_resp.json()
+    result_id = start_data["result_id"]
+    question_id = start_data["questions"][0]["id"]
 
-    response = await auth_client.post("/quiz_process/end_quiz", json=end_payload)
+    submit_resp = await auth_client.post(
+        "/quiz_process/submit_answer",
+        json={"result_id": result_id, "question_id": question_id, "answer": "WrongChoice1"},
+    )
+    assert submit_resp.status_code == 200
+    assert submit_resp.json()["is_correct"] is False
+
+    response = await auth_client.post("/quiz_process/end_quiz", json={"quiz_id": quiz_id, "result_id": result_id})
     assert response.status_code == 200
 
     # Verify correct_answer is correctly saved to DB

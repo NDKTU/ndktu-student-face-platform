@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from app.core.schemas import TashkentDatetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -19,8 +19,8 @@ class QuestionResponse(BaseModel):
     options: Optional[list[dict[str, Any]]] = None
     order: int
     category: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: TashkentDatetime
+    updated_at: TashkentDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,8 +80,8 @@ class MethodResponse(BaseModel):
     name: str
     description: str
     instruction: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
+    created_at: TashkentDatetime
+    updated_at: TashkentDatetime
     questions: list[QuestionResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -127,8 +127,8 @@ class TestResultResponse(BaseModel):
     user_id: Optional[int]
     answers: list[dict[str, Any]]
     diagnosis: Optional[dict[str, Any]] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: TashkentDatetime
+    updated_at: TashkentDatetime
     method: Optional[MethodResponse] = None
     user: Optional[TestResultUserInfo] = None
 

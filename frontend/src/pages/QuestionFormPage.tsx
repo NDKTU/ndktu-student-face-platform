@@ -20,6 +20,7 @@ const questionSchema = z.object({
     option_b: z.string().min(1, 'Option B is required'),
     option_c: z.string().min(1, 'Option C is required'),
     option_d: z.string().min(1, 'Option D is required'),
+    correct_option: z.enum(['a', 'b', 'c', 'd']),
 });
 
 type QuestionFormValues = z.infer<typeof questionSchema>;
@@ -60,6 +61,7 @@ const QuestionFormPage = () => {
             option_b: '',
             option_c: '',
             option_d: '',
+            correct_option: 'a',
         }
     });
 
@@ -72,6 +74,7 @@ const QuestionFormPage = () => {
                 option_b: question.option_b,
                 option_c: question.option_c,
                 option_d: question.option_d,
+                correct_option: (question.correct_option as 'a' | 'b' | 'c' | 'd') || 'a',
             });
         }
     }, [question, reset]);
@@ -130,8 +133,12 @@ const QuestionFormPage = () => {
             option_b: data.option_b,
             option_c: data.option_c,
             option_d: data.option_d,
+            correct_option: data.correct_option,
         };
 
+        // Editing creates a new version with a new id (see backend Question
+        // versioning) — we always navigate away on success rather than staying
+        // on this page, so there's no stale id left referencing the old version.
         const onSuccess = () => {
             navigate('/questions');
         };
@@ -159,11 +166,25 @@ const QuestionFormPage = () => {
     const renderEditorWithUpload = (
         label: string,
         field: any,
-        error?: string
+        error?: string,
+        optionKey?: 'a' | 'b' | 'c' | 'd'
     ) => (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">{label}</label>
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium">{label}</label>
+                    {optionKey && (
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                            <input
+                                type="radio"
+                                value={optionKey}
+                                {...register('correct_option')}
+                                className="h-3.5 w-3.5"
+                            />
+                            To'g'ri javob
+                        </label>
+                    )}
+                </div>
                 <Button
                     type="button"
                     variant="outline"
@@ -231,22 +252,22 @@ const QuestionFormPage = () => {
                             <Controller
                                 name="option_a"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option A', field, errors.option_a?.message)}
+                                render={({ field }) => renderEditorWithUpload('Option A', field, errors.option_a?.message, 'a')}
                             />
                             <Controller
                                 name="option_b"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option B', field, errors.option_b?.message)}
+                                render={({ field }) => renderEditorWithUpload('Option B', field, errors.option_b?.message, 'b')}
                             />
                             <Controller
                                 name="option_c"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option C', field, errors.option_c?.message)}
+                                render={({ field }) => renderEditorWithUpload('Option C', field, errors.option_c?.message, 'c')}
                             />
                             <Controller
                                 name="option_d"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option D', field, errors.option_d?.message)}
+                                render={({ field }) => renderEditorWithUpload('Option D', field, errors.option_d?.message, 'd')}
                             />
                         </div>
 

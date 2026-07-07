@@ -6,12 +6,12 @@ from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.base import Base
+from app.core.database.base import Base
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.user.models.user import User
+    from app.modules.auth.model import User
 
 
 class PsychologyMethod(Base, IdIntPk, TimestampMixin):

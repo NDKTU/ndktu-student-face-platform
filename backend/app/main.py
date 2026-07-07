@@ -6,20 +6,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import app.core.logging  # Trigger logging configuration
-import app.core.models_registry  # noqa: F401 — ensures every model is imported before SQLAlchemy resolves relationships
+import app.core.database.models_registry  # noqa: F401 — ensures every model is imported before SQLAlchemy resolves relationships
 from app.core.config import settings
-from app.lifespan.lifespan import lifespan
-from app.middleware.logging_middleware import LoggingMiddleware
+from app.core.lifespan import lifespan
+from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.modules.router import router
 
 app = FastAPI(lifespan=lifespan)
 
-# Ensure upload directory exists
+# Ensure upload directory (and its purpose-based subfolders) exist
 os.makedirs(settings.absolute_upload_dir, exist_ok=True)
+os.makedirs(settings.question_upload_dir, exist_ok=True)
+os.makedirs(settings.profile_upload_dir, exist_ok=True)
+os.makedirs(settings.evidence_dir, exist_ok=True)
+os.makedirs(settings.course_resource_upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.absolute_upload_dir), name="uploads")
 
-# Ensure cheating evidence directory exists
-os.makedirs(settings.evidence_dir, exist_ok=True)
+# Legacy alias: cheating evidence used to live outside uploads/ at a separate
+# /evidence path. It's now uploads/cheating_evidence/ (served under /uploads too),
+# but this second mount keeps already-stored `/evidence/...` URLs resolving.
 app.mount("/evidence", StaticFiles(directory=settings.evidence_dir), name="evidence")
 
 

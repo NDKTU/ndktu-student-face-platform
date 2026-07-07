@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import logging
 
-from core.db_helper import db_helper
-from dependence.role_checker import PermissionRequired
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.user.models.user import User
+from app.modules.auth.model import User
 
 from .schemas import (
     MethodCreateRequest,

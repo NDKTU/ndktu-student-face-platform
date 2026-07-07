@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { type StartQuizResponse, type EndQuizResponse, type AnswerDTO } from '@/services/quizProcessService';
+import { type StartQuizResponse, type EndQuizResponse } from '@/services/quizProcessService';
 import type { ProctoringMode } from '@/services/quizService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -18,7 +18,7 @@ import {
     ArrowLeft,
     AlertTriangle
 } from 'lucide-react';
-import { useStartQuiz, useEndQuiz } from '@/hooks/useQuizProcess';
+import { useStartQuiz, useSubmitAnswer, useEndQuiz } from '@/hooks/useQuizProcess';
 import { useQuizzes } from '@/hooks/useQuizzes';
 import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
@@ -73,6 +73,7 @@ const QuizTestPage = () => {
     const isAdmin = user?.roles?.some(role => role.name.toLowerCase() === 'admin');
 
     const startQuizMutation = useStartQuiz();
+    const submitAnswerMutation = useSubmitAnswer();
     const endQuizMutation = useEndQuiz();
 
 
@@ -139,6 +140,28 @@ const QuizTestPage = () => {
 
     const handleSelectAnswer = (questionId: number, option: string) => {
         setAnswers((prev: Record<number, string>) => ({ ...prev, [questionId]: option }));
+
+        if (!quizData) return;
+        const question = quizData.questions.find((q) => q.id === questionId);
+        if (!question) return;
+
+        const answerValue =
+            option === 'A' ? question.option_a :
+            option === 'B' ? question.option_b :
+            option === 'C' ? question.option_c :
+            option === 'D' ? question.option_d : '';
+
+        // Sent immediately as the student picks — the backend already reserved
+        // this question for this attempt at start_quiz, and grades it right away.
+        submitAnswerMutation.mutate({
+            result_id: quizData.result_id,
+            question_id: questionId,
+            answer: answerValue,
+        }, {
+            onError: (error) => {
+                console.error('Failed to submit answer', error);
+            },
+        });
     };
 
     const handleSubmit = useCallback((isCheatingOverride?: boolean, reasonOverride?: string, imageUrlOverride?: string) => {
@@ -147,26 +170,13 @@ const QuizTestPage = () => {
         const isCurrentlyCheating = isCheatingOverride ?? cheatingDetected;
         const currentReason = reasonOverride ?? (isCurrentlyCheating ? cheatingReason : undefined);
         const currentImageUrl = imageUrlOverride ?? (isCurrentlyCheating ? cheatingImageUrl : undefined);
+        const totalQuestions = quizData.questions.length;
 
-        const answerList: AnswerDTO[] = quizData.questions.map((q) => {
-            const selectedKey = answers[q.id];
-            let answerValue = '';
-
-            if (selectedKey === 'A') answerValue = q.option_a;
-            else if (selectedKey === 'B') answerValue = q.option_b;
-            else if (selectedKey === 'C') answerValue = q.option_c;
-            else if (selectedKey === 'D') answerValue = q.option_d;
-
-            return {
-                question_id: q.id,
-                answer: answerValue,
-            };
-        });
-
+        // Answers were already sent one-by-one via submit_answer as the student
+        // picked them — end_quiz only finalizes the attempt now.
         endQuizMutation.mutate({
             quiz_id: quizData.quiz_id,
-            user_id: user?.id || null,
-            answers: answerList,
+            result_id: quizData.result_id,
             cheating_detected: isCurrentlyCheating,
             reason: isCurrentlyCheating ? currentReason : undefined,
             cheating_image_url: currentImageUrl,
@@ -182,9 +192,9 @@ const QuizTestPage = () => {
                 // even if the backend call failed (e.g., due to duplicate submission)
                 if (isCurrentlyCheating) {
                     setResults({
-                        total_questions: answerList.length,
+                        total_questions: totalQuestions,
                         correct_answers: 0,
-                        wrong_answers: answerList.length,
+                        wrong_answers: totalQuestions,
                         grade: 2,
                         cheating_detected: true,
                         reason: currentReason || 'Ko\'p juzli shaxs aniqlandi'
@@ -196,7 +206,7 @@ const QuizTestPage = () => {
             }
         });
         // Bug#4 fix: added cheatingImageUrl to dependency list to avoid stale closure
-    }, [quizData, answers, user, endQuizMutation, cheatingDetected, cheatingReason, cheatingImageUrl]);
+    }, [quizData, endQuizMutation, cheatingDetected, cheatingReason, cheatingImageUrl]);
 
     // Timer — Bug#12 fix: use a ref to prevent duplicate submit on cheating race condition
     const isSubmittingRef = useRef(false);

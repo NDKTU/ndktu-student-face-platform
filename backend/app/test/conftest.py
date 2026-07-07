@@ -1,7 +1,7 @@
 import pytest_asyncio
 import redis.asyncio as redis
 from core.config import settings
-from core.db_helper import db_helper
+from core.database.db_helper import db_helper
 from fastapi_limiter import FastAPILimiter
 from httpx import ASGITransport, AsyncClient
 from main import app as fastapi_app
@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
-import app.core.models_registry  # noqa: F401
-from app.core.base import Base
+import app.core.database.models_registry  # noqa: F401
+from app.core.database.base import Base
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -88,7 +88,7 @@ async def async_client(async_db):
 
 @pytest_asyncio.fixture
 async def test_role(async_db):
-    from app.modules.role.models.role import Role
+    from app.modules.auth.model import Role
 
     role = Role(name="Admin")
     async_db.add(role)
@@ -148,7 +148,7 @@ async def create_permission(async_client, access_token):
 @pytest_asyncio.fixture
 async def test_subject(async_db):
     """Create a subject directly in DB since there is no API for it"""
-    from app.modules.subject.models.subject import Subject
+    from app.modules.quiz.model import Subject
 
     subject = Subject(name="Mathematics")
     async_db.add(subject)

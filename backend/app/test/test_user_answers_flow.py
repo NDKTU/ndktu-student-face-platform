@@ -1,12 +1,8 @@
 import pytest
 from sqlalchemy import select
 
-from app.modules.question.model import Question
-from app.modules.quiz.models.quiz import Quiz
-from app.modules.quiz.models.quiz_questions import QuizQuestion
-from app.modules.subject.models.subject import Subject
-from app.modules.user.models.user import User
-from app.modules.user_answers.model import UserAnswers
+from app.modules.auth.model import User
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject, UserAnswers
 
 
 @pytest.mark.asyncio
@@ -23,13 +19,14 @@ async def test_user_answers_flow(auth_client, async_db):
     result = await async_db.execute(stmt)
     user = result.scalar_one()
 
-    # Create Question
+    # Create Question — correct_option marks "4" (option_a) as the right answer.
     question = Question(
         text="What is 2+2?",
         option_a="4",
         option_b="3",
         option_c="5",
         option_d="6",
+        correct_option="a",
         subject_id=subject.id,
         user_id=user.id,
     )
@@ -55,26 +52,26 @@ async def test_user_answers_flow(auth_client, async_db):
     async_db.add(quiz_question)
     await async_db.commit()
 
-    # 2. Start Quiz
+    # 2. Start Quiz — this now creates the Result(status="in_progress") attempt
+    # and reserves a UserAnswers row per served question.
     start_response = await auth_client.post("/quiz_process/start_quiz", json={"quiz_id": quiz.id, "pin": "1234"})
     assert start_response.status_code == 200
     data = start_response.json()
     assert len(data["questions"]) == 1
     question_dto = data["questions"][0]
+    result_id = data["result_id"]
 
-    # 3. End Quiz with Correct Answer
-    end_payload = {
-        "quiz_id": quiz.id,
-        "user_id": user.id,
-        "answers": [
-            {
-                "question_id": question_dto["id"],
-                "answer": "4",  # Correct answer (Option A)
-            }
-        ],
-    }
+    # 3. Submit the answer for that question, then end the quiz
+    submit_response = await auth_client.post(
+        "/quiz_process/submit_answer",
+        json={"result_id": result_id, "question_id": question_dto["id"], "answer": "4"},
+    )
+    assert submit_response.status_code == 200
+    assert submit_response.json()["is_correct"] is True
 
-    end_response = await auth_client.post("/quiz_process/end_quiz", json=end_payload)
+    end_response = await auth_client.post(
+        "/quiz_process/end_quiz", json={"quiz_id": quiz.id, "result_id": result_id}
+    )
     assert end_response.status_code == 200
     end_data = end_response.json()
     assert end_data["correct_answers"] == 1
@@ -89,7 +86,7 @@ async def test_user_answers_flow(auth_client, async_db):
     assert user_answers[0].is_correct is True
 
     # 5. Verify via API
-    api_response = await auth_client.get("/user_answers/")
+    api_response = await auth_client.get("/user_answers/", params={"result_id": result_id})
     assert api_response.status_code == 200
     api_data = api_response.json()
 

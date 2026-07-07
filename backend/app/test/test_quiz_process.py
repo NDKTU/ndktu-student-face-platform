@@ -32,12 +32,13 @@ async def test_start_quiz(auth_client, test_subject, test_group, async_db):
             "option_b": "B",
             "option_c": "C",
             "option_d": "D",
+            "correct_option": "a",
         }
         q_resp = await auth_client.post("/question/", json=q_payload)
         questions.append(q_resp.json()["id"])
 
     # 3. Manually link questions to quiz (since no API for it)
-    from app.modules.quiz.models.quiz_questions import QuizQuestion
+    from app.modules.quiz.model import QuizQuestion
 
     for q_id in questions:
         qq = QuizQuestion(quiz_id=quiz_id, question_id=q_id)
@@ -51,6 +52,7 @@ async def test_start_quiz(auth_client, test_subject, test_group, async_db):
     assert response.status_code == 200
     data = response.json()
     assert data["quiz_id"] == quiz_id
+    assert "result_id" in data
     assert len(data["questions"]) == 2
 
 
@@ -73,40 +75,34 @@ async def test_end_quiz(auth_client, test_subject, test_group):
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
 
-    # Create a question
+    # Create a question — correct_option explicitly marks which of the 4 options is right.
     q_payload = {
         "subject_id": test_subject.id,
         "user_id": user_id,
         "text": "What is A?",
-        "option_a": "A",  # Let's assume A is correct? We don't know the logic for correctness here without looking at model/logic.
-        # Usually correctness is stored in Question model. Schema for creation didn't specify correct answer explicitly?
-        # Let's check QuestionCreateRequest...
-        # It has option_a..d. Where is correct answer?
-        # Maybe "answer" field?
-        # Looking at QuestionCreateRequest in Step 37, there is NO field for correct answer.
-        # This is strange. Maybe it's implicitly Option A? Or maybe the model was not fully shown or separate field?
-        # Let's check Question model if possible or just View File.
+        "option_a": "A",
         "option_b": "B",
         "option_c": "C",
         "option_d": "D",
+        "correct_option": "a",
     }
-    # Wait, if I can't specify correct answer, how is it graded?
-    # Let's check Question model or Schema again.
-    # Step 37: QuestionCreateRequest fields: subject_id, user_id, text, option_a, option_b, option_c, option_d.
-    # NO correct_answer.
+    await auth_client.post("/question/", json=q_payload)
 
-    # Maybe the "answer" logic is handled differently? Or maybe I missed it.
-    # I'll check the Question model in a sec.
+    # Start the attempt — this is what reserves the served questions and creates
+    # the Result(status="in_progress") row, replacing the old stateless start_quiz.
+    start_resp = await auth_client.post("/quiz_process/start_quiz", json={"quiz_id": quiz_id, "pin": "5678"})
+    assert start_resp.status_code == 200
+    start_data = start_resp.json()
+    result_id = start_data["result_id"]
 
-    q_resp = await auth_client.post("/question/", json=q_payload)
-    question_id = q_resp.json()["id"]
+    for q in start_data["questions"]:
+        submit_resp = await auth_client.post(
+            "/quiz_process/submit_answer",
+            json={"result_id": result_id, "question_id": q["id"], "answer": "A"},
+        )
+        assert submit_resp.status_code == 200
 
-    # End Quiz
-    end_payload = {
-        "quiz_id": quiz_id,
-        "user_id": user_id,
-        "answers": [{"question_id": question_id, "answer": "A"}],
-    }
+    end_payload = {"quiz_id": quiz_id, "result_id": result_id}
 
     response = await auth_client.post("/quiz_process/end_quiz", json=end_payload)
     assert response.status_code == 200

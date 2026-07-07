@@ -77,6 +77,18 @@ class CorsConfig(BaseModel):
     origins: list[str] = []
 
 
+class AdminConfig(BaseModel):
+    """Bootstrap admin account, created once by init_db on first boot.
+
+    Optional and unset by default so existing databases (which already have
+    an admin account created before this existed) aren't forced to set these
+    — init_db just skips admin-user creation with a warning if either is empty.
+    """
+
+    username: str | None = None
+    password: str | None = None
+
+
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -94,6 +106,7 @@ class AppConfig(BaseSettings):
     file_url: FileUrl
     redis: RedisConfig
     cors: CorsConfig = CorsConfig()
+    admin: AdminConfig = AdminConfig()
 
     # Add derived absolute paths
     @property
@@ -105,8 +118,20 @@ class AppConfig(BaseSettings):
         return BASE_DIR / self.file_url.upload_dir
 
     @property
+    def question_upload_dir(self) -> Path:
+        return self.absolute_upload_dir / "question"
+
+    @property
+    def profile_upload_dir(self) -> Path:
+        return self.absolute_upload_dir / "profile"
+
+    @property
     def evidence_dir(self) -> Path:
-        return BASE_DIR / "cheating_evidence"
+        return self.absolute_upload_dir / "cheating_evidence"
+
+    @property
+    def course_resource_upload_dir(self) -> Path:
+        return self.absolute_upload_dir / "course_resources"
 
 
 settings = AppConfig()

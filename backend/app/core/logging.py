@@ -2,9 +2,16 @@ import logging
 import os
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
 # --- Base setup ---
-LOG_DIR = "logs"
+# Anchored to an absolute path (mirroring core/config.py's BASE_DIR) rather than
+# a bare relative "logs" string — a relative path resolves against whatever the
+# process's CWD happens to be at startup, so invoking the app from a different
+# directory than the documented one would silently write logs somewhere else
+# entirely instead of the directory the backend_logs Docker volume expects.
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+LOG_DIR = str(_BASE_DIR / "logs")
 LEVELS = ["debug", "info", "warning", "error", "critical"]
 RETENTION_DAYS = {"debug": 5, "info": 7, "warning": 30, "error": 30, "critical": 30}
 

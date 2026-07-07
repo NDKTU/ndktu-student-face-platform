@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.modules.group.models.group_teachers import GroupTeacher
+from app.modules.organization_structure.model import GroupTeacher
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,7 @@ export interface StartQuizRequest {
 }
 
 export interface StartQuizResponse {
+    result_id: number;
     quiz_id: number;
     title: string;
     duration: number;
@@ -25,15 +26,20 @@ export interface StartQuizResponse {
     face_ws_token?: string;
 }
 
-export interface AnswerDTO {
+export interface SubmitAnswerRequest {
+    result_id: number;
     question_id: number;
     answer: string;
 }
 
+export interface SubmitAnswerResponse {
+    question_id: number;
+    is_correct: boolean;
+}
+
 export interface EndQuizRequest {
     quiz_id: number;
-    user_id?: number | null;
-    answers: AnswerDTO[];
+    result_id: number;
     cheating_detected?: boolean;
     reason?: string;
     cheating_image_url?: string;
@@ -51,6 +57,11 @@ export interface EndQuizResponse {
 export const quizProcessService = {
     startQuiz: async (data: StartQuizRequest) => {
         const response = await api.post<StartQuizResponse>('/quiz_process/start_quiz', data);
+        return response.data;
+    },
+
+    submitAnswer: async (data: SubmitAnswerRequest) => {
+        const response = await api.post<SubmitAnswerResponse>('/quiz_process/submit_answer', data);
         return response.data;
     },
 

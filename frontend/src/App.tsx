@@ -24,7 +24,6 @@ import UserAnswersPage from '@/pages/UserAnswersPage';
 import TeacherGroupsPage from '@/pages/TeacherGroupsPage';
 import TeacherSubjectsPage from '@/pages/TeacherSubjectsPage';
 import TeacherRankingPage from '@/pages/TeacherRankingPage';
-import StatisticsPage from '@/pages/StatisticsPage';
 import YakuniyPage from '@/pages/YakuniyPage';
 import PsychologyPage from '@/pages/PsychologyPage';
 import PsychologyTestPage from '@/pages/PsychologyTestPage';
@@ -114,15 +113,14 @@ function App() {
                 <Route path="/" element={<DashboardRedirect />} />
                 <Route path="/profile" element={<ProfilePage />} />
 
-                <Route path="/dashboard" element={<PermissionRoute permission="read:statistics"><Dashboard /></PermissionRoute>} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/users" element={<PermissionRoute permission="read:user"><UsersPage /></PermissionRoute>} />
                 <Route path="/roles" element={<PermissionRoute permission="read:role"><RolesPage /></PermissionRoute>} />
                 <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                 <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
                 <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
                 <Route path="/employees" element={<PermissionRoute permission="read:employee"><EmployeesPage /></PermissionRoute>} />
-                <Route path="/teacher-ranking" element={<PermissionRoute permission={['read:statistics', 'read:teacher']}><TeacherRankingPage /></PermissionRoute>} />
-                <Route path="/statistics" element={<PermissionRoute permission="read:statistics"><StatisticsPage /></PermissionRoute>} />
+                <Route path="/teacher-ranking" element={<PermissionRoute permission="read:teacher"><TeacherRankingPage /></PermissionRoute>} />
 
                 <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                 <Route path="/kafedras" element={<PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute>} />

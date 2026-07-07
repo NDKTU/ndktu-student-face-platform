@@ -3,8 +3,8 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.modules.permission.model import Permission
-from app.modules.role.models.role import Role
+from app.modules.auth.model import Permission
+from app.modules.auth.model import Role
 
 
 @pytest_asyncio.fixture

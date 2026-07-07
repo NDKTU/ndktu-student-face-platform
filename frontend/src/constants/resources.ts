@@ -15,7 +15,6 @@ import {
     Trophy,
     BarChart2,
     Calendar,
-    LineChart,
     Briefcase,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -60,7 +59,6 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Testlar' },
 
     me:            { label: 'Profil' },
-    statistics:    { label: 'Statistika', icon: LineChart },
     quiz_process:  { label: 'Test jarayoni' },
     user_answers:  { label: 'Foydalanuvchi javoblari' },
     lesson_result: { label: 'Dars natijalari' },

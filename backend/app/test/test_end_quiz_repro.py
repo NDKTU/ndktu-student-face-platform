@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from app.modules.quiz.models.quiz_questions import QuizQuestion
+from app.modules.quiz.model import QuizQuestion
 
 
 @pytest_asyncio.fixture
@@ -35,6 +35,7 @@ async def setup_quiz_execution(auth_client, async_db, test_subject, test_user):
         "option_b": "B",
         "option_c": "C",
         "option_d": "D",
+        "correct_option": "a",
     }
     q1_resp = await auth_client.post("/question/", json=q1_payload)
     q1_id = q1_resp.json()["id"]
@@ -54,25 +55,23 @@ async def setup_quiz_execution(auth_client, async_db, test_subject, test_user):
 async def test_end_quiz_error_reproduction(setup_quiz_execution, auth_client):
     data = setup_quiz_execution
 
-    # End Quiz Payload
-    end_payload = {
-        "quiz_id": data["quiz_id"],
-        "user_id": data["user_id"],
-        "answers": [
-            {
-                "question_id": data["q1_id"],  # Valid ID
-                "answer": "Option A",
-            }
-        ],
-    }
+    # start_quiz creates the attempt (Result) and reserves the served questions —
+    # end_quiz can only finalize an attempt that was actually started.
+    start_resp = await auth_client.post(
+        "/quiz_process/start_quiz", json={"quiz_id": data["quiz_id"], "pin": "1234"}
+    )
+    assert start_resp.status_code == 200
+    result_id = start_resp.json()["result_id"]
 
-    # Call end_quiz
-    # We use auth_client which has the user logged in.
-    # The payload has user_id which might be anything. The backend should ignore it and use auth user.
-    # Let's set user_id to something invalid to prove it's ignored/handled safely.
-    end_payload["user_id"] = 99999
+    submit_resp = await auth_client.post(
+        "/quiz_process/submit_answer",
+        json={"result_id": result_id, "question_id": data["q1_id"], "answer": "Option A"},
+    )
+    assert submit_resp.status_code == 200
 
-    resp = await auth_client.post("/quiz_process/end_quiz", json=end_payload)
+    resp = await auth_client.post(
+        "/quiz_process/end_quiz", json={"quiz_id": data["quiz_id"], "result_id": result_id}
+    )
 
     # We expect this to SUCCEED with 200 now
     print(resp.json())

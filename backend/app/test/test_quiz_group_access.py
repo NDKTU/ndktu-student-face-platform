@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 import pytest_asyncio
 
-from app.modules.student.model import Student
+from app.modules.auth.model import Student
 
 
 @pytest_asyncio.fixture
