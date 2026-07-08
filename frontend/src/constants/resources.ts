@@ -16,6 +16,7 @@ import {
     BarChart2,
     Briefcase,
     User,
+    Library,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
     group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound },
     subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Testlar' },
+    course:        { label: 'Kurslar',          href: '/courses',     icon: Library,       section: 'Testlar' },
 
     quiz:          { label: 'Testlar',          href: '/quizzes',     icon: BookOpen,      section: 'Testlar' },
     active_quiz:   { label: 'Faol testlar',     href: '/active-quizzes', icon: PlayCircle, section: 'Testlar' },
@@ -113,19 +115,51 @@ interface StudentSidebarItem extends SidebarItem {
     permission: string;
 }
 
-const STUDENT_TEST_ITEMS: StudentSidebarItem[] = [
+// Student-only destinations that don't follow the generic read:<resource> ->
+// RESOURCES[resource] convention (their route/permission differs from the
+// admin/staff page for the same concept, e.g. quiz-taking vs quiz management).
+const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, permission: 'quiz_process:start_quiz' },
-    { name: 'Natijalar', href: '/results', icon: FileText, permission: 'read:result' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, permission: 'read:psychology' },
 ];
 
+// Resources whose generic admin/staff destination shouldn't be surfaced to a
+// plain student even if their role happens to have read access to it — either
+// they have a dedicated, more appropriate page instead (see
+// STUDENT_BESPOKE_ITEMS), or the permission is granted to students purely to
+// unblock an API call (e.g. QuizTestPage's own active-quiz fetch) and was
+// never meant to expose the admin management page itself.
+const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz']);
+
 const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {
     const sections: SidebarSection[] = [STUDENT_ALWAYS_VISIBLE];
+    const grouped: Record<string, SidebarItem[]> = {};
 
-    const items = STUDENT_TEST_ITEMS.filter((item) => permissions.has(item.permission))
-        .map(({ name, href, icon }) => ({ name, href, icon }));
-    if (items.length) {
-        sections.push({ label: 'Test', items });
+    for (const perm of permissions) {
+        if (!perm.startsWith('read:')) continue;
+        const resource = perm.slice('read:'.length);
+        if (STUDENT_HIDDEN_RESOURCES.has(resource)) continue;
+        const meta = RESOURCES[resource];
+        if (!meta?.href || !meta.icon || !meta.section) continue;
+
+        (grouped[meta.section] ??= []).push({
+            name: meta.label,
+            href: meta.href,
+            icon: meta.icon,
+        });
+    }
+
+    for (const item of STUDENT_BESPOKE_ITEMS) {
+        if (!permissions.has(item.permission)) continue;
+        (grouped['Testlar'] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
+    }
+
+    for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
+        if (sectionLabel === 'Umumiy') continue;
+        const items = grouped[sectionLabel];
+        if (items?.length) {
+            sections.push({ label: sectionLabel, items });
+        }
     }
 
     return sections;

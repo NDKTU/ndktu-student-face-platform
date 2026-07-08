@@ -34,7 +34,8 @@
       "mcp__playwright__browser_evaluate",
       "Bash(curl -s -o /dev/null -w \"frontend health: %{http_code}\\\\n\" http://localhost:3000)",
       "Bash(docker cp *)",
-      "Bash(docker exec database psql -U bekzod -d basic_database -c ' *)"
+      "Bash(docker exec database psql -U bekzod -d basic_database -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"frontend: %{http_code}\\\\n\" http://localhost:3000)"
     ],
     "additionalDirectories": [
       "/tmp/pptx_preview"

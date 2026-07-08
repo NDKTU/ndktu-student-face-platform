@@ -16,6 +16,7 @@ import FacultyPage from '@/pages/FacultyPage';
 import KafedraPage from '@/pages/KafedraPage';
 import GroupsPage from '@/pages/GroupsPage';
 import SubjectsPage from '@/pages/SubjectsPage';
+import CoursesPage from '@/pages/CoursesPage';
 import StudentsPage from '@/pages/StudentsPage';
 import QuestionsPage from '@/pages/QuestionsPage';
 import QuestionFormPage from '@/pages/QuestionFormPage';
@@ -131,6 +132,7 @@ function App() {
                 <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
 
                 <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
+                <Route path="/courses" element={<PermissionRoute permission="read:course"><CoursesPage /></PermissionRoute>} />
                 <Route path="/teacher-groups" element={<PermissionRoute permission="read:group"><TeacherGroupsPage /></PermissionRoute>} />
                 <Route path="/teacher-subjects" element={<PermissionRoute permission="read:subject"><TeacherSubjectsPage /></PermissionRoute>} />
                 <Route path="/questions" element={<PermissionRoute permission="read:question"><QuestionsPage /></PermissionRoute>} />

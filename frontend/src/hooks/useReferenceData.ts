@@ -3,6 +3,7 @@ import { facultyService } from '@/services/facultyService';
 import { kafedraService } from '@/services/kafedraService';
 import { roleService } from '@/services/roleService';
 import { permissionService } from '@/services/permissionService';
+import { specialityService } from '@/services/specialityService';
 
 // Faculties
 export const useFaculties = (page = 1, limit = 100, name?: string, enabled: boolean = true) => {
@@ -85,6 +86,15 @@ export const useDeleteKafedra = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['kafedras'] });
         },
+    });
+};
+
+// Specialities
+export const useSpecialities = (page = 1, limit = 100, name?: string, kafedra_id?: number, enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['specialities', page, limit, name, kafedra_id],
+        queryFn: () => specialityService.getSpecialities(page, limit, name, kafedra_id),
+        enabled,
     });
 };
 
