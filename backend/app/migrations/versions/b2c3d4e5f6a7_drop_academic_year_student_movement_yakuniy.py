@@ -2,9 +2,9 @@
 
 Removes the AcademicYear/Semester, StudentMovement and Yakuniy modules and
 their tables. Course.academic_year_id is dropped (Course.semester_number is
-a plain int field, unrelated to the Semester model, and is kept). Quiz never
-had its semester_id column applied to the database (pre-existing drift), so
-there is nothing to drop there.
+a plain int field, unrelated to the Semester model, and is kept). Quizzes.
+semester_id was dropped from the ORM model without ever being backed by a
+migration, so it is dropped here too before the semesters table.
 
 Revision ID: b2c3d4e5f6a7
 Revises: a1b2c3d4e5f6
@@ -32,6 +32,10 @@ def upgrade() -> None:
 
     op.drop_table('yakuniy')
     op.drop_table('student_movements')
+
+    op.drop_constraint('quizzes_semester_id_fkey', 'quizzes', type_='foreignkey')
+    op.drop_column('quizzes', 'semester_id')
+
     op.drop_table('semesters')
     op.drop_table('academic_years')
 
@@ -66,6 +70,11 @@ def downgrade() -> None:
         sa.UniqueConstraint('academic_year_id', 'number', name='uq_semester_year_number'),
     )
     op.create_index('ix_semesters_academic_year_id', 'semesters', ['academic_year_id'], unique=False)
+
+    op.add_column('quizzes', sa.Column('semester_id', sa.Integer(), nullable=True))
+    op.create_foreign_key(
+        'quizzes_semester_id_fkey', 'quizzes', 'semesters', ['semester_id'], ['id'], ondelete='SET NULL'
+    )
 
     op.create_table(
         'student_movements',

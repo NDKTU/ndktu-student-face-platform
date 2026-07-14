@@ -21,6 +21,8 @@ export interface ImageUploadFieldProps {
     disabled?: boolean;
     /** Size of the preview thumbnail. Default 80. */
     previewSize?: number;
+    /** Defaults to `uploadService.uploadImage` (question images folder). */
+    uploadFn?: (file: File) => Promise<{ url: string }>;
 }
 
 export function ImageUploadField({
@@ -30,6 +32,7 @@ export function ImageUploadField({
     helperText = "PNG, JPG — maksimal ~5MB",
     disabled,
     previewSize = 80,
+    uploadFn = uploadService.uploadImage,
 }: ImageUploadFieldProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [localPreview, setLocalPreview] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function ImageUploadField({
         setError(null);
         setIsUploading(true);
         try {
-            const { url } = await uploadService.uploadImage(file);
+            const { url } = await uploadFn(file);
             onChange(url);
             // Keep localPreview until next render — server URL may still be loading
         } catch {

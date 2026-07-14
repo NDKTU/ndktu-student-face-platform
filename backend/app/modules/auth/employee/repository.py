@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.modules.auth.model import Employee, Teacher, User
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
@@ -28,6 +29,23 @@ class EmployeeRepository:
 
     def _generate_full_name(self, first_name: str, last_name: str, third_name: str) -> str:
         return f"{last_name} {first_name} {third_name}"
+
+    async def upload_image(self, file) -> str:
+        import os
+        import shutil
+        import uuid
+
+        file_ext = file.filename.split(".")[-1]
+        filename = f"{uuid.uuid4()}.{file_ext}"
+
+        upload_dir = settings.profile_upload_dir
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = upload_dir / filename
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        return f"{settings.file_url.http}/profile/{filename}"
 
     async def create_employee(self, session: AsyncSession, data: EmployeeCreateRequest) -> Employee:
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)

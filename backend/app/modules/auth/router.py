@@ -3,7 +3,7 @@ import logging
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -697,6 +697,19 @@ async def create_employee(
     _: PermissionRequired = Depends(PermissionRequired("create:employee")),
 ):
     return await get_employee_repository.create_employee(session=session, data=data)
+
+
+@employee_router.post(
+    "/upload_image",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
+async def upload_employee_image(
+    file: UploadFile = File(...),
+    _: PermissionRequired = Depends(PermissionRequired("create:employee")),
+):
+    url = await get_employee_repository.upload_image(file=file)
+    return {"url": url}
 
 
 @employee_router.get("/me", response_model=EmployeeResponse)

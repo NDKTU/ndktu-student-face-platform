@@ -33,7 +33,7 @@ export interface EmployeeCreateRequest {
     last_name: string;
     third_name: string;
     phone_number?: string;
-    image_url?: string;
+    image_url?: string | null;
     roles: { name: string }[];
 }
 
@@ -42,7 +42,7 @@ export interface EmployeeUpdateRequest {
     last_name: string;
     third_name: string;
     phone_number?: string;
-    image_url?: string;
+    image_url?: string | null;
 }
 
 export interface EmployeeListResponse {
