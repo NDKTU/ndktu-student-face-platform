@@ -26,11 +26,6 @@ detailed_formatter = logging.Formatter(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-console_formatter = logging.Formatter(
-    "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
 
 # --- Filters ---
 class LevelFilter(logging.Filter):
@@ -73,14 +68,6 @@ for lib in [
     "asyncio",
 ]:
     logging.getLogger(lib).setLevel(logging.WARNING)
-
-
-# --- Console handler ---
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(console_formatter)
-console_handler.addFilter(NoiseFilter())
-logger.addHandler(console_handler)
 
 
 # --- File handlers per level ---

@@ -99,3 +99,6 @@ examples/
 *.png
 
 scripts/_assets/                                                                                                                                                                        
+.claude/
+.agents/
+.stitch/
