@@ -125,5 +125,13 @@
     "copyPin": "Nusxalash",
     "pinCopied": "PIN nusxalandi",
     "ballOf": "{{ball}} / {{total}}"
+  },
+  "proctoring": {
+    "online": "Nazorat yoqilgan",
+    "connecting": "Ulanmoqda...",
+    "offline": "Nazorat ishlamayapti",
+    "faces": "Kadrda {{count}} ta yuz",
+    "warningTitle": "Ogohlantirish {{count}} / {{max}}",
+    "warningText": "{{max}} ta ogohlantirishdan so'ng test avtomatik yakunlanadi."
   }
 }

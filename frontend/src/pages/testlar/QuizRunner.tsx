@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuizStore } from '@/features/testlar/model/quiz.store';
+import { ProctoringBadge } from '@/features/testlar/ui/ProctoringBadge';
 import { formatTime } from '@/shared/lib/quizFormat';
 import { Button } from '@/shared/ui/Button';
 
@@ -20,6 +21,11 @@ export function QuizRunner() {
   const tick = useQuizStore((s) => s.tick);
   const finish = useQuizStore((s) => s.finish);
 
+  // Режим прокторинга задаёт сервер при выдаче попытки — клиент его не выбирает.
+  const proctoring = useQuizStore((s) => s.proctoring);
+  const faceWsToken = useQuizStore((s) => s.faceWsToken);
+  const referenceImageUrl = useQuizStore((s) => s.referenceImageUrl);
+
   // Один интервал на всё прохождение; tick сам завершит тест на нуле.
   useEffect(() => {
     const id = setInterval(tick, 1000);
@@ -33,6 +39,21 @@ export function QuizRunner() {
 
   return (
     <div className="mx-auto max-w-[820px] px-6 pt-6 pb-16">
+      {proctoring === 'face' && (
+        <ProctoringBadge
+          quizId={test.id}
+          token={faceWsToken}
+          referenceImageUrl={referenceImageUrl}
+          onCheatingDetected={(reason, imageUrl) =>
+            void finish({
+              cheatingDetected: true,
+              reason,
+              ...(imageUrl ? { cheatingImageUrl: imageUrl } : {}),
+            })
+          }
+        />
+      )}
+
       <div className="quiz-bar mb-5 flex items-center justify-between gap-4 rounded-14 border border-line bg-surface px-5 py-3.5 shadow-card">
         <div className="min-w-0">
           <div className="truncate text-14 font-bold text-ink">{test.fan}</div>
