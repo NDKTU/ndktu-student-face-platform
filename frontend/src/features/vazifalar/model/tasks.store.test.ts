@@ -18,6 +18,7 @@ const store = () => useTasksStore.getState();
 function sub(id: number, over: Partial<TaskSubmissionRow> = {}): TaskSubmissionRow {
   return {
     id,
+    userId: id + 500,
     fish: 'Talaba Test',
     initials: 'TT',
     status: 'topshirilgan',
@@ -98,7 +99,9 @@ describe('tasks store — проверка работ', () => {
 
     await store().grade(1, 1, 90, 'Yaxshi');
 
-    expect(api.gradeSubmission).toHaveBeenCalledWith(1, 90, 'Yaxshi');
+    // Оценка адресуется парой (задание, пользователь): id самой сдачи
+    // бэкенд не принимает.
+    expect(api.gradeSubmission).toHaveBeenCalledWith(1, 501, 90, 'Yaxshi');
     expect(store().byId[1]!.subs[0]!.ball).toBe(90);
     // Счётчик оценённых вырос без перезапроса всего списка.
     expect(store().tasks[0]!.graded).toBe(1);

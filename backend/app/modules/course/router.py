@@ -33,6 +33,7 @@ from .assignment.schemas import (
     AssignmentListRequest,
     AssignmentListResponse,
     AssignmentResponse,
+    PendingSubmissionListResponse,
     AssignmentUpdateRequest,
     SubmissionGradeRequest,
     SubmissionListResponse,
@@ -265,6 +266,19 @@ async def list_assignments(
     current_user: "User" = Depends(PermissionRequired("read:assignment")),
 ):
     return await get_assignment_repository.list_assignments(session=session, request=data, current_user=current_user)
+
+
+@assignment_router.get("/pending", response_model=PendingSubmissionListResponse)
+async def list_pending_submissions(
+    limit: int = 20,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:assignment")),
+):
+    """Работы, ждущие проверки. Объявлен до /{assignment_id}: иначе «pending»
+    попал бы туда как идентификатор."""
+    return await get_assignment_repository.list_pending(
+        session=session, current_user=current_user, limit=limit
+    )
 
 
 @assignment_router.get("/{assignment_id}", response_model=AssignmentResponse)

@@ -38,6 +38,21 @@ class AssignmentUpdateRequest(BaseModel):
     allowed_file_types: Optional[List[str]] = None
 
 
+class AssignmentCourseInfo(BaseModel):
+    """Контекст задания: без него в списке нечего показать, кроме заголовка.
+
+    Экран заданий выводит фан, группу и преподавателя — всё это лежит на курсе,
+    а разрешать course_id на клиенте значило бы запрос на каждую строку.
+    """
+
+    id: int
+    name: str
+    subject_name: Optional[str] = None
+    teacher_name: Optional[str] = None
+    faculty_name: Optional[str] = None
+    group_names: List[str] = []
+
+
 class AssignmentStats(BaseModel):
     total_students: int
     submitted: int
@@ -57,6 +72,7 @@ class AssignmentResponse(BaseModel):
     allow_file: bool
     allow_text: bool
     allowed_file_types: List[str] = []
+    course: Optional[AssignmentCourseInfo] = None
     stats: Optional[AssignmentStats] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
@@ -124,3 +140,25 @@ class SubmissionResponse(BaseModel):
 
 class SubmissionListResponse(BaseModel):
     submissions: List[SubmissionResponse]
+
+
+class PendingSubmission(BaseModel):
+    """Работа, ждущая проверки, вместе с контекстом задания.
+
+    Плоская строка: домашней странице преподавателя нужен список «что
+    проверить», а не задания со вложенными сдачами.
+    """
+
+    id: int
+    assignment_id: int
+    assignment_title: str
+    user_id: int
+    full_name: str
+    subject_name: Optional[str] = None
+    group_names: List[str] = []
+    submitted_at: Optional[TashkentDatetime] = None
+
+
+class PendingSubmissionListResponse(BaseModel):
+    total: int
+    submissions: List[PendingSubmission]

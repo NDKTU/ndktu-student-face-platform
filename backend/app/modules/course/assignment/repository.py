@@ -9,8 +9,11 @@ from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
 from app.modules.auth.model import Employee, Student, User
+from app.modules.organization_structure.model import Group
+from app.modules.quiz.model import Subject
 
 from .schemas import (
+    AssignmentCourseInfo,
     AssignmentCreateRequest,
     AssignmentListRequest,
     AssignmentListResponse,
@@ -20,6 +23,8 @@ from .schemas import (
     SubmissionGradeRequest,
     SubmissionListResponse,
     SubmissionResponse,
+    PendingSubmission,
+    PendingSubmissionListResponse,
     SubmissionSubmitRequest,
     SubmissionUserInfo,
 )
@@ -70,9 +75,49 @@ class AssignmentRepository:
         )
         counts = {row[0]: row[1] for row in (await session.execute(sub_counts_stmt)).all()}
 
+        # Контекст курса: фан, преподаватель, факультет и группы. Одним
+        # запросом на задание — иначе список из полусотни строк дал бы столько
+        # же обращений к БД.
+        course = (
+            await session.execute(
+                select(Course)
+                .options(
+                    selectinload(Course.subject),
+                    selectinload(Course.teacher),
+                    selectinload(Course.faculty),
+                )
+                .where(Course.id == a.course_id)
+            )
+        ).scalar_one_or_none()
+
+        group_names = list(
+            (
+                await session.execute(
+                    select(Group.name)
+                    .join(CourseGroup, CourseGroup.group_id == Group.id)
+                    .where(CourseGroup.course_id == a.course_id)
+                    .order_by(Group.name)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
         return AssignmentResponse(
             id=a.id,
             course_id=a.course_id,
+            course=(
+                AssignmentCourseInfo(
+                    id=course.id,
+                    name=course.name,
+                    subject_name=course.subject.name if course.subject else None,
+                    teacher_name=course.teacher.username if course.teacher else None,
+                    faculty_name=course.faculty.name if course.faculty else None,
+                    group_names=group_names,
+                )
+                if course
+                else None
+            ),
             lesson_id=a.lesson_id,
             created_by_user_id=a.created_by_user_id,
             title=a.title,
@@ -200,6 +245,84 @@ class AssignmentRepository:
         )
 
     # ── Submissions ─────────────────────────────────────────────────────────
+
+    async def list_pending(
+        self, session: AsyncSession, current_user: User, limit: int = 20
+    ) -> PendingSubmissionListResponse:
+        """Сданные, но ещё не проверенные работы по курсам преподавателя.
+
+        Домашняя страница спрашивает «что проверить», поэтому строки плоские:
+        задание со вложенными сдачами ей пришлось бы разворачивать самой.
+        """
+        stmt = (
+            select(AssignmentSubmission, Assignment, Course)
+            .join(Assignment, Assignment.id == AssignmentSubmission.assignment_id)
+            .join(Course, Course.id == Assignment.course_id)
+            .options(
+                selectinload(AssignmentSubmission.user).selectinload(User.employee),
+                selectinload(AssignmentSubmission.user).selectinload(User.student),
+            )
+            .where(AssignmentSubmission.status.in_(("submitted", "late")))
+        )
+
+        # Администратор видит всё, остальные — только свои курсы. То же правило,
+        # что и в списке курсов: преподаватель не должен проверять чужие работы.
+        if not await self._is_admin(current_user):
+            stmt = stmt.where(Course.teacher_id == current_user.id)
+
+        stmt = stmt.order_by(desc(AssignmentSubmission.submitted_at)).limit(limit)
+        rows = (await session.execute(stmt)).all()
+
+        # Группы курса — одним запросом на всю выборку, а не на каждую строку.
+        course_ids = {course.id for _, _, course in rows}
+        groups: dict[int, list[str]] = {}
+        if course_ids:
+            for course_id, name in (
+                await session.execute(
+                    select(CourseGroup.course_id, Group.name)
+                    .join(Group, Group.id == CourseGroup.group_id)
+                    .where(CourseGroup.course_id.in_(course_ids))
+                    .order_by(Group.name)
+                )
+            ).all():
+                groups.setdefault(course_id, []).append(name)
+
+        subject_ids = {course.subject_id for _, _, course in rows if course.subject_id}
+        subjects: dict[int, str] = {}
+        if subject_ids:
+            subjects = dict(
+                (
+                    await session.execute(
+                        select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
+                    )
+                ).all()
+            )
+
+        def full_name(user: User | None) -> str:
+            if user is None:
+                return ""
+            if user.student:
+                return user.student.full_name
+            if user.employee:
+                return user.employee.full_name
+            return user.username
+
+        return PendingSubmissionListResponse(
+            total=len(rows),
+            submissions=[
+                PendingSubmission(
+                    id=sub.id,
+                    assignment_id=assignment.id,
+                    assignment_title=assignment.title,
+                    user_id=sub.user_id,
+                    full_name=full_name(sub.user),
+                    subject_name=subjects.get(course.subject_id) if course.subject_id else None,
+                    group_names=groups.get(course.id, []),
+                    submitted_at=sub.submitted_at,
+                )
+                for sub, assignment, course in rows
+            ],
+        )
 
     async def _serialize_submission(self, sub: AssignmentSubmission) -> SubmissionResponse:
         user_info: SubmissionUserInfo | None = None

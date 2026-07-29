@@ -19,7 +19,7 @@ export function StudentVazifalarPage() {
   const { t } = useTranslation('vazifalar');
   const { t: tn } = useTranslation('nav');
 
-  const { status: loadStatus, error, reload } = useVazifalar();
+  const { status: loadStatus, error, reload } = useVazifalar(true);
   const allTasks = useTasksStore((s) => s.tasks);
 
   // Список уже урезан сервером до своей группы; своё состояние — в mySub.

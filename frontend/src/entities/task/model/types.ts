@@ -31,6 +31,8 @@ export interface StudentTask {
 /** Сдача студента в том виде, как её отдаёт бэкенд. */
 export interface TaskSubmissionRow {
   id: number;
+  /** Автор работы. Оценка ставится по (задание, пользователь), а не по id сдачи. */
+  userId: number;
   fish: string;
   initials: string;
   status: 'baholangan' | 'topshirilgan' | 'topshirilmagan';

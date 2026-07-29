@@ -36,7 +36,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'reja', path: '/reja', section: 'asosiy', permission: 'read:curriculum' },
   { key: 'savollar', path: '/savollar', section: 'asosiy', permission: 'read:question', persona: 'staff' },
   { key: 'testlar', path: '/testlar', section: 'asosiy', permission: 'read:quiz', persona: 'staff' },
-  { key: 'kurslar', path: '/kurslar', section: 'asosiy', permission: 'read:course' },
+  // Раздел скрыт до появления модели контента. Production-«Lesson» — это
+  // занятие по расписанию (группа, дата, журнал посещаемости), а экран
+  // «Kurslar» показывает библиотеку видеоуроков. Натянуть одно на другое
+  // значило бы заводить копию каждого видео на каждую группу и дату.
+  { key: 'kurslar', path: '/kurslar', section: 'asosiy', permission: 'read:course', hidden: true },
   // Преподаватель проверяет работы, администратор распоряжается заданиями
   // целиком — это разные права, а не разные роли.
   { key: 'tvazlar', path: '/tvazlar', section: 'asosiy', permission: 'update:submission', persona: 'staff' },
