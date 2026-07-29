@@ -8,12 +8,20 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, SubjectTeacher
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, SubjectTeacher, UserAnswers
 
 from .schemas import (
+    QuizAttempt,
+    QuizAttemptAnswer,
     QuizCreateRequest,
+    QuizCreateResponse,
+    QuizDetailOption,
+    QuizDetailQuestion,
+    QuizDetailResponse,
+    QuizDetailStats,
     QuizListRequest,
     QuizListResponse,
+    QuizQuestionStat,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,8 +84,16 @@ class QuizRepository:
             )
         return new_quiz
 
+    def _eager(self):
+        """Фан, группа и автор — их показывает список тестов."""
+        return (
+            selectinload(Quiz.subject),
+            selectinload(Quiz.group),
+            selectinload(Quiz.user).selectinload(User.employee),
+        )
+
     async def get_quiz(self, session: AsyncSession, quiz_id: int) -> Quiz:
-        stmt = select(Quiz).where(Quiz.id == quiz_id)
+        stmt = select(Quiz).options(*self._eager()).where(Quiz.id == quiz_id)
         result = await session.execute(stmt)
         quiz = result.scalar_one_or_none()
 
@@ -86,10 +102,168 @@ class QuizRepository:
 
         return quiz
 
+    async def get_detail(self, session: AsyncSession, quiz_id: int) -> QuizDetailResponse:
+        """Аналитика теста: вопросы, попытки студентов и сводка.
+
+        Собирается четырьмя запросами. Правильные ответы здесь отдаются
+        осознанно: экран смотрит преподаватель. Прохождение идёт через
+        /quiz_process, и там их нет.
+        """
+        quiz = (
+            await session.execute(
+                select(Quiz)
+                .options(
+                    *self._eager(),
+                    selectinload(Quiz.quiz_questions).selectinload(QuizQuestion.question),
+                )
+                .where(Quiz.id == quiz_id)
+            )
+        ).scalar_one_or_none()
+
+        if not quiz:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+
+        letters = ("a", "b", "c", "d")
+        questions: list[QuizDetailQuestion] = []
+        for qq in quiz.quiz_questions:
+            question = qq.question
+            if question is None:
+                continue
+            options = [
+                QuizDetailOption(letter=letter.upper(), text=getattr(question, f"option_{letter}"))
+                for letter in letters
+            ]
+            questions.append(
+                QuizDetailQuestion(
+                    id=question.id,
+                    text=question.text,
+                    options=options,
+                    correct=letters.index(question.correct_option),
+                )
+            )
+
+        results = (
+            (
+                await session.execute(
+                    select(Result)
+                    .options(
+                        selectinload(Result.user).selectinload(User.student),
+                        selectinload(Result.user).selectinload(User.employee),
+                    )
+                    .where(Result.quiz_id == quiz_id)
+                    .order_by(desc(Result.created_at))
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        # Ответы всех попыток одним запросом: по запросу на попытку означало бы
+        # десятки обращений на один экран.
+        answers_by_result: dict[int, list[UserAnswers]] = {}
+        if results:
+            for answer in (
+                (
+                    await session.execute(
+                        select(UserAnswers).where(
+                            UserAnswers.result_id.in_([r.id for r in results])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            ):
+                answers_by_result.setdefault(answer.result_id, []).append(answer)
+
+        def full_name(user: User | None) -> str:
+            if user is None:
+                return ""
+            if user.student:
+                return user.student.full_name
+            if user.employee:
+                return user.employee.full_name
+            return user.username
+
+        attempts: list[QuizAttempt] = []
+        for result in results:
+            rows = answers_by_result.get(result.id, [])
+            spent = None
+            if result.finished_at and result.created_at:
+                spent = int((result.finished_at - result.created_at).total_seconds())
+
+            attempts.append(
+                QuizAttempt(
+                    result_id=result.id,
+                    user_id=result.user_id,
+                    full_name=full_name(result.user),
+                    submitted=result.status == "completed",
+                    correct_answers=result.correct_answers or 0,
+                    wrong_answers=result.wrong_answers or 0,
+                    total=len(rows),
+                    grade=result.grade or 0,
+                    spent_seconds=spent,
+                    finished_at=result.finished_at,
+                    answers=[
+                        QuizAttemptAnswer(
+                            question_id=a.question_id, answer=a.answer, is_correct=a.is_correct
+                        )
+                        for a in rows
+                    ],
+                )
+            )
+
+        submitted = [a for a in attempts if a.submitted]
+        grades = [a.grade for a in submitted]
+        spents = [a.spent_seconds for a in submitted if a.spent_seconds is not None]
+
+        # Знаменатель — размер группы, а не число попыток: сводка отвечает на
+        # вопрос «сколько из группы уже сдали».
+        total_students = 0
+        if quiz.group_id:
+            total_students = (
+                await session.execute(
+                    select(func.count(Student.id)).where(Student.group_id == quiz.group_id)
+                )
+            ).scalar() or 0
+
+        per_question = [
+            QuizQuestionStat(
+                question_id=q.id,
+                correct=sum(
+                    1
+                    for a in attempts
+                    for row in a.answers
+                    if row.question_id == q.id and row.is_correct
+                ),
+                wrong=sum(
+                    1
+                    for a in attempts
+                    for row in a.answers
+                    if row.question_id == q.id and row.is_correct is False
+                ),
+            )
+            for q in questions
+        ]
+
+        return QuizDetailResponse(
+            quiz=QuizCreateResponse.model_validate(quiz),
+            questions=questions,
+            attempts=attempts,
+            stats=QuizDetailStats(
+                submitted=len(submitted),
+                total_students=total_students,
+                avg_grade=round(sum(grades) / len(grades), 1) if grades else 0.0,
+                max_grade=max(grades) if grades else 0,
+                min_grade=min(grades) if grades else 0,
+                avg_seconds=int(sum(spents) / len(spents)) if spents else None,
+            ),
+            per_question=per_question,
+        )
+
     async def list_quizzes(
         self, session: AsyncSession, request: QuizListRequest, current_user: User
     ) -> QuizListResponse:
-        stmt = select(Quiz)
+        stmt = select(Quiz).options(*self._eager())
 
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
         is_student = any(role.name.lower() == "student" for role in current_user.roles)

@@ -67,11 +67,15 @@ describe('testlar store — мутации', () => {
     api.createTest.mockResolvedValueOnce(meta(2, { pin: '999888' }));
 
     const created = await store().add({
-      fan: 'Fizika',
-      guruh: 'KI-24-02',
+      name: 'Fizika — KI-24-02',
+      subjectId: 3,
+      groupId: 4,
+      teacherId: 7,
       savollar: 10,
       davomiylik: 20,
-      oqituvchi: 'Jasur Bozorov',
+      pin: '999888',
+      isActive: true,
+      proctoring: 'standard',
     });
 
     expect(created.pin).toBe('999888');
@@ -79,11 +83,11 @@ describe('testlar store — мутации', () => {
   });
 
   it('update заменяет тест ответом сервера', async () => {
-    api.updateTest.mockResolvedValueOnce(meta(1, { holati: 'Yopilgan' }));
+    api.updateTest.mockResolvedValueOnce(meta(1, { holati: 'Yopiq' }));
 
-    await store().update(1, { holati: 'Yopilgan' });
+    await store().update(1, { holati: 'Yopiq' });
 
-    expect(store().tests[0]!.holati).toBe('Yopilgan');
+    expect(store().tests[0]!.holati).toBe('Yopiq');
   });
 
   it('remove убирает тест после успешного удаления', async () => {
@@ -99,7 +103,17 @@ describe('testlar store — мутации', () => {
     api.createTest.mockRejectedValueOnce(new Error('HTTP 500'));
 
     await expect(
-      store().add({ fan: 'X', guruh: 'G', savollar: 1, davomiylik: 1, oqituvchi: 'T' }),
+      store().add({
+        name: 'X',
+        subjectId: null,
+        groupId: null,
+        teacherId: null,
+        savollar: 1,
+        davomiylik: 1,
+        pin: '111111',
+        isActive: false,
+        proctoring: 'standard',
+      }),
     ).rejects.toThrow('HTTP 500');
     expect(store().tests).toHaveLength(1);
   });

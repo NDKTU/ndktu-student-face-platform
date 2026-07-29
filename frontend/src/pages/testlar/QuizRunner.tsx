@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuizStore } from '@/features/testlar/model/quiz.store';
-import { formatTime } from '@/entities/test/mock/tests';
+import { formatTime } from '@/shared/lib/quizFormat';
 import { Button } from '@/shared/ui/Button';
 
 /** Прохождение теста с обратным отсчётом. Таймер живёт, пока фаза = quiz. */
@@ -112,7 +112,7 @@ export function QuizRunner() {
           {t('quiz.prev')}
         </Button>
         {index === questions.length - 1 ? (
-          <Button onClick={finish}>{t('quiz.finish')}</Button>
+          <Button onClick={() => void finish()}>{t('quiz.finish')}</Button>
         ) : (
           <Button onClick={next}>{t('quiz.next')}</Button>
         )}

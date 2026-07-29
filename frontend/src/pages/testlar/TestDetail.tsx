@@ -12,7 +12,6 @@ import { useToast } from '@/shared/ui/Toast';
 const STATUS_TONE: Record<TestStatus, { bg: string; fg: string }> = {
   Faol: { bg: 'var(--color-success-tint)', fg: 'var(--color-success)' },
   Yopiq: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
-  Yopilgan: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
 };
 
 /** Аналитика теста: показатели, результаты студентов и разбор по вопросам.

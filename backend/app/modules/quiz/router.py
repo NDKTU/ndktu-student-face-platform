@@ -24,6 +24,7 @@ from .quiz.repository import get_quiz_repository
 from .quiz.schemas import (
     QuizCreateRequest,
     QuizCreateResponse,
+    QuizDetailResponse,
     QuizListRequest,
     QuizListResponse,
 )
@@ -308,6 +309,17 @@ async def list_active_quizzes(
 ):
     data.is_active = True
     return await get_quiz_repository.list_quizzes(session=session, request=data, current_user=current_user)
+
+
+@quiz_router.get("/{quiz_id}/detail", response_model=QuizDetailResponse)
+async def get_quiz_detail(
+    quiz_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:result")),
+):
+    """Аналитика теста. Право переиспользуем: экран показывает именно
+    результаты студентов, а на них уже есть read:result."""
+    return await get_quiz_repository.get_detail(session=session, quiz_id=quiz_id)
 
 
 @quiz_router.get("/{quiz_id}", response_model=QuizCreateResponse)

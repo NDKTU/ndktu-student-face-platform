@@ -13,7 +13,6 @@ import { TestDetail } from './TestDetail';
 const STATUS_TONE: Record<TestStatus, { bg: string; fg: string }> = {
   Faol: { bg: 'var(--color-success-tint)', fg: 'var(--color-success)' },
   Yopiq: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
-  Yopilgan: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
 };
 
 /** Testlar для super_admin/admin: список всех тестов + аналитика (read-only). */

@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TEACHER_TEST_SUBJECTS } from '@/entities/test/mock/tests';
+import { generatePin } from '@/shared/lib/quizFormat';
+import { getMyGroups, getMySubjects, type AssignedGroup, type AssignedSubject } from '@/shared/api/mening';
+import { getFanlar } from '@/shared/api/fanlar';
+import { useSessionStore } from '@/features/auth/model/session.store';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
 import type { TestMeta, TestStatus } from '@/entities/test/model/types';
 import { useTestlarStore } from '@/features/testlar/model/testlar.store';
 import { useTestlar } from '@/features/testlar/lib/useTestlar';
@@ -15,7 +19,6 @@ import { useToast } from '@/shared/ui/Toast';
 const STATUS_TONE: Record<TestStatus, { bg: string; fg: string }> = {
   Faol: { bg: 'var(--color-success-tint)', fg: 'var(--color-success)' },
   Yopiq: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
-  Yopilgan: { bg: 'var(--color-surface-alt)', fg: 'var(--color-ink-muted)' },
 };
 
 export function TeacherTestlarPage() {
@@ -30,6 +33,32 @@ export function TeacherTestlarPage() {
 
   const [creating, setCreating] = useState(false);
   const [createdPin, setCreatedPin] = useState<string | null>(null);
+
+  // Предметы и группы формы — закрепления преподавателя. У администратора их
+  // нет, поэтому для него берём весь каталог фанов.
+  const user = useSessionStore((s) => s.user);
+  const { isAdmin } = usePermissions();
+  const userId = user?.id ?? null;
+  const [subjects, setSubjects] = useState<AssignedSubject[]>([]);
+  const [groups, setGroups] = useState<AssignedGroup[]>([]);
+
+  useEffect(() => {
+    if (userId === null) return;
+    let alive = true;
+
+    const subjectSource = isAdmin
+      ? getFanlar().then((fans) => fans.map((f) => ({ id: f.id, name: f.fan })))
+      : getMySubjects(userId);
+
+    void subjectSource.then((items) => alive && setSubjects(items)).catch(() => undefined);
+    void getMyGroups(userId)
+      .then((items) => alive && setGroups(items))
+      .catch(() => undefined);
+
+    return () => {
+      alive = false;
+    };
+  }, [userId, isAdmin]);
 
   // Фильтровать нечего: сервер отдал только тесты этого преподавателя.
   const columns: Column<TestMeta>[] = [
@@ -56,28 +85,33 @@ export function TeacherTestlarPage() {
 
   async function createTest(draft: {
     subjectId: string;
-    guruh: string;
+    groupId: string;
     savollar: string;
     davomiylik: string;
   }) {
-    const subject =
-      TEACHER_TEST_SUBJECTS.find((s) => s.id === draft.subjectId) ?? TEACHER_TEST_SUBJECTS[0];
     const count = parseInt(draft.savollar, 10);
-    if (Number.isNaN(count) || count < 1 || count > subject.count) {
+    if (Number.isNaN(count) || count < 1) {
       toast(t('create.invalidCount'));
       return;
     }
 
+    const subject = subjects.find((s) => String(s.id) === draft.subjectId) ?? null;
+    const group = groups.find((g) => String(g.id) === draft.groupId) ?? null;
+
     try {
-      // PIN генерирует сервер — он же его потом и проверяет.
       const created = await add({
-        fan: subject.fan,
-        guruh: draft.guruh.trim() || 'KI-24-01',
+        name: subject ? `${subject.name} — ${group?.name ?? ''}`.trim() : t('create.untitled'),
+        subjectId: subject?.id ?? null,
+        groupId: group?.id ?? null,
+        // Автор теста — владелец токена: список тестов преподавателя строится
+        // по этому полю.
+        teacherId: userId,
         savollar: count,
         davomiylik: parseInt(draft.davomiylik, 10) || 30,
-        // Автора сервер подставит из токена — здесь его знать неоткуда.
-        oqituvchi: '',
-        subjectId: subject.id,
+        // PIN бэкенд не придумывает — он приходит в теле запроса.
+        pin: generatePin(),
+        isActive: true,
+        proctoring: 'standard',
       });
       setCreating(false);
       setCreatedPin(created.pin ?? null);
@@ -114,7 +148,9 @@ export function TeacherTestlarPage() {
       </div>
 
       {creating && (
-        <CreateTestModal onCreate={(d) => void createTest(d)} onCancel={() => setCreating(false)} />
+        <CreateTestModal
+          subjects={subjects}
+          groups={groups} onCreate={(d) => void createTest(d)} onCancel={() => setCreating(false)} />
       )}
 
       {createdPin && (
@@ -146,17 +182,26 @@ export function TeacherTestlarPage() {
 }
 
 function CreateTestModal({
+  subjects,
+  groups,
   onCreate,
   onCancel,
 }: {
-  onCreate: (draft: { subjectId: string; guruh: string; savollar: string; davomiylik: string }) => void;
+  subjects: AssignedSubject[];
+  groups: AssignedGroup[];
+  onCreate: (draft: {
+    subjectId: string;
+    groupId: string;
+    savollar: string;
+    davomiylik: string;
+  }) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation('testlar');
   const { t: tc } = useTranslation('common');
   const [draft, setDraft] = useState({
-    subjectId: TEACHER_TEST_SUBJECTS[0].id as string,
-    guruh: 'KI-24-01',
+    subjectId: String(subjects[0]?.id ?? ''),
+    groupId: String(groups[0]?.id ?? ''),
     savollar: '20',
     davomiylik: '30',
   });
@@ -180,19 +225,27 @@ function CreateTestModal({
           onChange={(e) => setDraft((d) => ({ ...d, subjectId: e.target.value }))}
           className={modalInputClass}
         >
-          {TEACHER_TEST_SUBJECTS.map((s) => (
+          {subjects.length === 0 && <option value="">{t('create.noSubjects')}</option>}
+          {subjects.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.fan}
+              {s.name}
             </option>
           ))}
         </select>
       </ModalField>
       <ModalField label={t('create.guruh')}>
-        <input
-          value={draft.guruh}
-          onChange={(e) => setDraft((d) => ({ ...d, guruh: e.target.value }))}
+        <select
+          value={draft.groupId}
+          onChange={(e) => setDraft((d) => ({ ...d, groupId: e.target.value }))}
           className={modalInputClass}
-        />
+        >
+          {groups.length === 0 && <option value="">{t('create.noGroups')}</option>}
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
       </ModalField>
       <div className="grid grid-cols-2 gap-3.5">
         <ModalField label={t('create.questions')}>

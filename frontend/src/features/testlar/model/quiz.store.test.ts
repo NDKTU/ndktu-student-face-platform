@@ -5,7 +5,8 @@ import { useQuizStore } from './quiz.store';
 // Вопросы и балл теперь приходят с сервера — граница подменяется целиком.
 vi.mock('@/shared/api/testlar', () => ({
   startTest: vi.fn(),
-  submitTest: vi.fn(),
+  submitAnswer: vi.fn(),
+  endTest: vi.fn(),
 }));
 
 const api = vi.mocked(await import('@/shared/api/testlar'));
@@ -24,6 +25,7 @@ const TEST: TestMeta = {
 
 // Сервер отдаёт вопросы без правильных ответов.
 const QUESTIONS: QuizQuestion[] = [0, 1, 2].map((i) => ({
+  id: 100 + i,
   text: `Savol ${i + 1}`,
   image: false,
   options: (['A', 'B', 'C', 'D'] as const).map((letter) => ({
@@ -38,7 +40,15 @@ const store = () => useQuizStore.getState();
 beforeEach(() => {
   vi.clearAllMocks();
   store().reset();
-  api.startTest.mockResolvedValue({ test: TEST, questions: QUESTIONS });
+  api.startTest.mockResolvedValue({
+    resultId: 55,
+    test: TEST,
+    questions: QUESTIONS,
+    proctoring: 'standard',
+    faceWsToken: null,
+    referenceImageUrl: null,
+  });
+  api.submitAnswer.mockResolvedValue({ question_id: 100, is_correct: true });
 });
 
 describe('quiz store — запуск', () => {
@@ -74,6 +84,8 @@ describe('quiz store — прохождение', () => {
   it('answer пишет ответ текущего вопроса, навигация двигает индекс', () => {
     store().answer(2);
     expect(store().answers).toEqual({ 0: 2 });
+    // Ответ уходит сразу и адресуется id вопроса, а сервер сверяет текст.
+    expect(api.submitAnswer).toHaveBeenCalledWith(55, 100, 'Variant C');
 
     store().next();
     store().answer(1);
@@ -91,7 +103,7 @@ describe('quiz store — прохождение', () => {
     store().tick();
     expect(store().remaining).toBe(30 * 60 - 1);
 
-    api.submitTest.mockResolvedValueOnce({
+    api.endTest.mockResolvedValueOnce({
       correct: 0,
       wrong: 3,
       total: 3,
@@ -103,11 +115,11 @@ describe('quiz store — прохождение', () => {
     await vi.waitFor(() => expect(store().phase).toBe('result'));
   });
 
-  it('finish отправляет ответы и берёт результат с сервера', async () => {
+  it('finish подводит итог попытки — ответы уже на сервере', async () => {
     store().answer(3);
     useQuizStore.setState({ remaining: 30 * 60 - 120 });
 
-    api.submitTest.mockResolvedValueOnce({
+    api.endTest.mockResolvedValueOnce({
       correct: 2,
       wrong: 1,
       total: 3,
@@ -117,8 +129,9 @@ describe('quiz store — прохождение', () => {
 
     await store().finish();
 
-    // Имя сдающего не передаётся: сервер берёт его из токена.
-    expect(api.submitTest).toHaveBeenCalledWith(1, { 0: 3 }, 120);
+    // Ответы отправлены поштучно ещё во время теста; сюда уходит только
+    // идентификатор попытки и потраченное время.
+    expect(api.endTest).toHaveBeenCalledWith(1, 55, 120, undefined);
     expect(store().phase).toBe('result');
     expect(store().result).toMatchObject({ correct: 2, wrong: 1, pct: 67 });
   });

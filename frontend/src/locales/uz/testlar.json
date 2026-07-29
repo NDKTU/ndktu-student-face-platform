@@ -61,7 +61,10 @@
     "pinTitle": "Test PIN kodi",
     "pinNote": "Talabalarga ushbu PIN kodni bering",
     "copyPin": "Nusxalash",
-    "pinCopied": "PIN nusxalandi"
+    "pinCopied": "PIN nusxalandi",
+    "noSubjects": "Biriktirilgan fan yo'q",
+    "noGroups": "Biriktirilgan guruh yo'q",
+    "untitled": "Yangi test"
   },
   "teacher": {
     "column": {

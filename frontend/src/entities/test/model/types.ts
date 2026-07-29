@@ -1,4 +1,5 @@
-export type TestStatus = 'Faol' | 'Yopiq' | 'Yopilgan';
+/** На бэкенде это флаг is_active — третьего состояния там нет. */
+export type TestStatus = 'Faol' | 'Yopiq';
 
 export interface TestMeta {
   id: number;
@@ -20,6 +21,8 @@ export interface QuizOption {
 }
 
 export interface QuizQuestion {
+  /** Есть при прохождении теста: ответ адресуется по id вопроса. */
+  id?: number;
   text: string;
   image: boolean;
   options: QuizOption[];

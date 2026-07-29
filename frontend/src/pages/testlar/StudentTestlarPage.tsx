@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatTime } from '@/entities/test/mock/tests';
+import { formatTime } from '@/shared/lib/quizFormat';
 import type { TestMeta } from '@/entities/test/model/types';
 import { useQuizStore } from '@/features/testlar/model/quiz.store';
 import { useTestlarStore } from '@/features/testlar/model/testlar.store';
