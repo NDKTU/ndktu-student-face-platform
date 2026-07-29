@@ -1,22 +1,50 @@
-import type { PermissionCode, PermissionMatrix } from '@/entities/access/model/permissions';
-import type { Role } from '@/entities/access/model/roles';
+import { getAll } from './envelope';
 import { api } from './http';
 
-interface MatrixResponse {
-  matrix: PermissionMatrix;
+/**
+ * Граница до бэкенда для ролей и прав.
+ *
+ * И роли, и права — обычные строки в БД: роль заводит администратор, а права
+ * бэкенд заводит сам, обходя маршруты при старте. Закрытых списков ни там,
+ * ни там нет, поэтому матрица строится из того, что пришло с сервера.
+ */
+
+export interface RoleInfo {
+  id: number;
+  name: string;
 }
 
-export const getMatrix = () => api.get<MatrixResponse>('/rollar').then((r) => r.matrix);
+export interface PermissionInfo {
+  id: number;
+  name: string;
+}
 
-/** Возвращает матрицу целиком: сервер — единственный источник правды. */
-export const setPermission = (role: Role, code: PermissionCode, granted: boolean) =>
-  api.patch<MatrixResponse>(`/rollar/${role}`, { code, granted }).then((r) => r.matrix);
+export interface RoleWithPermissions extends RoleInfo {
+  permissions: PermissionInfo[];
+}
+
+/** Роли вместе с их правами — список отдаёт их вложенными. */
+export const getRoles = () => getAll<RoleWithPermissions>('/role/', 'roles');
+
+/** Полный словарь прав: из него строятся строки матрицы. */
+export const getPermissions = () => getAll<PermissionInfo>('/permission/', 'permissions');
+
+export const createRole = (name: string) => api.post<RoleInfo>('/role/', { name });
+
+export const deleteRole = (roleId: number) => api.delete(`/role/${roleId}`);
 
 /**
- * Сколько учёток у каждой роли. Раньше эти числа были придуманы прямо на
- * экране (`super_admin: 2, admin: 5`) — теперь считает БД.
+ * Назначает роли ровно этот набор прав.
+ *
+ * Эндпоинт заменяет набор целиком, а не переключает одно право, — поэтому
+ * экран присылает весь список после каждой галочки.
  */
+export const assignPermissions = (roleId: number, permissionIds: number[]) =>
+  api.post<{ message: string }>('/role/assign_permission', {
+    role_id: roleId,
+    permission_ids: permissionIds,
+  });
+
+/** Сколько учёток у каждой роли. Ключ — имя роли, как она заведена в БД. */
 export const getRoleCounts = () =>
-  api
-    .get<{ counts: Record<string, number> }>('/foydalanuvchilar/role-counts')
-    .then((r) => r.counts);
+  api.get<{ counts: Record<string, number> }>('/user/role-counts').then((r) => r.counts);

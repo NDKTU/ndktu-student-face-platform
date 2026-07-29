@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.core.schemas import TashkentDatetime
 from typing import Optional
 
@@ -35,6 +37,21 @@ class EmployeeCreateRequest(BaseModel):
     image_url: Optional[str] = None
     department_id: Optional[int] = None
     roles: list[RoleRequest] = []
+    # Служебная карточка: её показывает реестр «Xodimlar». Всё необязательно —
+    # сотрудника заводят по ФИО и учётке, остальное дозаполняют позже.
+    position_title: Optional[str] = None
+    work_email: Optional[str] = None
+    work_phone: Optional[str] = None
+    gender: Optional[str] = None
+    birth_date: Optional[date] = None
+    hire_date: Optional[date] = None
+    status: Optional[str] = None
+    # Персональные данные. Принимаем на запись здесь, но наружу отдаём только
+    # через /employee/{id}/sensitive — в EmployeeResponse их нет.
+    jshshir: Optional[str] = None
+    passport: Optional[str] = None
+    personal_phone: Optional[str] = None
+    address: Optional[str] = None
 
     @field_validator("first_name", "last_name", "third_name", mode="before")
     @classmethod
@@ -65,6 +82,21 @@ class EmployeeUpdateRequest(BaseModel):
     phone_number: Optional[str] = None
     image_url: Optional[str] = None
     department_id: Optional[int] = None
+    # Служебная карточка: её показывает реестр «Xodimlar». Всё необязательно —
+    # сотрудника заводят по ФИО и учётке, остальное дозаполняют позже.
+    position_title: Optional[str] = None
+    work_email: Optional[str] = None
+    work_phone: Optional[str] = None
+    gender: Optional[str] = None
+    birth_date: Optional[date] = None
+    hire_date: Optional[date] = None
+    status: Optional[str] = None
+    # Персональные данные. Принимаем на запись здесь, но наружу отдаём только
+    # через /employee/{id}/sensitive — в EmployeeResponse их нет.
+    jshshir: Optional[str] = None
+    passport: Optional[str] = None
+    personal_phone: Optional[str] = None
+    address: Optional[str] = None
 
     @field_validator("first_name", "last_name", "third_name", mode="before")
     @classmethod
@@ -85,6 +117,15 @@ class EmployeeResponse(BaseModel):
     image_url: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
+
+    position_title: Optional[str] = None
+    work_email: Optional[str] = None
+    work_phone: Optional[str] = None
+    gender: Optional[str] = None
+    birth_date: Optional[date] = None
+    hire_date: Optional[date] = None
+    status: str = "Faol"
+    last_login_at: Optional[TashkentDatetime] = None
 
     user: Optional[EmployeeUserInfo] = None
     teacher: Optional[EmployeeTeacherInfo] = None

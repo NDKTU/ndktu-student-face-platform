@@ -1,69 +1,56 @@
 {
   "title": "Rollar va ruxsatlar",
-  "subtitle": "Rollarni yarating va modullar boʻyicha ruxsatlarni biriktiring",
+  "subtitle": "Rollarni yarating va resurslar boʻyicha ruxsatlarni biriktiring",
   "listTitle": "Rollar",
   "addRole": "Yangi rol",
   "systemBadge": "TIZIM",
-  "systemRole": "Tizim roli",
-  "systemHint": "Tizim roli — o'chirib bo'lmaydi",
   "userCount": "{{count}} foydalanuvchi",
   "autoSaveHint": "O'zgarishlar darhol saqlanadi",
   "saved": "Ruxsat yangilandi",
-  "module": {
-    "LMS": {
-      "label": "LMS",
-      "sub": "O'quv jarayoni"
-    },
-    "CMMS": {
-      "label": "CMMS",
-      "sub": "Texnik xizmat, uskunalar"
-    },
-    "USERS": {
-      "label": "Foydalanuvchilar",
-      "sub": "Hisoblar va autentifikatsiya"
-    },
-    "SETTINGS": {
-      "label": "Sozlamalar",
-      "sub": "Tizim konfiguratsiyasi"
-    }
-  },
-  "perm": {
-    "lms:read": "Ko'rish",
-    "lms:write": "Yaratish va tahrirlash",
-    "lms:delete": "O'chirish",
-    "cmms:read": "Ko'rish",
-    "cmms:write": "Yaratish va tahrirlash",
-    "cmms:delete": "O'chirish",
-    "users:read": "Ko'rish",
-    "users:write": "Boshqarish",
-    "users:invite": "Taklif qilish",
-    "settings:read": "Ko'rish",
-    "settings:write": "O'zgartirish"
-  },
-  "role": {
-    "super_admin": {
-      "name": "Super Admin",
-      "desc": "Tizimning barcha modullari va sozlamalariga toʻliq kirish. Rollar va ruxsatlarni boshqaradi."
-    },
-    "admin": {
-      "name": "Administrator",
-      "desc": "Universitet maʼlumotlari va foydalanuvchilarni boshqaradi."
-    },
-    "dekan": {
-      "name": "Dekan",
-      "desc": "Fakultet doirasidagi kafedralar, mutaxassisliklar va oʻquv jarayonini nazorat qiladi."
-    },
-    "kafedra_mudiri": {
-      "name": "Kafedra mudiri",
-      "desc": "Kafedra fanlari, oʻqituvchilari va oʻquv rejasini boshqaradi."
-    },
-    "oqituvchi": {
-      "name": "O'qituvchi",
-      "desc": "Biriktirilgan fanlar va guruhlar bilan ishlaydi."
-    },
-    "talaba": {
-      "name": "Talaba",
-      "desc": "O'z guruhi va fanlari boʻyicha maʼlumotlarni koʻradi (faqat oʻqish)."
-    }
+  "superuserHint": "«Admin» roli barcha tekshiruvlardan o'tib ketadi — uning ruxsatlarini o'zgartirib bo'lmaydi.",
+  "grantedSummary": "{{granted}} / {{total}} ruxsat berilgan",
+  "resource": {
+    "faculty": "Fakultetlar",
+    "kafedra": "Kafedralar",
+    "speciality": "Mutaxassisliklar",
+    "group": "Guruhlar",
+    "department": "Bo'limlar",
+    "curriculum": "O'quv reja",
+    "subject": "Fanlar",
+    "question": "Savollar",
+    "quiz": "Testlar",
+    "result": "Natijalar",
+    "course": "Kurslar",
+    "lesson": "Darslar",
+    "assignment": "Vazifalar",
+    "submission": "Topshirmalar",
+    "resource": "Resurslar",
+    "student": "Talabalar",
+    "teacher": "O'qituvchilar",
+    "employee": "Xodimlar",
+    "user": "Foydalanuvchilar",
+    "role": "Rollar",
+    "permission": "Ruxsatlar",
+    "psychology": "Psixologiya",
+    "psychology_results": "Psixologiya natijalari",
+    "teacher_assignment": "O'qituvchi biriktiruvi",
+    "active_quiz": "Faol testlar",
+    "student_sensitive": "Talaba maxfiy ma'lumoti",
+    "employee_sensitive": "Xodim maxfiy ma'lumoti",
+    "lesson_result": "Dars natijalari",
+    "maxsus": "Maxsus ruxsatlar",
+    "academic_year": "O'quv yili",
+    "module": "Modullar",
+    "sinf": "Sinflar",
+    "syllabus": "Sillabus",
+    "topic": "Mavzular",
+    "tutor": "Tyutorlar",
+    "yakuniy": "Yakuniy nazorat",
+    "student_movement": "Talaba harakati",
+    "statistics": "Statistika",
+    "statistics:demographics": "Statistika — demografiya",
+    "statistics:items": "Statistika — savol tahlili",
+    "statistics:proctoring": "Statistika — proctoring",
+    "statistics:psychology": "Statistika — psixologiya"
   }
 }

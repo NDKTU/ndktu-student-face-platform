@@ -14,7 +14,7 @@ describe('buildEmployees', () => {
   });
 
   it('порядок ролей совпадает с прототипом', () => {
-    expect(directory.employees.map((e) => e.roleId)).toEqual([
+    expect(directory.employees.map((e) => e.roleNames[0])).toEqual([
       'super_admin', 'admin',
       'dekan', 'dekan', 'dekan', 'dekan', 'dekan', 'dekan',
       'kafedra_mudiri', 'kafedra_mudiri', 'kafedra_mudiri', 'kafedra_mudiri',
@@ -27,7 +27,8 @@ describe('buildEmployees', () => {
     expect(directory.employees[0]).toEqual({
       id: 6260,
       fish: 'Sardor Aliyev',
-      roleId: 'super_admin',
+      userId: 6260,
+      roleNames: ['super_admin'],
       role: 'Super Admin',
       unit: 'Rektorat',
       lavozim: 'Tizim administratori',
@@ -53,7 +54,7 @@ describe('buildEmployees', () => {
     const last = directory.employees.at(-1)!;
     expect(last.id).toBe(6275);
     expect(last.fish).toBe("Abdullayev Islom Sardor o'g'li");
-    expect(last.roleId).toBe('talaba');
+    expect(last.roleNames[0]).toBe('talaba');
     expect(last.unit).toBe('DI-24-01');
   });
 

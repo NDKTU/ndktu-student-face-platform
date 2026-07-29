@@ -1,26 +1,32 @@
 import { create } from 'zustand';
-import type { PermissionCode, PermissionMatrix } from '@/entities/access/model/permissions';
-import type { Role } from '@/entities/access/model/roles';
 import * as api from '@/shared/api/rollar';
+import type { PermissionInfo, RoleWithPermissions } from '@/shared/api/rollar';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 interface RollarState {
-  matrix: PermissionMatrix | null;
-  /** Число учёток по ролям — счётчики в списке ролей. */
+  /** Роли с их правами — как они заведены в БД. */
+  roles: RoleWithPermissions[];
+  /** Полный словарь прав: бэкенд заводит их сам, обходя маршруты при старте. */
+  permissions: PermissionInfo[];
+  /** Число учёток по ролям — счётчики в списке. */
   counts: Record<string, number>;
   status: LoadStatus;
   error: string | null;
 
   load: () => Promise<void>;
-  toggle: (role: Role, code: PermissionCode, granted: boolean) => Promise<void>;
+  /** Выдать или отобрать одно право у роли. */
+  toggle: (roleId: number, permissionId: number, granted: boolean) => Promise<void>;
+  addRole: (name: string) => Promise<void>;
+  removeRole: (roleId: number) => Promise<void>;
 }
 
 /** Текущий запрос, чтобы StrictMode не слал его дважды. */
 let inFlight: Promise<void> | null = null;
 
-export const useRollarStore = create<RollarState>()((set) => ({
-  matrix: null,
+export const useRollarStore = create<RollarState>()((set, get) => ({
+  roles: [],
+  permissions: [],
   counts: {},
   status: 'idle',
   error: null,
@@ -31,8 +37,12 @@ export const useRollarStore = create<RollarState>()((set) => ({
     set({ status: 'loading', error: null });
     inFlight = (async () => {
       try {
-        const [matrix, counts] = await Promise.all([api.getMatrix(), api.getRoleCounts()]);
-        set({ matrix, counts, status: 'ready' });
+        const [roles, permissions, counts] = await Promise.all([
+          api.getRoles(),
+          api.getPermissions(),
+          api.getRoleCounts(),
+        ]);
+        set({ roles, permissions, counts, status: 'ready' });
       } catch (e) {
         set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       } finally {
@@ -43,9 +53,43 @@ export const useRollarStore = create<RollarState>()((set) => ({
     return inFlight;
   },
 
-  // Сервер отвечает всей матрицей — берём её, а не переключаем локально:
-  // строка super_admin заблокирована, и отказ должен быть виден сразу.
-  toggle: async (role, code, granted) => {
-    set({ matrix: await api.setPermission(role, code, granted) });
+  toggle: async (roleId, permissionId, granted) => {
+    const role = get().roles.find((r) => r.id === roleId);
+    const permission = get().permissions.find((p) => p.id === permissionId);
+    if (!role || !permission) return;
+
+    // Эндпоинт заменяет набор прав роли целиком, а не переключает одно, —
+    // поэтому новый набор считаем здесь и отправляем его весь.
+    const next = granted
+      ? [...role.permissions, permission]
+      : role.permissions.filter((p) => p.id !== permissionId);
+
+    const patch = (permissions: PermissionInfo[]) =>
+      set((s) => ({
+        roles: s.roles.map((r) => (r.id === roleId ? { ...r, permissions } : r)),
+      }));
+
+    // Ставим галочку сразу, чтобы она не «залипала» на время запроса;
+    // при ошибке возвращаем прежний набор.
+    patch(next);
+    try {
+      await api.assignPermissions(
+        roleId,
+        next.map((p) => p.id),
+      );
+    } catch (e) {
+      patch(role.permissions);
+      throw e;
+    }
+  },
+
+  addRole: async (name) => {
+    const created = await api.createRole(name);
+    set((s) => ({ roles: [...s.roles, { ...created, permissions: [] }] }));
+  },
+
+  removeRole: async (roleId) => {
+    await api.deleteRole(roleId);
+    set((s) => ({ roles: s.roles.filter((r) => r.id !== roleId) }));
   },
 }));

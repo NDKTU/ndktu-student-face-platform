@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from '@/entities/access/model/roles';
 import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import * as api from '@/shared/api/xodimlar';
 
@@ -16,11 +15,6 @@ interface EmployeesState {
   add: (draft: EmployeeDraft) => Promise<void>;
   update: (id: number, draft: EmployeeDraft) => Promise<void>;
 }
-
-/** Варианты роли для формы — константы, за ними на сервер ходить незачем. */
-export const ASSIGNABLE_ROLE_OPTIONS: { id: Role; label: string }[] = ASSIGNABLE_ROLES.map(
-  (id) => ({ id, label: ROLE_LABELS[id] }),
-);
 
 /** Текущий запрос, чтобы StrictMode не слал его дважды. */
 let inFlight: Promise<void> | null = null;

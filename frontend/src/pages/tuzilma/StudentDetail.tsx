@@ -82,7 +82,7 @@ export function StudentDetail({ student, group, speciality, faculty }: StudentDe
               <FieldGrid
                 rows={[
                   [t('student.field.birth'), profile.data.birth],
-                  [t('student.field.email'), profile.data.email],
+                  [t('student.field.email'), profile.data.login],
                   [t('student.field.lang'), profile.data.lang],
                   [t('student.field.eduType'), profile.data.eduType],
                   [t('student.field.semestr'), profile.data.semestr],
@@ -104,7 +104,7 @@ export function StudentDetail({ student, group, speciality, faculty }: StudentDe
                 [t('student.field.jshshir'), d.jshshir],
                 [t('student.field.soc'), d.soc],
                 [t('student.field.pov'), d.pov],
-                [t('student.field.country'), d.country],
+                [t('student.field.passport'), d.passport],
                 [t('student.field.vil'), d.vil],
                 [t('student.field.tum'), d.tum],
                 [t('student.field.address'), d.address],

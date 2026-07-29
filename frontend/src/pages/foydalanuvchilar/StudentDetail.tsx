@@ -109,7 +109,7 @@ export function StudentDetail({ student }: { student: StudentRow }) {
             <FieldGrid
               rows={[
                 [t('detail.field.birth'), profile.data.birth],
-                [t('detail.field.email'), profile.data.email],
+                [t('detail.field.email'), profile.data.login],
                 [t('detail.field.lang'), profile.data.lang],
                 [t('detail.field.eduType'), profile.data.eduType],
                 [t('detail.field.semestr'), profile.data.semestr],
@@ -130,7 +130,7 @@ export function StudentDetail({ student }: { student: StudentRow }) {
               [t('detail.field.jshshir'), d.jshshir],
               [t('detail.field.soc'), d.soc],
               [t('detail.field.pov'), d.pov],
-              [t('detail.field.country'), d.country],
+              [t('detail.field.country'), d.passport],
               [t('detail.field.vil'), d.vil],
               [t('detail.field.tum'), d.tum],
               [t('detail.field.address'), d.address],

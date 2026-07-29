@@ -17,8 +17,9 @@ const store = () => useEmployeesStore.getState();
 function row(id: number, over: Partial<Employee> = {}): Employee {
   return {
     id,
+    userId: id + 100,
     fish: 'Sardor Aliyev',
-    roleId: 'super_admin',
+    roleNames: ['super_admin'],
     role: 'Super Admin',
     unit: 'Rektorat',
     lavozim: 'Tizim administratori',

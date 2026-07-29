@@ -73,10 +73,15 @@ function makeEmployee(
   const hireMonth = 1 + ((h >>> 3) % 12);
   const hireDay = 1 + ((h >>> 2) % 27);
 
+  // userId совпадает с id: у мока учётка и сотрудник — одна сущность, а
+  // второй вызов rng.uid() сдвинул бы все последующие идентификаторы.
+  const id = rng.uid();
+
   return {
-    id: rng.uid(),
+    id,
+    userId: id,
     fish,
-    roleId,
+    roleNames: [roleId],
     role: ROLE_LABELS[roleId],
     unit,
     lavozim: POSITIONS[roleId],

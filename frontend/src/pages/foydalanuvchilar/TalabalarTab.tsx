@@ -5,14 +5,11 @@ import { useTalabalar } from '@/features/talabalar/lib/useTalabalar';
 import { toFacultyTree } from '@/features/talabalar/lib/facultyTree';
 import { useStructureStore } from '@/features/tuzilma/model/structure.store';
 import { useStructure } from '@/features/tuzilma/lib/useStructure';
-import type { StudentDraft, StudentRow } from '@/entities/student/model/types';
+import type { StudentRow } from '@/entities/student/model/types';
 import type { StudentStatus } from '@/entities/university/model/types';
 import { statusTone } from '@/entities/university/lib/studentProfile';
 import { DataTable, TableCard, type Column } from '@/shared/ui/DataTable';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
-import { Button } from '@/shared/ui/Button';
-import { useToast } from '@/shared/ui/Toast';
-import { StudentModal } from './StudentModal';
 import { FilterBar, filterSelectClass, SearchInput } from './FilterBar';
 
 const STATUSES: StudentStatus[] = ['Faol', "Akademik ta'til", "Ta'til"];
@@ -20,12 +17,9 @@ const SOURCES: StudentRow['manba'][] = ['HEMIS', "Qo'lda"];
 
 export function TalabalarTab() {
   const { t } = useTranslation('talabalar');
-  const { t: tc } = useTranslation('common');
-  const toast = useToast();
 
   const { status, error, reload } = useTalabalar();
   const students = useStudentsStore((s) => s.students);
-  const add = useStudentsStore((s) => s.add);
   const select = useStudentsStore((s) => s.select);
 
   // Справочник групп берётся из дерева структуры — отдельного эндпоинта нет.
@@ -38,7 +32,6 @@ export function TalabalarTab() {
   const [guruh, setGuruh] = useState('');
   const [holati, setHolati] = useState('');
   const [manba, setManba] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
 
   // Список групп сужается выбранным факультетом — иначе он необозрим.
   const groupOptions = useMemo(() => {
@@ -71,7 +64,7 @@ export function TalabalarTab() {
           </span>
           <div className="min-w-0">
             <div className="truncate text-14 font-semibold text-ink">{s.fish}</div>
-            <div className="truncate text-11-5 text-ink-subtle">{s.email}</div>
+            <div className="truncate text-11-5 text-ink-subtle">{s.login}</div>
           </div>
         </div>
       ),
@@ -144,37 +137,18 @@ export function TalabalarTab() {
     },
   ];
 
-  async function handleSave(draft: StudentDraft) {
-    try {
-      await add(draft);
-      toast(tc('created'));
-      setModalOpen(false);
-    } catch (e) {
-      toast(`${tc('saveError')}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
 
   if (status === 'loading' || status === 'idle') return <LoadingState />;
   if (status === 'error') return <ErrorState message={error} onRetry={() => void reload()} />;
 
   return (
     <>
-      {/* На этой вкладке крупного заголовка нет — только счётчик и действия. */}
+      {/* Кнопок «добавить» и «импорт» здесь больше нет: студентов заводит
+          синхронизация с HEMIS, эндпоинта на ручное создание у бэкенда нет,
+          а импорт за той кнопкой не стоял вовсе — она показывала уведомление.
+          Синхронизация переедет сюда отдельным экраном. */}
       <div className="mb-[22px] flex flex-wrap items-center justify-between gap-4">
         <p className="m-0 text-14 text-ink-muted">{t('subtitle', { count: students.length })}</p>
-        <div className="flex flex-wrap gap-2.5">
-          <Button
-            variant="secondary"
-            className="h-[46px] rounded-12 px-5"
-            onClick={() => toast(t('importDone'))}
-          >
-            <DownloadIcon />
-            {t('import')}
-          </Button>
-          <Button className="h-[46px] rounded-12 px-5" onClick={() => setModalOpen(true)}>
-            + {t('add')}
-          </Button>
-        </div>
       </div>
 
       <FilterBar>
@@ -240,23 +214,7 @@ export function TalabalarTab() {
         )}
       </TableCard>
 
-      {modalOpen && (
-        <StudentModal
-          tree={tree}
-          onSave={(draft) => void handleSave(draft)}
-          onCancel={() => setModalOpen(false)}
-        />
-      )}
     </>
   );
 }
 
-function DownloadIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3v12" />
-      <path d="m7 12 5 5 5-5" />
-      <path d="M4 21h16" />
-    </svg>
-  );
-}

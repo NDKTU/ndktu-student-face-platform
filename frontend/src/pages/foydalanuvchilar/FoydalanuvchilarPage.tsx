@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ASSIGNABLE_ROLE_OPTIONS,
   unitOptions,
   useEmployeesStore,
 } from '@/features/xodimlar/model/employees.store';
 import { useStudentsStore } from '@/features/talabalar/model/students.store';
 import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { getEmployeeSensitive } from '@/shared/api/xodimlar';
+import { useRollar } from '@/features/rollar/lib/useRollar';
+import { useRollarStore } from '@/features/rollar/model/rollar.store';
+import { roleLabel } from '@/entities/access/model/roles';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { useToast } from '@/shared/ui/Toast';
 import { EmployeeDetail } from '../xodimlar/EmployeeDetail';
@@ -65,6 +67,15 @@ export function FoydalanuvchilarPage() {
     }
   }
 
+  // Роли для формы — из справочника БД: новую роль должно быть можно назначить
+  // ещё до того, как её кто-то носит.
+  useRollar();
+  const roles = useRollarStore((s) => s.roles);
+  const assignableRoles = useMemo(
+    () => roles.map((r) => ({ name: r.name, label: roleLabel(r.name) })),
+    [roles],
+  );
+
   // Карточки открываются на всю страницу. Список при этом только прячется, а не
   // размонтируется, иначе возврат из карточки сбрасывал бы поиск и фильтры.
   const crumbs = selectedStudent
@@ -91,7 +102,7 @@ export function FoydalanuvchilarPage() {
           mode="edit"
           initial={editing.draft}
           units={unitOptions(employees)}
-          roles={ASSIGNABLE_ROLE_OPTIONS}
+          roles={assignableRoles}
           onSave={(draft) => void save(editing.id, draft)}
           onCancel={() => setEditing(null)}
         />
@@ -138,7 +149,7 @@ function toDraft(e: Employee): EmployeeDraft {
     workEmail: e.workEmail,
     hire: e.hire,
     login: e.login,
-    roleId: e.roleId,
+    roleNames: e.roleNames,
     holati: e.holati,
   };
 }

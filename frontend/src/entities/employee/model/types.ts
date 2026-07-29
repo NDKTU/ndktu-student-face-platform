@@ -1,5 +1,3 @@
-import type { Role } from '@/entities/access/model/roles';
-
 export type EmployeeStatus = 'Faol' | 'Bloklangan' | "Ta'tilda";
 
 /**
@@ -10,8 +8,13 @@ export type EmployeeStatus = 'Faol' | 'Bloklangan' | "Ta'tilda";
 export interface Employee {
   id: number;
   fish: string;
-  roleId: Role;
-  /** Человекочитаемое название роли — выводится из roleId на клиенте. */
+  /** Учётка сотрудника: по ней он входит. */
+  userId: number;
+  /**
+   * Роли — свободные строки из БД, их заводит администратор. Сотрудник может
+   * иметь несколько; `role` — подпись первой, для бейджа в списке.
+   */
+  roleNames: string[];
   role: string;
   /** Подразделение: ректорат, факультет, кафедра или группа (для студента). */
   unit: string;
@@ -30,7 +33,7 @@ export interface Employee {
   workPhone: string;
 }
 
-/** Персональные данные сотрудника — их отдаёт только super_admin'у. */
+/** Персональные данные сотрудника — за отдельным правом read:employee_sensitive. */
 export interface EmployeeSensitive {
   personalPhone: string;
   jshshir: string;
@@ -54,6 +57,6 @@ export type EmployeeDraft = Partial<{
   hire: string;
   login: string;
   pwd: string;
-  roleId: Role;
+  roleNames: string[];
   holati: EmployeeStatus;
 }>;

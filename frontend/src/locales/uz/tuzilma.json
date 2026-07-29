@@ -71,7 +71,7 @@
     },
     "field": {
       "birth": "Tug'ilgan sana",
-      "email": "Email",
+      "email": "Login",
       "lang": "Ta'lim tili",
       "eduType": "Ta'lim turi",
       "semestr": "Semestr",
@@ -80,7 +80,7 @@
       "jshshir": "JSHSHIR",
       "soc": "Ijtimoiy toifa",
       "pov": "Kambag'allik darajasi",
-      "country": "Mamlakat",
+      "country": "Pasport",
       "vil": "Viloyat",
       "tum": "Tuman",
       "address": "Manzil"

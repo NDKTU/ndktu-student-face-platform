@@ -62,10 +62,30 @@ class StudentUpdateRequest(BaseModel):
     group_id: Optional[int] = None
 
 
+class StudentGroupInfo(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentUserInfo(BaseModel):
+    id: int
+    username: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class StudentResponse(StudentBase):
     id: int
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
+
+    # Реестр студентов показывает группу и логин. group_id и user_id сами по
+    # себе бесполезны: разрешать их в названия на клиенте — это лишний запрос
+    # на каждую из полутора тысяч строк.
+    group: Optional[StudentGroupInfo] = None
+    user: Optional[StudentUserInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 

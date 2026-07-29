@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ASSIGNABLE_ROLE_OPTIONS,
-  unitOptions,
-  useEmployeesStore,
-} from '@/features/xodimlar/model/employees.store';
+import { unitOptions, useEmployeesStore } from '@/features/xodimlar/model/employees.store';
+import { useRollar } from '@/features/rollar/lib/useRollar';
+import { useRollarStore } from '@/features/rollar/model/rollar.store';
+import { roleLabel } from '@/entities/access/model/roles';
 import { useXodimlar } from '@/features/xodimlar/lib/useXodimlar';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '@/entities/employee/model/types';
 import { PageHeader } from '@/shared/ui/PageHeader';
@@ -43,6 +42,15 @@ export function XodimlarTab() {
   const roleOptions = useMemo(
     () => Array.from(new Set(employees.map((e) => e.role))).sort((a, b) => a.localeCompare(b)),
     [employees],
+  );
+
+  // Роли для формы — из справочника БД, а не из уже заведённых сотрудников:
+  // иначе новую роль нельзя было бы назначить, пока её никто не носит.
+  useRollar();
+  const roles = useRollarStore((s) => s.roles);
+  const assignableRoles = useMemo(
+    () => roles.map((r) => ({ name: r.name, label: roleLabel(r.name) })),
+    [roles],
   );
 
   const filtered = useMemo(() => {
@@ -146,7 +154,7 @@ export function XodimlarTab() {
         actions={
           <Button
             className="h-[46px] rounded-12 px-5"
-            onClick={() => setModal({ mode: 'add', draft: { unit: units[0], roleId: 'oqituvchi' } })}
+            onClick={() => setModal({ mode: 'add', draft: { unit: units[0], roleNames: [] } })}
           >
             + {t('add')}
           </Button>
@@ -205,7 +213,7 @@ export function XodimlarTab() {
           mode={modal.mode}
           initial={modal.draft}
           units={units}
-          roles={ASSIGNABLE_ROLE_OPTIONS}
+          roles={assignableRoles}
           onSave={(draft) => void handleSave(draft)}
           onCancel={() => setModal(null)}
         />

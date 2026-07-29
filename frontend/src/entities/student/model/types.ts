@@ -7,7 +7,8 @@ export type StudentSource = 'HEMIS' | "Qo'lda";
 export interface StudentRow {
   id: number;
   fish: string;
-  email: string;
+  /** Логин учётки. У студента нет поля email — под именем показываем его. */
+  login: string;
   gender: 'm' | 'f';
   /** Студенческий ID: год поступления + код факультета + номер. */
   sid: string;
@@ -26,7 +27,7 @@ export interface StudentRow {
 /** Анкета студента, вкладка «Umumiy». Приезжает отдельным запросом. */
 export interface StudentProfile {
   birth: string;
-  email: string;
+  login: string;
   phone: string;
   lang: string;
   eduType: string;
@@ -36,40 +37,14 @@ export interface StudentProfile {
   kursLevel: string;
 }
 
-/** Персональные данные студента — их отдают super_admin'у и admin'у. */
+/** Персональные данные студента — за отдельным правом read:student_sensitive. */
 export interface StudentSensitive {
   jshshir: string;
-  country: string;
+  passport: string;
   vil: string;
   tum: string;
   address: string;
   soc: string;
+  /** Льгота / категория. */
   pov: string;
-}
-
-/** Черновик формы «Yangi talaba». */
-export interface StudentDraft {
-  familiya: string;
-  ism: string;
-  otasi: string;
-  jinsi: 'Erkak' | 'Ayol';
-  birth: string;
-
-  sid: string;
-  fakultet: string;
-  mutaxassislik: string;
-  guruh: string;
-  kurs: string;
-  semestr: string;
-  shakl: string;
-  eduType: string;
-  lang: string;
-  pay: string;
-  holati: StudentStatus;
-
-  jshshir: string;
-  manzil: string;
-
-  email: string;
-  phone: string;
 }

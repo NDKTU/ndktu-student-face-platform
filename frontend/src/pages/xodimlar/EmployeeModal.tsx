@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '@/entities/employee/model/types';
-import type { Role } from '@/entities/access/model/roles';
 import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
@@ -14,7 +13,8 @@ interface EmployeeModalProps {
   mode: 'add' | 'edit';
   initial: EmployeeDraft;
   units: string[];
-  roles: { id: Role; label: string }[];
+  /** Роли из БД: имя — то, что уходит на сервер, label — подпись. */
+  roles: { name: string; label: string }[];
   onSave: (draft: EmployeeDraft) => void;
   onCancel: () => void;
 }
@@ -162,12 +162,15 @@ export function EmployeeModal({ mode, initial, units, roles, onSave, onCancel }:
         <Row>
           <ModalField label={t('field.role')}>
             <select
-              value={draft.roleId ?? 'oqituvchi'}
-              onChange={(e) => set('roleId', e.target.value as Role)}
+              value={draft.roleNames?.[0] ?? ''}
+              onChange={(e) => set('roleNames', e.target.value ? [e.target.value] : [])}
               className={modalInputClass}
             >
+              <option value="">—</option>
               {roles.map((role) => (
-                <option key={role.id} value={role.id}>{role.label}</option>
+                <option key={role.name} value={role.name}>
+                  {role.label}
+                </option>
               ))}
             </select>
           </ModalField>

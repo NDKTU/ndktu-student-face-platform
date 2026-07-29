@@ -78,6 +78,12 @@ class EmployeeRepository:
             image_url=data.image_url,
             department_id=data.department_id,
         )
+        # Служебная карточка и персональные данные — списком: перечислять их
+        # в конструкторе значило бы забывать новое поле при каждом расширении.
+        for _field in ('position_title', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'status', 'jshshir', 'passport', 'personal_phone', 'address'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_employee, _field, _value)
         session.add(new_employee)
 
         try:
@@ -155,6 +161,13 @@ class EmployeeRepository:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Employee name already taken",
                 )
+
+
+        # None означает «не трогать»: форма присылает только отредактированное.
+        for _field in ('position_title', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'status', 'jshshir', 'passport', 'personal_phone', 'address'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(employee, _field, _value)
 
         employee.first_name = data.first_name
         employee.last_name = data.last_name

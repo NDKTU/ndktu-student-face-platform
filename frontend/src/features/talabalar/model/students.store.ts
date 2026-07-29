@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { StudentDraft, StudentRow } from '@/entities/student/model/types';
+import type { StudentRow } from '@/entities/student/model/types';
 import * as api from '@/shared/api/talabalar';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -12,7 +12,6 @@ interface StudentsState {
 
   select: (id: number | null) => void;
   load: () => Promise<void>;
-  add: (draft: StudentDraft) => Promise<void>;
 }
 
 /** Текущий запрос, чтобы StrictMode не слал его дважды. */
@@ -43,10 +42,4 @@ export const useStudentsStore = create<StudentsState>()((set) => ({
     return inFlight;
   },
 
-  // Новая запись встаёт в начало списка: её только что завели, и она должна
-  // быть видна без прокрутки полутора тысяч строк.
-  add: async (draft) => {
-    const created = await api.createStudent(draft);
-    set((s) => ({ students: [created, ...s.students] }));
-  },
 }));
