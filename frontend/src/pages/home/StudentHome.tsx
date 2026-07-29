@@ -1,36 +1,71 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { buildUniversity } from '@/entities/university/mock/build';
-import { buildCourse } from '@/entities/course/mock/buildCourse';
 import type { RejaRow } from '@/entities/university/model/types';
+import { useSessionStore } from '@/features/auth/model/session.store';
+import { getReja, getGroupStudents } from '@/shared/api/tuzilma';
+import { api } from '@/shared/api/http';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 
-/** Группа студента, под которым выполняется вход (в прототипе переименована). */
-const STUDENT_GROUP_NAME = 'DI-24-01';
-
-/** Показатели студента — фиксированные значения прототипа. */
-const STATS = [
-  { key: 'gpa', value: '4.3' },
-  { key: 'attendance', value: '96%' },
-  { key: 'credits', value: '48/240' },
-] as const;
+interface ApiGroup {
+  id: number;
+  name: string;
+  kurs: number | null;
+  speciality_id: number | null;
+}
 
 export function StudentHome() {
   const { t } = useTranslation('home');
   const { t: tn } = useTranslation('nav');
   const navigate = useNavigate();
 
-  const { group, department, subjects } = useMemo(() => {
-    const { faculties } = buildUniversity();
-    const department = faculties[2]!.kafedralar[0]!;
-    const spec = department.mutaxassisliklar[0]!;
-    const group = spec.guruhlar[0]!;
-    const currentSemester = 4;
-    const inSem = spec.reja.filter((r) => r.semestr === currentSemester);
-    const subjects = inSem.length >= 4 ? inSem : spec.reja.slice(0, 6);
-    return { group, department, subjects };
-  }, []);
+  const user = useSessionStore((s) => s.user);
+  const student = user?.student ?? null;
+  const groupId = student?.group?.id ?? null;
+
+  const [group, setGroup] = useState<ApiGroup | null>(null);
+  const [groupSize, setGroupSize] = useState<number | null>(null);
+  const [subjects, setSubjects] = useState<RejaRow[]>([]);
+
+  useEffect(() => {
+    if (groupId === null) return;
+    let alive = true;
+
+    void (async () => {
+      try {
+        const info = await api.get<ApiGroup>(`/group/${groupId}`);
+        if (!alive) return;
+        setGroup(info);
+
+        // Состав группы и учебный план — независимые запросы; ошибку каждого
+        // гасим отдельно, чтобы одна не уносила всю страницу.
+        void getGroupStudents(groupId)
+          .then((list) => alive && setGroupSize(list.length))
+          .catch(() => undefined);
+
+        if (info.speciality_id !== null) {
+          const plan = await getReja(info.speciality_id);
+          if (!alive) return;
+          // Семестр берём из анкеты студента; если её нет — показываем план
+          // целиком, это честнее пустого списка.
+          const semester = Number.parseInt(student?.semester ?? '', 10);
+          const current = Number.isNaN(semester)
+            ? plan
+            : plan.filter((row) => row.semestr === semester);
+          setSubjects(current.length > 0 ? current : plan);
+        }
+      } catch {
+        // Страница остаётся с тем, что успело загрузиться.
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [groupId, student?.semester]);
+
+  const firstName = student?.first_name ?? '';
+  const kurs = Number.parseInt(student?.level ?? '', 10);
 
   return (
     <>
@@ -39,33 +74,42 @@ export function StudentHome() {
       <div className="mx-auto w-full max-w-[1440px] px-8 pt-7 pb-12">
         <div className="rounded-20 bg-[linear-gradient(135deg,#2836C7_0%,#4655D8_100%)] px-7 py-6 text-white">
           <div className="text-20 font-extrabold tracking-[-0.02em]">
-            {t('student.welcome', { name: 'Islom' })}
+            {t('student.welcome', { name: firstName })}
           </div>
           <div className="mt-1 text-13 font-semibold opacity-85">
-            {t('student.group', { spec: 'Dasturiy injiniring', name: 'DI-24-01', kurs: 2 })}
+            {t('student.group', {
+              spec: student?.specialty ?? '',
+              name: student?.group?.name ?? '',
+              kurs: Number.isNaN(kurs) ? '' : kurs,
+            })}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            {STATS.map((stat) => (
-              <div key={stat.key} className="rounded-14 bg-white/15 px-4 py-3">
-                <div className="text-20 font-extrabold">{stat.value}</div>
-                <div className="text-11-5 font-medium opacity-85">{t(`student.stat.${stat.key}`)}</div>
+          {/* Плитки посещаемости и кредитов убраны: считать их не из чего —
+              журнал посещаемости и зачёт кредитов на бэкенде пока не сводятся.
+              GPA приходит из анкеты HEMIS, поэтому он остался. */}
+          {student?.avg_gpa !== null && student?.avg_gpa !== undefined && (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <div className="rounded-14 bg-white/15 px-4 py-3">
+                <div className="text-20 font-extrabold">{student.avg_gpa}</div>
+                <div className="text-11-5 font-medium opacity-85">{t('student.stat.gpa')}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 grid items-start gap-[18px] lg:[grid-template-columns:1fr_1.6fr]">
           <div className="rounded-16 border border-line bg-surface p-6 shadow-card">
             <h3 className="mt-0 mb-4 text-16 font-bold text-ink">{t('student.myGroup')}</h3>
-            <div className="text-20 font-extrabold text-ink">{STUDENT_GROUP_NAME}</div>
+            <div className="text-20 font-extrabold text-ink">{student?.group?.name ?? '—'}</div>
             <dl className="mt-4 flex flex-col gap-3">
               {[
-                [t('student.groupField.kaf'), department.name],
-                [t('student.groupField.sardor'), group.sardor],
+                [t('student.groupField.faculty'), student?.faculty ?? '—'],
+                [t('student.groupField.kurs'), group?.kurs ? `${group.kurs}` : '—'],
                 [
                   t('student.groupField.students'),
-                  t('student.groupField.studentsValue', { count: group.student_count }),
+                  groupSize === null
+                    ? '—'
+                    : t('student.groupField.studentsValue', { count: groupSize }),
                 ],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-baseline justify-between gap-3">
@@ -87,35 +131,30 @@ export function StudentHome() {
                 {t('student.all')}
               </button>
             </div>
-            <div className="flex flex-col gap-4">
-              {subjects.map((row) => (
-                <SubjectProgress key={row.fan} row={row} label={t('student.progress')} credit={t('student.credit', { count: row.kredit })} />
-              ))}
-            </div>
+
+            {subjects.length === 0 ? (
+              <p className="m-0 text-13-5 text-ink-subtle">{t('student.subjectsEmpty')}</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {/* Полосы «освоено на N%» здесь были, но считать их пока не из
+                    чего: прогресса по курсу бэкенд не хранит. Показываем то,
+                    что в плане действительно есть. */}
+                {subjects.map((row) => (
+                  <div
+                    key={`${row.fan}-${row.semestr}`}
+                    className="flex items-baseline justify-between gap-3 border-b border-surface-muted pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <span className="text-13-5 font-semibold text-ink">{row.fan}</span>
+                    <span className="flex-none text-12 font-medium text-ink-subtle">
+                      {t('student.credit', { count: row.kredit })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
     </>
-  );
-}
-
-function SubjectProgress({ row, label, credit }: { row: RejaRow; label: string; credit: string }) {
-  const course = buildCourse(row.fan, row.oqituvchi, row.semestr);
-  const pct = Math.round((course.doneCount / course.total) * 100);
-
-  return (
-    <div>
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-13-5 font-semibold text-ink">{row.fan}</span>
-        <span className="text-12 font-medium text-ink-subtle">{credit}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="h-[9px] flex-1 overflow-hidden rounded-md bg-surface-muted">
-          <div className="h-full rounded-md bg-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
-        </div>
-        <span className="w-10 text-right text-12 font-bold text-brand">{pct}%</span>
-      </div>
-      <div className="mt-1 text-11 text-ink-subtle">{label}</div>
-    </div>
   );
 }

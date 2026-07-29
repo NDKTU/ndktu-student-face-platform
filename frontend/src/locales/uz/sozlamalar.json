@@ -1,32 +1,19 @@
 {
   "title": "Sozlamalar",
-  "subtitle": "Tizim konfiguratsiyasi",
-  "general": {
-    "title": "Umumiy",
-    "name": "Universitet nomi",
-    "abbr": "Qisqartma",
-    "founded": "Tashkil etilgan yili"
-  },
-  "toggles": {
-    "title": "Xavfsizlik va bildirishnomalar",
-    "twoFA": {
-      "title": "Ikki bosqichli autentifikatsiya",
-      "sub": "Barcha administratorlar uchun majburiy"
-    },
-    "email": {
-      "title": "Email bildirishnomalari",
-      "sub": "Muhim voqealar haqida xabar berish"
-    },
-    "digest": {
-      "title": "Haftalik hisobot",
-      "sub": "Har dushanba kuni tizim hisobotini yuborish"
-    }
-  },
-  "save": "Saqlash",
-  "saved": "Sozlamalar saqlandi",
-  "defaults": {
-    "name": "Navoiy davlat konchilik va texnologiyalar universiteti",
-    "abbr": "NDKTU",
-    "founded": "2022"
+  "subtitle": "Hisob ma'lumotlaringizni boshqaring",
+  "account": {
+    "title": "Hisob ma'lumotlari",
+    "current": "Joriy parol",
+    "username": "Yangi login",
+    "new": "Yangi parol",
+    "repeat": "Yangi parolni takrorlang",
+    "currentRequired": "Joriy parolni kiriting",
+    "nothingToChange": "Login yoki yangi parolni kiriting",
+    "mismatch": "Yangi parollar mos kelmadi",
+    "tooShort": "Parol kamida 6 belgidan iborat bo'lsin",
+    "changed": "Ma'lumotlar o'zgartirildi — qaytadan kiring",
+    "failed": "Ma'lumotlarni o'zgartirib bo'lmadi",
+    "submitting": "Saqlanmoqda...",
+    "reloginHint": "O'zgarishdan so'ng sessiya yakunlanadi va qaytadan kirish so'raladi"
   }
 }

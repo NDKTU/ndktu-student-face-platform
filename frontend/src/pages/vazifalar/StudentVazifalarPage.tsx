@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useTasksStore, type SubmitDraft } from '@/features/vazifalar/model/tasks.store';
 import { useVazifalar } from '@/features/vazifalar/lib/useVazifalar';
 import { toStudentTask } from '@/entities/task/lib/taskState';
-import { taskStatusMeta } from '@/entities/task/mock/studentTasks';
+import { taskStatusMeta } from '@/entities/task/lib/taskStatusMeta';
 import type { StudentTask, TaskStatus } from '@/entities/task/model/types';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';

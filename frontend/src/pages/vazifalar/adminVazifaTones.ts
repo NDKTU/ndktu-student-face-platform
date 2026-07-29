@@ -1,4 +1,4 @@
-import type { SubmissionStatus, TaskState } from '@/entities/task/mock/adminTasks';
+import type { SubmissionStatus, TaskState } from '@/entities/task/model/types';
 
 /** Цвет чипа сводного статуса задания. */
 export const STATE_TONE: Record<TaskState, { bg: string; fg: string }> = {

@@ -24,6 +24,8 @@ class GroupCreateResponse(BaseModel):
     id: int
     name: str
     faculty_id: int
+    # Нужен домашней странице студента: по нему она достаёт учебный план.
+    speciality_id: Optional[int] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
     kurs: Optional[int] = None

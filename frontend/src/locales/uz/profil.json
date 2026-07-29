@@ -11,19 +11,5 @@
   "semester": "Semestr",
   "educationForm": "Taʼlim shakli",
   "paymentForm": "Toʻlov shakli",
-  "gpa": "Oʻrtacha ball",
-  "password": {
-    "title": "Parolni oʻzgartirish",
-    "old": "Joriy parol",
-    "new": "Yangi parol",
-    "repeat": "Yangi parolni takrorlang",
-    "submit": "Parolni oʻzgartirish",
-    "submitting": "Saqlanmoqda...",
-    "empty": "Barcha maydonlarni toʻldiring",
-    "mismatch": "Yangi parollar mos kelmadi",
-    "tooShort": "Parol kamida 6 belgidan iborat boʻlsin",
-    "changed": "Parol oʻzgartirildi — qaytadan kiring",
-    "failed": "Parolni oʻzgartirib boʻlmadi",
-    "reloginHint": "Parol oʻzgargach sessiya yakunlanadi va qaytadan kirish soʻraladi"
-  }
+  "gpa": "Oʻrtacha ball"
 }

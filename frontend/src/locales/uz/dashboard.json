@@ -7,21 +7,7 @@
     "kafedra": "Kafedra",
     "mutaxassislik": "Mutaxassislik",
     "talaba": "Talaba",
-    "oqituvchi": "O'qituvchi",
-    "growth": "+3.2%"
+    "oqituvchi": "O'qituvchi"
   },
-  "facultyChart": "Fakultetlar boʻyicha talabalar",
-  "activity": {
-    "title": "Soʻnggi faoliyat",
-    "items": {
-      "student": "Yangi talaba roʻyxatga olindi — DI-24-01 guruhi",
-      "studentTime": "5 daqiqa oldin",
-      "plan": "Metallurgiya boʻyicha oʻquv reja tasdiqlandi",
-      "planTime": "2 soat oldin",
-      "mudir": "Geodeziya kafedrasiga mudir tayinlandi",
-      "mudirTime": "Kecha, 16:20",
-      "spec": "Kiberxavfsizlik mutaxassisligi qoʻshildi",
-      "specTime": "2 kun oldin"
-    }
-  }
+  "facultyChart": "Fakultetlar boʻyicha talabalar"
 }

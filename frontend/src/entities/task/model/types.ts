@@ -66,3 +66,9 @@ export interface TaskRow {
 export interface TaskDetail extends Omit<TaskRow, 'submitted' | 'graded' | 'mySub'> {
   subs: TaskSubmissionRow[];
 }
+
+/** Статус одной сдачи в таблице проверки. */
+export type SubmissionStatus = 'baholangan' | 'topshirilgan' | 'topshirilmagan';
+
+/** Сводное состояние задания целиком — чип в административном списке. */
+export type TaskState = 'baholangan' | 'kechikkan' | 'tekshirilmoqda';

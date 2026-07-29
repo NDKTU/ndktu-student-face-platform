@@ -4,7 +4,7 @@ import { useTasksStore } from '@/features/vazifalar/model/tasks.store';
 import { useVazifalar } from '@/features/vazifalar/lib/useVazifalar';
 import { taskState } from '@/entities/task/lib/taskState';
 import type { TaskDetail, TaskRow, TaskSubmissionRow } from '@/entities/task/model/types';
-import { shortFaculty } from '@/entities/course/mock/adminCourses';
+import { shortFaculty } from '@/shared/lib/shortFaculty';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { DataTable, TableCard, type Column } from '@/shared/ui/DataTable';

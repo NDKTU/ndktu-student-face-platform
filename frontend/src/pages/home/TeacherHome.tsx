@@ -1,22 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getPending, type PendingSubmission } from '@/shared/api/vazifalar';
-import { TEACHER_TESTS } from '@/entities/test/mock/tests';
+import { getActiveQuizzes, getMyGroups, getMySubjects } from '@/shared/api/mening';
+import { useCurrentUser } from '@/features/auth/lib/useCurrentUser';
+import { useSessionStore } from '@/features/auth/model/session.store';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
-
-/** Предметы и группы преподавателя. */
-const SUBJECTS = [
-  { fan: 'Kon jinslari mexanikasi', groups: ['KI-24-01', 'KI-24-02', 'KI-23-01'] },
-  { fan: 'Portlatish ishlari texnologiyasi', groups: ['KI-23-01', 'KI-23-02'] },
-  { fan: 'Kon aerologiyasi va ventilyatsiya', groups: ['KI-24-01', 'KI-24-02'] },
-  { fan: 'Oliy matematika', groups: ['KI-24-01', 'MT-24-01', 'GD-24-01'] },
-];
 
 export function TeacherHome() {
   const { t } = useTranslation('home');
   const { t: tn } = useTranslation('nav');
   const navigate = useNavigate();
+
+  const me = useCurrentUser();
+  const user = useSessionStore((s) => s.user);
+  const userId = user?.id ?? null;
+  // Первое имя из ФИО: приветствие обращается по имени, а не по фамилии.
+  const firstName = user?.employee?.first_name ?? me.displayName.split(' ')[0] ?? '';
+  const kafedra = user?.employee?.teacher?.kafedra?.name ?? '';
+
+  const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
+  const [groups, setGroups] = useState<{ id: number; name: string }[]>([]);
+  const [activeTests, setActiveTests] = useState(0);
 
   // Плоский список работ на проверке приходит отдельным запросом: в списке
   // заданий сдач нет, а тянуть детали каждого — это два десятка запросов.
@@ -31,13 +36,30 @@ export function TeacherHome() {
     };
   }, []);
 
-  const groupCount = useMemo(() => new Set(SUBJECTS.flatMap((s) => s.groups)).size, []);
+  // Закрепления и активные тесты — три независимых запроса. Ошибку каждого
+  // гасим по отдельности: пустая плитка лучше пустой страницы.
+  useEffect(() => {
+    if (userId === null) return;
+    let alive = true;
 
-  const activeTests = TEACHER_TESTS.filter((x) => x.holati === 'Faol').length;
+    void getMySubjects(userId)
+      .then((items) => alive && setSubjects(items))
+      .catch(() => undefined);
+    void getMyGroups(userId)
+      .then((items) => alive && setGroups(items))
+      .catch(() => undefined);
+    void getActiveQuizzes()
+      .then((items) => alive && setActiveTests(items.length))
+      .catch(() => undefined);
+
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   const stats = [
-    { key: 'subjects', value: SUBJECTS.length, alert: false },
-    { key: 'groups', value: groupCount, alert: false },
+    { key: 'subjects', value: subjects.length, alert: false },
+    { key: 'groups', value: groups.length, alert: false },
     { key: 'tests', value: activeTests, alert: false },
     { key: 'ungraded', value: ungraded.length, alert: ungraded.length > 0 },
   ] as const;
@@ -49,9 +71,9 @@ export function TeacherHome() {
       <div className="mx-auto w-full max-w-[1440px] px-8 pt-7 pb-12">
         <div className="rounded-20 bg-[linear-gradient(135deg,#157A43_0%,#1F9A57_100%)] px-7 py-6 text-white">
           <div className="text-20 font-extrabold tracking-[-0.02em]">
-            {t('teacher.welcome', { name: 'Jasur' })}
+            {t('teacher.welcome', { name: firstName })}
           </div>
-          <div className="mt-1 text-13 font-semibold opacity-85">{t('teacher.kaf', { kaf: 'Konchilik ishi kafedrasi' })}</div>
+          <div className="mt-1 text-13 font-semibold opacity-85">{t('teacher.kaf', { kaf: kafedra })}</div>
         </div>
 
         <div className="mt-5 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">

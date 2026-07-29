@@ -3,21 +3,19 @@
     "welcome": "Xush kelibsiz, {{name}}! 👋",
     "group": "{{spec}} · {{name}} · {{kurs}}-kurs",
     "stat": {
-      "gpa": "Oʻrtacha GPA",
-      "attendance": "Davomat",
-      "credits": "Kreditlar"
+      "gpa": "Oʻrtacha GPA"
     },
     "myGroup": "Mening guruhim",
     "groupField": {
-      "kaf": "Kafedra",
-      "sardor": "Guruh sardori",
+      "faculty": "Fakultet",
+      "kurs": "Kurs",
       "students": "Talabalar soni",
       "studentsValue": "{{count}} ta"
     },
     "subjects": "Joriy fanlar",
     "all": "Barchasi →",
-    "progress": "Oʻzlashtirish",
-    "credit": "{{count}} kredit"
+    "credit": "{{count}} kredit",
+    "subjectsEmpty": "O'quv reja hali to'ldirilmagan"
   },
   "teacher": {
     "welcome": "Xush kelibsiz, {{name}}! 👋",

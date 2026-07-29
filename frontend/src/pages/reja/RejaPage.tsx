@@ -5,7 +5,7 @@ import { useStructure } from '@/features/tuzilma/lib/useStructure';
 import { useFanlarStore } from '@/features/fanlar/model/fanlar.store';
 import { useFanlar } from '@/features/fanlar/lib/useFanlar';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
-import { FACULTY_COLORS } from '@/entities/university/mock/catalog';
+import { FACULTY_COLORS } from '@/entities/university/lib/facultyColors';
 import type { EduForm, RejaRow } from '@/entities/university/model/types';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';

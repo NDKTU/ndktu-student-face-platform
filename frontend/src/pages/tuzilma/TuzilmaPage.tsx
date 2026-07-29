@@ -10,8 +10,8 @@ import {
   countFacultySpecialities,
   countFacultyStudents,
   countSpecialityStudents,
-} from '@/entities/university/mock/build';
-import { namePrefix } from '@/entities/university/mock/rng';
+} from '@/entities/university/lib/counters';
+import { namePrefix } from '@/shared/lib/namePrefix';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Button } from '@/shared/ui/Button';

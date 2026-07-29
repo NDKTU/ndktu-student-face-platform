@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStructureStore } from '@/features/tuzilma/model/structure.store';
 import { useStructure } from '@/features/tuzilma/lib/useStructure';
-import { countFacultyStudents } from '@/entities/university/mock/build';
+import { countFacultyStudents } from '@/entities/university/lib/counters';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { STAT_ICONS } from './statIcons';
@@ -57,12 +57,6 @@ export function DashboardPage() {
     return rows.map((r) => ({ ...r, pct: `${Math.round((r.value / max) * 100)}%` }));
   }, [faculties]);
 
-  const activity = [
-    { text: t('activity.items.student'), time: t('activity.items.studentTime'), tone: 'var(--color-success-bright)' },
-    { text: t('activity.items.plan'), time: t('activity.items.planTime'), tone: 'var(--color-brand)' },
-    { text: t('activity.items.mudir'), time: t('activity.items.mudirTime'), tone: 'var(--color-warning)' },
-    { text: t('activity.items.spec'), time: t('activity.items.specTime'), tone: 'var(--color-violet)' },
-  ];
 
   return (
     <>
@@ -93,13 +87,9 @@ export function DashboardPage() {
           <StatCard icon="fakultet" tone="brand" value={totals.faculties} label={t('stat.fakultet')} />
           <StatCard icon="kafedra" tone="info" value={totals.departments} label={t('stat.kafedra')} />
           <StatCard icon="mutaxassislik" tone="violet" value={totals.specialities} label={t('stat.mutaxassislik')} />
-          <StatCard
-            icon="talaba"
-            tone="success"
-            value={totals.students}
-            label={t('stat.talaba')}
-            badge={t('stat.growth')}
-          />
+          {/* Бейдж «+3.2%» здесь был фиксированной строкой из прототипа:
+              динамику бэкенд не считает, сравнивать не с чем. */}
+          <StatCard icon="talaba" tone="success" value={totals.students} label={t('stat.talaba')} />
           <StatCard icon="oqituvchi" tone="warning" value={totals.teachers} label={t('stat.oqituvchi')} />
         </div>
 
@@ -123,25 +113,6 @@ export function DashboardPage() {
             </div>
           </Panel>
 
-          <Panel title={t('activity.title')}>
-            <div className="flex flex-col gap-0.5">
-              {activity.map((item) => (
-                <div
-                  key={item.text}
-                  className="flex gap-3 border-b border-canvas py-[11px]"
-                >
-                  <span
-                    className="mt-[5px] size-[9px] flex-none rounded-full"
-                    style={{ background: item.tone }}
-                  />
-                  <div>
-                    <div className="text-13 leading-[1.4] font-semibold text-ink">{item.text}</div>
-                    <div className="mt-0.5 text-11-5 text-ink-subtle">{item.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
         </div>
           </>
         )}
