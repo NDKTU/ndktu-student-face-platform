@@ -33,7 +33,18 @@ export interface Group {
   name: string;
   kurs: number;
   sardor: string;
-  students: Student[];
+  /**
+   * Сколько студентов в группе. Дерево структуры несёт только число: сам
+   * список — это больше тысячи строк на реальных данных, и тянуть его в
+   * каждый обход дерева нельзя.
+   */
+  student_count: number;
+  /**
+   * Состав группы. Приходит не из дерева, а отдельным запросом при раскрытии
+   * карточки — поэтому опционален. Ещё его заполняют мок-генераторы экранов,
+   * не переведённых на API.
+   */
+  students?: Student[];
 }
 
 export interface Speciality {
@@ -45,7 +56,12 @@ export interface Speciality {
   /** Учебный год плана («2025/2026»); у сгенерированных планов его нет. */
   reja_yil?: string | null;
   guruhlar: Group[];
+  /** Строки плана. Пусто до тех пор, пока экран «O'quv reja» их не загрузит. */
   reja: RejaRow[];
+  /** Сколько строк в плане — известно сразу, из дерева. */
+  curriculum_count: number;
+  /** Сумма кредитов плана — тоже из дерева: строк там нет, считать не из чего. */
+  curriculum_credits: number;
 }
 
 export interface Department {

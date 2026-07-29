@@ -65,7 +65,7 @@ export function StudentHome() {
                 [t('student.groupField.sardor'), group.sardor],
                 [
                   t('student.groupField.students'),
-                  t('student.groupField.studentsValue', { count: group.students.length }),
+                  t('student.groupField.studentsValue', { count: group.student_count }),
                 ],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-baseline justify-between gap-3">

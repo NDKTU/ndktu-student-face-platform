@@ -23,6 +23,9 @@ class TreeSpeciality(BaseModel):
     academic_year: Optional[str] = None
     position: int
     curriculum_count: int
+    # Сумма кредитов плана. Карточка специальности показывает её в списке,
+    # а сами строки плана туда не едут — считать на клиенте было бы не из чего.
+    curriculum_credits: int
     groups: list[TreeGroup]
 
 

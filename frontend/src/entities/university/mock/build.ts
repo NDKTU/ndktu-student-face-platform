@@ -176,7 +176,14 @@ export function buildUniversity(seed?: number): University {
             };
           });
 
-          return { id: rng.uid(), name, kurs, sardor: rng.person().display, students };
+          return {
+            id: rng.uid(),
+            name,
+            kurs,
+            sardor: rng.person().display,
+            student_count: students.length,
+            students,
+          };
         });
 
         reja.forEach((row) => {
@@ -197,6 +204,8 @@ export function buildUniversity(seed?: number): University {
           shakl: specDef.shakl,
           guruhlar,
           reja,
+          curriculum_count: reja.length,
+          curriculum_credits: reja.reduce((acc, r) => acc + r.kredit, 0),
         };
       });
 
@@ -251,7 +260,7 @@ export function computeTotals(faculties: Faculty[]): UniversityTotals {
       teachers += k.oqituvchilar;
       k.mutaxassisliklar.forEach((s) =>
         s.guruhlar.forEach((g) => {
-          students += g.students.length;
+          students += g.student_count;
         }),
       );
     });
@@ -266,7 +275,7 @@ export function countFacultyStudents(faculty: Faculty): number {
     (acc, k) =>
       acc +
       k.mutaxassisliklar.reduce(
-        (sum, s) => sum + s.guruhlar.reduce((n, g) => n + g.students.length, 0),
+        (sum, s) => sum + s.guruhlar.reduce((n, g) => n + g.student_count, 0),
         0,
       ),
     0,
@@ -274,7 +283,7 @@ export function countFacultyStudents(faculty: Faculty): number {
 }
 
 export function countSpecialityStudents(speciality: Speciality): number {
-  return speciality.guruhlar.reduce((acc, g) => acc + g.students.length, 0);
+  return speciality.guruhlar.reduce((acc, g) => acc + g.student_count, 0);
 }
 
 export function countFacultySpecialities(faculty: Faculty): number {

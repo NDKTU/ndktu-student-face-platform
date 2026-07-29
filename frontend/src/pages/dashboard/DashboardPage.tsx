@@ -37,7 +37,7 @@ export function DashboardPage() {
         specialities += k.mutaxassisliklar.length;
         k.mutaxassisliklar.forEach((s) =>
           s.guruhlar.forEach((g) => {
-            students += g.students.length;
+            students += g.student_count;
           }),
         );
       });

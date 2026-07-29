@@ -40,6 +40,17 @@ interface StructureState {
   rejaYears: Record<number, string>;
 
   load: () => Promise<void>;
+  /**
+   * Подгружает состав группы: дерево несёт только их число. Вызывается при
+   * заходе в группу, результат подкладывается в само дерево, чтобы карточка
+   * и профиль студента читали его как раньше.
+   */
+  loadGroupStudents: (groupId: number) => Promise<void>;
+  /**
+   * Подгружает строки учебного плана: дерево несёт только их число.
+   * Вызывается при выборе специальности на экране «O'quv reja».
+   */
+  loadReja: (specialityId: number) => Promise<void>;
   drillInto: (step: DrillStep) => void;
   popTo: (depth: number) => void;
   selectStudent: (id: number | null) => void;
@@ -92,6 +103,28 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
     return inFlight;
   },
 
+  loadGroupStudents: async (groupId) => {
+    // Повторно не ходим: состав группы за время просмотра не меняется, а
+    // возврат по хлебным крошкам иначе перезапрашивал бы его каждый раз.
+    if (findGroup(get().faculties, groupId)?.students) return;
+
+    const students = await api.getGroupStudents(groupId);
+    set((s) => ({
+      faculties: mapGroup(s.faculties, groupId, (group) => ({ ...group, students })),
+    }));
+  },
+
+  loadReja: async (specialityId) => {
+    const rows = await api.getReja(specialityId);
+    set((s) => ({
+      faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
+        ...sp,
+        reja: rows,
+        curriculum_count: rows.length,
+      })),
+    }));
+  },
+
   drillInto: (step) => set((s) => ({ drill: [...s.drill, step], selectedStudentId: null })),
 
   popTo: (depth) => set((s) => ({ drill: s.drill.slice(0, depth), selectedStudentId: null })),
@@ -142,6 +175,7 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
         shakl,
         reja_yil: year,
         reja: [],
+        curriculum_count: 0,
       })),
     }));
   },
@@ -152,6 +186,7 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
       faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
         ...sp,
         reja: [...sp.reja, created],
+        curriculum_count: sp.curriculum_count + 1,
       })),
     }));
   },
@@ -176,6 +211,7 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
       faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
         ...sp,
         reja: sp.reja.filter((_, i) => i !== index),
+        curriculum_count: Math.max(0, sp.curriculum_count - 1),
       })),
     }));
   },
@@ -183,7 +219,11 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
   clearRejaPlan: async (specialityId) => {
     await api.clearReja(specialityId);
     set((s) => ({
-      faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({ ...sp, reja: [] })),
+      faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
+        ...sp,
+        reja: [],
+        curriculum_count: 0,
+      })),
     }));
   },
 
@@ -193,6 +233,7 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
       faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
         ...sp,
         reja: sp.reja.filter((r) => r.semestr !== semestr),
+        curriculum_count: sp.reja.filter((r) => r.semestr !== semestr).length,
       })),
     }));
   },
@@ -216,15 +257,20 @@ function createOnServer(level: number, drill: DrillStep[], draft: EntityDraft): 
         shakl: draft.shakl,
       });
     default:
-      return api.createGroup(drill[2]!.id, {
+      // faculty_id у группы обязателен на бэкенде. В форме его не спрашивают:
+      // это самый первый шаг drill-пути, по которому мы сюда и пришли.
+      return api.createGroup(drill[2]!.id, drill[0]!.id, {
         name,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
-        sardor: draft.sardor?.trim(),
       });
   }
 }
 
-function updateOnServer(level: number, id: number, draft: EntityDraft): Promise<Entity> {
+function updateOnServer(
+  level: number,
+  id: number,
+  draft: EntityDraft,
+): Promise<Partial<Entity>> {
   const name = draft.name?.trim();
 
   switch (level) {
@@ -238,7 +284,6 @@ function updateOnServer(level: number, id: number, draft: EntityDraft): Promise<
       return api.updateGroup(id, {
         name,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
-        sardor: draft.sardor?.trim(),
       });
   }
 }
@@ -256,6 +301,39 @@ function removeOnServer(level: number, id: number): Promise<void> {
   }
 }
 
+/** Ищет группу по id во всём дереве — drill-путь для этого знать не обязательно. */
+function findGroup(faculties: Faculty[], groupId: number): Group | undefined {
+  for (const faculty of faculties) {
+    for (const department of faculty.kafedralar) {
+      for (const speciality of department.mutaxassisliklar) {
+        const group = speciality.guruhlar.find((g) => g.id === groupId);
+        if (group) return group;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Обновляет группу по id, не завися от drill-пути. */
+function mapGroup(
+  faculties: Faculty[],
+  groupId: number,
+  update: (group: Group) => Group,
+): Faculty[] {
+  return faculties.map((faculty) => ({
+    ...faculty,
+    kafedralar: faculty.kafedralar.map((department) => ({
+      ...department,
+      mutaxassisliklar: department.mutaxassisliklar.map((speciality) => ({
+        ...speciality,
+        guruhlar: speciality.guruhlar.map((group) =>
+          group.id === groupId ? update(group) : group,
+        ),
+      })),
+    })),
+  }));
+}
+
 /** Собирает {specialityId: reja_yil} со всего дерева для восстановления после загрузки. */
 function collectRejaYears(faculties: Faculty[]): Record<number, string> {
   const years: Record<number, string> = {};
@@ -270,7 +348,7 @@ function collectRejaYears(faculties: Faculty[]): Record<number, string> {
 }
 
 /** Скалярные поля берём от сервера, вложенные коллекции — из текущего состояния. */
-function mergeEntity(current: Entity, updated: Entity): Entity {
+function mergeEntity(current: Entity, updated: Partial<Entity>): Entity {
   const nested = Object.fromEntries(
     Object.entries(current).filter(([, value]) => Array.isArray(value)),
   );

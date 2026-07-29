@@ -29,10 +29,11 @@ describe('buildUniversity', () => {
     expect(group.name).toBe('KI-24-03');
     expect(group.kurs).toBe(2);
     expect(group.students).toHaveLength(26);
+    expect(group.student_count).toBe(26);
   });
 
   it('воспроизводит первого студента целиком', () => {
-    const student = uni.faculties[0]!.kafedralar[0]!.mutaxassisliklar[0]!.guruhlar[0]!.students[0]!;
+    const student = uni.faculties[0]!.kafedralar[0]!.mutaxassisliklar[0]!.guruhlar[0]!.students![0]!;
     expect(student).toEqual({
       id: 5000,
       gender: 'f',

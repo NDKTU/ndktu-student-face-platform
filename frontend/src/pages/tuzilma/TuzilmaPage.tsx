@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
 import {
@@ -62,9 +62,16 @@ export function TuzilmaPage() {
   const department = faculty?.kafedralar.find((k) => k.id === drill[1]?.id) ?? null;
   const speciality = department?.mutaxassisliklar.find((s) => s.id === drill[2]?.id) ?? null;
   const group = speciality?.guruhlar.find((g) => g.id === drill[3]?.id) ?? null;
-  const student = group?.students.find((s) => s.id === selectedStudentId) ?? null;
+  const student = group?.students?.find((s) => s.id === selectedStudentId) ?? null;
 
   const level = drill.length;
+
+  // Состав группы дерево не несёт — забираем его, как только в группу зашли.
+  const loadGroupStudents = useStructureStore((s) => s.loadGroupStudents);
+  const groupId = group?.id ?? null;
+  useEffect(() => {
+    if (groupId !== null) void loadGroupStudents(groupId);
+  }, [groupId, loadGroupStudents]);
 
   const crumbs = useMemo(() => {
     const items = [{ label: t('title'), onClick: level > 0 ? () => popTo(0) : undefined }];
@@ -231,7 +238,7 @@ export function TuzilmaPage() {
         stats: [
           { value: s.guruhlar.length, label: t('stat.guruh') },
           { value: countSpecialityStudents(s), label: t('stat.talaba') },
-          { value: s.reja.length, label: t('stat.fan') },
+          { value: s.curriculum_count, label: t('stat.fan') },
         ],
         canWrite,
         onOpen: () => drillInto({ id: s.id, name: s.name }),
@@ -248,7 +255,7 @@ export function TuzilmaPage() {
         badgeBg: faculty.color.bg,
         badgeFg: faculty.color.fg,
         lead: { label: t('group.leader'), name: g.sardor, initials: namePrefix(g.sardor) },
-        stats: [{ value: g.students.length, label: t('stat.talaba') }],
+        stats: [{ value: g.student_count, label: t('stat.talaba') }],
         canWrite,
         onOpen: () => drillInto({ id: g.id, name: g.name }),
         onEdit: () =>

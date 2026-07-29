@@ -34,9 +34,9 @@ export function GroupDetail({ group, speciality, faculty, onOpenStudent }: Group
           </div>
 
           <div className="flex gap-[22px]">
-            <Stat value={group.students.length} label={t('stat.talaba')} />
+            <Stat value={group.student_count} label={t('stat.talaba')} />
             <Stat value={group.kurs} label={t('stat.kurs')} />
-            <Stat value={speciality.reja.length} label={t('stat.fan')} />
+            <Stat value={speciality.curriculum_count} label={t('stat.fan')} />
           </div>
         </div>
 
@@ -56,7 +56,7 @@ export function GroupDetail({ group, speciality, faculty, onOpenStudent }: Group
             </tr>
           </thead>
           <tbody>
-            {group.students.map((student, index) => {
+            {(group.students ?? []).map((student, index) => {
               const tone = statusTone(student.tone);
               return (
                 <tr

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStructureStore } from '@/features/tuzilma/model/structure.store';
 import { useStructure } from '@/features/tuzilma/lib/useStructure';
@@ -57,7 +57,11 @@ interface PlanOption {
   kafedra: string;
   shakl: EduForm;
   teachers: TeacherOption[];
+  /** Строки плана. Пусты, пока специальность не открыли. */
   reja: RejaRow[];
+  /** Счётчики из дерева — они известны и до загрузки строк. */
+  fanCount: number;
+  creditCount: number;
 }
 
 /** Строка плана вместе с её позицией в reja специальности — по ней идут правки. */
@@ -118,6 +122,10 @@ export function RejaPage() {
             shakl: speciality.shakl,
             teachers: department.teachers.map((p) => ({ short: p.short, display: p.display })),
             reja: speciality.reja,
+            // Из дерева: строки плана в списке не загружены, а карточка
+            // показывает «сколько фанов и кредитов» ещё до его открытия.
+            fanCount: speciality.curriculum_count,
+            creditCount: speciality.curriculum_credits,
           })),
         ),
       ),
@@ -129,6 +137,12 @@ export function RejaPage() {
   const [planModal, setPlanModal] = useState<PlanDraft | null>(null);
   const [fanModal, setFanModal] = useState<FanModalState | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  // Строки плана дерево не несёт — забираем их при выборе специальности.
+  const loadReja = useStructureStore((s) => s.loadReja);
+  useEffect(() => {
+    if (specId !== null) void loadReja(specId);
+  }, [specId, loadReja]);
 
   const plan = plans.find((p) => p.id === specId) ?? null;
   const entries: RejaEntry[] = useMemo(
@@ -353,7 +367,7 @@ function PlansLevel({ plans, canWrite, onOpen, onNewPlan, onEditPlan, onClearPla
       >
         {plans.map((plan, i) => {
           const color = badgeColor(i);
-          const credits = plan.reja.reduce((acc, r) => acc + r.kredit, 0);
+          const credits = plan.creditCount;
           return (
             <EntityCard
               key={plan.id}
@@ -372,7 +386,7 @@ function PlansLevel({ plans, canWrite, onOpen, onNewPlan, onEditPlan, onClearPla
               chips={[{ text: plan.shakl, ...FORM_CHIP[plan.shakl] }]}
               stats={[
                 { value: SEMESTERS.length, label: t('stat.semestr') },
-                { value: plan.reja.length, label: t('stat.fan') },
+                { value: plan.fanCount, label: t('stat.fan') },
                 { value: credits, label: t('stat.kredit') },
               ]}
               canWrite={canWrite}
@@ -410,6 +424,8 @@ function SemestersLevel({
   onClearSemester,
 }: SemestersLevelProps) {
   const { t } = useTranslation('reja');
+  // Внутри плана строки уже загружены — считаем по ним, счётчик из дерева
+  // после правок успел бы устареть.
   const totalCredits = plan.reja.reduce((acc, r) => acc + r.kredit, 0);
 
   return (

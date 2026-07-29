@@ -69,15 +69,18 @@ class OrganizationTreeRepository:
                 )
             ).all()
         )
-        curriculum_per_speciality = dict(
-            (
+        curriculum_stats = {
+            speciality_id: (count, credits or 0)
+            for speciality_id, count, credits in (
                 await session.execute(
-                    select(Curriculum.speciality_id, func.count()).group_by(
-                        Curriculum.speciality_id
-                    )
+                    select(
+                        Curriculum.speciality_id,
+                        func.count(),
+                        func.sum(Curriculum.credit),
+                    ).group_by(Curriculum.speciality_id)
                 )
             ).all()
-        )
+        }
 
         def to_group(group: Group) -> TreeGroup:
             return TreeGroup(
@@ -101,6 +104,7 @@ class OrganizationTreeRepository:
 
         specialities_by_kafedra: dict[int, list[TreeSpeciality]] = defaultdict(list)
         for speciality in specialities:
+            rows, credits = curriculum_stats.get(speciality.id, (0, 0))
             specialities_by_kafedra[speciality.kafedra_id].append(
                 TreeSpeciality(
                     id=speciality.id,
@@ -109,7 +113,8 @@ class OrganizationTreeRepository:
                     education_form=speciality.education_form,
                     academic_year=speciality.academic_year,
                     position=speciality.position,
-                    curriculum_count=curriculum_per_speciality.get(speciality.id, 0),
+                    curriculum_count=rows,
+                    curriculum_credits=credits,
                     groups=groups_by_speciality.get(speciality.id, []),
                 )
             )
