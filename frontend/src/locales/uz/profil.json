@@ -1,0 +1,20 @@
+{
+  "title": "Profil",
+  "contact": "Aloqa maʼlumotlari",
+  "details": "Maʼlumotlar",
+  "email": "Email",
+  "phone": "Telefon",
+  "edit": "Tahrirlash",
+  "saved": "Profil maʼlumotlari yangilandi",
+  "password": {
+    "title": "Parolni oʻzgartirish",
+    "old": "Joriy parol",
+    "new": "Yangi parol",
+    "repeat": "Yangi parolni takrorlang",
+    "submit": "Parolni oʻzgartirish",
+    "empty": "Barcha maydonlarni toʻldiring",
+    "mismatch": "Yangi parollar mos kelmadi",
+    "tooShort": "Parol kamida 6 belgidan iborat boʻlsin",
+    "changed": "Parol muvaffaqiyatli oʻzgartirildi"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "title": "Xodimlar",
+  "subtitle": "Universitet xodimlari va ularning tizim hisoblari — {{count}} ta",
+  "add": "Xodim qo'shish",
+  "column": {
+    "fish": "F.I.Sh",
+    "lavozim": "Lavozim",
+    "unit": "Bo'linma",
+    "role": "Rol",
+    "holati": "Holat"
+  },
+  "tab": {
+    "umumiy": "Umumiy",
+    "maxfiy": "Maxfiy ma'lumot",
+    "tizim": "Tizim (User)"
+  },
+  "field": {
+    "fish": "F.I.Sh",
+    "gender": "Jinsi",
+    "birth": "Tug'ilgan sana",
+    "workPhone": "Ish telefoni",
+    "workEmail": "Ish email",
+    "hire": "Ishga kirgan sana",
+    "jshshir": "JSHSHIR",
+    "passport": "Passport seriya/raqam",
+    "address": "Yashash manzili",
+    "personalPhone": "Shaxsiy telefon",
+    "lavozim": "Lavozim",
+    "unit": "Kafedra / bo'linma",
+    "login": "Login",
+    "pwd": "Boshlang'ich parol",
+    "role": "Rol",
+    "holati": "Holat",
+    "lastLogin": "Oxirgi kirish"
+  },
+  "modal": {
+    "add": "Yangi xodim",
+    "edit": "Xodimni tahrirlash",
+    "subtitle": "Xodim ma'lumotlari va unga biriktiriladigan tizim hisobi"
+  },
+  "action": {
+    "edit": "Tahrirlash",
+    "resetPassword": "Parolni tiklash",
+    "resetSent": "Parolni tiklash havolasi yuborildi"
+  },
+  "denied": {
+    "title": "Bu ma'lumotni ko'rish uchun ruxsat yo'q",
+    "text": "Maxfiy shaxsiy ma'lumotlar faqat Super Admin uchun ko'rinadi."
+  },
+  "validation": {
+    "fishRequired": "F.I.Sh kiriting"
+  },
+  "section": {
+    "shaxsiy": "SHAXSIY",
+    "maxfiy": "MAXFIY MA'LUMOT",
+    "ish": "ISH MA'LUMOTLARI",
+    "tizim": "TIZIM (USER)"
+  },
+  "photoUpload": "Rasm yuklash",
+  "tizimNote": "Har xodimga bitta user (login) biriktiriladi.",
+  "placeholder": {
+    "fish": "Familiya Ism Otasining ismi",
+    "jshshir": "14 raqam",
+    "passport": "AA 1234567",
+    "personalPhone": "+998 __ ___-__-__",
+    "address": "Shahar, ko'cha, uy",
+    "lavozim": "Masalan: Katta o'qituvchi",
+    "workPhone": "+998 __ ___-__-__",
+    "workEmail": "ism.familiya@ndktu.uz",
+    "date": "KK.OO.YYYY",
+    "login": "ism.familiya"
+  },
+  "search": "Ism yoki email bo'yicha qidirish...",
+  "filter": {
+    "role": "Barcha rollar",
+    "unit": "Barcha bo'linmalar",
+    "status": "Barchasi"
+  },
+  "empty": {
+    "title": "Xodim topilmadi",
+    "text": "Qidiruv yoki filtrlarni o'zgartiring."
+  }
+}

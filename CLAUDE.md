@@ -27,9 +27,12 @@ docker exec nusmt_backend sh -c "cd /face/app && uv run alembic upgrade head"
 ```bash
 cd frontend
 npm install
-npm run dev      # Vite dev server on :5173
-npm run build    # tsc + vite build
-npm run lint     # ESLint
+npm run dev        # Vite dev server on :5173 (proxies /api + /uploads to :8000)
+npm run build      # tsc -b + vite build
+npm run lint       # oxlint + eslint
+npm run test       # vitest
+npm run typecheck  # tsc --noEmit
+npm run verify     # typecheck + lint + test + build — run this before every commit
 ```
 
 ### Backend (local dev without Docker)
@@ -46,6 +49,7 @@ uv run uvicorn app.main:app --reload
 |---|---|---|
 | `nusmt_backend` | 8000 | FastAPI REST API |
 | `nusmt_frontend` | 3000 | React SPA served by nginx |
+| `nusmt_frontend_legacy` | — | Old SPA, served at `/legacy/` through `nusmt_frontend` (transitional) |
 | `nusmt_face_detection` | 8001 | Face-detection microservice (separate FastAPI app) |
 | `database` | 5436→5432 | PostgreSQL 17 |
 | `redis_cache` | 6379 | Redis (caching + queue) |
@@ -66,21 +70,29 @@ FastAPI app at `app/main.py`. All business-logic modules live under `app/modules
 
 **Auth:** JWT-based with a single active session backed by Redis (no refresh tokens). On login, `UserService.create_session_token` issues an access token carrying a unique `jti` and stores `user:session:{user_id} → jti` in Redis. Every authenticated request is validated by `UserService.validate_session` (called from both `dependence/role_checker.py::get_current_user_id` — used by all `PermissionRequired` routes — and `get_current_user` for `/user/me`): it decodes the token, checks the `jti` matches Redis, and **slides the idle TTL** (`settings.jwt.session_idle_minutes`, default 30 min). So the real session timeout is a server-side idle window; the JWT `exp` (`access_token_expires_minutes`) is just an absolute cap. A second login from another device overwrites the `jti` and invalidates the first. `POST /user/logout` and a password change both delete the Redis key to revoke the session immediately.
 
-The frontend stores only the `token` in `localStorage` (shared across tabs to avoid self-eviction) via `frontend/src/services/tokenStorage.ts`. The axios interceptor in `frontend/src/services/api.ts` does NOT refresh — on 401 it clears the token and redirects to `/login` (adding `?reason=session` when the 401 is a single-session eviction). A 15-min client idle timeout (`useIdleTimeout.ts`) logs out before the server window and redirects with `?idle=1`.
+The frontend stores only the `token` in `localStorage` under the key `token` (shared across tabs to avoid self-eviction). The HTTP client does NOT refresh — on 401 it clears the token and redirects to `/login` (adding `?reason=session` when the 401 is a single-session eviction). A 15-min client idle timeout logs out before the server window and redirects with `?idle=1`. Both frontends share the same `localStorage` key on purpose: they are the same origin, and two different keys would mean two tokens racing over one server-side `jti`.
 
 **File uploads:** Uploaded files are saved to `settings.file_url.upload_dir` (resolved via `settings.absolute_upload_dir`) and served as static files from `/uploads`. The upload helper is in `question/repository.py::upload_image` and `resource/repository.py` — both use `settings` for paths.
 
 ### Frontend (`frontend/`)
-React 19 + Vite + TypeScript + Tailwind CSS 4. React Query (`@tanstack/react-query`) handles all server state. Forms use `react-hook-form` + Zod. Rich text editing uses `jodit-react`. HTML from the backend is sanitized with `DOMPurify` before rendering.
+React 19 + Vite 8 + TypeScript 6 + Tailwind CSS 4 (CSS-first `@theme` in `src/index.css`). Server state is held in **zustand** stores; HTTP goes through **native fetch**, not axios. There is no React Query here — do not add it. UI text is Uzbek-only via i18next (`src/locales/uz/*.json`), and `eslint-plugin-i18next` blocks hardcoded strings.
 
-**API layer:** All HTTP calls go through `src/services/api.ts` (axios instance). Each domain has a service file (`src/services/psychologyService.ts`, `questionService.ts`, etc.) and a corresponding React Query hook file (`src/hooks/usePsychology.ts`, `useQuestions.ts`, etc.).
+**Layout:** Feature-Sliced Design — `app/` (router), `pages/`, `widgets/layout/`, `features/<x>/{model,lib,ui}`, `entities/<x>/{model,lib}`, `shared/{api,config,lib,ui}`.
 
-**Routing / roles:** `App.tsx` wraps routes in `<RoleRoute allowedRoles={[...]}>`. Roles in use: `admin`, `teacher`, `student`, `psixologik`, `tutor`. Dashboard redirects differ per role: `psixologik` → `/psychology`, `student` → `/quiz-test`, `teacher` → `/questions`.
+**API layer:** All HTTP calls go through `src/shared/api/http.ts` (exports `api.get/post/put/delete`, `ApiError`, `configureAuth`). Each domain has one file in `src/shared/api/`, and that file is the *only* place backend field names appear — pages and stores speak the app's own types.
 
-**Environment:** The frontend reads two Vite env vars:
-- `VITE_API_URL` (default: `/api`)
+**Data flow per feature:** `features/<x>/model/<x>.store.ts` (zustand: `{data, status: 'idle'|'loading'|'ready'|'error', error}` + async actions) and `features/<x>/lib/use<X>.ts` (loads on mount). One-off detail loads use `shared/lib/useAsyncData.ts`, which has a dedicated `'denied'` status for HTTP 403.
+
+**Routing / access:** `app/App.tsx` declares routes as a `[NavKey, path, render][]` table so every one is wrapped in `<RequireAccess>` — a new section cannot be added without a guard. Access is derived from the backend's granular permissions (`read:faculty`, `create:quiz`, …) taken from `GET /user/me`, never from role names; a role literally named `Admin` bypasses every check server-side, and the client mirrors that.
+
+**Environment:** see `.env.example`.
+- `VITE_API_URL` (default `/api`)
 - `VITE_FACE_DETECTION_SERVICE_URL` (default: same-origin WebSocket `/v1/video/stream`)
-- `VITE_ENABLE_QUIZ_PROCTORING` (default: `true`)
+
+**Verification:** `npm run verify` (typecheck + oxlint/eslint + vitest + build) must pass before every commit.
+
+### Legacy frontend (`frontend-legacy/`) — transitional
+The previous SPA (React 19 + axios + React Query + jodit + xlsx). It is built with Vite `base: '/legacy/'` and served at `/legacy/` by the main frontend's nginx; its own container serves static files only. It still holds features not yet ported: psychology, quiz proctoring, HEMIS sync, results/user answers, teacher ranking, lesson journal. **Do not add features here** — it is deleted once porting completes. Migration plan: `~/.claude/plans/now-in-this-project-lovely-karp.md`.
 
 ### Psychology module
 The psychology module is a self-contained assessment system. `PsychologyMethod` groups questions; `PsychologyQuestion` uses JSONB `content` and `options` fields whose structure varies by `question_type`:
@@ -96,7 +108,7 @@ The psychology module is a self-contained assessment system. `PsychologyMethod` 
 
 Scoring logic is in `psychology/scoring.py`. The `instruction` JSONB on `PsychologyMethod` drives scoring: `scoring.method` is `"sum"` or `"category"`. For `multi_choice`, submitted answers are `number[]`; `_coerce_int` sums the array values for scoring.
 
-Adding a new question type requires: updating `QUESTION_TYPES` literal in `schemas.py`, adding a renderer component in `PsychologyTestPage.tsx`, registering it in `QuestionRenderer`, updating label/icon/color maps in `PsychologyPage.tsx`, and adding a display case in `AnswerRow.tsx`.
+Adding a new question type requires: updating the `QUESTION_TYPES` literal in `schemas.py`, adding a renderer component in `frontend-legacy/src/pages/PsychologyTestPage.tsx`, registering it in `QuestionRenderer`, updating label/icon/color maps in `frontend-legacy/src/pages/PsychologyPage.tsx`, and adding a display case in `frontend-legacy/src/components/psychology/AnswerRow.tsx`. (The psychology UI has not been ported to the new frontend yet — see the migration plan.)
 
 ### Face detection
-A separate FastAPI service in `face-detection/`. Communicates with the backend over the internal Docker network via `APP_CONFIG__FACE_SERVICE__URL`. The frontend connects to it via WebSocket during quiz proctoring (`QuizTestPage.tsx`). The backend shares the `backend_uploads` volume with this service (read-only).
+A separate FastAPI service in `face-detection/`. Communicates with the backend over the internal Docker network via `APP_CONFIG__FACE_SERVICE__URL`. The frontend connects to it via WebSocket during quiz proctoring (currently `frontend-legacy/src/pages/QuizTestPage.tsx` + `hooks/useVideoMonitoring.ts`; not yet ported). The backend shares the `backend_uploads` volume with this service (read-only).

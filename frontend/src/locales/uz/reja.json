@@ -1,0 +1,63 @@
+{
+  "title": "O'quv reja",
+  "subtitle": "Mutaxassisliklar bo'yicha o'quv rejalari",
+  "speciality": "Mutaxassislik",
+  "totalCredits": "Jami kredit",
+  "semester": "{{n}}-semestr",
+  "newPlan": "Yangi o'quv reja",
+  "addFan": "Fan qo'shish",
+  "planModal": {
+    "title": "Yangi o'quv reja",
+    "subtitle": "Mutaxassislik uchun bo'sh reja yaratiladi (1–8 semestr).",
+    "create": "Yaratish"
+  },
+  "fanModal": {
+    "add": "O'quv rejaga fan qo'shish",
+    "edit": "Fanni tahrirlash"
+  },
+  "field": {
+    "speciality": "Mutaxassislik",
+    "year": "O'quv yili",
+    "shakl": "Ta'lim shakli",
+    "fan": "Fan",
+    "semestr": "Semestr",
+    "kredit": "Kredit",
+    "oqituvchi": "O'qituvchi"
+  },
+  "placeholder": {
+    "fan": "Fan nomini yozib qidiring...",
+    "year": "2025/2026"
+  },
+  "action": {
+    "edit": "Tahrirlash",
+    "delete": "O'chirish",
+    "addFan": "Fan qo'shish",
+    "clear": "Tozalash"
+  },
+  "confirmDelete": "“{{name}}” fani o'quv rejadan o'chiriladi.",
+  "validation": {
+    "fanRequired": "Fan nomini kiriting"
+  },
+  "toast": {
+    "planCreated": "Yangi o'quv reja yaratildi"
+  },
+  "stat": {
+    "semestr": "Semestr",
+    "fan": "Fan",
+    "kredit": "Kredit"
+  },
+  "planMeta": "{{sem}} semestr · {{fan}} fan · {{kredit}} kredit",
+  "semesterMeta": "{{fan}} ta fan · {{kredit}} kredit",
+  "confirmClearPlan": "“{{name}}” o'quv rejasi butunlay tozalanadi.",
+  "confirmClearSemester": "{{n}}-semestr barcha fanlardan tozalanadi.",
+  "empty": {
+    "plans": {
+      "title": "O'quv reja yo'q",
+      "text": "Mutaxassislik uchun yangi o'quv reja yarating."
+    },
+    "semester": {
+      "title": "Fan qo'shilmagan",
+      "text": "Bu semestrga hali birorta fan qo'shilmagan."
+    }
+  }
+}

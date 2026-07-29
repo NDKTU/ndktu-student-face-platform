@@ -1,0 +1,112 @@
+{
+  "pageTitle": "Foydalanuvchilar",
+  "tab": {
+    "xodimlar": "Xodimlar",
+    "talabalar": "Talabalar"
+  },
+  "subtitle": "Universitet talabalari — {{count}} ta",
+  "add": "Talaba qo'shish",
+  "import": "HEMIS'dan import",
+  "importDone": "HEMIS sinxronizatsiyasi ishga tushirildi",
+  "search": "Ism yoki student ID bo'yicha qidirish...",
+  "filter": {
+    "faculty": "Barcha fakultetlar",
+    "group": "Barcha guruhlar",
+    "status": "Barchasi",
+    "source": "Barcha manba"
+  },
+  "column": {
+    "fish": "F.I.Sh",
+    "sid": "Student ID",
+    "guruh": "Guruh",
+    "fakultet": "Fakultet",
+    "kurs": "Kurs",
+    "holat": "Holat",
+    "manba": "Manba"
+  },
+  "kurs": "{{n}}-kurs",
+  "empty": {
+    "title": "Talaba topilmadi",
+    "text": "Qidiruv yoki filtrlarni o'zgartiring."
+  },
+  "modal": {
+    "add": "Yangi talaba",
+    "note": "Qo'lda kiritilgan talabalar HEMIS sinxronizatsiyasida o'zgartirilmaydi."
+  },
+  "section": {
+    "shaxsiy": "SHAXSIY",
+    "oqish": "O'QISH",
+    "maxfiy": "MAXFIY MA'LUMOT",
+    "aloqa": "ALOQA"
+  },
+  "photo": "Rasm",
+  "field": {
+    "familiya": "Familiya",
+    "ism": "Ism",
+    "otasi": "Otasining ismi",
+    "jinsi": "Jinsi",
+    "birth": "Tug'ilgan sana",
+    "sid": "Student ID",
+    "fakultet": "Fakultet",
+    "mutaxassislik": "Mutaxassislik",
+    "guruh": "Guruh",
+    "kurs": "Kurs",
+    "semestr": "Semestr",
+    "shakl": "Ta'lim shakli",
+    "eduType": "Ta'lim turi",
+    "lang": "Ta'lim tili",
+    "pay": "To'lov shakli",
+    "holati": "Holati",
+    "jshshir": "JSHSHIR",
+    "manzil": "Manzil",
+    "email": "Email",
+    "phone": "Telefon"
+  },
+  "placeholder": {
+    "select": "Tanlang",
+    "sid": "ST-2025-XXXXX",
+    "date": "KK.OO.YYYY",
+    "jshshir": "14 raqam",
+    "manzil": "Shahar, ko'cha, uy",
+    "email": "ism@student.ndktu.uz",
+    "phone": "+998 __ ___-__-__"
+  },
+  "validation": {
+    "sidRequired": "Student ID kiriting"
+  },
+  "detail": {
+    "idLabel": "ID: {{sid}}",
+    "guruh": "Guruh",
+    "mutaxassislik": "Mutaxassislik",
+    "fakultet": "Fakultet",
+    "manba": "Manba",
+    "manbaNote": {
+      "HEMIS": "HEMIS orqali sinxronlangan",
+      "Qo'lda": "Qo'lda kiritilgan"
+    },
+    "tab": {
+      "umumiy": "Umumiy ma'lumot",
+      "maxfiy": "Maxfiy ma'lumot"
+    },
+    "field": {
+      "birth": "Tug'ilgan sana",
+      "email": "Email",
+      "lang": "Ta'lim tili",
+      "eduType": "Ta'lim turi",
+      "semestr": "Semestr",
+      "kurs": "Kurs",
+      "pay": "To'lov shakli",
+      "jshshir": "JSHSHIR",
+      "soc": "Ijtimoiy toifa",
+      "pov": "Kambag'allik darajasi",
+      "country": "Mamlakat",
+      "vil": "Viloyat",
+      "tum": "Tuman",
+      "address": "Manzil"
+    },
+    "denied": {
+      "title": "Bu ma'lumotni ko'rish uchun ruxsat yo'q",
+      "text": "Maxfiy shaxsiy ma'lumotlar faqat Super Admin uchun ko'rinadi."
+    }
+  }
+}

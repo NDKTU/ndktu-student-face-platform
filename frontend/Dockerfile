@@ -1,4 +1,5 @@
-FROM node:22-alpine AS build
+# Vite 8 + TypeScript 6 uchun Node 24 kerak (Node 22 da oxc/rolldown ishlamaydi).
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -7,8 +8,11 @@ ARG VITE_FACE_DETECTION_SERVICE_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_FACE_DETECTION_SERVICE_URL=$VITE_FACE_DETECTION_SERVICE_URL
 
-COPY package*.json ./
-RUN npm install
+# `npm ci` emas, `npm install`: lock fayl glibc hostda yaratilgan, bu image esa
+# musl (alpine). @tailwindcss/oxide va lightningcss musl-ga xos transitive
+# paketlar (@emnapi/*) tortadi, ularni glibc lock fayli o'z ichiga ololmaydi.
+COPY package.json package-lock.json ./
+RUN npm install --no-audit --no-fund
 
 COPY . .
 RUN npm run build

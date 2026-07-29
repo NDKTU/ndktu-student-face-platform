@@ -1,0 +1,17 @@
+FROM node:24-alpine
+
+WORKDIR /app
+
+# Install deps in a separate layer so source edits don't trigger a reinstall.
+# Use `npm install`, not `npm ci`: the lock file is generated on a glibc host, but
+# this image is musl (alpine). Native deps (@tailwindcss/oxide, lightningcss) pull
+# musl-only transitive packages (@emnapi/*) that a glibc lock can't contain, so a
+# strict `npm ci` fails. `npm install` resolves the correct per-platform binaries.
+COPY package.json package-lock.json ./
+RUN npm install --no-audit --no-fund
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

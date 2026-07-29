@@ -1,0 +1,126 @@
+{
+  "studentTitle": "Testlar",
+  "studentSubtitle": "Faol testlar va natijalaringiz",
+  "tab": {
+    "active": "Faol testlar",
+    "results": "Natijalarim"
+  },
+  "card": {
+    "questions": "{{count}} ta savol",
+    "duration": "{{count}} daqiqa",
+    "start": "Testni boshlash",
+    "closed": "Yopiq"
+  },
+  "empty": {
+    "active": "Faol test yo'q",
+    "results": "Hali test topshirmadingiz"
+  },
+  "pin": {
+    "title": "Testga kirish",
+    "label": "PIN kodi",
+    "placeholder": "000000",
+    "hint": "{{fan}} · {{count}} ta savol · {{duration}} daqiqa",
+    "start": "Boshlash",
+    "cancel": "Bekor qilish",
+    "invalid": "PIN 6 raqamli boʻlishi kerak"
+  },
+  "quiz": {
+    "question": "Savol {{current}} / {{total}}",
+    "prev": "Oldingi",
+    "next": "Keyingi",
+    "finish": "Yakunlash",
+    "answered": "{{count}} / {{total}} javob berildi",
+    "timeLeft": "Qolgan vaqt"
+  },
+  "result": {
+    "title": "Test natijasi",
+    "correct": "To'g'ri javob",
+    "wrong": "Noto'g'ri",
+    "spent": "Sarflangan vaqt",
+    "back": "Testlarga qaytish",
+    "score": "{{correct}} / {{total}}"
+  },
+  "results": {
+    "date": "Sana",
+    "score": "Ball",
+    "percent": "Foiz",
+    "time": "Vaqt"
+  },
+  "create": {
+    "button": "Test yaratish",
+    "title": "Yangi test",
+    "fan": "Fan",
+    "guruh": "Guruh",
+    "year": "O'quv yili",
+    "semester": "Semestr",
+    "questions": "Savollar soni",
+    "duration": "Davomiyligi (daqiqa)",
+    "submit": "Yaratish",
+    "invalidCount": "Savollar soni notoʻgʻri",
+    "created": "Test yaratildi",
+    "pinTitle": "Test PIN kodi",
+    "pinNote": "Talabalarga ushbu PIN kodni bering",
+    "copyPin": "Nusxalash",
+    "pinCopied": "PIN nusxalandi"
+  },
+  "teacher": {
+    "column": {
+      "name": "Test",
+      "guruh": "Guruh",
+      "questions": "Savollar",
+      "duration": "Vaqt",
+      "status": "Holat",
+      "pin": "PIN"
+    }
+  },
+  "status": {
+    "Faol": "Faol",
+    "Yopiq": "Yopiq",
+    "Yopilgan": "Yopilgan"
+  },
+  "admin": {
+    "subtitle": "Barcha testlar va natijalar tahlili",
+    "column": {
+      "name": "Test",
+      "guruh": "Guruh",
+      "questions": "Savollar",
+      "duration": "Vaqt",
+      "status": "Holat",
+      "pin": "PIN"
+    }
+  },
+  "detail": {
+    "stat": {
+      "submitted": "Topshirganlar",
+      "avg": "O'rtacha ball",
+      "max": "Eng yuqori",
+      "min": "Eng past",
+      "avgTime": "O'rtacha vaqt"
+    },
+    "tab": {
+      "results": "Talabalar natijalari",
+      "questions": "Savollar tahlili"
+    },
+    "results": {
+      "fish": "F.I.Sh",
+      "ball": "Ball",
+      "foiz": "Foiz",
+      "vaqt": "Vaqt",
+      "sana": "Sana",
+      "holati": "Holati"
+    },
+    "studentStatus": {
+      "submitted": "Topshirgan",
+      "notSubmitted": "Topshirmagan"
+    },
+    "back": "Natijalarga qaytish",
+    "question": {
+      "correct": "✓ To'g'ri",
+      "selected": "✕ Belgilangan",
+      "correctCount": "{{count}} ta to'g'ri"
+    },
+    "copyPin": "Nusxalash",
+    "pinCopied": "PIN nusxalandi",
+    "ballOf": "{{ball}} / {{total}}"
+  }
+}

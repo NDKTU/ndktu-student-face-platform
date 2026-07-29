@@ -1,0 +1,32 @@
+{
+  "title": "Sozlamalar",
+  "subtitle": "Tizim konfiguratsiyasi",
+  "general": {
+    "title": "Umumiy",
+    "name": "Universitet nomi",
+    "abbr": "Qisqartma",
+    "founded": "Tashkil etilgan yili"
+  },
+  "toggles": {
+    "title": "Xavfsizlik va bildirishnomalar",
+    "twoFA": {
+      "title": "Ikki bosqichli autentifikatsiya",
+      "sub": "Barcha administratorlar uchun majburiy"
+    },
+    "email": {
+      "title": "Email bildirishnomalari",
+      "sub": "Muhim voqealar haqida xabar berish"
+    },
+    "digest": {
+      "title": "Haftalik hisobot",
+      "sub": "Har dushanba kuni tizim hisobotini yuborish"
+    }
+  },
+  "save": "Saqlash",
+  "saved": "Sozlamalar saqlandi",
+  "defaults": {
+    "name": "Navoiy davlat konchilik va texnologiyalar universiteti",
+    "abbr": "NDKTU",
+    "founded": "2022"
+  }
+}

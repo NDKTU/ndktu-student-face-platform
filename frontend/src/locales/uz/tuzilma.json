@@ -1,0 +1,102 @@
+{
+  "title": "Tuzilma",
+  "level": {
+    "faculty": {
+      "plural": "Fakultetlar",
+      "noun": "fakultet",
+      "single": "Fakultet",
+      "empty": "Hali fakultetlar qoʻshilmagan.",
+      "emptyTitle": "Fakultetlar yoʻq"
+    },
+    "department": {
+      "plural": "Kafedralar",
+      "noun": "kafedra",
+      "single": "Kafedra",
+      "empty": "Hali kafedralar qoʻshilmagan.",
+      "emptyTitle": "Kafedralar yoʻq"
+    },
+    "speciality": {
+      "plural": "Mutaxassisliklar",
+      "noun": "mutaxassislik",
+      "single": "Mutaxassislik",
+      "empty": "Hali mutaxassisliklar qoʻshilmagan.",
+      "emptyTitle": "Mutaxassisliklar yoʻq"
+    },
+    "group": {
+      "plural": "Guruhlar",
+      "noun": "guruh",
+      "single": "Guruh",
+      "empty": "Hali guruhlar qoʻshilmagan.",
+      "emptyTitle": "Guruhlar yoʻq"
+    }
+  },
+  "count": "{{count}} ta {{noun}}",
+  "field": {
+    "name": "Nomi",
+    "dekan": "Dekan",
+    "mudir": "Kafedra mudiri",
+    "kod": "Kod",
+    "shakl": "Ta'lim shakli",
+    "kurs": "Kurs",
+    "sardor": "Guruh sardori"
+  },
+  "stat": {
+    "kafedra": "Kafedra",
+    "mutaxassislik": "Mutaxassislik",
+    "talaba": "Talaba",
+    "oqituvchi": "O'qituvchi",
+    "guruh": "Guruh",
+    "fan": "Fan",
+    "kurs": "Kurs"
+  },
+  "tab": {
+    "guruhlar": "Guruhlar",
+    "reja": "O'quv reja",
+    "talabalar": "Talabalar",
+    "fanlar": "Fanlar"
+  },
+  "group": {
+    "studentsCount": "Talabalar soni",
+    "leader": "Guruh sardori",
+    "subtitle": "{{spec}} · {{kurs}}-kurs"
+  },
+  "student": {
+    "columnNo": "#",
+    "columnFish": "F.I.Sh",
+    "columnSid": "Student ID",
+    "columnStatus": "Holati",
+    "tab": {
+      "general": "Umumiy ma'lumot",
+      "sensitive": "Maxfiy ma'lumot"
+    },
+    "field": {
+      "birth": "Tug'ilgan sana",
+      "email": "Email",
+      "lang": "Ta'lim tili",
+      "eduType": "Ta'lim turi",
+      "semestr": "Semestr",
+      "kurs": "Kurs",
+      "pay": "To'lov shakli",
+      "jshshir": "JSHSHIR",
+      "soc": "Ijtimoiy toifa",
+      "pov": "Kambag'allik darajasi",
+      "country": "Mamlakat",
+      "vil": "Viloyat",
+      "tum": "Tuman",
+      "address": "Manzil"
+    },
+    "denied": {
+      "title": "Bu ma'lumotni ko'rish uchun ruxsat yo'q",
+      "text": "Maxfiy shaxsiy ma'lumotlar faqat vakolatli xodimlarga ko'rinadi."
+    },
+    "idLabel": "ID: {{sid}}"
+  },
+  "confirmDelete": {
+    "title": "O'chirishni tasdiqlang",
+    "text": "“{{name}}” o'chiriladi. Bu amalni bekor qilib bo'lmaydi."
+  },
+  "modal": {
+    "addTitle": "{{level}} qo'shish",
+    "editTitle": "{{level}}ni tahrirlash"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "add": "Qoʻshish",
+  "edit": "Tahrirlash",
+  "delete": "O'chirish",
+  "save": "Saqlash",
+  "cancel": "Bekor qilish",
+  "search": "Qidirish",
+  "all": "Barchasi",
+  "clear": "Tozalash",
+  "back": "Orqaga",
+  "profile": "Profil",
+  "settings": "Sozlamalar",
+  "saved": "O'zgarishlar saqlandi",
+  "created": "Muvaffaqiyatli qo'shildi",
+  "deleted": "O'chirildi",
+  "notFound": {
+    "title": "Natija topilmadi",
+    "text": "Filtrlarni o'zgartiring."
+  },
+  "notifications": {
+    "title": "Bildirishnomalar",
+    "empty": "Yangi bildirishnoma yo'q",
+    "markAllRead": "Barchasini oʻqilgan deb belgilash",
+    "allMarked": "Barcha bildirishnomalar oʻqilgan deb belgilandi"
+  },
+  "unit": {
+    "student": "Talaba",
+    "students": "ta",
+    "credit": "kredit",
+    "course": "-kurs",
+    "semester": "-semestr"
+  },
+  "personaRole": "Rol: {{title}}",
+  "loading": "Yuklanmoqda...",
+  "loadError": "Ma'lumotni yuklab bo'lmadi",
+  "retry": "Qayta urinish",
+  "saveError": "Saqlab bo'lmadi"
+}

@@ -1,0 +1,27 @@
+{
+  "title": "Boshqaruv paneli",
+  "subtitle": "NDKTU o'quv boshqaruv tizimi — umumiy koʻrsatkichlar",
+  "year": "2025–2026 oʻquv yili",
+  "stat": {
+    "fakultet": "Fakultet",
+    "kafedra": "Kafedra",
+    "mutaxassislik": "Mutaxassislik",
+    "talaba": "Talaba",
+    "oqituvchi": "O'qituvchi",
+    "growth": "+3.2%"
+  },
+  "facultyChart": "Fakultetlar boʻyicha talabalar",
+  "activity": {
+    "title": "Soʻnggi faoliyat",
+    "items": {
+      "student": "Yangi talaba roʻyxatga olindi — DI-24-01 guruhi",
+      "studentTime": "5 daqiqa oldin",
+      "plan": "Metallurgiya boʻyicha oʻquv reja tasdiqlandi",
+      "planTime": "2 soat oldin",
+      "mudir": "Geodeziya kafedrasiga mudir tayinlandi",
+      "mudirTime": "Kecha, 16:20",
+      "spec": "Kiberxavfsizlik mutaxassisligi qoʻshildi",
+      "specTime": "2 kun oldin"
+    }
+  }
+}

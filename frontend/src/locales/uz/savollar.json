@@ -1,0 +1,40 @@
+{
+  "title": "Savollar banki",
+  "subtitle": "Fan boʻyicha test savollarini boshqaring",
+  "teacherLabel": "O'qituvchi",
+  "fanLabel": "Fan",
+  "addQuestion": "Savol qo'shish",
+  "bankCount": "Bankda {{count}} ta savol mavjud",
+  "emptyTitle": "Hali savol qo'shilmagan",
+  "emptyText": "“+ Savol qo'shish” tugmasi orqali boshlang.",
+  "correct": "To'g'ri: {{letter}}",
+  "hasImage": "Rasmli",
+  "scope": {
+    "teacher": "O'z fanlaringiz",
+    "admin": "Butun universitet bo'yicha"
+  },
+  "bankCountPrefix": "Bankda",
+  "bankCountSuffix": "savol mavjud",
+  "bankCountValue": "{{count}} ta",
+  "modal": {
+    "add": "Yangi savol",
+    "edit": "Savolni tahrirlash"
+  },
+  "field": {
+    "question": "Savol matni",
+    "correct": "To'g'ri javob",
+    "option": "{{letter}} variant"
+  },
+  "placeholder": {
+    "question": "Savol matnini kiriting...",
+    "option": "Variant matni"
+  },
+  "action": {
+    "edit": "Tahrirlash",
+    "delete": "O'chirish"
+  },
+  "confirmDelete": "Bu savol o'chiriladi. Bu amalni bekor qilib bo'lmaydi.",
+  "validation": {
+    "questionRequired": "Savol matnini kiriting"
+  }
+}

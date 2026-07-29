@@ -1,39 +1,30 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath, URL } from 'node:url';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
+    port: 5173,
+    // Docker'siz lokal ishlashda backend to'g'ridan-to'g'ri :8000 da turadi.
+    // Prod'da bu yo'llarni nginx proksi qiladi, shuning uchun ilova ikkala
+    // holatda ham bir xil nisbiy `/api` manzilidan foydalanadi.
     proxy: {
-      // Forward all backend routes to the backend container / local backend
-      '/user': 'http://localhost:8000',
-      '/role': 'http://localhost:8000',
-      '/permission': 'http://localhost:8000',
-      '/faculty': 'http://localhost:8000',
-      '/kafedra': 'http://localhost:8000',
-      '/group': 'http://localhost:8000',
-      '/teacher': 'http://localhost:8000',
-      '/question': 'http://localhost:8000',
-      '/quiz': 'http://localhost:8000',
-      '/quiz_process': 'http://localhost:8000',
-      '/result': 'http://localhost:8000',
-      '/statistics': 'http://localhost:8000',
-      '/students': 'http://localhost:8000',
-      '/subject': 'http://localhost:8000',
-      '/hemis': 'http://localhost:8000',
-      '/user_answers': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
+      '/api': 'http://localhost:8000',
       '/uploads': 'http://localhost:8000',
-      '/docs': 'http://localhost:8000',
-      '/redoc': 'http://localhost:8000',
-      '/openapi.json': 'http://localhost:8000',
     },
   },
-})
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    css: true,
+  },
+});

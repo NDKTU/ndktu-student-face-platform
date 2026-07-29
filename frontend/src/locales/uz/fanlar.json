@@ -1,0 +1,43 @@
+{
+  "title": "Fanlar",
+  "subtitle": "Universitet boʻyicha oʻqitiladigan fanlar — {{count}} ta",
+  "column": {
+    "fan": "Fan nomi",
+    "kafedra": "Kafedra",
+    "kredit": "Kredit",
+    "oqituvchi": "O'qituvchi"
+  },
+  "add": "Fan qo'shish",
+  "search": "Fan qidirish...",
+  "allKafedra": "Barcha kafedralar",
+  "empty": {
+    "title": "Natija topilmadi",
+    "text": "Qidiruv yoki filtrni o'zgartiring."
+  },
+  "modal": {
+    "add": "Yangi fan",
+    "edit": "Fanni tahrirlash"
+  },
+  "field": {
+    "fan": "Fan nomi",
+    "kafedra": "Kafedra",
+    "kredit": "Kredit",
+    "kod": "Fan kodi",
+    "tavsif": "Tavsif"
+  },
+  "placeholder": {
+    "fan": "Masalan: Kon jinslari mexanikasi",
+    "kafedra": "Kafedra tanlang",
+    "kod": "Ixtiyoriy",
+    "tavsif": "Fan haqida qisqacha (ixtiyoriy)"
+  },
+  "action": {
+    "edit": "Tahrirlash",
+    "delete": "O'chirish"
+  },
+  "confirmDelete": "“{{name}}” fani o'chiriladi. Bu amalni bekor qilib bo'lmaydi.",
+  "validation": {
+    "fanRequired": "Fan nomini kiriting",
+    "kafedraRequired": "Kafedra tanlang"
+  }
+}

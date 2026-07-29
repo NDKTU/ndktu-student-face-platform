@@ -1,291 +1,290 @@
-@import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+@import './assets/fonts.css';
 
+/*
+ * Дизайн-токены извлечены из прототипа (reference/page.html) по фактическому
+ * использованию — порт делается пиксель-в-пиксель, поэтому шкалы нестандартные:
+ * прототип использует полупиксельные кегли (13.5px) и радиусы вроде 11px и 20px,
+ * которых нет в дефолтной шкале Tailwind.
+ *
+ * Правило: в компонентах не должно быть захардкоженных hex-цветов и произвольных
+ * размеров — всё через токены ниже.
+ */
 @theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-
-  /* Design radius scale: sm 10 / md 12 / lg 16 / xl 20 */
-  --radius-sm: 0.625rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-
+  /* --- шрифты --- */
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* --- кегли (px, ровно как в прототипе) --- */
+  --text-11: 11px;
+  --text-11-5: 11.5px;
+  --text-12: 12px;
+  --text-12-5: 12.5px;
+  --text-13: 13px;
+  --text-13-5: 13.5px;
+  --text-14: 14px;
+  --text-14-5: 14.5px;
+  --text-15: 15px;
+  --text-15-5: 15.5px;
+  --text-16: 16px;
+  --text-17: 17px;
+  --text-18: 18px;
+  --text-20: 20px;
+  --text-23: 23px;
+  --text-24: 24px;
+  --text-25: 25px;
+  --text-28: 28px;
+  --text-30: 30px;
+
+  /* --- радиусы --- */
+  --radius-8: 8px;
+  --radius-9: 9px;
+  --radius-10: 10px;
+  --radius-11: 11px;
+  --radius-12: 12px;
+  --radius-13: 13px;
+  --radius-14: 14px;
+  --radius-15: 15px;
+  --radius-16: 16px;
+  --radius-18: 18px;
+  --radius-20: 20px;
+  --radius-22: 22px;
+
+  /* --- бренд --- */
+  --color-brand: #2836c7;
+  --color-brand-hover: #1b2596;
+  --color-brand-soft: #edeffc;
+  --color-brand-border: #c9cef0;
+  --color-brand-ink: #2749c4;
+
+  /* --- текст --- */
+  --color-ink: #1a1c2e;
+  --color-ink-secondary: #4a4e66;
+  --color-ink-muted: #6b6e82;
+  --color-ink-subtle: #9498ad;
+  --color-ink-faint: #9aa0b8;
+  /* Моноширинные коды (kod специальности, student ID). */
+  --color-ink-code: #8b90a8;
+
+  /* --- поверхности --- */
+  --color-canvas: #f4f5fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f8f9fe;
+  --color-surface-sunken: #eef0f6;
+  --color-surface-muted: #f0f1f7;
+  --color-surface-alt: #f1f2f7;
+
+  /* --- границы --- */
+  --color-line: #e3e5f0;
+  --color-line-strong: #d8dbec;
+  --color-line-stronger: #c4c8dc;
+  --color-line-bold: #b4b8cc;
+
+  /* --- семантика --- */
+  --color-success: #157a43;
+  --color-success-soft: #ddf3e6;
+  --color-success-tint: #edf7ee;
+  --color-success-bright: #22a560;
+  --color-danger: #c4363b;
+  --color-danger-soft: #fdecec;
+  --color-warning: #b45309;
+  --color-warning-soft: #fbeedd;
+  --color-info: #0e7c86;
+  --color-info-soft: #dbf1f2;
+  --color-violet: #6d28d9;
+  --color-violet-soft: #eee7fb;
+  --color-rose: #a33254;
+  --color-rose-soft: #fbe4eb;
+
+  /* --- цвета ролей (персона-свитчер, аватары, бейджи) --- */
+  --color-role-super-admin: #2836c7;
+  --color-role-admin: #0e7c86;
+  --color-role-dekan: #b45309;
+  --color-role-kafedra-mudiri: #6d28d9;
+  --color-role-oqituvchi: #157a43;
+  --color-role-talaba: #a33254;
+
+  /* Фон экрана логина — единственный градиент в системе. */
+  --background-image-login: linear-gradient(160deg, #f4f5fa 0%, #e7e9f7 100%);
+
+  /* --- тени --- */
+  --shadow-card: 0 1px 2px rgb(26 28 46 / 0.04);
+  --shadow-focus: 0 0 0 3px rgb(40 54 199 / 0.12);
+  --shadow-brand: 0 2px 8px rgb(40 54 199 / 0.28);
+  --shadow-popover: 0 14px 36px rgb(26 28 46 / 0.18);
+  --shadow-modal: 0 30px 70px rgb(20 22 40 / 0.4);
+  --shadow-drawer: 0 24px 60px rgb(20 22 40 / 0.28);
+  --shadow-login-card: 0 24px 64px rgb(26 28 46 / 0.13);
+  --shadow-login-cta: 0 6px 18px rgb(40 54 199 / 0.32);
+
+  /* --- анимации (перенесены из reference/styles/base.css) --- */
+  --animate-fade: dcfade 0.16s ease;
+  --animate-pop: dcpop 0.18s ease;
+  --animate-drop: dcdrop 0.14s ease;
+  --animate-spin-slow: dcspin 0.9s linear infinite;
 }
 
-@layer base {
-  :root {
-    /* ── NDKTU LMS design tokens (light only) ── */
-    --background: #F4F5FA;
-    --foreground: #1A1C2E;
+@keyframes dcfade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
-    --card: #FFFFFF;
-    --card-foreground: #1A1C2E;
+@keyframes dcpop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
-    --popover: #FFFFFF;
-    --popover-foreground: #1A1C2E;
+@keyframes dcdrop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
-    /* Deep academic indigo */
-    --primary: #2836C7;
-    --primary-hover: #1B2596;
-    --primary-foreground: #FFFFFF;
-
-    --secondary: #EEF0F6;
-    --secondary-foreground: #1A1C2E;
-
-    --muted: #EEF0F6;
-    --muted-foreground: #6B6E82;
-
-    /* Indigo tint — active nav / soft accents */
-    --accent: #EDEFFC;
-    --accent-foreground: #2836C7;
-    --accent-border: #C9CEF0;
-
-    --destructive: #C4363B;
-    --destructive-foreground: #FFFFFF;
-    --destructive-bg: #FDECEC;
-
-    --success: #157A43;
-    --success-foreground: #FFFFFF;
-    --success-bg: #EDF7EE;
-
-    --warning: #B45309;
-    --warning-foreground: #FFFFFF;
-    --warning-bg: #FBEEDD;
-
-    --info: #0E7C86;
-    --info-foreground: #FFFFFF;
-    --info-bg: #DBF1F2;
-
-    --border: #E3E5F0;
-    --border-strong: #D8DBEC;
-    --input: #E3E5F0;
-    --ring: #2836C7;
-
-    /* Extra surface + text ramp from the mockup */
-    --surface-subtle: #F8F9FE;
-    --surface-raised: #FAFBFF;
-    --text-body: #4A4E66;
-    --text-label: #9498AD;
-
-    /* Radius base (cards) */
-    --radius: 1rem;
-
-    --sidebar-width: 16rem;
-    --sidebar-width-collapsed: 4.25rem;
-    --navbar-height: 4rem;
-
-    /* Elevation */
-    --shadow-card: 0 1px 2px rgba(26, 28, 46, .04);
-    --shadow-raised: 0 1px 3px rgba(26, 28, 46, .06);
-    --shadow-pop: 0 14px 36px rgba(26, 28, 46, .18);
-    --shadow-primary: 0 2px 8px rgba(40, 54, 199, .28);
-    --shadow-primary-lg: 0 12px 32px rgba(40, 54, 199, .30);
-    --ring-focus: 0 0 0 3px rgba(40, 54, 199, .12);
-
-    /* Grade colors */
-    --grade-5: #2836C7;
-    --grade-4: #2457D6;
-    --grade-3: #B45309;
-    --grade-low: #C4363B;
+@keyframes dcspin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-    box-sizing: border-box;
-  }
-
-  html {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+  html,
+  body {
+    margin: 0;
+    padding: 0;
   }
 
   body {
-    @apply bg-background text-foreground;
-    line-height: 1.55;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /*
+     * Прототип не задаёт line-height глобально и живёт на браузерном `normal`,
+     * а Tailwind по умолчанию ставит 1.5. Разница копится по вертикали
+     * (на экране логина набегало 23px) и ломает сверку пиксель-в-пиксель.
+     * Межстрочный интервал задаём точечно там, где он есть в оригинале.
+     */
+    line-height: normal;
+  }
+
+  button {
+    font-family: inherit;
+    color: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    font-family: inherit;
   }
 
   a {
-    color: var(--primary);
+    color: var(--color-brand);
     text-decoration: none;
   }
-  a:hover {
-    color: var(--primary-hover);
-  }
 
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+  a:hover {
+    color: var(--color-brand-hover);
   }
 
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+
   ::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
+    background: var(--color-line-strong);
     border-radius: 8px;
-    border: 2px solid var(--background);
+    border: 2px solid var(--color-canvas);
   }
+
   ::-webkit-scrollbar-thumb:hover {
-    background: #C4C8DC;
+    background: var(--color-line-stronger);
   }
 }
 
-@layer utilities {
-  .page-container {
-    @apply mx-auto w-full max-w-screen-xl space-y-6;
-  }
-
-  .page-header {
-    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
-  }
-
-  .page-title {
-    font-family: var(--font-display);
-    @apply text-2xl font-bold tracking-tight text-foreground;
-  }
-
-  .page-description {
-    @apply text-sm text-muted-foreground;
-  }
-
-  .font-display {
-    font-family: var(--font-display);
-  }
-
-  .font-mono {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  }
-
-  /* Thin themed scrollbar for inner scroll regions */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-  }
-
-  /* Status chip helpers (bg/fg pairs from the mockup).
-     `.badge*` are kept as aliases for back-compat with existing markup. */
-  .chip,
-  .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
-  }
-  .chip-primary,     .badge-primary     { background: var(--accent); color: var(--primary); }
-  .chip-success,     .badge-success     { background: var(--success-bg); color: var(--success); }
-  .chip-destructive, .badge-destructive { background: var(--destructive-bg); color: var(--destructive); }
-  .chip-warning,     .badge-warning     { background: var(--warning-bg); color: var(--warning); }
-  .chip-info                            { background: var(--info-bg); color: var(--info); }
-  .chip-muted,       .badge-muted       { background: var(--muted); color: var(--muted-foreground); }
-
-  .section-divider {
-    @apply h-px w-full bg-border;
-  }
-
-  .grade-badge {
-    font-family: 'JetBrains Mono', monospace;
-    @apply inline-flex items-center justify-center rounded-full font-semibold;
-  }
-
-  .shadow-card { box-shadow: var(--shadow-card); }
-  .shadow-pop { box-shadow: var(--shadow-pop); }
-}
-
-@keyframes dcpop {
-  from { opacity: 0; transform: translateY(8px) scale(.985); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes dcdrop {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes dcfade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* ── Responsive "row → card" tables.
-   Opt in per page: add class="rtab" to <Table> and data-label="…" to each cell. */
+/*
+ * Мобильная раскладка перенесена из reference/styles/base.css.
+ * В прототипе она держалась на селекторах по содержимому style-атрибута
+ * (`[style*="grid-template-columns: 1.4fr 1fr"]`) — здесь этого нет:
+ * сетки задаются классами и схлопываются своими же адаптивными вариантами.
+ */
 @media (max-width: 820px) {
-  table.rtab { display: block; width: 100%; }
-  table.rtab thead { display: none; }
-  table.rtab tbody { display: block; }
-  table.rtab tr {
-    display: block;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    margin: 0 0 12px;
-    padding: 6px 10px;
-    background: var(--card);
+  body {
+    overflow-x: hidden;
   }
-  table.rtab td {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: space-between;
-    padding: 9px 4px !important;
-    border: none !important;
-    text-align: right;
-  }
-  table.rtab td::before {
-    content: attr(data-label);
-    color: var(--text-label);
-    font-size: 11.5px;
-    font-weight: 600;
-    text-align: left;
-    flex: none;
-    white-space: nowrap;
-  }
-  table.rtab td:first-child { justify-content: flex-start; }
-  table.rtab td:first-child::before { display: none !important; }
-  table.rtab td[data-label="#"] { display: none !important; }
-  table.rtab td:empty { display: none !important; }
-}
 
-/* ── Hide ugly native number-input spinners globally.
-   Our shared <Input type="number"> renders custom ChevronUp/ChevronDown
-   steppers instead. Raw <input type="number"> also gets a clean field. */
-input[type='number']::-webkit-inner-spin-button,
-input[type='number']::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  appearance: none;
-  margin: 0;
-}
-input[type='number'] {
-  -moz-appearance: textfield;
-  appearance: textfield;
+  .app-header {
+    height: 56px;
+    padding: 0 12px;
+    gap: 10px;
+  }
+
+  .hdr-logo {
+    gap: 8px;
+  }
+
+  .hdr-user-text {
+    display: none;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: 100vh;
+    width: 276px;
+    max-width: 85vw;
+    z-index: 130;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--shadow-drawer);
+  }
+
+  .app-sidebar[data-open='true'] {
+    transform: translateX(0);
+  }
+
+  .app-sidebar .sidebar-logo {
+    display: flex;
+  }
+
+  .app-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgb(20 22 40 / 0.45);
+    z-index: 125;
+    animation: var(--animate-fade);
+  }
+
+  .crumb-bar {
+    height: 48px;
+    padding: 0 14px;
+  }
+
+  .app-scroll {
+    padding-bottom: 92px;
+  }
+
+  .role-pill {
+    right: 12px;
+    bottom: 12px;
+    transform: scale(0.86);
+    transform-origin: bottom right;
+  }
 }

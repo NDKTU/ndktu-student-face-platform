@@ -1,0 +1,67 @@
+{
+  "title": "Kurslar",
+  "subtitle": "Barcha o'qituvchilarning kurslari ({{count}} ta)",
+  "create": "Kurs yaratish",
+  "filter": {
+    "faculty": "Fakultet",
+    "allFaculties": "Barcha fakultetlar",
+    "teacher": "O'qituvchi",
+    "allTeachers": "Barcha o'qituvchilar",
+    "group": "Guruh",
+    "allGroups": "Barcha guruhlar",
+    "clear": "Tozalash"
+  },
+  "column": {
+    "fan": "Fan",
+    "guruh": "Guruh",
+    "oqituvchi": "O'qituvchi",
+    "fac": "Fakultet",
+    "sem": "Sem.",
+    "mavzu": "Mavzu",
+    "dars": "Dars"
+  },
+  "empty": {
+    "title": "Natija topilmadi",
+    "text": "Filtrlarni o'zgartiring."
+  },
+  "detail": {
+    "lessons": "{{count}} ta dars",
+    "totalLessons": "{{count}} ta dars",
+    "addMavzu": "Mavzu qo'shish",
+    "addDars": "Dars qo'shish",
+    "emptyMavzuTitle": "Hali mavzu qo'shilmagan",
+    "emptyMavzuText": "Boshlash uchun birinchi mavzuni qo'shing.",
+    "emptyDars": "Hali dars qo'shilmagan",
+    "metaLine": "{{oqituvchi}} · {{fac}} · {{sem}}-semestr · {{lessons}} ta dars"
+  },
+  "video": {
+    "youtube": "YouTube",
+    "upload": "Video dars"
+  },
+  "mavzuModal": {
+    "add": "Yangi mavzu",
+    "edit": "Mavzuni tahrirlash",
+    "name": "Mavzu nomi",
+    "order": "Tartib raqami"
+  },
+  "darsModal": {
+    "add": "Yangi dars",
+    "edit": "Darsni tahrirlash",
+    "title": "Dars nomi",
+    "videoType": "Video turi",
+    "dur": "Davomiyligi (daqiqa)",
+    "desc": "Tavsif",
+    "hasUy": "Uy vazifasi",
+    "uyText": "Vazifa matni",
+    "uyDeadline": "Muddat"
+  },
+  "toast": {
+    "mavzuAdded": "Mavzu qo'shildi",
+    "mavzuSaved": "Mavzu saqlandi",
+    "darsAdded": "Dars qo'shildi",
+    "darsSaved": "Dars saqlandi",
+    "deleted": "O'chirildi"
+  },
+  "confirmMavzu": "Bu mavzu va uning barcha darslari o'chiriladi.",
+  "confirmDars": "Bu dars o'chiriladi."
+}

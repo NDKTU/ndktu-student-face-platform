@@ -1,35 +1,38 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import tseslint from 'typescript-eslint';
+import i18next from 'eslint-plugin-i18next';
 
-export default defineConfig([
-  globalIgnores(['dist']),
+/**
+ * Основной линтер проекта — oxlint (`npm run lint`).
+ * ESLint здесь держим ради одного правила, аналога которому в oxlint нет:
+ * запрета текстовых литералов в JSX. Без него хардкод узбекских строк
+ * расползётся по компонентам и добавить вторую локаль станет дорого.
+ */
+export default tseslint.config(
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    ignores: ['dist', 'node_modules', 'src/entities/university/mock/catalog.ts'],
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+      parser: tseslint.parser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    plugins: { i18next },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': [
+      'i18next/no-literal-string': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+        {
+          // Латиница проходит проверку в атрибутах вроде className;
+          // ловим именно видимый текст и подписи для скринридеров.
+          markupOnly: false,
+          onlyAttribute: ['alt', 'title', 'aria-label', 'placeholder'],
+        },
       ],
-      'react-hooks/exhaustive-deps': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/incompatible-library': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-refresh/only-export-components': 'warn',
     },
   },
-])
+  {
+    // В тестах узбекский текст — это ожидаемые значения, а не UI-строки.
+    files: ['src/**/*.test.{ts,tsx}'],
+    rules: { 'i18next/no-literal-string': 'off' },
+  },
+);

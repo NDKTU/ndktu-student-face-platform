@@ -1,0 +1,145 @@
+{
+  "studentTitle": "Vazifalarim",
+  "studentSubtitle": "Uy vazifalari va topshiriqlar — {{count}} ta",
+  "filter": {
+    "all": "Barchasi",
+    "topshirilmagan": "Topshirilmagan",
+    "topshirilgan": "Topshirilgan",
+    "baholangan": "Baholangan",
+    "kechikkan": "Kechikkan"
+  },
+  "column": {
+    "title": "Topshiriq",
+    "fan": "Fan",
+    "deadline": "Muddat",
+    "status": "Holat",
+    "ball": "Ball"
+  },
+  "empty": {
+    "title": "Vazifa yo'q",
+    "text": "Ushbu holatda topshiriq topilmadi."
+  },
+  "status": {
+    "baholangan": "Baholangan",
+    "topshirilgan": "Topshirilgan",
+    "topshirilmagan": "Topshirilmagan",
+    "kechikkan": "Kechikkan"
+  },
+  "detail": {
+    "deadline": "Muddat: {{date}}",
+    "grade": "O'qituvchi bahosi",
+    "gradedAt": "Baholandi: {{date}}",
+    "mySubmission": "Mening topshirmam",
+    "submittedAt": "Topshirilgan: {{date}}",
+    "notSubmitted": "Hali topshirmadingiz. “Topshirish” tugmasini bosing.",
+    "submit": "Topshirish",
+    "resubmit": "Qayta topshirish",
+    "overdue": "Muddat tugagan — topshirib bo'lmaydi",
+    "view": "Ko'rish",
+    "ballLabel": "{{ball}} / 100"
+  },
+  "submitModal": {
+    "title": "Vazifani topshirish",
+    "file": "Fayl nomi",
+    "text": "Izoh (ixtiyoriy)",
+    "link": "Havola (ixtiyoriy)",
+    "submit": "Topshirish",
+    "done": "Vazifa topshirildi",
+    "empty": "Kamida bitta fayl, matn yoki havola qoʻshing"
+  },
+  "teacher": {
+    "title": "Vazifalar",
+    "subtitle": "Topshiriqlar bo'yicha talaba topshirmalarini tekshiring va baholang",
+    "column": {
+      "title": "Topshiriq",
+      "fan": "Fan",
+      "guruh": "Guruh",
+      "deadline": "Muddat",
+      "submitted": "Topshirgan",
+      "pending": "Kutilmoqda"
+    },
+    "empty": {
+      "title": "Topshiriq yo'q",
+      "text": "Darslarga uy vazifasi qo'shsangiz, shu yerda ko'rinadi."
+    },
+    "subsTitle": "Topshirmalar",
+    "subStatus": {
+      "baholangan": "Baholangan",
+      "topshirilgan": "Kutilmoqda",
+      "topshirilmagan": "Topshirmagan"
+    },
+    "grade": "Baholash",
+    "gradeModal": {
+      "title": "Baholash",
+      "ball": "Ball (0–100)",
+      "feedback": "Izoh",
+      "save": "Saqlash",
+      "saved": "Baho saqlandi",
+      "invalid": "Ball kiriting (0–100)"
+    }
+  },
+  "admin": {
+    "title": "Vazifalar",
+    "subtitle": "Universitet bo'yicha barcha topshiriqlar — nazorat ko'rinishi",
+    "filter": {
+      "fac": "Barcha fakultetlar",
+      "oq": "Barcha o'qituvchilar",
+      "guruh": "Barcha guruhlar",
+      "status": "Barcha holatlar",
+      "clear": "Tozalash"
+    },
+    "counter": "{{shown}} / {{total}} topshiriq",
+    "column": {
+      "title": "Topshiriq",
+      "oqituvchi": "O'qituvchi",
+      "guruh": "Guruh",
+      "deadline": "Muddat",
+      "submitted": "Topshirgan",
+      "graded": "Baholangan",
+      "status": "Holat"
+    },
+    "state": {
+      "baholangan": "Baholangan",
+      "kechikkan": "Muddati o'tgan",
+      "tekshirilmoqda": "Tekshirilmoqda"
+    },
+    "empty": {
+      "title": "Topshiriq topilmadi",
+      "text": "Filtrlarni o'zgartiring."
+    },
+    "detail": {
+      "meta": "{{fan}} · {{oqituvchi}} · muddat {{deadline}}",
+      "stat": {
+        "submitted": "Topshirgan",
+        "graded": "Baholangan",
+        "pending": "Kutilmoqda"
+      },
+      "column": {
+        "fish": "F.I.Sh",
+        "status": "Holat",
+        "submittedAt": "Topshirilgan",
+        "ball": "Ball"
+      }
+    },
+    "subStatus": {
+      "baholangan": "Baholangan",
+      "topshirilgan": "Topshirilgan",
+      "topshirilmagan": "Topshirmagan"
+    },
+    "grade": {
+      "studentAnswer": "Talaba javobi",
+      "submittedAt": "Topshirilgan: {{date}}",
+      "view": "Ko'rish",
+      "panel": "Baholash",
+      "current": "Joriy baho: {{ball}} / 100",
+      "ball": "Ball (0–100)",
+      "izoh": "Izoh",
+      "saveNext": "Saqlash va keyingisi",
+      "save": "Saqlash",
+      "back": "Ro'yxatga qaytish",
+      "saved": "Baholandi",
+      "invalid": "Ball kiriting",
+      "ballOf": "{{ball}} / 100"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "section": {
+    "asosiy": "Asosiy",
+    "boshqaruv": "Boshqaruv"
+  },
+  "bosh": "Bosh sahifa",
+  "tuzilma": "Tuzilma",
+  "fanlar": "Fanlar",
+  "reja": "O'quv reja",
+  "savollar": "Savollar banki",
+  "testlar": "Testlar",
+  "kurslar": "Kurslar",
+  "avazlar": "Vazifalar",
+  "foydalanuvchilar": "Foydalanuvchilar",
+  "rollar": "Rollar va ruxsatlar",
+  "sozlamalar": "Sozlamalar",
+  "tfanlarim": "Mening fanlarim",
+  "tvazlar": "Vazifalar",
+  "guruhim": "Mening guruhim",
+  "fanlarim": "Fanlarim",
+  "stestlar": "Testlar",
+  "svazlar": "Vazifalarim",
+  "profil": "Profil",
+  "bildirishnomalar": "Bildirishnomalar",
+  "placeholder": {
+    "soon": "Bu boʻlim keyingi bosqichda koʻchiriladi.",
+    "denied": "Bu boʻlimga ruxsatingiz yoʻq."
+  },
+  "menu": "Menyu"
+}
