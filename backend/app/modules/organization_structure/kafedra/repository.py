@@ -41,6 +41,13 @@ class KafedraRepository:
         new_kafedra = Kafedra(
             name=data.name, faculty_id=data.faculty_id, position=next_position
         )
+        # Необязательные поля карточки переносим списком: перечислять их
+        # по одному в конструкторе значило бы забывать новое поле при каждом
+        # расширении схемы.
+        for _field in ('mudir_user_id', 'mudir_name'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_kafedra, _field, _value)
         session.add(new_kafedra)
 
         try:
@@ -121,6 +128,13 @@ class KafedraRepository:
 
         if data.faculty_id is not None:
             kafedra.faculty_id = data.faculty_id
+
+        # Те же необязательные поля, что и при создании. None означает
+        # «не трогать»: форма присылает только то, что редактировала.
+        for _field in ('mudir_user_id', 'mudir_name'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(kafedra, _field, _value)
 
         await session.commit()
         await session.refresh(kafedra)

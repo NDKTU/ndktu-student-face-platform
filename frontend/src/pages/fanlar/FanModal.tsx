@@ -5,10 +5,15 @@ import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 
+export interface KafedraOption {
+  id: number;
+  name: string;
+}
+
 interface FanModalProps {
   mode: 'add' | 'edit';
   initial: FanDraft;
-  kafedraOptions: string[];
+  kafedraOptions: KafedraOption[];
   onSave: (draft: FanDraft) => void;
   onCancel: () => void;
 }
@@ -29,7 +34,7 @@ export function FanModal({ mode, initial, kafedraOptions, onSave, onCancel }: Fa
       toast(t('validation.fanRequired'));
       return;
     }
-    if (!draft.kafedra) {
+    if (draft.kafedraId === null) {
       toast(t('validation.kafedraRequired'));
       return;
     }
@@ -61,14 +66,21 @@ export function FanModal({ mode, initial, kafedraOptions, onSave, onCancel }: Fa
 
       <ModalField label={`${t('field.kafedra')} *`}>
         <select
-          value={draft.kafedra}
-          onChange={(e) => set('kafedra', e.target.value)}
+          value={draft.kafedraId ?? ''}
+          onChange={(e) => {
+            const id = e.target.value === '' ? null : Number(e.target.value);
+            setDraft((d) => ({
+              ...d,
+              kafedraId: id,
+              kafedra: kafedraOptions.find((k) => k.id === id)?.name ?? '',
+            }));
+          }}
           className={modalInputClass}
         >
           <option value="">{t('placeholder.kafedra')}</option>
           {kafedraOptions.map((k) => (
-            <option key={k} value={k}>
-              {k}
+            <option key={k.id} value={k.id}>
+              {k.name}
             </option>
           ))}
         </select>

@@ -6,6 +6,13 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 class FacultyCreateRequest(BaseModel):
     name: str
+    # Поля карточки, которые показывает дерево структуры. Все необязательные:
+    # запись заводят по названию, остальное дозаполняют позже.
+    code: Optional[str] = None
+    dekan_user_id: Optional[int] = None
+    dekan_name: Optional[str] = None
+    color_bg: Optional[str] = None
+    color_fg: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -24,6 +31,12 @@ class FacultyCreateResponse(BaseModel):
     name: str
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
+    code: Optional[str] = None
+    dekan_user_id: Optional[int] = None
+    dekan_name: Optional[str] = None
+    color_bg: Optional[str] = None
+    color_fg: Optional[str] = None
+    position: int = 0
 
     model_config = ConfigDict(
         from_attributes=True,

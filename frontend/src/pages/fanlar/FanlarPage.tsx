@@ -14,9 +14,18 @@ import { RowMenu } from '@/shared/ui/RowMenu';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { useToast } from '@/shared/ui/Toast';
+import { useStructure } from '@/features/tuzilma/lib/useStructure';
+import { useStructureStore } from '@/features/tuzilma/model/structure.store';
 import { FanModal } from './FanModal';
 
-const EMPTY_DRAFT: FanDraft = { fan: '', kafedra: '', kredit: '3', kod: '', tavsif: '' };
+const EMPTY_DRAFT: FanDraft = {
+  fan: '',
+  kafedra: '',
+  kafedraId: null,
+  kredit: '3',
+  kod: '',
+  tavsif: '',
+};
 
 type ModalState = { mode: 'add' | 'edit'; id?: number; draft: FanDraft };
 
@@ -36,11 +45,18 @@ export function FanlarPage() {
   const [modal, setModal] = useState<ModalState | null>(null);
   const [confirm, setConfirm] = useState<{ id: number; name: string } | null>(null);
 
-  // Список кафедр для фильтра и формы — уникальные значения из каталога.
+  // Кафедры берём из дерева структуры, а не из уже заведённых фанов: иначе в
+  // пустом каталоге выбирать было бы не из чего.
+  useStructure();
+  const faculties = useStructureStore((s) => s.faculties);
   const kafedraOptions = useMemo(
-    () => Array.from(new Set(fans.map((f) => f.kafedra))).sort((a, b) => a.localeCompare(b)),
-    [fans],
+    () =>
+      faculties
+        .flatMap((f) => f.kafedralar.map((k) => ({ id: k.id, name: k.name })))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [faculties],
   );
+  const kafedraNames = useMemo(() => kafedraOptions.map((k) => k.name), [kafedraOptions]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -105,7 +121,14 @@ export function FanlarPage() {
     setModal({
       mode: 'edit',
       id: r.id,
-      draft: { fan: r.fan, kafedra: r.kafedra, kredit: String(r.kredit), kod: r.kod, tavsif: r.tavsif },
+      draft: {
+        fan: r.fan,
+        kafedra: r.kafedra,
+        kafedraId: r.kafedraId,
+        kredit: String(r.kredit),
+        kod: r.kod,
+        tavsif: r.tavsif,
+      },
     });
   }
 
@@ -181,9 +204,9 @@ export function FanlarPage() {
                 className="h-[42px] min-w-[200px] rounded-11 border border-line bg-surface px-3.5 text-14 text-ink-secondary outline-none focus:border-brand"
               >
                 <option value="">{t('allKafedra')}</option>
-                {kafedraOptions.map((k) => (
-                  <option key={k} value={k}>
-                    {k}
+                {kafedraNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
               </select>

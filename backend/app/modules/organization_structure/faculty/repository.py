@@ -36,6 +36,13 @@ class FacultyRepository:
         ).scalar_one()
 
         new_faculty = Faculty(name=data.name, position=next_position)
+        # Необязательные поля карточки переносим списком: перечислять их
+        # по одному в конструкторе значило бы забывать новое поле при каждом
+        # расширении схемы.
+        for _field in ('code', 'dekan_user_id', 'dekan_name', 'color_bg', 'color_fg'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_faculty, _field, _value)
         session.add(new_faculty)
 
         try:
@@ -109,6 +116,13 @@ class FacultyRepository:
                     detail="Faculty name already taken",
                 )
             faculty.name = data.name
+
+        # Те же необязательные поля, что и при создании. None означает
+        # «не трогать»: форма присылает только то, что редактировала.
+        for _field in ('code', 'dekan_user_id', 'dekan_name', 'color_bg', 'color_fg'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(faculty, _field, _value)
 
         await session.commit()
         await session.refresh(faculty)

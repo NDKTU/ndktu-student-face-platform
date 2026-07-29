@@ -39,6 +39,13 @@ class GroupRepository:
         ).scalar_one()
 
         new_group = Group(name=data.name, faculty_id=data.faculty_id, position=next_position)
+        # Необязательные поля карточки переносим списком: перечислять их
+        # по одному в конструкторе значило бы забывать новое поле при каждом
+        # расширении схемы.
+        for _field in ('kurs', 'sardor_student_id'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_group, _field, _value)
         session.add(new_group)
 
         try:
@@ -173,6 +180,13 @@ class GroupRepository:
 
         if data.faculty_id is not None:
             group.faculty_id = data.faculty_id
+
+        # Те же необязательные поля, что и при создании. None означает
+        # «не трогать»: форма присылает только то, что редактировала.
+        for _field in ('kurs', 'sardor_student_id'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(group, _field, _value)
 
         await session.commit()
         await session.refresh(group)

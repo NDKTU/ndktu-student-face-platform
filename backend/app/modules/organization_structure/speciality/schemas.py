@@ -7,6 +7,11 @@ from pydantic import BaseModel, ConfigDict, field_validator
 class SpecialityCreateRequest(BaseModel):
     name: str
     kafedra_id: int
+    # Поля карточки, которые показывает дерево структуры. Все необязательные:
+    # запись заводят по названию, остальное дозаполняют позже.
+    code: Optional[str] = None
+    education_form: Optional[str] = None
+    academic_year: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -36,6 +41,10 @@ class SpecialityResponse(BaseModel):
     kafedra_id: int
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
+    code: Optional[str] = None
+    education_form: Optional[str] = None
+    academic_year: Optional[str] = None
+    position: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

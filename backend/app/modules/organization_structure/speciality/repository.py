@@ -38,6 +38,13 @@ class SpecialityRepository:
         new_speciality = Speciality(
             name=data.name, kafedra_id=data.kafedra_id, position=next_position
         )
+        # Необязательные поля карточки переносим списком: перечислять их
+        # по одному в конструкторе значило бы забывать новое поле при каждом
+        # расширении схемы.
+        for _field in ('code', 'education_form', 'academic_year'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_speciality, _field, _value)
         session.add(new_speciality)
 
         try:
@@ -123,6 +130,13 @@ class SpecialityRepository:
 
         if data.kafedra_id is not None:
             speciality.kafedra_id = data.kafedra_id
+
+        # Те же необязательные поля, что и при создании. None означает
+        # «не трогать»: форма присылает только то, что редактировала.
+        for _field in ('code', 'education_form', 'academic_year'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(speciality, _field, _value)
 
         try:
             await session.commit()

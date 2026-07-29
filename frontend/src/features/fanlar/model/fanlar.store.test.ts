@@ -14,7 +14,17 @@ const api = vi.mocked(await import('@/shared/api/fanlar'));
 const store = () => useFanlarStore.getState();
 
 function row(id: number, fan: string): FanRow {
-  return { id, fan, kafedra: 'K', kredit: 3, semestr: 1, oqituvchi: '—', kod: '', tavsif: '' };
+  return {
+    id,
+    fan,
+    kafedra: 'K',
+    kafedraId: 1,
+    kredit: 3,
+    semestr: 1,
+    oqituvchi: '—',
+    kod: '',
+    tavsif: '',
+  };
 }
 
 beforeEach(() => {
@@ -52,11 +62,12 @@ describe('fanlar store — мутации', () => {
   it('add ставит ответ сервера в начало списка', async () => {
     api.createFan.mockResolvedValueOnce(row(2, 'Yangi fan'));
 
-    await store().add({ fan: 'Yangi fan', kafedra: 'K', kredit: '5', kod: '', tavsif: '' });
+    await store().add({ fan: 'Yangi fan', kafedra: 'K', kafedraId: 1, kredit: '5', kod: '', tavsif: '' });
 
     expect(api.createFan).toHaveBeenCalledWith({
       fan: 'Yangi fan',
       kafedra: 'K',
+      kafedraId: 1,
       kredit: '5',
       kod: '',
       tavsif: '',
@@ -67,7 +78,7 @@ describe('fanlar store — мутации', () => {
   it('update заменяет строку ответом сервера', async () => {
     api.updateFan.mockResolvedValueOnce({ ...row(1, 'Fizika'), kredit: 8 });
 
-    await store().update(1, { fan: 'Fizika', kafedra: 'K', kredit: '8', kod: '', tavsif: '' });
+    await store().update(1, { fan: 'Fizika', kafedra: 'K', kafedraId: 1, kredit: '8', kod: '', tavsif: '' });
 
     expect(store().fans[0]!.kredit).toBe(8);
   });
@@ -85,7 +96,7 @@ describe('fanlar store — мутации', () => {
     api.createFan.mockRejectedValueOnce(new Error('HTTP 500'));
 
     await expect(
-      store().add({ fan: 'X', kafedra: 'K', kredit: '3', kod: '', tavsif: '' }),
+      store().add({ fan: 'X', kafedra: 'K', kafedraId: 1, kredit: '3', kod: '', tavsif: '' }),
     ).rejects.toThrow('HTTP 500');
     expect(store().fans).toHaveLength(1);
   });

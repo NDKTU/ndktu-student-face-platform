@@ -4,8 +4,22 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
+class KafedraInfo(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SubjectCreateRequest(BaseModel):
     name: str
+    # Поля карточки, которые показывает дерево структуры. Все необязательные:
+    # запись заводят по названию, остальное дозаполняют позже.
+    kafedra_id: Optional[int] = None
+    code: Optional[str] = None
+    credit: Optional[int] = None
+    semester: Optional[int] = None
+    description: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -24,6 +38,12 @@ class SubjectCreateResponse(BaseModel):
     name: str
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
+    kafedra_id: Optional[int] = None
+    kafedra: Optional[KafedraInfo] = None
+    code: Optional[str] = None
+    credit: Optional[int] = None
+    semester: Optional[int] = None
+    description: Optional[str] = None
 
     model_config = ConfigDict(
         from_attributes=True,

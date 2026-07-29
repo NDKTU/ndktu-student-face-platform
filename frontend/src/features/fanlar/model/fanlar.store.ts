@@ -7,12 +7,16 @@ export interface FanRow extends Subject {
   id: number;
   kod: string;
   tavsif: string;
+  /** Кафедра на бэкенде — ссылка; строкой её только показывают. */
+  kafedraId: number | null;
 }
 
 /** Черновик формы «Yangi fan». */
 export interface FanDraft {
   fan: string;
+  /** Название — для показа в форме; сохраняется по kafedraId. */
   kafedra: string;
+  kafedraId: number | null;
   kredit: string;
   kod: string;
   tavsif: string;

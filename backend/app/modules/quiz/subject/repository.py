@@ -3,6 +3,7 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Teacher, User
 from app.modules.quiz.model import Subject, SubjectTeacher
@@ -27,6 +28,13 @@ class SubjectRepository:
             )
 
         new_subject = Subject(name=data.name)
+        # Необязательные поля карточки переносим списком: перечислять их
+        # по одному в конструкторе значило бы забывать новое поле при каждом
+        # расширении схемы.
+        for _field in ('kafedra_id', 'code', 'credit', 'semester', 'description'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(new_subject, _field, _value)
         session.add(new_subject)
 
         try:
@@ -38,12 +46,19 @@ class SubjectRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
-        return new_subject
+        # Перечитываем через get_subject: он подгружает кафедру, а её ждёт
+        # схема ответа. Без этого сериализация падает на MissingGreenlet —
+        # ленивая связь в асинхронной сессии не подтянется сама.
+        return await self.get_subject(session, new_subject.id)
 
     async def get_subject(self, session: AsyncSession, subject_id: int) -> Subject:
         # Use primary key id descending if created_at is not available,
         # but all models here inherit from TimestampMixin based on previous checks.
-        stmt = select(Subject).where(Subject.id == subject_id)
+        # Кафедра выводится в каталоге строкой — подгружаем сразу, иначе
+        # на каждую строку списка ушёл бы отдельный запрос.
+        stmt = select(Subject).options(selectinload(Subject.kafedra)).where(
+            Subject.id == subject_id
+        )
         result = await session.execute(stmt)
         subject = result.scalar_one_or_none()
 
@@ -55,7 +70,7 @@ class SubjectRepository:
     async def list_subjects(
         self, session: AsyncSession, request: SubjectListRequest, current_user: User
     ) -> SubjectListResponse:
-        stmt = select(Subject)
+        stmt = select(Subject).options(selectinload(Subject.kafedra))
 
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
@@ -135,9 +150,15 @@ class SubjectRepository:
                 )
             subject.name = data.name
 
+        # Те же необязательные поля, что и при создании. None означает
+        # «не трогать»: форма присылает только то, что редактировала.
+        for _field in ('kafedra_id', 'code', 'credit', 'semester', 'description'):
+            _value = getattr(data, _field, None)
+            if _value is not None:
+                setattr(subject, _field, _value)
+
         await session.commit()
-        await session.refresh(subject)
-        return subject
+        return await self.get_subject(session, subject_id)
 
     async def delete_subject(self, session: AsyncSession, subject_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func
