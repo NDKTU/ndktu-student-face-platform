@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class FacultyRepository:
     async def create_faculty(self, session: AsyncSession, data: FacultyCreateRequest) -> Faculty:
-        stmt_check = select(Faculty).where(Faculty.name == data.name)
+        stmt_check = select(Faculty).where(func.lower(Faculty.name) == data.name.lower())
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
             raise HTTPException(
@@ -88,7 +88,9 @@ class FacultyRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
 
         if data.name is not None:
-            stmt_check = select(Faculty).where(Faculty.name == data.name, Faculty.id != faculty_id)
+            stmt_check = select(Faculty).where(
+                func.lower(Faculty.name) == data.name.lower(), Faculty.id != faculty_id
+            )
             existing_faculty = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_faculty:
                 raise HTTPException(

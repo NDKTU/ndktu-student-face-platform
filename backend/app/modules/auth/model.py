@@ -1,6 +1,15 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
@@ -143,7 +152,22 @@ class Student(Base, TimestampMixin, IdIntPk):
     enrollment_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
     graduation_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
 
-    group: Mapped["Group"] = relationship("Group", back_populates="students")
+    # --- Персональные данные --------------------------------------------------
+    # Наружу уходят ТОЛЬКО через GET /students/{id}/sensitive под отдельным
+    # правом. В StudentResponse их быть не должно: списочный эндпоинт отдаёт
+    # сотни строк разом, и одно лишнее поле в схеме — это утечка на весь курс.
+    jshshir: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    passport: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    social_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    benefit: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # foreign_keys: у groups появилась встречная ссылка sardor_student_id,
+    # так что путей между таблицами стало два — нужный указываем явно.
+    group: Mapped["Group"] = relationship(
+        "Group", back_populates="students", foreign_keys=[group_id]
+    )
     user: Mapped["User"] = relationship("User", back_populates="student")
 
 
@@ -164,6 +188,26 @@ class Employee(Base, IdIntPk, TimestampMixin):
 
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # --- Служебная карточка ---------------------------------------------------
+    position_title: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    work_email: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    work_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    birth_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    hire_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    # Faol / Bloklangan / Ta'tilda. Влияет на возможность входа.
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="Faol")
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # --- Персональные данные --------------------------------------------------
+    # Как и у студента: только через GET /employee/{id}/sensitive и только под
+    # своим правом. Со студенческим оно не связано — это два независимо
+    # выдаваемых права, а не одна «привилегия администратора».
+    jshshir: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    passport: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    personal_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="employee")
     teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="employee", uselist=False)

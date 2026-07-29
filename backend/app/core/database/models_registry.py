@@ -35,6 +35,7 @@ __all__ = [
     "TeacherAssignment",
     "Department",
     "Resource",
+    "Curriculum",
 ]
 
 from app.modules.auth.model import (
@@ -58,6 +59,7 @@ from app.modules.course.model import (
     Resource,
 )
 from app.modules.organization_structure.model import (
+    Curriculum,
     Department,
     Faculty,
     Group,

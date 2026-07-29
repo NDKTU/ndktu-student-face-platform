@@ -12,7 +12,11 @@ class FacultyCreateRequest(BaseModel):
     def name_must_not_be_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Name cannot be empty")
-        return v.strip().lower()
+        # .lower() здесь больше нет: названия показываются в интерфейсе как
+        # есть, и «konchilik fakulteti» на карточке выглядело бы опечаткой.
+        # Регистронезависимость обеспечивает проверка уникальности в
+        # репозитории (func.lower), а не порча самих данных.
+        return v.strip()
 
 
 class FacultyCreateResponse(BaseModel):

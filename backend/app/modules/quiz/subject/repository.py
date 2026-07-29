@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SubjectRepository:
     async def create_subject(self, session: AsyncSession, data: SubjectCreateRequest) -> Subject:
-        stmt_check = select(Subject).where(Subject.name == data.name)
+        stmt_check = select(Subject).where(func.lower(Subject.name) == data.name.lower())
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
             raise HTTPException(
@@ -124,7 +124,9 @@ class SubjectRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
         if data.name is not None:
-            stmt_check = select(Subject).where(Subject.name == data.name, Subject.id != subject_id)
+            stmt_check = select(Subject).where(
+                func.lower(Subject.name) == data.name.lower(), Subject.id != subject_id
+            )
             existing_subject = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_subject:
                 raise HTTPException(

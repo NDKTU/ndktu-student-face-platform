@@ -2,7 +2,7 @@ import random
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
@@ -11,13 +11,25 @@ from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.auth.model import Employee, Teacher, User
-    from app.modules.organization_structure.model import Group
+    from app.modules.organization_structure.model import Group, Kafedra
 
 
 class Subject(Base, IdIntPk, TimestampMixin):
     __tablename__ = "subjects"
 
     name: Mapped[str] = mapped_column(String(250), unique=True)
+
+    # Каталожная карточка фана. Раньше у предмета было только имя, и справочник
+    # на фронте показывать было нечего.
+    kafedra_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("kafedras.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    credit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    kafedra: Mapped["Kafedra | None"] = relationship("Kafedra")
 
     subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
         "SubjectTeacher",
