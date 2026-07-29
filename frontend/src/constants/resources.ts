@@ -12,11 +12,18 @@ import {
     UsersRound,
     ClipboardList,
     PlayCircle,
-    Trophy,
-    BarChart2,
     Briefcase,
     User,
     Library,
+    Home,
+    Network,
+    CalendarDays,
+    HelpCircle,
+    FileCheck2,
+    LayoutGrid,
+    ClipboardCheck,
+    ShieldCheck,
+    Settings,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -96,13 +103,47 @@ export interface SidebarSection {
     items: SidebarItem[];
 }
 
-const ALWAYS_VISIBLE: SidebarSection = {
-    label: 'Umumiy',
-    items: [
-        { name: 'Dashboard', href: '/', icon: BarChart2 },
-        { name: 'Reyting', href: '/teacher-ranking', icon: Trophy },
-    ],
-};
+// Explicit admin navigation — matches the NDKTU mockup 1:1 (ASOSIY / BOSHQARUV).
+// Consolidates Faculty/Kafedra/Group into "Tuzilma" and Roles+Permissions into
+// "Rollar va ruxsatlar"; adds O'quv reja + Sozlamalar. Each item is gated by the
+// existing read permission (a super-admin has them all).
+interface AdminNavItem extends SidebarItem {
+    permission?: string;
+}
+
+const ADMIN_NAV: { label: string; items: AdminNavItem[] }[] = [
+    {
+        label: 'Asosiy',
+        items: [
+            { name: 'Bosh sahifa',       href: '/',          icon: Home },
+            { name: 'Tuzilma',           href: '/faculties', icon: Network,        permission: 'read:faculty' },
+            { name: 'Fanlar',            href: '/subjects',  icon: BookOpen,       permission: 'read:subject' },
+            { name: "O'quv reja",        href: '/reja',      icon: CalendarDays },
+            { name: 'Savollar banki',    href: '/questions', icon: HelpCircle,     permission: 'read:question' },
+            { name: 'Testlar',           href: '/quizzes',   icon: FileCheck2,     permission: 'read:quiz' },
+            { name: 'Kurslar',           href: '/courses',   icon: LayoutGrid,     permission: 'read:course' },
+            { name: 'Vazifalar',         href: '/results',   icon: ClipboardCheck, permission: 'read:result' },
+        ],
+    },
+    {
+        label: 'Boshqaruv',
+        items: [
+            { name: 'Foydalanuvchilar',    href: '/users',    icon: Users,       permission: 'read:user' },
+            { name: 'Rollar va ruxsatlar', href: '/roles',    icon: ShieldCheck, permission: 'read:role' },
+            { name: 'Sozlamalar',          href: '/settings', icon: Settings },
+        ],
+    },
+];
+
+const buildAdminSidebar = (permissions: ReadonlySet<string>): SidebarSection[] =>
+    ADMIN_NAV
+        .map((group) => ({
+            label: group.label,
+            items: group.items
+                .filter((item) => !item.permission || permissions.has(item.permission))
+                .map(({ name, href, icon }) => ({ name, href, icon })),
+        }))
+        .filter((group) => group.items.length > 0);
 
 const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
     label: 'Umumiy',
@@ -169,9 +210,11 @@ export const buildSidebar = (
     permissions: ReadonlySet<string>,
     roleNames: ReadonlyArray<string>
 ): SidebarSection[] => {
-    const isStudent = roleNames.some((r) => r.toLowerCase() === 'student');
-    if (isStudent) return buildStudentSidebar(permissions);
+    const lower = roleNames.map((r) => r.toLowerCase());
+    if (lower.includes('student')) return buildStudentSidebar(permissions);
+    if (lower.includes('admin')) return buildAdminSidebar(permissions);
 
+    // teacher / psixologik / tutor — derive from permissions + RESOURCES sections
     const grouped: Record<string, SidebarItem[]> = {};
 
     for (const perm of permissions) {
@@ -187,8 +230,7 @@ export const buildSidebar = (
         });
     }
 
-    const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');
-    const sections: SidebarSection[] = isAdmin ? [ALWAYS_VISIBLE] : [];
+    const sections: SidebarSection[] = [];
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
         if (sectionLabel === 'Umumiy') continue;
         const items = grouped[sectionLabel];

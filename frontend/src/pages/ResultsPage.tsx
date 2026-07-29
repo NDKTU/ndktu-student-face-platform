@@ -80,7 +80,7 @@ const SlideOver = ({ result, onClose, onViewAnswers, onDelete, isAdmin }: SlideO
                 <div className="flex-1 px-6 py-5 space-y-5">
                     {/* Grade hero */}
                     <div className={cn('rounded-2xl p-6 text-center', conf.softBg)}>
-                        <p className="font-display text-8xl font-semibold tracking-tight leading-none" style={{ color: `hsl(var(--grade-${Math.min(result.grade, 5) as 1|2|3|4|5}))` }}>
+                        <p className="font-display text-8xl font-semibold tracking-tight leading-none" style={{ color: `var(--grade-${Math.min(result.grade, 5) as 1|2|3|4|5})` }}>
                             {result.grade}
                         </p>
                         <p className={cn('mt-2 text-sm font-semibold', conf.softText)}>{conf.label}</p>

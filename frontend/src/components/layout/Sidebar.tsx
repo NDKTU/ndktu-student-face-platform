@@ -1,168 +1,125 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, Menu, X } from 'lucide-react';
 import { cn } from '@/utils/utils';
 import { useAuth } from '@/context/AuthContext';
 import { buildSidebar } from '@/constants/resources';
+import Avatar from '@/components/ui/Avatar';
 import logo from '@/assets/logo.png';
 
 interface SidebarProps {
+    collapsed: boolean;
     mobileOpen: boolean;
     setMobileOpen: (open: boolean) => void;
 }
 
-const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
+const Sidebar = ({ collapsed, mobileOpen, setMobileOpen }: SidebarProps) => {
     const location = useLocation();
     const { user, permissions } = useAuth();
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    
-    // Manage which sections are open
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-        'Umumiy': true,
-        'Boshqaruv': false,
-        'Foydalanuvchilar': true,
-        'Testlar': false,
-        'Psixologiya': false,
-        'Ruxsatlar tizimi': false,
-        'Test': true // for students
-    });
-
-    const toggleSection = (label: string) => {
-        setOpenSections(prev => ({
-            ...prev,
-            [label]: !prev[label]
-        }));
-    };
 
     const sections = useMemo(() => {
         const roleNames = (user?.roles ?? []).map((r) => r.name);
         return buildSidebar(permissions, roleNames);
     }, [user, permissions]);
 
+    // Labels are hidden only on the desktop icon-rail (collapsed & not the mobile drawer).
+    const showLabels = mobileOpen || !collapsed;
+
+    const displayName = user?.student
+        ? `${user.student.first_name} ${user.student.last_name}`.trim() || user.username
+        : user?.username ?? 'User';
+    const roleLabel = user?.roles?.[0]?.name ?? 'Foydalanuvchi';
+
+    const isActive = (href: string) =>
+        href === '/'
+            ? location.pathname === '/'
+            : location.pathname === href || location.pathname.startsWith(href + '/');
+
     return (
         <>
             {mobileOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+                    className="fixed inset-0 z-40 bg-[rgba(20,22,40,.45)] md:hidden [animation:dcfade_.16s_ease]"
                     onClick={() => setMobileOpen(false)}
                     aria-hidden="true"
                 />
             )}
 
             <aside
+                data-open={mobileOpen}
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-all duration-300 md:static',
+                    'fixed inset-y-0 left-0 z-50 flex h-screen flex-none flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-200 md:static md:h-auto',
+                    'w-[276px] max-w-[85vw] shadow-[0_24px_60px_rgba(20,22,40,.28)] md:max-w-none md:shadow-none',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-                    isCollapsed ? 'w-16' : 'w-64'
+                    collapsed ? 'md:w-[68px]' : 'md:w-64',
                 )}
             >
-                <div
-                    className={cn(
-                        'flex h-16 shrink-0 items-center border-b border-border transition-colors',
-                        isCollapsed ? 'justify-center px-0' : 'justify-between px-4'
-                    )}
-                >
-                    <div className={cn("flex items-center gap-3 overflow-hidden", isCollapsed && "hidden")}>
-                        <img src={logo} alt="NDKTU" className="h-8 w-8 shrink-0 object-contain rounded-lg" />
-                        <span className="text-[12px] font-bold leading-tight text-foreground/80 line-clamp-2">
-                            LMS Admin Panel
-                        </span>
+                {/* Brand — only shown inside the mobile drawer (header carries it on desktop) */}
+                <div className="flex items-center gap-[11px] px-4 pb-2 pt-4 md:hidden">
+                    <img src={logo} alt="NDKTU" className="h-9 w-9 object-contain" />
+                    <div className="leading-[1.05]">
+                        <div className="text-[15px] font-extrabold tracking-[-0.02em] text-foreground">
+                            NDKTU <span className="text-primary">LMS</span>
+                        </div>
+                        <div className="text-[10px] font-medium text-[color:var(--text-label)]">O'quv boshqaruv tizimi</div>
                     </div>
-                    <button 
-                        onClick={() => setIsCollapsed(!isCollapsed)}
+                </div>
+
+                <nav className="custom-scrollbar flex flex-1 flex-col gap-[3px] overflow-y-auto overflow-x-hidden px-3 py-4">
+                    {sections.filter((s) => s.items.length > 0).map((section) => (
+                        <div key={section.label} className="flex flex-col gap-[3px]">
+                            {showLabels && (
+                                <div className="px-3 pb-2 pt-3 text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#B4B8CC] first:pt-1.5">
+                                    {section.label}
+                                </div>
+                            )}
+                            {section.items.map((item) => {
+                                const active = isActive(item.href);
+                                return (
+                                    <div key={item.href} className="group relative">
+                                        <Link
+                                            to={item.href}
+                                            onClick={() => setMobileOpen(false)}
+                                            data-tip={item.name}
+                                            className={cn(
+                                                'flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm transition-colors',
+                                                !showLabels && 'justify-center',
+                                                active
+                                                    ? 'bg-accent font-bold text-primary'
+                                                    : 'font-medium text-[color:var(--text-body)] hover:bg-accent',
+                                            )}
+                                        >
+                                            <item.icon size={20} strokeWidth={1.8} className="flex-none" />
+                                            {showLabels && <span className="truncate whitespace-nowrap">{item.name}</span>}
+                                        </Link>
+                                        {!showLabels && (
+                                            <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground opacity-0 shadow-pop transition-opacity group-hover:opacity-100">
+                                                {item.name}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </nav>
+
+                {/* Footer user card */}
+                <div className="flex-none border-t border-[#EEF0F6] p-3">
+                    <div
                         className={cn(
-                            "flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                            isCollapsed && "w-full"
+                            'flex items-center gap-[11px] rounded-[12px] border border-[#EEF0F6] bg-[color:var(--surface-subtle)] p-2.5',
+                            !showLabels && 'justify-center',
                         )}
                     >
-                        <Menu size={20} />
-                    </button>
-                </div>
-
-                {mobileOpen && (
-                    <button
-                        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent md:hidden"
-                        onClick={() => setMobileOpen(false)}
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                )}
-
-                <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
-                    <nav className="flex flex-col gap-2 px-2">
-                        {sections.filter(s => s.items.length > 0).map((section) => (
-                            <div key={section.label} className="flex flex-col">
-                                {!isCollapsed ? (
-                                    <button 
-                                        onClick={() => toggleSection(section.label)}
-                                        className="flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors"
-                                    >
-                                        <span>{section.label}</span>
-                                        <ChevronDown size={14} className={cn("transition-transform duration-200", openSections[section.label] ? "rotate-180" : "rotate-0")} />
-                                    </button>
-                                ) : (
-                                    <div className="my-2 h-px bg-border/50 mx-2" />
-                                )}
-
-                                <div className={cn(
-                                    "flex flex-col gap-1 overflow-hidden transition-all duration-300",
-                                    !isCollapsed && !openSections[section.label] ? "max-h-0 opacity-0" : "max-h-[1000px] opacity-100"
-                                )}>
-                                    {section.items.map((item) => {
-                                        const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
-                                        return (
-                                            <div key={item.href} className="relative group">
-                                                <Link
-                                                    to={item.href}
-                                                    onClick={() => setMobileOpen(false)}
-                                                    className={cn(
-                                                        'relative flex items-center rounded-lg text-sm font-medium transition-all duration-200',
-                                                        isCollapsed
-                                                            ? 'h-10 w-10 justify-center mx-auto'
-                                                            : 'h-10 gap-3 px-3 mx-1',
-                                                        isActive
-                                                            ? 'bg-primary/10 text-primary font-semibold'
-                                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                                                    )}
-                                                >
-                                                    {isActive && (
-                                                        <span className={cn(
-                                                            "absolute bg-primary rounded-r-full shadow-[0_0_8px_hsl(var(--primary)/0.5)] transition-all",
-                                                            isCollapsed ? "left-0 top-2 bottom-2 w-1" : "left-[-4px] top-2 bottom-2 w-1"
-                                                        )} />
-                                                    )}
-                                                    <item.icon className={cn('shrink-0 transition-transform duration-200 group-hover:scale-110', isCollapsed ? 'h-5 w-5' : 'h-[18px] w-[18px]', isActive && 'text-primary')} />
-                                                    {!isCollapsed && <span className="truncate">{item.name}</span>}
-                                                </Link>
-
-                                                {/* Tooltip for collapsed state */}
-                                                {isCollapsed && (
-                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs font-medium rounded-md shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap border border-border">
-                                                        {item.name}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                        <Avatar name={displayName} src={user?.student?.image_path} size={34} shape="rounded" />
+                        {showLabels && (
+                            <div className="min-w-0 leading-[1.15]">
+                                <div className="truncate text-[12.5px] font-bold text-foreground">{displayName}</div>
+                                <div className="text-[11px] text-[color:var(--text-label)]">{roleLabel}</div>
                             </div>
-                        ))}
-                    </nav>
-                </div>
-
-                {!isCollapsed && (
-                    <div className="shrink-0 border-t border-border p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                {user?.username?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-medium text-foreground truncate max-w-[150px]">{user?.username}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user?.roles?.[0]?.name || 'User'}</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
-                )}
+                </div>
             </aside>
         </>
     );

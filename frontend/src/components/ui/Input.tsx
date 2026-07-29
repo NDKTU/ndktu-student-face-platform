@@ -70,7 +70,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
             {label && (
                 <label
                     htmlFor={inputId}
-                    className="mb-1.5 block text-sm font-medium text-foreground"
+                    className="mb-1.5 block text-[13px] font-semibold text-foreground"
                 >
                     {label}
                 </label>
@@ -88,12 +88,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
                     id={inputId}
                     type={inputType}
                     className={cn(
-                        'flex h-9 w-full rounded-xl border border-input/60 bg-transparent px-3 py-1 text-sm shadow-sm',
-                        'placeholder:text-muted-foreground',
-                        'transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'flex h-10 w-full rounded-[11px] border border-input bg-card px-3.5 py-1 text-sm text-foreground',
+                        'placeholder:text-[color:var(--text-label)]',
+                        'transition-[border-color,box-shadow]',
+                        'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/15',
                         'disabled:cursor-not-allowed disabled:opacity-50',
-                        error && 'border-destructive focus-visible:ring-destructive',
+                        error && 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/15',
                         leftAddon && 'pl-9',
                         (rightAddon || isPassword) && 'pr-9',
                         isNumber && 'pr-8 tabular-nums',

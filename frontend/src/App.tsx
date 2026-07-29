@@ -1,10 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { ThemeProvider } from '@/context/ThemeContext';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
 import Dashboard from '@/pages/Dashboard';
 import ProfilePage from '@/pages/ProfilePage';
+import RejaPage from '@/pages/RejaPage';
+import SettingsPage from '@/pages/SettingsPage';
 import UsersPage from '@/pages/UsersPage';
 import QuizzesPage from '@/pages/QuizzesPage';
 import ActiveQuizzesPage from '@/pages/ActiveQuizzesPage';
@@ -98,16 +99,17 @@ function App() {
   useGlobalErrorLogger();
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <Router>
-            <Routes>
+      <AuthProvider>
+        <Router>
+          <Routes>
             <Route path="/login" element={<Login />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<DashboardRedirect />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/reja" element={<RejaPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
 
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/users" element={<PermissionRoute permission="read:user"><UsersPage /></PermissionRoute>} />
@@ -148,10 +150,9 @@ function App() {
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Router>
-        </AuthProvider>
-      </ThemeProvider>
+          </Routes>
+        </Router>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
