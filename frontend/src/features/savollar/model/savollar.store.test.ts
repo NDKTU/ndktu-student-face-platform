@@ -14,7 +14,7 @@ const api = vi.mocked(await import('@/shared/api/savollar'));
 
 const store = () => useSavollarStore.getState();
 
-function q(id: number, subjectId = 'ts1', text = 'Savol?'): Question {
+function q(id: number, subjectId = 1, text = 'Savol?'): Question {
   return {
     id,
     subjectId,
@@ -32,14 +32,14 @@ function q(id: number, subjectId = 'ts1', text = 'Savol?'): Question {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useSavollarStore.setState({ questions: [], status: 'idle', error: null });
+  useSavollarStore.setState({ questions: [], subjectId: null, status: 'idle', error: null });
 });
 
 describe('savollar store — загрузка', () => {
   it('load() кладёт банк и переводит статус в ready', async () => {
     api.getQuestions.mockResolvedValueOnce([q(1), q(2)]);
 
-    await store().load();
+    await store().load(1);
 
     expect(store().questions).toHaveLength(2);
     expect(store().status).toBe('ready');
@@ -49,7 +49,7 @@ describe('savollar store — загрузка', () => {
   it('ошибка сети попадает в состояние, а не роняет стор', async () => {
     api.getQuestions.mockRejectedValueOnce(new Error('Network error'));
 
-    await store().load();
+    await store().load(1);
 
     expect(store().status).toBe('error');
     expect(store().error).toBe('Network error');
@@ -63,10 +63,11 @@ describe('savollar store — мутации', () => {
   });
 
   it('add ставит ответ сервера в конец списка', async () => {
-    api.createQuestion.mockResolvedValueOnce(q(2, 'ts1', 'Yangi'));
+    api.createQuestion.mockResolvedValueOnce(q(2, 1, 'Yangi'));
 
     await store().add({
-      subjectId: 'ts1',
+      subjectId: 1,
+      userId: 7,
       text: 'Yangi',
       correct: 'A',
       options: [
@@ -83,7 +84,13 @@ describe('savollar store — мутации', () => {
   it('update заменяет вопрос ответом сервера', async () => {
     api.updateQuestion.mockResolvedValueOnce({ ...q(1), text: 'O‘zgargan' });
 
-    await store().update(1, { text: 'O‘zgargan' });
+    await store().update(1, {
+      subjectId: 1,
+      userId: 7,
+      text: 'O‘zgargan',
+      correct: 'A',
+      options: [],
+    });
 
     expect(store().questions[0]!.text).toBe('O‘zgargan');
   });
@@ -101,7 +108,7 @@ describe('savollar store — мутации', () => {
     api.createQuestion.mockRejectedValueOnce(new Error('HTTP 500'));
 
     await expect(
-      store().add({ subjectId: 'ts1', text: 'X', correct: 'A', options: [] }),
+      store().add({ subjectId: 1, userId: 7, text: 'X', correct: 'A', options: [] }),
     ).rejects.toThrow('HTTP 500');
     expect(store().questions).toHaveLength(1);
   });

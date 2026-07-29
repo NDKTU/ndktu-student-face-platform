@@ -3,14 +3,15 @@ export type OptionLetter = 'A' | 'B' | 'C' | 'D';
 export interface QuestionOption {
   letter: OptionLetter;
   text: string;
+  /** Текст варианта — ссылка на загруженную картинку, а не подпись. */
   image: boolean;
   correct: boolean;
 }
 
 export interface Question {
   id: number;
-  /** id предмета преподавателя (ts1..ts4) — по нему группируется банк. */
-  subjectId: string;
+  /** Предмет, к которому относится вопрос. */
+  subjectId: number;
   text: string;
   correct: OptionLetter;
   hasImage: boolean;

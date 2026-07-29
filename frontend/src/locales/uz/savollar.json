@@ -36,5 +36,6 @@
   "confirmDelete": "Bu savol o'chiriladi. Bu amalni bekor qilib bo'lmaydi.",
   "validation": {
     "questionRequired": "Savol matnini kiriting"
-  }
+  },
+  "noSubjects": "Biriktirilgan fan yo'q"
 }

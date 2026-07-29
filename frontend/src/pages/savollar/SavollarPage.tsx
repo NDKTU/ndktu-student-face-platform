@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TEACHER_SUBJECTS } from '@/entities/question/mock/buildQuestions';
 import type { OptionLetter, Question } from '@/entities/question/model/types';
 import { useSavollarStore } from '@/features/savollar/model/savollar.store';
 import { useSavollar } from '@/features/savollar/lib/useSavollar';
+import { useSessionStore } from '@/features/auth/model/session.store';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
+import { getMySubjects, type AssignedSubject } from '@/shared/api/mening';
+import { getFanlar } from '@/shared/api/fanlar';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { Button } from '@/shared/ui/Button';
@@ -28,23 +31,45 @@ export function SavollarPage() {
   const { t } = useTranslation('savollar');
   const { t: tc } = useTranslation('common');
   const toast = useToast();
-  const { status, error, reload } = useSavollar();
+
+  // Предметы преподавателя. Администратор своих закреплений не имеет, поэтому
+  // для него берём весь каталог — иначе банк ему открыть не из чего.
+  const user = useSessionStore((s) => s.user);
+  const { isAdmin } = usePermissions();
+  const userId = user?.id ?? null;
+  const [subjects, setSubjects] = useState<AssignedSubject[]>([]);
+
+  useEffect(() => {
+    if (userId === null) return;
+    let alive = true;
+
+    const source = isAdmin
+      ? getFanlar().then((fans) => fans.map((f) => ({ id: f.id, name: f.fan })))
+      : getMySubjects(userId);
+
+    void source.then((items) => alive && setSubjects(items)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [userId, isAdmin]);
+
+  const [subjectId, setSubjectId] = useState<number | null>(null);
+  // Первый предмет выбирается сам: без выбранного предмета показывать нечего.
+  const currentSubjectId = subjectId ?? subjects[0]?.id ?? null;
+
+  const { status, error, reload } = useSavollar(currentSubjectId);
 
   const questions = useSavollarStore((s) => s.questions);
   const add = useSavollarStore((s) => s.add);
   const update = useSavollarStore((s) => s.update);
   const remove = useSavollarStore((s) => s.remove);
 
-  const [subjectId, setSubjectId] = useState<string>(TEACHER_SUBJECTS[0].id);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [confirm, setConfirm] = useState<{ id: number } | null>(null);
 
-  const subject = TEACHER_SUBJECTS.find((s) => s.id === subjectId) ?? TEACHER_SUBJECTS[0];
-  const rows = useMemo(
-    () => questions.filter((q) => q.subjectId === subject.id),
-    [questions, subject.id],
-  );
+  // Фильтровать по предмету здесь больше не нужно: банк и так запрошен по нему.
+  const rows = questions;
 
   function openAdd() {
     setModal({ mode: 'add', draft: EMPTY_QUESTION_DRAFT, images: NO_IMAGES });
@@ -66,19 +91,26 @@ export function SavollarPage() {
   }
 
   async function handleSave(draft: QuestionDraft) {
-    if (!modal) return;
-    // Флаги картинок сохраняем от исходного вопроса — форма их не редактирует.
-    const options = LETTERS.map((letter) => ({
-      letter,
-      text: draft.options[letter],
-      image: modal.images[letter],
-    }));
+    if (!modal || currentSubjectId === null || userId === null) return;
+
+    // «Картинка это или текст» сервер не хранит: он определяется по самой
+    // ссылке в тексте варианта. Поэтому здесь только текст.
+    const options = LETTERS.map((letter) => ({ letter, text: draft.options[letter] }));
+    const payload = {
+      subjectId: currentSubjectId,
+      // Автор вопроса. Бэкенд требует его явно и не подставляет из токена.
+      userId,
+      text: draft.text,
+      correct: draft.correct,
+      options,
+    };
+
     try {
       if (modal.mode === 'add') {
-        await add({ subjectId: subject.id, text: draft.text, correct: draft.correct, options });
+        await add(payload);
         toast(tc('created'));
       } else if (modal.id) {
-        await update(modal.id, { text: draft.text, correct: draft.correct, options });
+        await update(modal.id, payload);
         toast(tc('saved'));
       }
       setModal(null);
@@ -113,16 +145,17 @@ export function SavollarPage() {
                   {t('fanLabel')}
                 </span>
                 <select
-                  value={subjectId}
+                  value={currentSubjectId ?? ''}
                   onChange={(e) => {
-                    setSubjectId(e.target.value);
+                    setSubjectId(e.target.value === '' ? null : Number(e.target.value));
                     setExpandedId(null);
                   }}
                   className="h-[42px] min-w-[250px] cursor-pointer rounded-11 border border-line bg-surface px-3 text-14 font-semibold text-ink outline-none focus:border-brand focus:shadow-focus"
                 >
-                  {TEACHER_SUBJECTS.map((s) => (
+                  {subjects.length === 0 && <option value="">{t('noSubjects')}</option>}
+                  {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.fan}
+                      {s.name}
                     </option>
                   ))}
                 </select>

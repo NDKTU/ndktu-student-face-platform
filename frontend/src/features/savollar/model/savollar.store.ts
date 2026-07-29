@@ -6,9 +6,12 @@ export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 interface SavollarState {
   questions: Question[];
+  /** Предмет, банк которого сейчас загружен. */
+  subjectId: number | null;
   status: LoadStatus;
   error: string | null;
-  load: () => Promise<void>;
+  /** Банк запрашивается по предмету: всех вопросов сразу экрану не нужно. */
+  load: (subjectId: number) => Promise<void>;
   add: (body: api.QuestionCreatePayload) => Promise<void>;
   update: (id: number, body: api.QuestionUpdatePayload) => Promise<void>;
   remove: (id: number) => Promise<void>;
@@ -17,18 +20,20 @@ interface SavollarState {
 /** Текущий запрос банка, чтобы StrictMode не слал его дважды. */
 let inFlight: Promise<void> | null = null;
 
-export const useSavollarStore = create<SavollarState>()((set) => ({
+export const useSavollarStore = create<SavollarState>()((set, get) => ({
   questions: [],
+  subjectId: null,
   status: 'idle',
   error: null,
 
-  load: async () => {
-    if (inFlight) return inFlight;
+  load: async (subjectId) => {
+    // Смена предмета — это новый запрос, а не повтор текущего.
+    if (inFlight && get().subjectId === subjectId) return inFlight;
 
-    set({ status: 'loading', error: null });
+    set({ status: 'loading', error: null, subjectId });
     inFlight = (async () => {
       try {
-        set({ questions: await api.getQuestions(), status: 'ready' });
+        set({ questions: await api.getQuestions(subjectId), status: 'ready' });
       } catch (e) {
         set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       } finally {
