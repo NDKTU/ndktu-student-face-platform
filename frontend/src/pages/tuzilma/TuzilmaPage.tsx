@@ -36,7 +36,10 @@ type ModalState = { mode: 'add' | 'edit'; level: number; id?: number; draft: Ent
 export function TuzilmaPage() {
   const { t } = useTranslation('tuzilma');
   const { t: tc } = useTranslation('common');
-  const { canWrite } = usePermissions();
+  // Структуру правит тот, кому разрешено заводить факультеты: остальные
+  // ветки дерева требуют тех же прав, отдельной проверки на каждую не нужно.
+  const { has } = usePermissions();
+  const canWrite = has('create:faculty');
   const toast = useToast();
   const { status, error, reload } = useStructure();
 

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import emblem from '@/assets/ndktu-emblem.png';
 import { useSessionStore } from '@/features/auth/model/session.store';
@@ -12,31 +12,21 @@ const inputClass =
 export function LoginPage() {
   const { t } = useTranslation('auth');
   const signIn = useSessionStore((s) => s.signIn);
-  const signInAs = useSessionStore((s) => s.signInAs);
+  const logoutReason = useSessionStore((s) => s.logoutReason);
+  const clearLogoutReason = useSessionStore((s) => s.clearLogoutReason);
   const toast = useToast();
 
-  const [hemisLoading, setHemisLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
 
-  /**
-   * Настоящей интеграции с HEMIS нет: кнопка входит демо-студентом через
-   * dev-login. В проде эндпоинт выключен, и кнопка вернёт ошибку — это
-   * честнее, чем впускать без проверки, как было раньше.
-   */
-  async function handleHemis() {
-    if (hemisLoading) return;
-    setHemisLoading(true);
-
-    try {
-      await signInAs('talaba', 'hemis');
-      toast(t('hemis.success'));
-    } catch (error) {
-      setHemisLoading(false);
-      toast(error instanceof Error ? error.message : t('staff.failed'));
-    }
-  }
+  // Почему выкинуло — сказать нужно один раз. Иначе сообщение осталось бы
+  // висеть и после следующего неудачного входа, объясняя не то.
+  useEffect(() => {
+    if (!logoutReason) return;
+    toast(logoutReason === 'idle' ? t('reason.idle') : t('reason.session'));
+    clearLogoutReason();
+  }, [logoutReason, clearLogoutReason, toast, t]);
 
   async function handleStaff(event: FormEvent) {
     event.preventDefault();
@@ -69,32 +59,9 @@ export function LoginPage() {
             <div className="mt-[5px] text-13 text-ink-subtle">{t('tagline')}</div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void handleHemis()}
-            disabled={hemisLoading}
-            className="flex h-[54px] w-full cursor-pointer items-center justify-center gap-[11px] rounded-14 border-none bg-brand text-15 font-bold text-white shadow-login-cta hover:bg-brand-hover"
-          >
-            {hemisLoading ? (
-              <>
-                <span className="size-[19px] animate-spin-slow rounded-full border-[2.5px] border-white/40 border-t-white" />
-                {t('hemis.loading')}
-              </>
-            ) : (
-              <>
-                <ArrowIcon />
-                {t('hemis.button')}
-              </>
-            )}
-          </button>
-          <p className="mt-[11px] text-center text-12-5 text-ink-subtle">{t('hemis.hint')}</p>
-
-          <div className="my-[26px] mb-[22px] flex items-center gap-3">
-            <span className="h-px flex-1 bg-line" />
-            <span className="text-12 font-semibold text-line-bold">{t('divider')}</span>
-            <span className="h-px flex-1 bg-line" />
-          </div>
-
+          {/* Кнопка «Войти через HEMIS» здесь была, но настоящей интеграции за
+              ней не стояло — она входила демо-студентом. Студенческий вход
+              вернётся вместе с реальным `POST /hemis/login`. */}
           <div className="mb-3.5 text-12 font-bold tracking-[0.05em] text-ink-subtle uppercase">
             {t('staff.title')}
           </div>
@@ -158,22 +125,3 @@ export function LoginPage() {
   );
 }
 
-function ArrowIcon() {
-  return (
-    <svg
-      width="19"
-      height="19"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-      <path d="M10 17l5-5-5-5" />
-      <path d="M15 12H3" />
-    </svg>
-  );
-}

@@ -75,7 +75,8 @@ type ConfirmState =
 export function RejaPage() {
   const { t } = useTranslation('reja');
   const { t: tc } = useTranslation('common');
-  const { canWrite } = usePermissions();
+  const { has } = usePermissions();
+  const canWrite = has('create:curriculum');
   const toast = useToast();
   const { status, error, reload } = useStructure();
 

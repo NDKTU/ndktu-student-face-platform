@@ -1,75 +1,184 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionUser } from '@/shared/api/auth';
+import type { MeResponse } from '@/shared/api/auth';
+import { ApiError } from '@/shared/api/http';
+import { getToken } from '@/shared/lib/tokenStorage';
 import { useSessionStore } from './session.store';
 
 // Стор ходит в сеть — граница до бэкенда подменяется целиком.
 vi.mock('@/shared/api/auth', () => ({
   login: vi.fn(),
-  devLogin: vi.fn(),
   me: vi.fn(),
+  logout: vi.fn().mockResolvedValue(undefined),
+  changeCredentials: vi.fn(),
 }));
 
 const api = vi.mocked(await import('@/shared/api/auth'));
 
 const store = () => useSessionStore.getState();
 
-const TEACHER: SessionUser = {
-  id: 1,
-  login: 'oqituvchi',
-  role: 'oqituvchi',
-  displayName: 'Jasur Bozorov',
-  guruh: null,
-};
+function meResponse(over: Partial<MeResponse> = {}): MeResponse {
+  return {
+    id: 1,
+    username: 'j.bozorov',
+    roles: [
+      { id: 2, name: 'teacher', permissions: [{ id: 10, name: 'read:quiz' }] },
+    ],
+    employee: {
+      id: 5,
+      first_name: 'Jasur',
+      last_name: 'Bozorov',
+      third_name: '',
+      full_name: 'Bozorov Jasur',
+      phone_number: null,
+      image_url: null,
+      teacher: null,
+    },
+    student: null,
+    created_at: '2026-01-01T00:00:00+05:00',
+    updated_at: '2026-01-01T00:00:00+05:00',
+    ...over,
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  store().signOut();
+  localStorage.clear();
+  useSessionStore.setState({
+    status: 'anonymous',
+    user: null,
+    permissions: new Set(),
+    roleNames: [],
+    persona: 'staff',
+    logoutReason: null,
+  });
 });
 
 describe('session store', () => {
-  it('вход кладёт токен и владельца, роль берётся с сервера', async () => {
-    api.login.mockResolvedValueOnce({ token: 'jwt-123', user: TEACHER });
+  it('вход — это два запроса: токен, затем профиль под ним', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-123' });
+    api.me.mockResolvedValueOnce(meResponse());
 
-    await store().signIn('oqituvchi', 'parol');
+    await store().signIn('j.bozorov', 'parol');
 
-    expect(api.login).toHaveBeenCalledWith('oqituvchi', 'parol');
-    expect(store().loggedIn).toBe(true);
-    expect(store().token).toBe('jwt-123');
-    // Роль приходит с сервера, а не выбирается на клиенте, как было раньше.
-    expect(store().role).toBe('oqituvchi');
-    expect(store().user?.displayName).toBe('Jasur Bozorov');
+    expect(api.login).toHaveBeenCalledWith('j.bozorov', 'parol');
+    expect(api.me).toHaveBeenCalledOnce();
+    expect(store().status).toBe('authenticated');
+    // Токен обязан лежать до вызова /user/me, иначе тот ответил бы 401.
+    expect(getToken()).toBe('jwt-123');
+  });
+
+  it('права раскладываются в плоский набор из всех ролей', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-123' });
+    api.me.mockResolvedValueOnce(
+      meResponse({
+        roles: [
+          { id: 1, name: 'teacher', permissions: [{ id: 1, name: 'read:quiz' }] },
+          { id: 2, name: 'tutor', permissions: [{ id: 2, name: 'read:group' }] },
+        ],
+      }),
+    );
+
+    await store().signIn('j.bozorov', 'parol');
+
+    expect(store().roleNames).toEqual(['teacher', 'tutor']);
+    expect([...store().permissions].sort()).toEqual(['read:group', 'read:quiz']);
+  });
+
+  it('персона определяется по анкете, а не по названию роли', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-s' });
+    api.me.mockResolvedValueOnce(
+      meResponse({
+        employee: null,
+        student: {
+          id: 7,
+          first_name: 'Islom',
+          last_name: 'Abdullayev',
+          third_name: '',
+          full_name: 'Abdullayev Islom',
+          image_path: null,
+          group: { id: 3, name: 'DI-24-01' },
+          university: null,
+          specialty: null,
+          education_form: null,
+          education_type: null,
+          payment_form: null,
+          education_lang: null,
+          faculty: null,
+          level: null,
+          semester: null,
+          address: null,
+          avg_gpa: null,
+        },
+      }),
+    );
+
+    await store().signIn('talaba', 'parol');
+
+    expect(store().persona).toBe('student');
   });
 
   it('неверный пароль не создаёт сессию', async () => {
-    api.login.mockRejectedValueOnce(new Error("Login yoki parol noto'g'ri"));
+    api.login.mockRejectedValueOnce(new ApiError(401, "Login yoki parol noto'g'ri"));
 
-    await expect(store().signIn('oqituvchi', 'xato')).rejects.toThrow("Login yoki parol noto'g'ri");
-    expect(store().loggedIn).toBe(false);
-    expect(store().token).toBeNull();
+    await expect(store().signIn('j.bozorov', 'xato')).rejects.toThrow("Login yoki parol noto'g'ri");
+    expect(store().status).toBe('anonymous');
+    expect(getToken()).toBeNull();
   });
 
-  it('переключение персоны — это настоящий перевход с новым токеном', async () => {
-    api.devLogin.mockResolvedValueOnce({
-      token: 'jwt-student',
-      user: { ...TEACHER, login: 'talaba', role: 'talaba', guruh: 'DI-24-01' },
-    });
+  it('упавший /user/me не оставляет половину сессии', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-123' });
+    api.me.mockRejectedValueOnce(new ApiError(500, 'Server xatosi'));
 
-    await store().signInAs('talaba');
-
-    expect(api.devLogin).toHaveBeenCalledWith('talaba');
-    expect(store().token).toBe('jwt-student');
-    expect(store().role).toBe('talaba');
-    expect(store().user?.guruh).toBe('DI-24-01');
+    await expect(store().signIn('j.bozorov', 'parol')).rejects.toThrow('Server xatosi');
+    // Иначе интерфейс остался бы с токеном, но без прав — и без объяснения.
+    expect(store().status).toBe('anonymous');
+    expect(getToken()).toBeNull();
   });
 
-  it('выход стирает токен', async () => {
-    api.login.mockResolvedValueOnce({ token: 'jwt-123', user: TEACHER });
-    await store().signIn('oqituvchi', 'parol');
+  it('bootstrap без токена сразу отдаёт анонимную сессию', async () => {
+    useSessionStore.setState({ status: 'unknown' });
 
-    store().signOut();
+    await store().bootstrap();
 
-    expect(store().loggedIn).toBe(false);
-    expect(store().token).toBeNull();
+    expect(api.me).not.toHaveBeenCalled();
+    expect(store().status).toBe('anonymous');
+  });
+
+  it('bootstrap с токеном восстанавливает сессию', async () => {
+    localStorage.setItem('token', 'jwt-saved');
+    useSessionStore.setState({ status: 'unknown' });
+    api.me.mockResolvedValueOnce(meResponse());
+
+    await store().bootstrap();
+
+    expect(store().status).toBe('authenticated');
+  });
+
+  it('обрыв сети при обновлении профиля не разлогинивает', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-123' });
+    api.me.mockResolvedValueOnce(meResponse());
+    await store().signIn('j.bozorov', 'parol');
+
+    api.me.mockRejectedValueOnce(new ApiError(0, 'Network error'));
+    await store().refreshMe();
+
+    // Сессия на сервере жива, пользователь ни в чём не виноват.
+    expect(store().status).toBe('authenticated');
+    expect(getToken()).toBe('jwt-123');
+  });
+
+  it('выход стирает токен и запоминает причину', async () => {
+    api.login.mockResolvedValueOnce({ type: 'Bearer', access_token: 'jwt-123' });
+    api.me.mockResolvedValueOnce(meResponse());
+    await store().signIn('j.bozorov', 'parol');
+
+    store().signOut('idle');
+
+    expect(api.logout).toHaveBeenCalledOnce();
+    expect(store().status).toBe('anonymous');
     expect(store().user).toBeNull();
+    expect(store().permissions.size).toBe(0);
+    expect(getToken()).toBeNull();
+    expect(store().logoutReason).toBe('idle');
   });
 });

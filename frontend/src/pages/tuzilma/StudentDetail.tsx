@@ -17,7 +17,7 @@ interface StudentDetailProps {
 export function StudentDetail({ student, group, speciality, faculty }: StudentDetailProps) {
   const { t } = useTranslation('tuzilma');
   const { t: tc } = useTranslation('common');
-  const { canViewSensitive } = usePermissions();
+  const { canViewStudentSensitive: canViewSensitive } = usePermissions();
   const [tab, setTab] = useState<'general' | 'sensitive'>('general');
 
   // Тот же источник, что и в реестре «Foydalanuvchilar»: анкета живёт в БД.

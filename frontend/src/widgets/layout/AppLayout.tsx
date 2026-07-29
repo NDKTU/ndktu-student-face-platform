@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
-import { PersonaSwitcher } from '@/features/persona/PersonaSwitcher';
+import { useIdleTimeout } from '@/features/auth/lib/useIdleTimeout';
 
 /** Брейкпоинт мобильной раскладки — тот же, что в прототипе. */
 const MOBILE_QUERY = '(max-width: 820px)';
@@ -11,6 +11,8 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useMediaQuery(MOBILE_QUERY);
+
+  useIdleTimeout();
 
   // На мобильном сайдбар — оверлей, кнопка в шапке открывает и закрывает его;
   // на десктопе та же кнопка сворачивает его до иконок.
@@ -42,8 +44,6 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-
-      <PersonaSwitcher />
     </div>
   );
 }

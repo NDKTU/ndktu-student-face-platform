@@ -2,11 +2,8 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import emblem from '@/assets/ndktu-emblem.png';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
-import type { NavKey } from '@/entities/access/model/roles';
+import type { NavItem } from '@/entities/access/model/nav';
 import { NavIcon } from './NavIcon';
-
-/** Разделы нижней группы меню — выводятся под заголовком «Boshqaruv». */
-const MANAGEMENT_KEYS: readonly NavKey[] = ['foydalanuvchilar', 'rollar', 'sozlamalar'];
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -18,8 +15,8 @@ export function AppSidebar({ collapsed, mobileOpen, onNavigate }: AppSidebarProp
   const { t } = useTranslation('nav');
   const { nav } = usePermissions();
 
-  const main = nav.filter((key) => !MANAGEMENT_KEYS.includes(key));
-  const management = nav.filter((key) => MANAGEMENT_KEYS.includes(key));
+  const main = nav.filter((item) => item.section === 'asosiy');
+  const management = nav.filter((item) => item.section === 'boshqaruv');
 
   return (
     <aside
@@ -40,15 +37,15 @@ export function AppSidebar({ collapsed, mobileOpen, onNavigate }: AppSidebarProp
 
       <nav className="flex flex-1 flex-col gap-[3px] overflow-x-hidden overflow-y-auto px-3 py-4">
         {!collapsed && <SectionLabel>{t('section.asosiy')}</SectionLabel>}
-        {main.map((key) => (
-          <SidebarLink key={key} navKey={key} collapsed={collapsed} onNavigate={onNavigate} />
+        {main.map((item) => (
+          <SidebarLink key={item.key} item={item} collapsed={collapsed} onNavigate={onNavigate} />
         ))}
 
         {management.length > 0 && (
           <>
             {!collapsed && <SectionLabel>{t('section.boshqaruv')}</SectionLabel>}
-            {management.map((key) => (
-              <SidebarLink key={key} navKey={key} collapsed={collapsed} onNavigate={onNavigate} />
+            {management.map((item) => (
+              <SidebarLink key={item.key} item={item} collapsed={collapsed} onNavigate={onNavigate} />
             ))}
           </>
         )}
@@ -66,18 +63,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 interface SidebarLinkProps {
-  navKey: NavKey;
+  item: NavItem;
   collapsed: boolean;
   onNavigate: () => void;
 }
 
-function SidebarLink({ navKey, collapsed, onNavigate }: SidebarLinkProps) {
+function SidebarLink({ item, collapsed, onNavigate }: SidebarLinkProps) {
   const { t } = useTranslation('nav');
-  const label = t(navKey);
+  const label = t(item.key);
 
   return (
     <NavLink
-      to={`/${navKey}`}
+      to={item.path}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       className={({ isActive }) =>
@@ -92,7 +89,7 @@ function SidebarLink({ navKey, collapsed, onNavigate }: SidebarLinkProps) {
       {({ isActive }) => (
         <>
           <span className={`grid flex-none place-items-center ${isActive ? 'text-brand' : 'text-ink-faint'}`}>
-            <NavIcon navKey={navKey} />
+            <NavIcon navKey={item.key} />
           </span>
           {!collapsed && <span className="whitespace-nowrap">{label}</span>}
         </>

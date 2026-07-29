@@ -2,23 +2,20 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
-import { PERSONAS } from '@/entities/access/model/roles';
+import { useCurrentUser } from '@/features/auth/lib/useCurrentUser';
 import { useSessionStore } from '@/features/auth/model/session.store';
-import { initials } from '@/entities/university/mock/rng';
 import { usePopover } from '@/shared/ui/popover.store';
 
 export function AvatarMenu() {
   const { t } = useTranslation('common');
   const { t: ta } = useTranslation('auth');
-  const { role, roleColor, canAccess } = usePermissions();
+  const { canAccess } = usePermissions();
+  const me = useCurrentUser();
   const signOut = useSessionStore((s) => s.signOut);
   const navigate = useNavigate();
 
   const { open, toggle, close } = usePopover('avatar');
   const containerRef = useRef<HTMLDivElement>(null);
-  // Имя — настоящего владельца токена; подпись под ним — название его роли.
-  const persona = PERSONAS[role];
-  const userName = useSessionStore((s) => s.user?.displayName) ?? persona.user;
 
   useEffect(() => {
     if (!open) return;
@@ -44,13 +41,13 @@ export function AvatarMenu() {
       >
         <span
           className="grid size-8 flex-none place-items-center rounded-full text-12-5 font-bold text-white"
-          style={{ background: roleColor }}
+          style={{ background: me.roleColor }}
         >
-          {initials(userName)}
+          {me.initials}
         </span>
         <span className="hdr-user-text text-left leading-[1.1]">
-          <span className="block text-13 font-bold text-ink">{userName}</span>
-          <span className="block text-11 text-ink-subtle">{persona.title}</span>
+          <span className="block text-13 font-bold text-ink">{me.displayName}</span>
+          <span className="block text-11 text-ink-subtle">{me.roleLabel}</span>
         </span>
         <ChevronIcon />
       </button>
@@ -60,13 +57,13 @@ export function AvatarMenu() {
           <div className="flex items-center gap-[11px] border-b border-surface-sunken px-4 py-[13px]">
             <span
               className="grid size-[34px] flex-none place-items-center rounded-9 text-12 font-bold text-white"
-              style={{ background: roleColor }}
+              style={{ background: me.roleColor }}
             >
-              {initials(userName)}
+              {me.initials}
             </span>
             <span className="min-w-0 leading-[1.15]">
-              <span className="block truncate text-12-5 font-bold text-ink">{userName}</span>
-              <span className="block text-11 text-ink-subtle">{persona.title}</span>
+              <span className="block truncate text-12-5 font-bold text-ink">{me.displayName}</span>
+              <span className="block text-11 text-ink-subtle">{me.roleLabel}</span>
             </span>
           </div>
 

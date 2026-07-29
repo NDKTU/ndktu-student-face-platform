@@ -1,20 +1,29 @@
 {
   "title": "Profil",
-  "contact": "Aloqa maʼlumotlari",
   "details": "Maʼlumotlar",
-  "email": "Email",
+  "username": "Login",
   "phone": "Telefon",
-  "edit": "Tahrirlash",
-  "saved": "Profil maʼlumotlari yangilandi",
+  "kafedra": "Kafedra",
+  "group": "Guruh",
+  "faculty": "Fakultet",
+  "specialty": "Mutaxassislik",
+  "level": "Kurs",
+  "semester": "Semestr",
+  "educationForm": "Taʼlim shakli",
+  "paymentForm": "Toʻlov shakli",
+  "gpa": "Oʻrtacha ball",
   "password": {
     "title": "Parolni oʻzgartirish",
     "old": "Joriy parol",
     "new": "Yangi parol",
     "repeat": "Yangi parolni takrorlang",
     "submit": "Parolni oʻzgartirish",
+    "submitting": "Saqlanmoqda...",
     "empty": "Barcha maydonlarni toʻldiring",
     "mismatch": "Yangi parollar mos kelmadi",
     "tooShort": "Parol kamida 6 belgidan iborat boʻlsin",
-    "changed": "Parol muvaffaqiyatli oʻzgartirildi"
+    "changed": "Parol oʻzgartirildi — qaytadan kiring",
+    "failed": "Parolni oʻzgartirib boʻlmadi",
+    "reloginHint": "Parol oʻzgargach sessiya yakunlanadi va qaytadan kirish soʻraladi"
   }
 }

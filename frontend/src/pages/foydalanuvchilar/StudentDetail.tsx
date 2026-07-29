@@ -13,7 +13,7 @@ type Tab = 'umumiy' | 'maxfiy';
 export function StudentDetail({ student }: { student: StudentRow }) {
   const { t } = useTranslation('talabalar');
   const { t: tc } = useTranslation('common');
-  const { canViewSensitive } = usePermissions();
+  const { canViewStudentSensitive: canViewSensitive } = usePermissions();
   const [tab, setTab] = useState<Tab>('umumiy');
 
   // Анкета приезжает с сервера: раньше она считалась здесь же из хэша sid.

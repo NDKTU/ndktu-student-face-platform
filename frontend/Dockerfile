@@ -3,7 +3,9 @@ FROM node:24-alpine AS build
 
 WORKDIR /app
 
-ARG VITE_API_URL
+# Значения по умолчанию — те же, что зашиты в коде: за nginx оба адреса
+# относительные. Указывать их снаружи нужно только при нестандартной схеме.
+ARG VITE_API_URL=/api
 ARG VITE_FACE_DETECTION_SERVICE_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_FACE_DETECTION_SERVICE_URL=$VITE_FACE_DETECTION_SERVICE_URL

@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from '@/pages/login/LoginPage';
 import { RequireAccess } from '@/entities/access/ui/RequireAccess';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
 import type { NavKey } from '@/entities/access/model/roles';
 import { useSessionStore } from '@/features/auth/model/session.store';
+import { useSessionSync } from '@/features/auth/lib/useSessionSync';
 import { Toast } from '@/shared/ui/Toast';
 import { AppLayout } from '@/widgets/layout/AppLayout';
 import { TuzilmaPage } from '@/pages/tuzilma/TuzilmaPage';
@@ -27,27 +29,57 @@ import { TeacherHome } from '@/pages/home/TeacherHome';
 import { PlaceholderPage } from '@/pages/placeholder/PlaceholderPage';
 
 export function App() {
-  const loggedIn = useSessionStore((s) => s.loggedIn);
+  const status = useSessionStore((s) => s.status);
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+
+  useSessionSync();
+
+  // Токен лежит в localStorage, а кто им владеет — знает только сервер.
+  // Пока `/user/me` не ответил, показывать нечего: и приложение, и экран
+  // входа были бы одинаково неверны.
+  useEffect(() => {
+    void bootstrap();
+  }, [bootstrap]);
 
   return (
     <BrowserRouter>
-      {loggedIn ? <AuthenticatedRoutes /> : <LoginPage />}
+      {status === 'unknown' ? (
+        <Splash />
+      ) : status === 'authenticated' ? (
+        <AuthenticatedRoutes />
+      ) : (
+        <LoginPage />
+      )}
       <Toast />
     </BrowserRouter>
   );
 }
 
+function Splash() {
+  return (
+    <div className="grid h-screen place-items-center bg-canvas">
+      <span className="size-8 animate-spin-slow rounded-full border-[3px] border-line border-t-brand" />
+    </div>
+  );
+}
+
 /**
- * Bosh sahifa зависит от роли: у преподавателя и студента — своя домашняя,
- * у управляющих ролей — административный дашборд.
+ * Bosh sahifa зависит от того, кто вошёл: у студента и преподавателя — своя
+ * домашняя, у управляющих ролей — административный дашборд.
  */
 function AuthenticatedRoutes() {
-  const role = useSessionStore((s) => s.role);
+  const { persona } = usePermissions();
+  // Преподаватель — это запись в `teachers`, а не право или название роли.
+  // У администратора право `create:quiz` тоже есть, но домашняя страница
+  // преподавателя ему нечем наполниться: ни своих предметов, ни своих групп.
+  const isTeacher = useSessionStore((s) => s.user?.employee?.teacher != null);
+
   const home =
-    role === 'talaba' ? <StudentHome /> : role === 'oqituvchi' ? <TeacherHome /> : <DashboardPage />;
-  // Testlar: у преподавателя — свои тесты + создание; у управляющих ролей —
-  // список всех тестов с аналитикой (буилдтестдетейл).
-  const testlar = role === 'oqituvchi' ? <TeacherTestlarPage /> : <AdminTestlarPage />;
+    persona === 'student' ? <StudentHome /> : isTeacher ? <TeacherHome /> : <DashboardPage />;
+
+  // Testlar: преподаватель ведёт свои тесты и конструктор, управляющие роли —
+  // общий список с аналитикой.
+  const testlar = isTeacher ? <TeacherTestlarPage /> : <AdminTestlarPage />;
 
   // Раздел -> путь -> страница. Гард навешивается на все разом, чтобы новый
   // раздел нельзя было добавить, забыв про проверку доступа.

@@ -1,43 +1,51 @@
-import { describe, expect, it } from 'vitest';
-import {
-  EMPLOYEE_SENSITIVE_ROLES,
-  ROLES,
-  SENSITIVE_DATA_ROLES,
-  type Role,
-} from '../model/roles';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { usePermissions } from './usePermissions';
+import { useSessionStore } from '@/features/auth/model/session.store';
+
+function withPermissions(names: string[], roleNames: string[] = ['dekan']) {
+  useSessionStore.setState({
+    permissions: new Set(names),
+    roleNames,
+    persona: 'staff',
+  });
+  return renderHook(() => usePermissions()).result.current;
+}
 
 /**
- * В системе два разных правила доступа к персональным данным, и их
- * нельзя сводить к одному:
+ * Персональные данные студента и сотрудника закрыты двумя разными правами, и
+ * сводить их к одному нельзя: тот, кому положено видеть анкету студента, не
+ * обязан видеть паспорт и ЖШШИР сотрудника.
  *
- *   студент  — видят super_admin и admin (SENSITIVE_DATA_ROLES);
- *   сотрудник — видит только super_admin.
- *
- * Прототип задаёт именно так. Если кто-то «унифицирует» правила,
- * админ получит доступ к паспортам и ЖШШИР сотрудников.
+ * Раньше это было зашито двумя списками ролей. Теперь права выдаются на экране
+ * «Rollar» по отдельности — проверка здесь ровно о том, что они независимы.
  */
 describe('доступ к персональным данным', () => {
-  it('карточку студента открывают super_admin и admin', () => {
-    expect(ROLES.filter((r) => SENSITIVE_DATA_ROLES.includes(r))).toEqual([
-      'super_admin',
-      'admin',
-    ]);
+  beforeEach(() => {
+    useSessionStore.setState({ permissions: new Set(), roleNames: [], persona: 'staff' });
   });
 
-  it('карточку сотрудника открывает только super_admin', () => {
-    expect(ROLES.filter((r) => EMPLOYEE_SENSITIVE_ROLES.includes(r))).toEqual(['super_admin']);
+  it('без прав не видно ни ту, ни другую анкету', () => {
+    const p = withPermissions([]);
+    expect(p.canViewStudentSensitive).toBe(false);
+    expect(p.canViewEmployeeSensitive).toBe(false);
   });
 
-  it('правила не совпадают — admin видит студента, но не сотрудника', () => {
-    expect(SENSITIVE_DATA_ROLES).toContain('admin');
-    expect(EMPLOYEE_SENSITIVE_ROLES).not.toContain('admin');
+  it('право на студента не открывает карточку сотрудника', () => {
+    const p = withPermissions(['read:student_sensitive']);
+    expect(p.canViewStudentSensitive).toBe(true);
+    expect(p.canViewEmployeeSensitive).toBe(false);
   });
 
-  it('ни одна из остальных ролей не видит персональных данных', () => {
-    const others: Role[] = ['dekan', 'kafedra_mudiri', 'oqituvchi', 'talaba'];
-    others.forEach((role) => {
-      expect(SENSITIVE_DATA_ROLES, role).not.toContain(role);
-      expect(EMPLOYEE_SENSITIVE_ROLES, role).not.toContain(role);
-    });
+  it('право на сотрудника не открывает карточку студента', () => {
+    const p = withPermissions(['read:employee_sensitive']);
+    expect(p.canViewEmployeeSensitive).toBe(true);
+    expect(p.canViewStudentSensitive).toBe(false);
+  });
+
+  it('Admin видит обе — сервер его тоже пропускает мимо проверок', () => {
+    const p = withPermissions([], ['Admin']);
+    expect(p.canViewStudentSensitive).toBe(true);
+    expect(p.canViewEmployeeSensitive).toBe(true);
   });
 });

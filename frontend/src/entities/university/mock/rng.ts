@@ -111,15 +111,9 @@ export function hashStr(value: string): number {
   return h >>> 0;
 }
 
-/** «Karimov Aziz» → «KA». Берёт первые буквы двух первых значимых слов. */
-export function initials(name: string): string {
-  return (name || '')
-    .split(/\s+/)
-    .filter((w) => w.length > 1)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join('');
-}
+// Не генератор, а помощник отображения: живёт в shared и переживёт удаление
+// моков. Реэкспорт — чтобы не править разом три десятка импортов.
+export { initials } from '@/shared/lib/initials';
 
 /** Транслит для логинов: «O'ktam» → «oktam». */
 export function translit(value: string): string {

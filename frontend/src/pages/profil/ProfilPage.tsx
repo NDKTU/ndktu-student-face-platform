@@ -1,10 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePermissions } from '@/entities/access/lib/usePermissions';
-import { PERSONAS } from '@/entities/access/model/roles';
-import { PROFILES } from '@/entities/access/model/profile';
+import { useCurrentUser } from '@/features/auth/lib/useCurrentUser';
 import { useSessionStore } from '@/features/auth/model/session.store';
-import { initials } from '@/entities/university/mock/rng';
+import { changeCredentials } from '@/shared/api/auth';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { Button } from '@/shared/ui/Button';
 import { modalInputClass } from '@/shared/ui/Modal';
@@ -14,36 +12,45 @@ const MIN_PASSWORD_LENGTH = 6;
 
 export function ProfilPage() {
   const { t } = useTranslation('profil');
-  const { t: tc } = useTranslation('common');
-  const { role, roleColor } = usePermissions();
+  const me = useCurrentUser();
+  const user = useSessionStore((s) => s.user);
+  const signOut = useSessionStore((s) => s.signOut);
   const toast = useToast();
 
-  const persona = PERSONAS[role];
-  const profile = PROFILES[role];
-  // Имя настоящего владельца токена; остальная анкета пока демонстрационная.
-  const userName = useSessionStore((s) => s.user?.displayName) ?? persona.user;
-
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ email: profile.email, phone: profile.phone });
-  const [contact, setContact] = useState({ email: profile.email, phone: profile.phone });
   const [password, setPassword] = useState({ old: '', next: '', repeat: '' });
+  const [busy, setBusy] = useState(false);
 
-  // Смена персоны меняет и профиль — незакоммиченное редактирование сбрасываем.
-  const [shownRole, setShownRole] = useState(role);
-  if (shownRole !== role) {
-    setShownRole(role);
-    setEditing(false);
-    setContact({ email: profile.email, phone: profile.phone });
-    setDraft({ email: profile.email, phone: profile.phone });
-  }
+  // Анкета — то, что отдал `/user/me`. Пустые поля не показываем: строка
+  // «Kafedra — —» ничего не сообщает, а место занимает.
+  const employee = user?.employee ?? null;
+  const student = user?.student ?? null;
+  const org = employee?.teacher?.kafedra?.name ?? student?.faculty ?? '';
 
-  function saveContact() {
-    setContact(draft);
-    setEditing(false);
-    toast(t('saved'));
-  }
+  const rows = (
+    [
+      [t('username'), me.username],
+      ...(employee
+        ? [
+            [t('phone'), employee.phone_number ?? ''],
+            [t('kafedra'), employee.teacher?.kafedra?.name ?? ''],
+          ]
+        : []),
+      ...(student
+        ? [
+            [t('group'), student.group?.name ?? ''],
+            [t('faculty'), student.faculty ?? ''],
+            [t('specialty'), student.specialty ?? ''],
+            [t('level'), student.level ?? ''],
+            [t('semester'), student.semester ?? ''],
+            [t('educationForm'), student.education_form ?? ''],
+            [t('paymentForm'), student.payment_form ?? ''],
+            [t('gpa'), student.avg_gpa === null ? '' : String(student.avg_gpa)],
+          ]
+        : []),
+    ] as [string, string][]
+  ).filter(([, value]) => value !== '');
 
-  function changePassword(event: FormEvent) {
+  async function changePassword(event: FormEvent) {
     event.preventDefault();
     if (!password.old || !password.next || !password.repeat) {
       toast(t('password.empty'));
@@ -57,8 +64,21 @@ export function ProfilPage() {
       toast(t('password.tooShort'));
       return;
     }
-    setPassword({ old: '', next: '', repeat: '' });
-    toast(t('password.changed'));
+
+    setBusy(true);
+    try {
+      await changeCredentials({ current_password: password.old, password: password.next });
+      setPassword({ old: '', next: '', repeat: '' });
+      toast(t('password.changed'));
+      // Бэкенд удаляет `jti` из Redis при смене пароля — сессия уже мертва, и
+      // следующий же запрос вернул бы 401. Выходим сами, пока можем объяснить
+      // причину.
+      signOut();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('password.failed'));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -70,17 +90,17 @@ export function ProfilPage() {
           <div className="flex flex-wrap items-start gap-[18px]">
             <div
               className="grid size-[58px] flex-none place-items-center rounded-15 text-18 font-extrabold text-white"
-              style={{ background: roleColor }}
+              style={{ background: me.roleColor }}
               aria-hidden="true"
             >
-              {initials(userName)}
+              {me.initials}
             </div>
             <div className="min-w-[220px] flex-1">
               <h1 className="m-0 text-23 leading-[1.15] font-extrabold tracking-[-0.02em] text-ink">
-                {userName}
+                {me.displayName}
               </h1>
               <div className="mt-1.5 text-13-5 text-ink-subtle">
-                {persona.title} · {profile.org}
+                {[me.roleLabel, org].filter(Boolean).join(' · ')}
               </div>
             </div>
           </div>
@@ -88,65 +108,13 @@ export function ProfilPage() {
 
         <div className="grid items-start gap-[18px] lg:grid-cols-2">
           <section className="rounded-18 border border-line bg-surface p-6 shadow-card">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="m-0 text-16 font-bold text-ink">{t('contact')}</h2>
-              {!editing && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraft(contact);
-                    setEditing(true);
-                  }}
-                  className="cursor-pointer border-none bg-transparent p-0 text-12-5 font-bold text-brand hover:underline"
-                >
-                  {t('edit')}
-                </button>
-              )}
-            </div>
-
-            {editing ? (
-              <div className="flex flex-col gap-3.5">
-                <label className="block">
-                  <span className="mb-1.5 block text-12-5 font-semibold text-ink-muted">
-                    {t('email')}
-                  </span>
-                  <input
-                    type="email"
-                    value={draft.email}
-                    onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
-                    className={modalInputClass}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-12-5 font-semibold text-ink-muted">
-                    {t('phone')}
-                  </span>
-                  <input
-                    value={draft.phone}
-                    onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
-                    className={modalInputClass}
-                  />
-                </label>
-                <div className="flex justify-end gap-2.5">
-                  <Button variant="secondary" onClick={() => setEditing(false)}>
-                    {tc('cancel')}
-                  </Button>
-                  <Button onClick={saveContact}>{tc('save')}</Button>
-                </div>
-              </div>
-            ) : (
-              <Rows rows={[[t('email'), contact.email], [t('phone'), contact.phone]]} />
-            )}
-          </section>
-
-          <section className="rounded-18 border border-line bg-surface p-6 shadow-card">
             <h2 className="mt-0 mb-4 text-16 font-bold text-ink">{t('details')}</h2>
-            <Rows rows={profile.rows} />
+            <Rows rows={rows} />
           </section>
 
           <section className="rounded-18 border border-line bg-surface p-6 shadow-card">
             <h2 className="mt-0 mb-4 text-16 font-bold text-ink">{t('password.title')}</h2>
-            <form onSubmit={changePassword} className="flex flex-col gap-3.5">
+            <form onSubmit={(e) => void changePassword(e)} className="flex flex-col gap-3.5">
               {(
                 [
                   ['old', t('password.old')],
@@ -167,8 +135,11 @@ export function ProfilPage() {
                   />
                 </label>
               ))}
+              <p className="m-0 text-12 text-ink-subtle">{t('password.reloginHint')}</p>
               <div className="flex justify-end">
-                <Button type="submit">{t('password.submit')}</Button>
+                <Button type="submit" disabled={busy}>
+                  {busy ? t('password.submitting') : t('password.submit')}
+                </Button>
               </div>
             </form>
           </section>

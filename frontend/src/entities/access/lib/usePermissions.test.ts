@@ -2,56 +2,72 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { usePermissions } from './usePermissions';
 import { useSessionStore } from '@/features/auth/model/session.store';
-import { ROLES, type Role } from '../model/roles';
+import type { Persona } from '@/features/auth/model/session.store';
+import type { NavKey } from '../model/roles';
 
-function asRole(role: Role) {
-  useSessionStore.setState({ role });
+function session(permissions: string[], roleNames: string[] = [], persona: Persona = 'staff') {
+  useSessionStore.setState({ permissions: new Set(permissions), roleNames, persona });
   return renderHook(() => usePermissions()).result.current;
 }
 
+const keys = (nav: readonly { key: NavKey }[]) => nav.map((item) => item.key);
+
 describe('usePermissions', () => {
   beforeEach(() => {
-    useSessionStore.setState({ role: 'super_admin' });
+    useSessionStore.setState({ permissions: new Set(), roleNames: [], persona: 'staff' });
   });
 
-  it('super_admin видит все одиннадцать разделов', () => {
-    expect(asRole('super_admin').nav).toHaveLength(11);
+  it('без прав остаются только разделы, которые ничего не требуют', () => {
+    expect(keys(session([]).nav)).toEqual(['bosh', 'sozlamalar']);
   });
 
-  it('talaba не видит административных разделов', () => {
-    const { nav } = asRole('talaba');
-    expect(nav).toEqual(['bosh', 'guruhim', 'fanlarim', 'stestlar', 'svazlar']);
-    expect(nav).not.toContain('foydalanuvchilar');
-    expect(nav).not.toContain('rollar');
+  it('раздел появляется вместе с правом на чтение его сущности', () => {
+    expect(keys(session(['read:subject']).nav)).toContain('fanlar');
+    expect(keys(session([]).nav)).not.toContain('fanlar');
   });
 
-  it('право на запись есть у четырёх управляющих ролей', () => {
-    const writers = ROLES.filter((role) => asRole(role).canWrite);
-    expect(writers).toEqual(['super_admin', 'admin', 'dekan', 'kafedra_mudiri']);
+  it('«Foydalanuvchilar» открывает любое из трёх прав, не все сразу', () => {
+    expect(keys(session(['read:employee']).nav)).toContain('foydalanuvchilar');
+    expect(keys(session(['read:student']).nav)).toContain('foydalanuvchilar');
   });
 
-  it('персональные данные студента видят только super_admin и admin', () => {
-    const allowed = ROLES.filter((role) => asRole(role).canViewSensitive);
-    expect(allowed).toEqual(['super_admin', 'admin']);
+  it('Admin видит всё: сервер пропускает эту роль мимо проверок', () => {
+    const admin = session([], ['Admin']);
+    expect(admin.isAdmin).toBe(true);
+    expect(admin.has('read:faculty')).toBe(true);
+    expect(keys(admin.nav)).toContain('rollar');
   });
 
-  it('canAccess закрывает чужой раздел и открывает общий', () => {
-    const talaba = asRole('talaba');
-    expect(talaba.canAccess('rollar')).toBe(false);
-    expect(talaba.canAccess('guruhim')).toBe(true);
-    // Профиль и уведомления доступны всем, хотя в меню их нет.
-    expect(talaba.canAccess('profil')).toBe(true);
-    expect(talaba.canAccess('bildirishnomalar')).toBe(true);
+  it('персона важнее прав: студенческие разделы сотруднику не показываются', () => {
+    // У Admin есть всё, но сдавать тесты ему негде — это экран студента.
+    const admin = session([], ['Admin'], 'staff');
+    expect(keys(admin.nav)).not.toContain('stestlar');
+    expect(keys(admin.nav)).toContain('testlar');
   });
 
-  it('матрица прав: удаление в LMS только у super_admin и admin', () => {
-    const canDelete = ROLES.filter((role) => asRole(role).can('lms:delete'));
-    expect(canDelete).toEqual(['super_admin', 'admin']);
+  it('…и наоборот: студент не получает разделов персонала', () => {
+    const student = session(['quiz_process:start_quiz', 'read:quiz'], ['student'], 'student');
+    expect(keys(student.nav)).toContain('stestlar');
+    expect(keys(student.nav)).not.toContain('testlar');
   });
 
-  it('у talaba в LMS только чтение', () => {
-    const talaba = asRole('talaba');
-    expect(talaba.can('lms:read')).toBe(true);
-    expect(talaba.can('lms:write')).toBe(false);
+  it('canAccess закрывает раздел без права и открывает общий', () => {
+    const student = session(['quiz_process:start_quiz'], ['student'], 'student');
+    expect(student.canAccess('rollar')).toBe(false);
+    expect(student.canAccess('stestlar')).toBe(true);
+    // Профиль есть у всех, хотя в меню он и не выводится.
+    expect(student.canAccess('profil')).toBe(true);
+    expect(keys(student.nav)).not.toContain('profil');
+  });
+
+  it('«Reja» ждёт своё право с бэкенда и до тех пор не показывается', () => {
+    expect(keys(session(['read:faculty']).nav)).not.toContain('reja');
+    expect(keys(session(['read:curriculum']).nav)).toContain('reja');
+  });
+
+  it('hasAny срабатывает по любому совпадению', () => {
+    const p = session(['read:quiz']);
+    expect(p.hasAny('read:course', 'read:quiz')).toBe(true);
+    expect(p.hasAny('read:course', 'read:role')).toBe(false);
   });
 });

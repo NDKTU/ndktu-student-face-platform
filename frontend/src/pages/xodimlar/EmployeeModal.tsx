@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSessionStore } from '@/features/auth/model/session.store';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
 import type { Employee, EmployeeDraft, EmployeeStatus } from '@/entities/employee/model/types';
 import type { Role } from '@/entities/access/model/roles';
 import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
@@ -29,7 +29,7 @@ export function EmployeeModal({ mode, initial, units, roles, onSave, onCancel }:
   const { t: tc } = useTranslation('common');
   const toast = useToast();
 
-  const canEditSensitive = useSessionStore((s) => s.role) === 'super_admin';
+  const canEditSensitive = usePermissions().canViewEmployeeSensitive;
   const [draft, setDraft] = useState<EmployeeDraft>(initial);
 
   function set<K extends keyof EmployeeDraft>(key: K, value: EmployeeDraft[K]) {

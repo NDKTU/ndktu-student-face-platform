@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import emblem from '@/assets/ndktu-emblem.png';
-import { NotificationsMenu } from '@/features/notifications/NotificationsMenu';
 import { AvatarMenu } from '@/features/auth/AvatarMenu';
 
 interface AppHeaderProps {
@@ -36,8 +35,10 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
 
       <div className="flex-1" />
 
+      {/* Колокольчик уведомлений убран вместе с лентой: она была фиксированным
+          демо-набором на роль, а источника для неё на бэкенде нет. Вернётся,
+          когда появится настоящий. */}
       <div className="flex flex-none items-center gap-1.5">
-        <NotificationsMenu />
         <AvatarMenu />
       </div>
     </header>
