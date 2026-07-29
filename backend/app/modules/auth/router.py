@@ -15,6 +15,7 @@ from .employee.schemas import (
     EmployeeListRequest,
     EmployeeListResponse,
     EmployeeResponse,
+    EmployeeSensitiveResponse,
     EmployeeUpdateRequest,
 )
 from .hemis.schemas import (
@@ -44,6 +45,7 @@ from .student.schemas import (
     StudentListRequest,
     StudentListResponse,
     StudentResponse,
+    StudentSensitiveResponse,
     StudentUpdateRequest,
     StudentWithUserListResponse,
 )
@@ -73,6 +75,7 @@ from .user.repository import get_user_repository
 from .user.schemas import (
     UserChangeCredentialsRequest,
     UserCreateRequest,
+    RoleCountsResponse,
     UserCreateResponse,
     UserListRequest,
     UserListResponse,
@@ -160,6 +163,16 @@ async def create_user(
 ):
     result = await get_user_repository.create_user(session=session, data=data)
     return result
+
+
+@user_router.get("/role-counts", response_model=RoleCountsResponse)
+async def get_role_counts(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:role")),
+):
+    """Число учёток по ролям. Объявлен до /{user_id}: иначе «role-counts»
+    попал бы туда как идентификатор и вернул бы 422."""
+    return RoleCountsResponse(counts=await get_user_repository.role_counts(session=session))
 
 
 @user_router.get("/{user_id}", response_model=UserCreateResponse)
@@ -399,6 +412,20 @@ async def list_students(
     _: PermissionRequired = Depends(PermissionRequired("read:student")),
 ):
     return await student_repository.list_students(session=session, request=data)
+
+
+@student_router.get("/{student_id}/sensitive", response_model=StudentSensitiveResponse)
+async def get_student_sensitive(
+    student_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:student_sensitive")),
+):
+    """ЖШШИР, паспорт и адрес студента.
+
+    Отдельное право, а не read:student: анкету студента смотрят многие, а
+    персональные данные — единицы, и выдаваться это должно независимо.
+    """
+    return await student_repository.get_student(session, student_id)
 
 
 @student_router.get("/{student_id}", response_model=StudentResponse)
@@ -728,6 +755,16 @@ async def update_my_employee_profile(
 ):
     employee = await get_employee_repository.get_employee_by_user_id(session=session, user_id=current_user.id)
     return await get_employee_repository.update_employee(session=session, employee_id=employee.id, data=data)
+
+
+@employee_router.get("/{employee_id}/sensitive", response_model=EmployeeSensitiveResponse)
+async def get_employee_sensitive(
+    employee_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:employee_sensitive")),
+):
+    """Персональные данные сотрудника. Право своё, со студенческим не связано."""
+    return await get_employee_repository.get_employee(session, employee_id)
 
 
 @employee_router.get("/{employee_id}", response_model=EmployeeResponse)

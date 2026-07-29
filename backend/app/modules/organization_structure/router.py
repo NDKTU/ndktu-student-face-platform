@@ -10,6 +10,15 @@ from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
 
+from .curriculum.repository import get_curriculum_repository
+from .curriculum.schemas import (
+    CurriculumCreateRequest,
+    CurriculumListRequest,
+    CurriculumListResponse,
+    CurriculumReorderRequest,
+    CurriculumResponse,
+    CurriculumUpdateRequest,
+)
 from .department.repository import get_department_repository
 from .department.schemas import (
     DepartmentCreateRequest,
@@ -40,6 +49,8 @@ from .kafedra.schemas import (
     KafedraListResponse,
 )
 from .speciality.repository import get_speciality_repository
+from .tree.repository import get_tree_repository
+from .tree.schemas import OrganizationTreeResponse
 from .speciality.schemas import (
     SpecialityCreateRequest,
     SpecialityListRequest,
@@ -439,6 +450,133 @@ async def delete_department(
     await get_department_repository.delete_department(session=session, department_id=department_id)
 
 
+
+# ============================================================================
+#  CURRICULUM (o'quv reja)
+# ============================================================================
+curriculum_router = APIRouter(
+    tags=["Curriculum"],
+    prefix="/curriculum",
+)
+
+
+@curriculum_router.post(
+    "/",
+    response_model=CurriculumResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def create_curriculum_row(
+    data: CurriculumCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("create:curriculum")),
+):
+    return await get_curriculum_repository.create_row(session=session, data=data)
+
+
+@curriculum_router.get("/", response_model=CurriculumListResponse)
+async def list_curriculum(
+    data: CurriculumListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:curriculum")),
+):
+    return await get_curriculum_repository.list_rows(session=session, request=data)
+
+
+@curriculum_router.put(
+    "/reorder",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def reorder_curriculum(
+    data: CurriculumReorderRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("update:curriculum")),
+):
+    """Порядок строк внутри семестра. Объявлен до /{row_id}, иначе «reorder»
+    попал бы в него как идентификатор."""
+    await get_curriculum_repository.reorder(session=session, ids=data.ids)
+    return {"message": "Reordered"}
+
+
+@curriculum_router.delete(
+    "/",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def clear_curriculum(
+    speciality_id: int,
+    semester: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("delete:curriculum")),
+):
+    """Очистка плана специальности целиком или одного её семестра."""
+    deleted = await get_curriculum_repository.clear(
+        session=session, speciality_id=speciality_id, semester=semester
+    )
+    return {"deleted": deleted}
+
+
+@curriculum_router.get("/{row_id}", response_model=CurriculumResponse)
+async def get_curriculum_row(
+    row_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:curriculum")),
+):
+    return await get_curriculum_repository.get_row(session=session, row_id=row_id)
+
+
+@curriculum_router.put(
+    "/{row_id}",
+    response_model=CurriculumResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def update_curriculum_row(
+    row_id: int,
+    data: CurriculumUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("update:curriculum")),
+):
+    return await get_curriculum_repository.update_row(session=session, row_id=row_id, data=data)
+
+
+@curriculum_router.delete(
+    "/{row_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def delete_curriculum_row(
+    row_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("delete:curriculum")),
+):
+    await get_curriculum_repository.delete_row(session=session, row_id=row_id)
+
+
+
+# ============================================================================
+#  ORGANIZATION TREE
+# ============================================================================
+tree_router = APIRouter(
+    tags=["Organization"],
+    prefix="/organization",
+)
+
+
+@tree_router.get("/tree", response_model=OrganizationTreeResponse)
+async def get_organization_tree(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:faculty")),
+):
+    """Факультеты -> кафедры -> специальности -> группы одним ответом.
+
+    Право переиспользуем: своё имя означало бы, что после выката его придётся
+    руками выдавать каждой роли, хотя дерево показывает ровно то, на что уже
+    есть read:faculty.
+    """
+    return await get_tree_repository.build(session=session)
+
+
 # ============================================================================
 #  AGGREGATE ROUTER
 # ============================================================================
@@ -447,4 +585,6 @@ router.include_router(faculty_router)
 router.include_router(kafedra_router)
 router.include_router(group_router)
 router.include_router(speciality_router)
+router.include_router(curriculum_router)
+router.include_router(tree_router)
 router.include_router(department_router)

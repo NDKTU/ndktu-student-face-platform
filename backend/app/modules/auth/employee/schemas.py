@@ -111,3 +111,16 @@ class EmployeeListResponse(BaseModel):
     page: int
     limit: int
     employees: list[EmployeeResponse]
+
+
+class EmployeeSensitiveResponse(BaseModel):
+    """Персональные данные сотрудника — по тем же правилам, что у студента,
+    но под своим правом: они выдаются независимо друг от друга."""
+
+    id: int
+    jshshir: Optional[str] = None
+    passport: Optional[str] = None
+    personal_phone: Optional[str] = None
+    address: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

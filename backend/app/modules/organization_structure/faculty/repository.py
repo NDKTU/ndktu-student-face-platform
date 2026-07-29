@@ -26,7 +26,16 @@ class FacultyRepository:
                 detail=f"Faculty '{data.name}' already exists",
             )
 
-        new_faculty = Faculty(name=data.name)
+        # position со server_default '0' поставил бы новую запись в начало
+        # списка. Новая запись должна оказаться в конце — её место потом
+        # меняют перетаскиванием, а не тем, что она только что создана.
+        next_position = (
+            await session.execute(
+                select(func.coalesce(func.max(Faculty.position), 0) + 1)
+            )
+        ).scalar_one()
+
+        new_faculty = Faculty(name=data.name, position=next_position)
         session.add(new_faculty)
 
         try:
@@ -64,7 +73,9 @@ class FacultyRepository:
         if request.name:
             stmt = stmt.where(Faculty.name.ilike(f"%{request.name}%"))
 
-        stmt = stmt.order_by(desc(Faculty.created_at))
+        # Порядок задаётся вручную (position), а не датой создания:
+        # структуру университета читают сверху вниз, а не «сначала свежее».
+        stmt = stmt.order_by(Faculty.position, Faculty.id)
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)

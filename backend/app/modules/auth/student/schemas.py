@@ -126,3 +126,23 @@ class StudentWithUserListResponse(BaseModel):
     page: int
     limit: int
     students: list[StudentWithUserResponse]
+
+
+class StudentSensitiveResponse(BaseModel):
+    """Персональные данные студента.
+
+    Живут в отдельной схеме, а не в StudentResponse, намеренно: списочный
+    эндпоинт отдаёт сотни строк разом, и одно лишнее поле здесь означало бы
+    выгрузку ЖШШИР всего курса одним запросом.
+    """
+
+    id: int
+    jshshir: Optional[str] = None
+    passport: Optional[str] = None
+    region: Optional[str] = None
+    district: Optional[str] = None
+    address: Optional[str] = None
+    social_category: Optional[str] = None
+    benefit: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Permission, Role, Student, Teacher, User
+from app.modules.auth.model import Employee, Permission, Role, Student, Teacher, User, UserRole
 
 from .schemas import (
     UserCreateRequest,
@@ -76,6 +76,19 @@ class UserRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         return user
+
+    async def role_counts(self, session: AsyncSession) -> dict[str, int]:
+        """Одним GROUP BY, а не выборкой всех пользователей: экран
+        «Foydalanuvchilar» показывает только числа на плитках."""
+        rows = (
+            await session.execute(
+                select(Role.name, func.count(UserRole.user_id))
+                .join(UserRole, UserRole.role_id == Role.id, isouter=True)
+                .group_by(Role.name)
+                .order_by(Role.name)
+            )
+        ).all()
+        return {name: count for name, count in rows}
 
     async def list_users(self, session: AsyncSession, request: UserListRequest) -> UserListResponse:
         # 1. Запрос на получение моделей

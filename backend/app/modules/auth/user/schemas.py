@@ -207,3 +207,9 @@ class UserLoginRequest(BaseModel):
 class UserLoginResponse(BaseModel):
     type: str = "Bearer"
     access_token: str
+
+
+class RoleCountsResponse(BaseModel):
+    """Сколько учёток у каждой роли. Ключ — имя роли из БД, как она заведена."""
+
+    counts: dict[str, int]

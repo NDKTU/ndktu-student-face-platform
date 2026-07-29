@@ -29,7 +29,18 @@ class KafedraRepository:
         # Ideally verify faculty_id exists here, but FK constraint will handle it (though with 500 err)
         # For now, let's rely on basic creation.
 
-        new_kafedra = Kafedra(name=data.name, faculty_id=data.faculty_id)
+        # position со server_default '0' поставил бы новую запись в начало
+        # списка. Новая запись должна оказаться в конце — её место потом
+        # меняют перетаскиванием, а не тем, что она только что создана.
+        next_position = (
+            await session.execute(
+                select(func.coalesce(func.max(Kafedra.position), 0) + 1).where(Kafedra.faculty_id == data.faculty_id)
+            )
+        ).scalar_one()
+
+        new_kafedra = Kafedra(
+            name=data.name, faculty_id=data.faculty_id, position=next_position
+        )
         session.add(new_kafedra)
 
         try:
@@ -70,7 +81,9 @@ class KafedraRepository:
         if request.faculty_id:
             stmt = stmt.where(Kafedra.faculty_id == request.faculty_id)
 
-        stmt = stmt.order_by(desc(Kafedra.created_at))
+        # Порядок задаётся вручную (position), а не датой создания:
+        # структуру университета читают сверху вниз, а не «сначала свежее».
+        stmt = stmt.order_by(Kafedra.position, Kafedra.id)
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)

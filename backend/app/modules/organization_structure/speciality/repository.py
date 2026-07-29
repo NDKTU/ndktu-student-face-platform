@@ -26,7 +26,18 @@ class SpecialityRepository:
                 detail=f"Speciality '{data.name}' already exists",
             )
 
-        new_speciality = Speciality(name=data.name, kafedra_id=data.kafedra_id)
+        # position со server_default '0' поставил бы новую запись в начало
+        # списка. Новая запись должна оказаться в конце — её место потом
+        # меняют перетаскиванием, а не тем, что она только что создана.
+        next_position = (
+            await session.execute(
+                select(func.coalesce(func.max(Speciality.position), 0) + 1).where(Speciality.kafedra_id == data.kafedra_id)
+            )
+        ).scalar_one()
+
+        new_speciality = Speciality(
+            name=data.name, kafedra_id=data.kafedra_id, position=next_position
+        )
         session.add(new_speciality)
 
         try:
@@ -79,7 +90,13 @@ class SpecialityRepository:
                 Kafedra.faculty_id == request.faculty_id
             )
 
-        stmt = stmt.order_by(desc(Speciality.created_at)).offset(request.offset).limit(request.limit)
+        # Порядок задаётся вручную (position), а не датой создания:
+        # структуру университета читают сверху вниз, а не «сначала свежее».
+        stmt = (
+            stmt.order_by(Speciality.position, Speciality.id)
+            .offset(request.offset)
+            .limit(request.limit)
+        )
 
         specialities = (await session.execute(stmt)).scalars().all()
         total = (await session.execute(count_stmt)).scalar() or 0
