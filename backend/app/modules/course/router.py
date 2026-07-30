@@ -28,6 +28,17 @@ from .lesson.schemas import (
     LessonUpdateRequest,
 )
 from .assignment.repository import get_assignment_repository
+from .content.repository import get_course_content_repository
+from .content.schemas import (
+    CourseContentResponse,
+    MaterialCreateRequest,
+    MaterialResponse,
+    MaterialUpdateRequest,
+    ReorderRequest,
+    TopicCreateRequest,
+    TopicResponse,
+    TopicUpdateRequest,
+)
 from .assignment.schemas import (
     AssignmentCreateRequest,
     AssignmentListRequest,
@@ -464,6 +475,181 @@ async def delete_resource(
     await get_resource_repository.delete_resource(session=session, resource_id=resource_id, current_user=current_user)
 
 
+
+# ============================================================================
+#  COURSE CONTENT (mavzular va materiallar)
+# ============================================================================
+content_router = APIRouter(
+    tags=["CourseContent"],
+    prefix="/course-content",
+)
+
+
+@content_router.get("/{course_id}", response_model=CourseContentResponse)
+async def get_course_content(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:course")),
+):
+    """Разделы курса с материалами и отметками спрашивающего.
+
+    Права переиспользуем: это содержимое курса, и на него уже есть read:course.
+    Новое имя пришлось бы выдавать вручную каждой роли после выката.
+    """
+    return await get_course_content_repository.get_content(
+        session=session, course_id=course_id, user=current_user
+    )
+
+
+@content_router.post(
+    "/{course_id}/topics",
+    response_model=TopicResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def create_course_topic(
+    course_id: int,
+    data: TopicCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    return await get_course_content_repository.create_topic(
+        session=session, course_id=course_id, data=data, user=current_user
+    )
+
+
+@content_router.put(
+    "/topics/reorder",
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def reorder_course_topics(
+    data: ReorderRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    """Объявлен до /topics/{topic_id}: иначе «reorder» уехал бы туда как id."""
+    await get_course_content_repository.reorder_topics(
+        session=session, ids=data.ids, user=current_user
+    )
+    return {"message": "Reordered"}
+
+
+@content_router.put(
+    "/topics/{topic_id}",
+    response_model=TopicResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def update_course_topic(
+    topic_id: int,
+    data: TopicUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    return await get_course_content_repository.update_topic(
+        session=session, topic_id=topic_id, data=data, user=current_user
+    )
+
+
+@content_router.delete(
+    "/topics/{topic_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def delete_course_topic(
+    topic_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    await get_course_content_repository.delete_topic(
+        session=session, topic_id=topic_id, user=current_user
+    )
+
+
+@content_router.post(
+    "/topics/{topic_id}/materials",
+    response_model=MaterialResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def create_course_material(
+    topic_id: int,
+    data: MaterialCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    return await get_course_content_repository.create_material(
+        session=session, topic_id=topic_id, data=data, user=current_user
+    )
+
+
+@content_router.put(
+    "/materials/reorder",
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def reorder_course_materials(
+    data: ReorderRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    await get_course_content_repository.reorder_materials(
+        session=session, ids=data.ids, user=current_user
+    )
+    return {"message": "Reordered"}
+
+
+@content_router.put(
+    "/materials/{material_id}/completed",
+    response_model=MaterialResponse,
+    dependencies=[Depends(RateLimiter(times=60, seconds=60))],
+)
+async def set_material_completed(
+    material_id: int,
+    completed: bool = True,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:course")),
+):
+    """Студент отмечает материал пройденным.
+
+    Право на чтение курса, а не на изменение: запись касается только самого
+    спрашивающего, а не содержимого курса. Своё право потребовало бы выдавать
+    его вручную каждой студенческой роли.
+    """
+    return await get_course_content_repository.set_completed(
+        session=session, material_id=material_id, user=current_user, completed=completed
+    )
+
+
+@content_router.put(
+    "/materials/{material_id}",
+    response_model=MaterialResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def update_course_material(
+    material_id: int,
+    data: MaterialUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    return await get_course_content_repository.update_material(
+        session=session, material_id=material_id, data=data, user=current_user
+    )
+
+
+@content_router.delete(
+    "/materials/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def delete_course_material(
+    material_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:course")),
+):
+    await get_course_content_repository.delete_material(
+        session=session, material_id=material_id, user=current_user
+    )
+
+
 # ============================================================================
 #  AGGREGATE ROUTER
 # ============================================================================
@@ -472,3 +658,4 @@ router.include_router(course_router)
 router.include_router(lesson_router)
 router.include_router(assignment_router)
 router.include_router(resource_router)
+router.include_router(content_router)

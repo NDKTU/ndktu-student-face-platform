@@ -36,6 +36,9 @@ __all__ = [
     "Department",
     "Resource",
     "Curriculum",
+    "CourseTopic",
+    "CourseMaterial",
+    "CourseMaterialProgress",
 ]
 
 from app.modules.auth.model import (
@@ -54,6 +57,9 @@ from app.modules.course.model import (
     AssignmentSubmission,
     Course,
     CourseGroup,
+    CourseMaterial,
+    CourseMaterialProgress,
+    CourseTopic,
     Lesson,
     LessonResult,
     Resource,
