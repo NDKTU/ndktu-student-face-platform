@@ -1,0 +1,39 @@
+{
+  "title": "Reyting",
+  "subtitle": "Talaba baholari asosida hisoblangan reyting",
+  "tab": {
+    "oqituvchilar": "O'qituvchilar",
+    "fakultetlar": "Fakultetlar",
+    "kafedralar": "Kafedralar"
+  },
+  "filter": {
+    "search": "O'qituvchi ismi",
+    "faculty": "Fakultet",
+    "allFaculties": "Barcha fakultetlar",
+    "kafedra": "Kafedra",
+    "allKafedras": "Barcha kafedralar",
+    "clear": "Filtrni tozalash"
+  },
+  "column": {
+    "rank": "O'rin",
+    "oqituvchi": "O'qituvchi",
+    "fakultet": "Fakultet",
+    "kafedra": "Kafedra",
+    "kafedralar": "Kafedralar",
+    "oqituvchilar": "O'qituvchilar",
+    "talabalar": "Talabalar",
+    "ortacha": "O'rtacha baho",
+    "reyting": "Reyting"
+  },
+  "empty": {
+    "title": "Reyting hisoblanmagan",
+    "text": "Baholar qo'yilgandan so'ng reyting shu yerda ko'rinadi."
+  },
+  "hint": "Reyting o'rtacha bahoni talabalar soniga qarab tuzatib hisoblanadi: uch bahosi bor o'qituvchi yuz bahosi bor o'qituvchidan yuqori turmaydi.",
+  "export": "CSV yuklab olish",
+  "exporting": "Tayyorlanmoqda…",
+  "exportEmpty": "Yuklab olish uchun ma'lumot yo'q",
+  "page": "{{from}}–{{to}} / {{total}}",
+  "prev": "Oldingi",
+  "next": "Keyingi"
+}

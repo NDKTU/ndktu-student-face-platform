@@ -17,6 +17,7 @@ import { FoydalanuvchilarPage } from '@/pages/foydalanuvchilar/FoydalanuvchilarP
 import { RollarPage } from '@/pages/rollar/RollarPage';
 import { SavollarPage } from '@/pages/savollar/SavollarPage';
 import { KurslarPage } from '@/pages/kurslar/KurslarPage';
+import { ReytingPage } from '@/pages/reyting/ReytingPage';
 import { StudentTestlarPage } from '@/pages/testlar/StudentTestlarPage';
 import { TeacherTestlarPage } from '@/pages/testlar/TeacherTestlarPage';
 import { AdminTestlarPage } from '@/pages/testlar/AdminTestlarPage';
@@ -91,6 +92,7 @@ function AuthenticatedRoutes() {
     ['rollar', '/rollar', () => <RollarPage />],
     ['savollar', '/savollar', () => <SavollarPage />],
     ['kurslar', '/kurslar', () => <KurslarPage />],
+    ['reyting', '/reyting', () => <ReytingPage />],
     ['testlar', '/testlar', () => testlar],
     ['stestlar', '/stestlar', () => <StudentTestlarPage />],
     ['svazlar', '/svazlar', () => <StudentVazifalarPage />],

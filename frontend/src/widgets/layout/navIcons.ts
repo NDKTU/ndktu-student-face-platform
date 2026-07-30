@@ -58,6 +58,11 @@ export const NAV_ICONS: Record<string, IconShape[]> = {
     { tag: "path", attrs: { "d": "M8 5H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2" } },
     { tag: "path", attrs: { "d": "m9.5 13 2 2 4-4" } },
   ],
+  reyting: [
+    { tag: "path", attrs: { "d": "M8 21h8M12 17v4" } },
+    { tag: "path", attrs: { "d": "M7 4h10v5a5 5 0 0 1-10 0z" } },
+    { tag: "path", attrs: { "d": "M7 5H5v2a3 3 0 0 0 2.4 2.9M17 5h2v2a3 3 0 0 1-2.4 2.9" } },
+  ],
   guruhim: [
     { tag: "circle", attrs: { "cx": "9", "cy": "8", "r": "3.2" } },
     { tag: "path", attrs: { "d": "M3.5 19c0-3.2 2.6-5 5.5-5s5.5 1.8 5.5 5" } },

@@ -28,6 +28,7 @@ export const NAV_KEYS = [
   'testlar',
   'kurslar',
   'avazlar',
+  'reyting',
   'foydalanuvchilar',
   'rollar',
   'sozlamalar',
