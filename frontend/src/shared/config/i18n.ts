@@ -8,6 +8,7 @@ import uzFanlar from '@/locales/uz/fanlar.json';
 import uzKurslar from '@/locales/uz/kurslar.json';
 import uzNav from '@/locales/uz/nav.json';
 import uzProfil from '@/locales/uz/profil.json';
+import uzPsixologiya from '@/locales/uz/psixologiya.json';
 import uzReja from '@/locales/uz/reja.json';
 import uzReyting from '@/locales/uz/reyting.json';
 import uzSavollar from '@/locales/uz/savollar.json';
@@ -36,6 +37,7 @@ export const resources = {
     kurslar: uzKurslar,
     nav: uzNav,
     profil: uzProfil,
+    psixologiya: uzPsixologiya,
     reja: uzReja,
     reyting: uzReyting,
     savollar: uzSavollar,

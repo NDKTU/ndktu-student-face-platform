@@ -91,6 +91,10 @@ export const NAV_ICONS: Record<string, IconShape[]> = {
     { tag: "path", attrs: { "d": "M12 3 5 6v5c0 4.4 3 7.4 7 8.8 4-1.4 7-4.4 7-8.8V6z" } },
     { tag: "path", attrs: { "d": "m9 12 2 2 4-4" } },
   ],
+  psixologiya: [
+    { tag: "path", attrs: { "d": "M12 4a4 4 0 0 0-4 4 3 3 0 0 0-1 5.8V16a3 3 0 0 0 3 3h.5a1.5 1.5 0 0 0 1.5-1.5V4z" } },
+    { tag: "path", attrs: { "d": "M12 4a4 4 0 0 1 4 4 3 3 0 0 1 1 5.8V16a3 3 0 0 1-3 3h-.5a1.5 1.5 0 0 1-1.5-1.5" } },
+  ],
   hemis: [
     { tag: "path", attrs: { "d": "M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z" } },
     { tag: "path", attrs: { "d": "M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7" } },

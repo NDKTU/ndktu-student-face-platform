@@ -45,6 +45,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Рейтинг считает сервер по оценкам студентов; право то же, что на список
   // преподавателей, — отдельного имени бэкенд не вводит.
   { key: 'reyting', path: '/reyting', section: 'asosiy', permission: 'read:teacher', persona: 'staff' },
+  // Раздел один и для психолога, и для студента: у первого редактор методик,
+  // у второго те же методики как тесты. `persona` здесь не задана намеренно.
+  { key: 'psixologiya', path: '/psixologiya', section: 'asosiy', permission: 'read:psychology' },
 
   { key: 'stestlar', path: '/stestlar', section: 'asosiy', permission: 'quiz_process:start_quiz', persona: 'student' },
   { key: 'svazlar', path: '/svazlar', section: 'asosiy', permission: 'create:submission', persona: 'student' },

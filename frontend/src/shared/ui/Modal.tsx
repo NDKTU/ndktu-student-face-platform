@@ -55,10 +55,13 @@ export function Modal({ title, subtitle, onClose, children, footer, size = 'md' 
 
 export function ModalField({
   label,
+  hint,
   children,
   className,
 }: {
   label: string;
+  /** Пояснение под полем: зачем оно и что сломается, если ввести не то. */
+  hint?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -66,6 +69,7 @@ export function ModalField({
     <label className={`block ${className ?? ''}`}>
       <span className="mb-1.5 block text-12-5 font-semibold text-ink-muted">{label}</span>
       {children}
+      {hint && <span className="mt-1 block text-11-5 text-ink-subtle">{hint}</span>}
     </label>
   );
 }
