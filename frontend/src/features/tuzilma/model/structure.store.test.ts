@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildUniversity } from '@/entities/university/mock/build';
 import type { Faculty } from '@/entities/university/model/types';
 import { useStructureStore } from './structure.store';
 
@@ -27,10 +26,59 @@ vi.mock('@/shared/api/tuzilma', () => ({
 
 const api = vi.mocked(await import('@/shared/api/tuzilma'));
 
-const pristine = buildUniversity();
+/**
+ * Дерево-заготовка для проверок стора.
+ *
+ * Раньше здесь работал мок-генератор университета на несколько сотен строк —
+ * он остался с прототипа и заодно снабжал данными сами экраны. Экраны давно
+ * читают API, а тесту нужна ровно эта форма: шесть факультетов, у каждого
+ * кафедра со специальностью, две группы и план из двух семестров.
+ */
+function buildFixture(): Faculty[] {
+  return Array.from({ length: 6 }, (_, f) => {
+    const base = (f + 1) * 100;
+    return {
+      id: base,
+      name: `Fakultet ${f + 1}`,
+      dekan: `Dekan ${f + 1}`,
+      color: { bg: '#EEF1FF', fg: '#2836C7' },
+      kafedralar: [
+        {
+          id: base + 10,
+          name: `Kafedra ${f + 1}`,
+          mudir: `Mudir ${f + 1}`,
+          oqituvchilar: 4,
+          teachers: [],
+          mutaxassisliklar: [
+            {
+              id: base + 20,
+              name: `Mutaxassislik ${f + 1}`,
+              kod: `6061010${f}`,
+              shakl: 'Kunduzgi' as const,
+              reja_yil: null,
+              curriculum_count: 3,
+              curriculum_credits: 12,
+              guruhlar: [
+                { id: base + 30, name: `G-${f + 1}-01`, kurs: 1, sardor: '—', student_count: 24 },
+                { id: base + 31, name: `G-${f + 1}-02`, kurs: 2, sardor: '—', student_count: 22 },
+              ],
+              reja: [
+                { id: base + 40, fan: 'Oliy matematika', semestr: 1, kredit: 5, oqituvchi: '—' },
+                { id: base + 41, fan: 'Fizika', semestr: 2, kredit: 4, oqituvchi: '—' },
+                { id: base + 42, fan: 'Kimyo', semestr: 2, kredit: 3, oqituvchi: '—' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  });
+}
+
+const pristine = { faculties: buildFixture() };
 
 function freshFaculties(): Faculty[] {
-  return buildUniversity().faculties;
+  return buildFixture();
 }
 
 const store = () => useStructureStore.getState();
