@@ -84,33 +84,15 @@ services:
     container_name: nusmt_frontend
     restart: always
     # nginx `proxy_pass` upstream nomlarini ishga tushishda hal qiladi: backend
-    # yoki frontend-legacy hali ko'tarilmagan bo'lsa, "host not found in
-    # upstream" bilan yiqiladi va qayta ishga tushish siklida qoladi.
+    # hali ko'tarilmagan bo'lsa, "host not found in upstream" bilan yiqiladi va
+    # qayta ishga tushish siklida qoladi.
     depends_on:
       backend:
         condition: service_healthy
-      frontend-legacy:
-        condition: service_started
     ports:
       - "3000:3000"
     volumes:
       - frontend_logs:/var/log/app_frontend
-    networks:
-      - app_network
-
-  # O'tish davridagi eski SPA: /legacy/ ostida, asosiy frontend nginx'i orqali.
-  # Tashqi port ochilmaydi — unga faqat shu proxy orqali kiriladi.
-  # 4-bosqichda bu servis butunlay olib tashlanadi.
-  frontend-legacy:
-    image: nusmt-frontend-legacy:latest
-    build:
-      context: ./frontend-legacy
-      cache_from:
-        - nusmt-frontend-legacy:latest
-      args:
-        BUILDKIT_INLINE_CACHE: "1"
-    container_name: nusmt_frontend_legacy
-    restart: always
     networks:
       - app_network
 

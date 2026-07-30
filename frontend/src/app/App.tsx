@@ -31,7 +31,6 @@ import { AdminVazifalarPage } from '@/pages/vazifalar/AdminVazifalarPage';
 import { SozlamalarPage } from '@/pages/sozlamalar/SozlamalarPage';
 import { StudentHome } from '@/pages/home/StudentHome';
 import { TeacherHome } from '@/pages/home/TeacherHome';
-import { PlaceholderPage } from '@/pages/placeholder/PlaceholderPage';
 
 export function App() {
   const status = useSessionStore((s) => s.status);
@@ -121,7 +120,6 @@ function AuthenticatedRoutes() {
             element={<RequireAccess nav={nav}>{render()}</RequireAccess>}
           />
         ))}
-        <Route path="/:nav" element={<PlaceholderPage />} />
         <Route path="*" element={<Navigate to="/bosh" replace />} />
       </Route>
     </Routes>

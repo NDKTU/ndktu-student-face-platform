@@ -49,7 +49,6 @@ uv run uvicorn app.main:app --reload
 |---|---|---|
 | `nusmt_backend` | 8000 | FastAPI REST API |
 | `nusmt_frontend` | 3000 | React SPA served by nginx |
-| `nusmt_frontend_legacy` | — | Old SPA, served at `/legacy/` through `nusmt_frontend` (transitional) |
 | `nusmt_face_detection` | 8001 | Face-detection microservice (separate FastAPI app) |
 | `database` | 5436→5432 | PostgreSQL 17 |
 | `redis_cache` | 6379 | Redis (caching + queue) |
@@ -91,9 +90,6 @@ React 19 + Vite 8 + TypeScript 6 + Tailwind CSS 4 (CSS-first `@theme` in `src/in
 
 **Verification:** `npm run verify` (typecheck + oxlint/eslint + vitest + build) must pass before every commit.
 
-### Legacy frontend (`frontend-legacy/`) — transitional
-The previous SPA (React 19 + axios + React Query + jodit + xlsx). It is built with Vite `base: '/legacy/'` and served at `/legacy/` by the main frontend's nginx; its own container serves static files only. It still holds features not yet ported: psychology, quiz proctoring, HEMIS sync, results/user answers, teacher ranking, lesson journal. **Do not add features here** — it is deleted once porting completes. Migration plan: `~/.claude/plans/now-in-this-project-lovely-karp.md`.
-
 ### Psychology module
 The psychology module is a self-contained assessment system. `PsychologyMethod` groups questions; `PsychologyQuestion` uses JSONB `content` and `options` fields whose structure varies by `question_type`:
 
@@ -108,7 +104,7 @@ The psychology module is a self-contained assessment system. `PsychologyMethod` 
 
 Scoring logic is in `psychology/scoring.py`. The `instruction` JSONB on `PsychologyMethod` drives scoring: `scoring.method` is `"sum"` or `"category"`. For `multi_choice`, submitted answers are `number[]`; `_coerce_int` sums the array values for scoring.
 
-Adding a new question type requires: updating the `QUESTION_TYPES` literal in `schemas.py`, adding a renderer component in `frontend-legacy/src/pages/PsychologyTestPage.tsx`, registering it in `QuestionRenderer`, updating label/icon/color maps in `frontend-legacy/src/pages/PsychologyPage.tsx`, and adding a display case in `frontend-legacy/src/components/psychology/AnswerRow.tsx`. (The psychology UI has not been ported to the new frontend yet — see the migration plan.)
+Adding a new question type requires: updating the `QUESTION_TYPES` literal in `schemas.py`, adding the name to `QUESTION_TYPES` in `frontend/src/shared/api/psixologiya.ts`, adding a renderer in `frontend/src/pages/psixologiya/QuestionRenderer.tsx` and registering it in the `switch` there, describing which fields the type uses in `SHAPE` in `QuestionModal.tsx`, adding a display case in `AnswerList.tsx`, and adding a `type.<name>` label to `locales/uz/psixologiya.json`.
 
 ### Face detection
-A separate FastAPI service in `face-detection/`. Communicates with the backend over the internal Docker network via `APP_CONFIG__FACE_SERVICE__URL`. The frontend connects to it via WebSocket during quiz proctoring (currently `frontend-legacy/src/pages/QuizTestPage.tsx` + `hooks/useVideoMonitoring.ts`; not yet ported). The backend shares the `backend_uploads` volume with this service (read-only).
+A separate FastAPI service in `face-detection/`. Communicates with the backend over the internal Docker network via `APP_CONFIG__FACE_SERVICE__URL`. The frontend connects to it via WebSocket during quiz proctoring (`frontend/src/features/testlar/lib/useVideoMonitoring.ts`, used by the quiz runner). The backend shares the `backend_uploads` volume with this service (read-only).
