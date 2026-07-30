@@ -1,0 +1,64 @@
+{
+  "title": "HEMIS sinxronizatsiyasi",
+  "subtitle": "Talaba ma'lumotlarini HEMIS tizimidan olib kelish",
+  "step": {
+    "credentials": "Kirish",
+    "preview": "Solishtirish",
+    "done": "Yakun"
+  },
+  "form": {
+    "hint": "HEMIS'ga talabaning o'z login va paroli bilan ulanamiz — tizimning xizmat kaliti yo'q. Parol hech qayerda saqlanmaydi.",
+    "login": "HEMIS login",
+    "password": "HEMIS parol",
+    "submit": "Ma'lumotni ko'rish",
+    "loading": "HEMIS bilan bog'lanmoqda…",
+    "required": "Login va parolni kiriting"
+  },
+  "preview": {
+    "profile": "HEMIS profili",
+    "status": "Bazadagi holati",
+    "willCreate": "Yangi talaba yaratiladi",
+    "willUpdate": "Mavjud talaba yangilanadi",
+    "facultyMissing": "Bu fakultet bazada yo'q — avtomatik tanlansa, yangisi yaratiladi.",
+    "groupMissing": "Guruh topilmadi — avtomatik tanlansa, \"{{name}}\" nomi bilan yaratiladi.",
+    "override": "Qo'lda biriktirish",
+    "overrideHint": "Nomlar mos kelmasa, talabani kerakli fakultet va guruhga o'zingiz biriktiring.",
+    "auto": "HEMIS bo'yicha (avtomatik)",
+    "faculty": "Fakultet",
+    "group": "Guruh",
+    "results": "Oldingi test natijalari",
+    "noResults": "Bu talabada natija yo'q.",
+    "sync": "Sinxronlash",
+    "syncing": "Sinxronlanmoqda…",
+    "back": "Orqaga"
+  },
+  "field": {
+    "fullName": "F.I.Sh.",
+    "studentIdNumber": "Talaba ID",
+    "university": "Universitet",
+    "faculty": "Fakultet",
+    "group": "Guruh",
+    "specialty": "Mutaxassislik",
+    "level": "Kurs",
+    "semester": "Semestr",
+    "educationForm": "Ta'lim shakli",
+    "educationType": "Ta'lim turi",
+    "paymentForm": "To'lov shakli",
+    "educationLang": "Ta'lim tili",
+    "studentStatus": "Holati",
+    "gender": "Jinsi",
+    "phone": "Telefon",
+    "address": "Manzil",
+    "birthDate": "Tug'ilgan sana"
+  },
+  "result": {
+    "quiz": "Test",
+    "subject": "Fan",
+    "grade": "Baho",
+    "date": "Sana"
+  },
+  "done": {
+    "title": "Sinxronizatsiya yakunlandi",
+    "again": "Yana bir talaba"
+  }
+}

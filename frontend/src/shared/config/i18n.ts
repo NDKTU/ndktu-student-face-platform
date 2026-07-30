@@ -14,6 +14,7 @@ import uzSavollar from '@/locales/uz/savollar.json';
 import uzTestlar from '@/locales/uz/testlar.json';
 import uzVazifalar from '@/locales/uz/vazifalar.json';
 import uzSozlamalar from '@/locales/uz/sozlamalar.json';
+import uzHemis from '@/locales/uz/hemis.json';
 import uzHome from '@/locales/uz/home.json';
 import uzRollar from '@/locales/uz/rollar.json';
 import uzTuzilma from '@/locales/uz/tuzilma.json';
@@ -41,6 +42,7 @@ export const resources = {
     testlar: uzTestlar,
     vazifalar: uzVazifalar,
     sozlamalar: uzSozlamalar,
+    hemis: uzHemis,
     home: uzHome,
     rollar: uzRollar,
     tuzilma: uzTuzilma,

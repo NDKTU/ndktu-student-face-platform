@@ -15,6 +15,7 @@ import { FanlarPage } from '@/pages/fanlar/FanlarPage';
 import { RejaPage } from '@/pages/reja/RejaPage';
 import { FoydalanuvchilarPage } from '@/pages/foydalanuvchilar/FoydalanuvchilarPage';
 import { RollarPage } from '@/pages/rollar/RollarPage';
+import { HemisPage } from '@/pages/hemis/HemisPage';
 import { SavollarPage } from '@/pages/savollar/SavollarPage';
 import { KurslarPage } from '@/pages/kurslar/KurslarPage';
 import { ReytingPage } from '@/pages/reyting/ReytingPage';
@@ -90,6 +91,7 @@ function AuthenticatedRoutes() {
     ['reja', '/reja', () => <RejaPage />],
     ['foydalanuvchilar', '/foydalanuvchilar', () => <FoydalanuvchilarPage />],
     ['rollar', '/rollar', () => <RollarPage />],
+    ['hemis', '/hemis', () => <HemisPage />],
     ['savollar', '/savollar', () => <SavollarPage />],
     ['kurslar', '/kurslar', () => <KurslarPage />],
     ['reyting', '/reyting', () => <ReytingPage />],

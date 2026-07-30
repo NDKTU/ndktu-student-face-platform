@@ -2,20 +2,25 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import emblem from '@/assets/ndktu-emblem.png';
 import { useSessionStore } from '@/features/auth/model/session.store';
+import { hemisLogin } from '@/shared/api/hemis';
 import { useToast } from '@/shared/ui/Toast';
 
-/** Общий класс поля ввода — форма логина использует его дважды. */
+/** Общий класс поля ввода — обе формы входа используют его дважды. */
 const inputClass =
   'h-[46px] w-full rounded-12 border border-line bg-surface-raised px-3.5 text-14 text-ink outline-none ' +
   'focus:border-brand focus:bg-surface focus:shadow-focus';
 
+type Mode = 'staff' | 'hemis';
+
 export function LoginPage() {
   const { t } = useTranslation('auth');
   const signIn = useSessionStore((s) => s.signIn);
+  const adoptToken = useSessionStore((s) => s.adoptToken);
   const logoutReason = useSessionStore((s) => s.logoutReason);
   const clearLogoutReason = useSessionStore((s) => s.clearLogoutReason);
   const toast = useToast();
 
+  const [mode, setMode] = useState<Mode>('staff');
   const [busy, setBusy] = useState(false);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +33,7 @@ export function LoginPage() {
     clearLogoutReason();
   }, [logoutReason, clearLogoutReason, toast, t]);
 
-  async function handleStaff(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!login.trim() || !password.trim()) {
       toast(t('staff.required'));
@@ -37,7 +42,13 @@ export function LoginPage() {
 
     setBusy(true);
     try {
-      await signIn(login.trim(), password);
+      if (mode === 'hemis') {
+        // Пароль проверяет HEMIS, но токен выдаёт наш бэкенд — дальше это
+        // обычная сессия, со своим `jti` и тем же idle-таймаутом.
+        await adoptToken(await hemisLogin({ login: login.trim(), password }));
+      } else {
+        await signIn(login.trim(), password);
+      }
       toast(t('staff.welcome'));
     } catch (error) {
       // Сервер отвечает одинаково на неизвестный логин и неверный пароль.
@@ -59,23 +70,33 @@ export function LoginPage() {
             <div className="mt-[5px] text-13 text-ink-subtle">{t('tagline')}</div>
           </div>
 
-          {/* Кнопка «Войти через HEMIS» здесь была, но настоящей интеграции за
-              ней не стояло — она входила демо-студентом. Студенческий вход
-              вернётся вместе с реальным `POST /hemis/login`. */}
-          <div className="mb-3.5 text-12 font-bold tracking-[0.05em] text-ink-subtle uppercase">
-            {t('staff.title')}
+          <div className="mb-4 flex gap-1 rounded-12 bg-surface-muted p-1">
+            {(['staff', 'hemis'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMode(key)}
+                className={`h-9 flex-1 cursor-pointer rounded-9 border-none text-13 font-bold ${
+                  mode === key ? 'bg-surface text-brand shadow-card' : 'bg-transparent text-ink-muted'
+                }`}
+              >
+                {t(`mode.${key}`)}
+              </button>
+            ))}
           </div>
 
-          <form onSubmit={(e) => void handleStaff(e)} className="flex flex-col gap-3.5">
+          <p className="mt-0 mb-4 text-12 leading-[1.5] text-ink-subtle">{t(`${mode}.hint`)}</p>
+
+          <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-3.5">
             <div>
               <label htmlFor="login" className="mb-1.5 block text-12-5 font-semibold text-ink-muted">
-                {t('staff.login')}
+                {mode === 'hemis' ? t('hemis.login') : t('staff.login')}
               </label>
               <input
                 id="login"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
-                placeholder={t('staff.loginPlaceholder')}
+                placeholder={mode === 'hemis' ? t('hemis.loginPlaceholder') : t('staff.loginPlaceholder')}
                 autoComplete="username"
                 className={inputClass}
               />
@@ -88,7 +109,7 @@ export function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => toast(t('staff.forgotHint'))}
+                  onClick={() => toast(mode === 'hemis' ? t('hemis.forgotHint') : t('staff.forgotHint'))}
                   className="cursor-pointer border-none bg-transparent p-0 text-12 font-bold text-brand hover:underline"
                 >
                   {t('staff.forgot')}
@@ -124,4 +145,3 @@ export function LoginPage() {
     </div>
   );
 }
-

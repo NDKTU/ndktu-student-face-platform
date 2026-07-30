@@ -31,6 +31,7 @@ export const NAV_KEYS = [
   'reyting',
   'foydalanuvchilar',
   'rollar',
+  'hemis',
   'sozlamalar',
   'tfanlarim',
   'tvazlar',

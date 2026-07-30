@@ -33,6 +33,12 @@ interface SessionState {
   /** Прочитать токен из хранилища и восстановить сессию. Вызывается один раз. */
   bootstrap: () => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
+  /**
+   * Принять уже выданный токен и поднять по нему сессию. Нужен входу через
+   * HEMIS: пароль там проверяет внешняя система, а токен нам выдаёт свой же
+   * бэкенд, и дальше сессия ничем не отличается от обычной.
+   */
+  adoptToken: (token: string) => Promise<void>;
   refreshMe: () => Promise<void>;
   signOut: (reason?: LogoutReason) => void;
   clearLogoutReason: () => void;
@@ -78,8 +84,12 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
 
   signIn: async (username, password) => {
     const { access_token } = await authApi.login(username, password);
+    await get().adoptToken(access_token);
+  },
+
+  adoptToken: async (token) => {
     // Токен нужно положить до запроса профиля: `/user/me` уже требует его.
-    setToken(access_token);
+    setToken(token);
 
     try {
       set({ ...fromMe(await authApi.me()), logoutReason: null });

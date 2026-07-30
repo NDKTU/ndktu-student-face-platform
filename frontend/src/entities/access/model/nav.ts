@@ -58,6 +58,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: ['read:user', 'read:student', 'read:employee'],
   },
   { key: 'rollar', path: '/rollar', section: 'boshqaruv', permission: 'read:role' },
+  // Импорт из HEMIS заводит и правит учётные записи студентов — право на
+  // просмотр без права на сам импорт здесь смысла не имеет.
+  { key: 'hemis', path: '/hemis', section: 'boshqaruv', permission: 'hemis_admin_sync' },
   { key: 'sozlamalar', path: '/sozlamalar', section: 'boshqaruv' },
 
   { key: 'profil', path: '/profil', section: 'boshqaruv', hidden: true },
