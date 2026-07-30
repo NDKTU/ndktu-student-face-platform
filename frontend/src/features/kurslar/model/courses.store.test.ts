@@ -12,7 +12,9 @@ vi.mock('@/shared/api/kurslar', () => ({
   createLesson: vi.fn(),
   updateLesson: vi.fn(),
   deleteLesson: vi.fn(),
-  reorderCourse: vi.fn(),
+  reorderTopics: vi.fn(),
+  reorderMaterials: vi.fn(),
+  setLessonCompleted: vi.fn(),
 }));
 
 const api = vi.mocked(await import('@/shared/api/kurslar'));
@@ -104,7 +106,7 @@ describe('courses store — мутации', () => {
   });
 
   it('addTopic шлёт черновик и перечитывает курс со счётчиками', async () => {
-    api.createTopic.mockResolvedValueOnce({ id: 2, no: 2, title: 'Yangi', darslar: [] });
+    api.createTopic.mockResolvedValueOnce({ id: 2 });
     // Номера и порядок пересчитывает сервер — стор берёт его ответ как есть.
     api.getCourse.mockResolvedValueOnce(course([1, 2, 3]));
 
@@ -126,20 +128,20 @@ describe('courses store — мутации', () => {
   });
 
   it('reorderLessons шлёт готовый порядок, а не пару from/to', async () => {
-    api.reorderCourse.mockResolvedValueOnce(course([2, 1]));
+    api.reorderMaterials.mockResolvedValueOnce({ message: 'Reordered' });
+    api.getCourse.mockResolvedValueOnce(course([2, 1]));
 
     await store().reorderLessons(1, 1, 1, 2);
 
-    expect(api.reorderCourse).toHaveBeenCalledWith(1, {
-      topicId: 1,
-      lessons: [2, 1],
-    });
+    // Эндпоинт принимает список id целиком: порядок считает клиент, потому что
+    // только он знает, куда именно перетащили.
+    expect(api.reorderMaterials).toHaveBeenCalledWith([2, 1]);
     expect(store().byId[1]!.mavzular[0]!.darslar.map((d) => d.id)).toEqual([2, 1]);
   });
 
   it('перетаскивание на себя не дёргает сервер', async () => {
     await store().reorderTopics(1, 1, 1);
-    expect(api.reorderCourse).not.toHaveBeenCalled();
+    expect(api.reorderTopics).not.toHaveBeenCalled();
   });
 
   it('сбой сервера пробрасывается наружу', async () => {

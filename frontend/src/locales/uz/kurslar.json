@@ -51,9 +51,7 @@
     "videoType": "Video turi",
     "dur": "Davomiyligi (daqiqa)",
     "desc": "Tavsif",
-    "hasUy": "Uy vazifasi",
-    "uyText": "Vazifa matni",
-    "uyDeadline": "Muddat"
+    "videoSrc": "Video havolasi"
   },
   "toast": {
     "mavzuAdded": "Mavzu qo'shildi",

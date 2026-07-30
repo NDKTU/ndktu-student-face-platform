@@ -2,18 +2,17 @@ export type VideoType = 'upload' | 'youtube';
 
 export interface Resource {
   name: string;
-  type: 'pdf' | 'pptx' | 'docx' | 'zip';
+  /** Ссылка на файл в uploads: сам файл в базе не лежит. */
+  url: string;
   size: string;
 }
 
-/** Домашнее задание, прикреплённое к уроку. */
-export interface Homework {
-  text: string;
-  deadline: string;
-  /** Проставляется, когда по заданию заводится запись в модуле Vazifalar. */
-  taskId?: number;
-}
-
+/**
+ * Материал раздела: видео, ссылка или текст.
+ *
+ * Домашнего задания здесь больше нет: на бэкенде задания живут своей таблицей
+ * и привязаны к курсу, а не к материалу, — их ведёт раздел «Vazifalar».
+ */
 export interface Lesson {
   id: number;
   no: number;
@@ -22,10 +21,10 @@ export interface Lesson {
   videoSrc: string;
   poster: string;
   dur: string;
+  /** Прошёл ли материал тот, кто смотрит. У преподавателя всегда false. */
   done: boolean;
   desc: string;
   resurslar: Resource[];
-  uy: Homework | null;
 }
 
 export interface Topic {
@@ -55,6 +54,7 @@ export interface AdminCourse {
   fac: string;
   kaf: string;
   sem: number;
+  /** Число разделов и материалов — приходит из счётчиков курса. */
   mavzular: number;
   darslar: number;
 }

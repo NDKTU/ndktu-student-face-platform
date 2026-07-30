@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCoursesStore } from '@/features/kurslar/model/courses.store';
 import { useKurslar } from '@/features/kurslar/lib/useKurslar';
-import { shortFaculty } from '@/entities/course/mock/adminCourses';
+import { shortFaculty } from '@/shared/lib/shortFaculty';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { DataTable, TableCard, type Column } from '@/shared/ui/DataTable';

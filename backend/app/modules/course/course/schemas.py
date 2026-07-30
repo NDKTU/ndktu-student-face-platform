@@ -75,6 +75,10 @@ class CourseResponse(BaseModel):
     faculty_id: Optional[int] = None
     kafedra_id: Optional[int] = None
     speciality_id: Optional[int] = None
+    # Счётчики содержимого: карточка курса показывает «мавзулар / дарслар»
+    # ещё до того, как курс открыли.
+    topic_count: int = 0
+    material_count: int = 0
     subject: Optional[CourseSubjectInfo] = None
     teacher: Optional[CourseTeacherInfo] = None
     faculty: Optional[CourseFacultyInfo] = None

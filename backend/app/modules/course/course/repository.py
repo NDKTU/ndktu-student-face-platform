@@ -5,7 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.course.model import Course, CourseGroup
+from app.modules.course.model import Course, CourseGroup, CourseMaterial, CourseTopic
 from app.modules.quiz.model import Subject
 from app.modules.quiz.model import SubjectTeacher
 from app.modules.auth.model import Employee, Teacher, User
@@ -40,9 +40,26 @@ class CourseRepository:
         teacher_full_name_stmt = select(Employee.full_name).where(Employee.user_id == course.teacher_id)
         teacher_full_name = (await session.execute(teacher_full_name_stmt)).scalar_one_or_none()
 
+        # Счётчики содержимого — двумя агрегатами, а не выборкой самих разделов:
+        # списку курсов нужны только числа.
+        topic_count = (
+            await session.execute(
+                select(func.count(CourseTopic.id)).where(CourseTopic.course_id == course.id)
+            )
+        ).scalar() or 0
+        material_count = (
+            await session.execute(
+                select(func.count(CourseMaterial.id))
+                .join(CourseTopic, CourseTopic.id == CourseMaterial.topic_id)
+                .where(CourseTopic.course_id == course.id)
+            )
+        ).scalar() or 0
+
         return CourseResponse(
             id=course.id,
             name=course.name,
+            topic_count=topic_count,
+            material_count=material_count,
             description=course.description,
             subject_id=course.subject_id,
             teacher_id=course.teacher_id,

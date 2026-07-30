@@ -127,35 +127,17 @@ export function LessonModal({
         />
       </ModalField>
 
-      <label className="flex items-center gap-2.5 text-13-5 font-semibold text-ink-secondary">
+      {/* Поля домашнего задания отсюда убраны: на бэкенде задания живут своей
+          таблицей и привязаны к курсу, а не к материалу, — их ведёт раздел
+          «Vazifalar». Вместо них — ссылка на само видео. */}
+      <ModalField label={t('darsModal.videoSrc')}>
         <input
-          type="checkbox"
-          checked={draft.hasUy}
-          onChange={(e) => set('hasUy', e.target.checked)}
-          className="size-4"
+          value={draft.videoSrc}
+          onChange={(e) => set('videoSrc', e.target.value)}
+          placeholder="https://youtu.be/... yoki /uploads/..."
+          className={modalInputClass}
         />
-        {t('darsModal.hasUy')}
-      </label>
-
-      {draft.hasUy && (
-        <>
-          <ModalField label={t('darsModal.uyText')}>
-            <input
-              value={draft.uyText}
-              onChange={(e) => set('uyText', e.target.value)}
-              className={modalInputClass}
-            />
-          </ModalField>
-          <ModalField label={t('darsModal.uyDeadline')}>
-            <input
-              value={draft.uyDeadline}
-              onChange={(e) => set('uyDeadline', e.target.value)}
-              placeholder="KK.OO.YYYY"
-              className={modalInputClass}
-            />
-          </ModalField>
-        </>
-      )}
+      </ModalField>
     </Modal>
   );
 }

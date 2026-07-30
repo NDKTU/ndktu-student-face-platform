@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCoursesStore, type LessonDraft, type TopicDraft } from '@/features/kurslar/model/courses.store';
 import type { AdminCourse, Lesson, Topic } from '@/entities/course/model/types';
-import { shortFaculty } from '@/entities/course/mock/adminCourses';
+import { shortFaculty } from '@/shared/lib/shortFaculty';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
@@ -19,11 +19,9 @@ type ConfirmState =
 const EMPTY_LESSON: LessonDraft = {
   title: '',
   videoType: 'youtube',
+  videoSrc: '',
   dur: '',
   desc: '',
-  hasUy: false,
-  uyText: '',
-  uyDeadline: '',
 };
 
 export function CourseDetail({ meta }: { meta: AdminCourse }) {
@@ -187,11 +185,9 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
                   draft: {
                     title: lesson.title,
                     videoType: lesson.videoType,
+                    videoSrc: lesson.videoSrc,
                     dur: lesson.dur.replace(' daq', ''),
                     desc: lesson.desc,
-                    hasUy: !!lesson.uy,
-                    uyText: lesson.uy?.text ?? '',
-                    uyDeadline: lesson.uy?.deadline ?? '',
                   },
                 })
               }

@@ -9,15 +9,16 @@ export interface TopicDraft {
   order: string;
 }
 
-/** Черновик урока. */
+/**
+ * Черновик материала. Домашнего задания здесь нет: на бэкенде задания привязаны
+ * к курсу отдельной таблицей, и ведёт их раздел «Vazifalar».
+ */
 export interface LessonDraft {
   title: string;
   videoType: Lesson['videoType'];
+  videoSrc: string;
   dur: string;
   desc: string;
-  hasUy: boolean;
-  uyText: string;
-  uyDeadline: string;
 }
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -49,6 +50,7 @@ interface CoursesState {
     fromId: number,
     toId: number,
   ) => Promise<void>;
+  setCompleted: (courseId: number, lessonId: number, completed: boolean) => Promise<void>;
 }
 
 /** Текущий запрос списка, чтобы StrictMode не слал его дважды. */
@@ -126,8 +128,8 @@ export const useCoursesStore = create<CoursesState>()((set, get) => ({
     );
     if (!order) return;
 
-    const updated = await api.reorderCourse(courseId, { topics: order });
-    set((s) => ({ byId: { ...s.byId, [courseId]: updated } }));
+    await api.reorderTopics(order);
+    await refresh(set, courseId);
   },
 
   reorderLessons: async (courseId, topicId, fromId, toId) => {
@@ -141,8 +143,14 @@ export const useCoursesStore = create<CoursesState>()((set, get) => ({
     );
     if (!order) return;
 
-    const updated = await api.reorderCourse(courseId, { topicId, lessons: order });
-    set((s) => ({ byId: { ...s.byId, [courseId]: updated } }));
+    await api.reorderMaterials(order);
+    await refresh(set, courseId);
+  },
+
+  /** Отметка «прошёл материал». Своя, а не курса — поэтому только перечитываем. */
+  setCompleted: async (courseId, lessonId, completed) => {
+    await api.setLessonCompleted(lessonId, completed);
+    await refresh(set, courseId);
   },
 }));
 
