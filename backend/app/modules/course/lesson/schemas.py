@@ -95,6 +95,8 @@ class LessonListResponse(BaseModel):
 class LessonResultUserInfo(BaseModel):
     id: int
     username: str
+    # Журнал подписывает строки ФИО, а не логином.
+    full_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -110,14 +112,16 @@ class LessonResultsBulkUpsertRequest(BaseModel):
 
 
 class LessonResultResponse(BaseModel):
-    id: int
+    # None у строк, которые ещё не сохранены: журнал показывает всю группу, а
+    # не только тех, кому уже поставили отметку.
+    id: Optional[int] = None
     lesson_id: int
     user_id: int
-    attendance: str
+    attendance: Optional[str] = None
     grade: Optional[int] = None
     notes: Optional[str] = None
-    created_at: TashkentDatetime
-    updated_at: TashkentDatetime
+    created_at: Optional[TashkentDatetime] = None
+    updated_at: Optional[TashkentDatetime] = None
     user: Optional[LessonResultUserInfo] = None
 
     model_config = ConfigDict(from_attributes=True)

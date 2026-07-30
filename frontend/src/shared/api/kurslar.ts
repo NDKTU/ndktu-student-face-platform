@@ -94,6 +94,7 @@ function toAdminCourse(course: ApiCourse): AdminCourse {
     id: course.id,
     fan: course.subject?.name ?? course.name,
     guruh: course.groups.map((g) => g.name).join(', '),
+    guruhlar: course.groups,
     oqituvchi: course.teacher?.full_name ?? course.teacher?.username ?? '',
     fac: course.faculty?.name ?? '',
     kaf: course.kafedra?.name ?? '',

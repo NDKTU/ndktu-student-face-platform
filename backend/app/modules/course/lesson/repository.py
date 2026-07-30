@@ -18,6 +18,7 @@ from .schemas import (
     LessonResultListResponse,
     LessonResultResponse,
     LessonResultsBulkUpsertRequest,
+    LessonResultUserInfo,
     LessonUpdateRequest,
 )
 
@@ -320,10 +321,54 @@ class LessonRepository:
 
         results = (await session.execute(stmt)).scalars().all()
 
-        return LessonResultListResponse(
-            total=len(results),
-            results=[LessonResultResponse.model_validate(r) for r in results],
+        # Студент видит только свою строку — состав группы ему не нужен.
+        if is_student and not is_admin:
+            return LessonResultListResponse(
+                total=len(results),
+                results=[LessonResultResponse.model_validate(r) for r in results],
+            )
+
+        # Преподавателю журнал открывается на всю группу: без этого у нового
+        # занятия не было бы ни одной строки, которую можно заполнить.
+        roster = (
+            (
+                await session.execute(
+                    select(Student)
+                    # Логин берём из связанного User: у ещё не заполненной строки
+                    # журнала нет LessonResult, из которого его можно достать.
+                    .options(selectinload(Student.user))
+                    .where(Student.group_id == lesson.group_id, Student.user_id.is_not(None))
+                    .order_by(Student.full_name)
+                )
+            )
+            .scalars()
+            .all()
         )
+
+        saved = {r.user_id: r for r in results}
+        rows: list[LessonResultResponse] = []
+
+        for student in roster:
+            info = LessonResultUserInfo(
+                id=student.user_id,
+                username=student.user.username if student.user else "",
+                full_name=student.full_name,
+            )
+            existing = saved.pop(student.user_id, None)
+            if existing is not None:
+                row = LessonResultResponse.model_validate(existing)
+                rows.append(row.model_copy(update={"user": info}))
+            else:
+                rows.append(
+                    LessonResultResponse(lesson_id=lesson_id, user_id=student.user_id, user=info)
+                )
+
+        # Отметки тех, кто в группе уже не числится, теряться не должны:
+        # студент мог перевестись после занятия.
+        for leftover in saved.values():
+            rows.append(LessonResultResponse.model_validate(leftover))
+
+        return LessonResultListResponse(total=len(rows), results=rows)
 
     async def upsert_lesson_results(
         self,

@@ -61,5 +61,51 @@
     "deleted": "O'chirildi"
   },
   "confirmMavzu": "Bu mavzu va uning barcha darslari o'chiriladi.",
-  "confirmDars": "Bu dars o'chiriladi."
+  "confirmDars": "Bu dars o'chiriladi.",
+  "tab": {
+    "content": "Kurs kontenti",
+    "journal": "Dars jurnali"
+  },
+  "journal": {
+    "count": "{{count}} ta mashg'ulot",
+    "addLesson": "Mashg'ulot qo'shish",
+    "emptyTitle": "Hali mashg'ulot yo'q",
+    "emptyText": "Davomat va baholarni kiritish uchun birinchi mashg'ulotni qo'shing.",
+    "open": "Jurnalni ochish",
+    "hide": "Yopish",
+    "noStudents": "Bu guruhda talaba topilmadi.",
+    "unsaved": "Saqlanmagan o'zgarishlar bor",
+    "allSaved": "Hammasi saqlangan",
+    "saving": "Saqlanmoqda…",
+    "saved": "Jurnal saqlandi",
+    "lessonAdded": "Mashg'ulot qo'shildi",
+    "newLesson": "Yangi mashg'ulot",
+    "deleteLesson": "Mashg'ulotni o'chirish",
+    "confirmLesson": "Bu mashg'ulot va uning barcha davomat yozuvlari o'chiriladi.",
+    "group": "Guruh",
+    "noGroups": "Kursga guruh biriktirilmagan",
+    "topic": "Mavzu",
+    "date": "Sana",
+    "lessonType": "Mashg'ulot turi",
+    "groupRequired": "Guruhni tanlang",
+    "topicRequired": "Mavzuni kiriting",
+    "dateRequired": "Sanani kiriting",
+    "column": {
+      "student": "Talaba",
+      "attendance": "Davomat",
+      "grade": "Baho",
+      "notes": "Izoh"
+    },
+    "attendance": {
+      "present": "Keldi",
+      "late": "Kechikdi",
+      "absent": "Kelmadi"
+    },
+    "type": {
+      "lecture": "Ma'ruza",
+      "seminar": "Seminar",
+      "lab": "Laboratoriya",
+      "independent": "Mustaqil ish"
+    }
+  }
 }

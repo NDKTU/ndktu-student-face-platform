@@ -50,6 +50,11 @@ export interface AdminCourse {
   id: number;
   fan: string;
   guruh: string;
+  /**
+   * Те же группы, но с id: журнал занятий ведётся по конкретной группе, а не по
+   * склеенной строке из таблицы.
+   */
+  guruhlar: { id: number; name: string }[];
   oqituvchi: string;
   fac: string;
   kaf: string;

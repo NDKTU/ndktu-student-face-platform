@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCoursesStore, type LessonDraft, type TopicDraft } from '@/features/kurslar/model/courses.store';
 import type { AdminCourse, Lesson, Topic } from '@/entities/course/model/types';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
 import { shortFaculty } from '@/shared/lib/shortFaculty';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -9,6 +10,7 @@ import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { RowMenu } from '@/shared/ui/RowMenu';
 import { useToast } from '@/shared/ui/Toast';
 import { TopicModal, LessonModal } from './CourseModals';
+import { JournalTab } from './JournalTab';
 
 type TopicModalState = { mode: 'add' | 'edit'; id?: number; draft: TopicDraft };
 type LessonModalState = { mode: 'add' | 'edit'; topicId: number; id?: number; draft: LessonDraft };
@@ -27,6 +29,12 @@ const EMPTY_LESSON: LessonDraft = {
 export function CourseDetail({ meta }: { meta: AdminCourse }) {
   const { t } = useTranslation('kurslar');
   const toast = useToast();
+  const { has } = usePermissions();
+
+  // Журнал занятий — отдельная вкладка, и она есть только у того, кто вообще
+  // видит занятия: студенту без `read:lesson` показывать пустую таблицу незачем.
+  const canSeeJournal = has('read:lesson');
+  const [tab, setTab] = useState<'content' | 'journal'>('content');
 
   const course = useCoursesStore((s) => s.byId[meta.id]);
   const loadCourse = useCoursesStore((s) => s.loadCourse);
@@ -140,17 +148,41 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
             })}
           </div>
         </div>
-        <Button
-          className="h-[38px] rounded-11 px-4"
-          onClick={() =>
-            setTopicModal({ mode: 'add', draft: { name: '', order: String(course.mavzular.length + 1) } })
-          }
-        >
-          + {t('detail.addMavzu')}
-        </Button>
+        {tab === 'content' && (
+          <Button
+            className="h-[38px] rounded-11 px-4"
+            onClick={() =>
+              setTopicModal({
+                mode: 'add',
+                draft: { name: '', order: String(course.mavzular.length + 1) },
+              })
+            }
+          >
+            + {t('detail.addMavzu')}
+          </Button>
+        )}
       </div>
 
-      {course.mavzular.length === 0 ? (
+      {canSeeJournal && (
+        <div className="mb-5 flex gap-1 rounded-12 border border-line bg-surface p-1 shadow-card">
+          {(['content', 'journal'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={`h-[34px] cursor-pointer rounded-9 border-none px-4 text-13 font-bold ${
+                tab === key ? 'bg-brand text-white' : 'bg-transparent text-ink-secondary'
+              }`}
+            >
+              {t(`tab.${key}`)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'journal' && canSeeJournal ? (
+        <JournalTab meta={meta} />
+      ) : course.mavzular.length === 0 ? (
         <div className="rounded-18 border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
           <div className="mx-auto mb-3.5 grid size-[54px] place-items-center rounded-15 bg-brand-soft text-brand">
             <BookIcon />

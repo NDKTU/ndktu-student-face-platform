@@ -26,6 +26,7 @@ function meta(id: number): AdminCourse {
     id,
     fan: 'Oliy matematika',
     guruh: 'KI-24-01',
+    guruhlar: [{ id: 11, name: 'KI-24-01' }],
     oqituvchi: 'Bozorov D.',
     fac: 'Konchilik fakulteti',
     kaf: 'Konchilik kafedrasi',
