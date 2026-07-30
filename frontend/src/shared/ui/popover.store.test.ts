@@ -12,14 +12,6 @@ describe('popover store', () => {
     expect(store().openId).toBeNull();
   });
 
-  it('открытие второго поповера закрывает первый', () => {
-    store().toggle('notifications');
-    expect(store().openId).toBe('notifications');
-
-    store().toggle('avatar');
-    expect(store().openId).toBe('avatar');
-  });
-
   it('повторное нажатие на тот же поповер закрывает его', () => {
     store().toggle('avatar');
     store().toggle('avatar');
@@ -27,7 +19,7 @@ describe('popover store', () => {
   });
 
   it('close закрывает что бы ни было открыто', () => {
-    store().toggle('notifications');
+    store().toggle('avatar');
     store().close();
     expect(store().openId).toBeNull();
   });

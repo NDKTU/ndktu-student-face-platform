@@ -1,0 +1,29 @@
+{
+  "subjects": {
+    "title": "Mening fanlarim",
+    "subtitle": "Sizga biriktirilgan fanlar va guruhlar",
+    "subjects": "Fanlar ({{count}})",
+    "groups": "Guruhlar ({{count}})",
+    "noSubjects": "Sizga fan biriktirilmagan.",
+    "noGroups": "Sizga guruh biriktirilmagan."
+  },
+  "group": {
+    "title": "Mening guruhim",
+    "card": "Ma'lumotlarim",
+    "classmates": "Guruhdoshlar ({{count}})",
+    "notStudent": "Bu bo'lim faqat talabalar uchun.",
+    "noGroup": "Siz hech qaysi guruhga biriktirilmagansiz.",
+    "empty": "Guruhda boshqa talaba yo'q.",
+    "field": {
+      "group": "Guruh",
+      "faculty": "Fakultet",
+      "specialty": "Mutaxassislik",
+      "level": "Kurs",
+      "semester": "Semestr",
+      "educationForm": "Ta'lim shakli",
+      "educationType": "Ta'lim turi",
+      "paymentForm": "To'lov shakli"
+    },
+    "classmatesDenied": "Guruhdoshlar ro'yxatini ko'rishga ruxsatingiz yo'q."
+  }
+}

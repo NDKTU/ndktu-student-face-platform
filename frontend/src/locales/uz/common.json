@@ -17,12 +17,6 @@
     "title": "Natija topilmadi",
     "text": "Filtrlarni o'zgartiring."
   },
-  "notifications": {
-    "title": "Bildirishnomalar",
-    "empty": "Yangi bildirishnoma yo'q",
-    "markAllRead": "Barchasini oʻqilgan deb belgilash",
-    "allMarked": "Barcha bildirishnomalar oʻqilgan deb belgilandi"
-  },
   "unit": {
     "student": "Talaba",
     "students": "ta",

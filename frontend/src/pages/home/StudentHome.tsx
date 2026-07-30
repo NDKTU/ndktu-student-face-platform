@@ -125,7 +125,7 @@ export function StudentHome() {
               <h3 className="m-0 text-16 font-bold text-ink">{t('student.subjects')}</h3>
               <button
                 type="button"
-                onClick={() => navigate('/fanlarim')}
+                onClick={() => navigate('/kurslar')}
                 className="cursor-pointer border-none bg-transparent p-0 text-12-5 font-bold text-brand hover:underline"
               >
                 {t('student.all')}

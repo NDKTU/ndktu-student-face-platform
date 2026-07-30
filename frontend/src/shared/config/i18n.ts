@@ -6,6 +6,7 @@ import uzCommon from '@/locales/uz/common.json';
 import uzDashboard from '@/locales/uz/dashboard.json';
 import uzFanlar from '@/locales/uz/fanlar.json';
 import uzKurslar from '@/locales/uz/kurslar.json';
+import uzMening from '@/locales/uz/mening.json';
 import uzNav from '@/locales/uz/nav.json';
 import uzProfil from '@/locales/uz/profil.json';
 import uzPsixologiya from '@/locales/uz/psixologiya.json';
@@ -35,6 +36,7 @@ export const resources = {
     dashboard: uzDashboard,
     fanlar: uzFanlar,
     kurslar: uzKurslar,
+    mening: uzMening,
     nav: uzNav,
     profil: uzProfil,
     psixologiya: uzPsixologiya,

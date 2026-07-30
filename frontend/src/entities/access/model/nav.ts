@@ -51,7 +51,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
   { key: 'stestlar', path: '/stestlar', section: 'asosiy', permission: 'quiz_process:start_quiz', persona: 'student' },
   { key: 'svazlar', path: '/svazlar', section: 'asosiy', permission: 'create:submission', persona: 'student' },
-  { key: 'fanlarim', path: '/fanlarim', section: 'asosiy', persona: 'student' },
   { key: 'guruhim', path: '/guruhim', section: 'asosiy', persona: 'student' },
 
   {
@@ -67,7 +66,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'sozlamalar', path: '/sozlamalar', section: 'boshqaruv' },
 
   { key: 'profil', path: '/profil', section: 'boshqaruv', hidden: true },
-  { key: 'bildirishnomalar', path: '/bildirishnomalar', section: 'boshqaruv', hidden: true },
 ];
 
 const BY_KEY = new Map(NAV_ITEMS.map((item) => [item.key, item]));

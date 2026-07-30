@@ -1,5 +1,5 @@
 import { getAll } from './envelope';
-import { api } from './http';
+import { api, ApiError } from './http';
 
 /**
  * Что закреплено лично за владельцем токена: его предметы, группы и активные
@@ -27,14 +27,36 @@ interface ApiAssignedGroups {
   group_teachers: { group_id: number; group: { id: number; name: string } }[];
 }
 
-export async function getMySubjects(userId: number): Promise<AssignedSubject[]> {
-  const data = await api.get<ApiAssignedSubjects>(`/teacher/assigned_subjects/by-user/${userId}`);
-  return (data.subject_teachers ?? []).map((st) => ({ id: st.subject.id, name: st.subject.name }));
+/**
+ * У пользователя без карточки преподавателя оба эндпоинта отвечают 404
+ * («Teacher not found for this user»). Это не сбой: закреплений просто нет, и
+ * показывать вместо пустого списка экран ошибки было бы неверно.
+ */
+async function assignedOrEmpty<T>(request: Promise<T[]>): Promise<T[]> {
+  try {
+    return await request;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return [];
+    throw e;
+  }
 }
 
-export async function getMyGroups(userId: number): Promise<AssignedGroup[]> {
-  const data = await api.get<ApiAssignedGroups>(`/teacher/assigned_groups/by-user/${userId}`);
-  return (data.group_teachers ?? []).map((gt) => ({ id: gt.group.id, name: gt.group.name }));
+export function getMySubjects(userId: number): Promise<AssignedSubject[]> {
+  return assignedOrEmpty(
+    api
+      .get<ApiAssignedSubjects>(`/teacher/assigned_subjects/by-user/${userId}`)
+      .then((data) =>
+        (data.subject_teachers ?? []).map((st) => ({ id: st.subject.id, name: st.subject.name })),
+      ),
+  );
+}
+
+export function getMyGroups(userId: number): Promise<AssignedGroup[]> {
+  return assignedOrEmpty(
+    api
+      .get<ApiAssignedGroups>(`/teacher/assigned_groups/by-user/${userId}`)
+      .then((data) => (data.group_teachers ?? []).map((gt) => ({ id: gt.group.id, name: gt.group.name }))),
+  );
 }
 
 export interface ActiveQuiz {

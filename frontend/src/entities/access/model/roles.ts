@@ -37,11 +37,9 @@ export const NAV_KEYS = [
   'tfanlarim',
   'tvazlar',
   'guruhim',
-  'fanlarim',
   'stestlar',
   'svazlar',
   'profil',
-  'bildirishnomalar',
 ] as const;
 
 export type NavKey = (typeof NAV_KEYS)[number];

@@ -20,6 +20,8 @@ import { SavollarPage } from '@/pages/savollar/SavollarPage';
 import { KurslarPage } from '@/pages/kurslar/KurslarPage';
 import { ReytingPage } from '@/pages/reyting/ReytingPage';
 import { PsixologiyaPage } from '@/pages/psixologiya/PsixologiyaPage';
+import { TeacherSubjectsPage } from '@/pages/mening/TeacherSubjectsPage';
+import { MyGroupPage } from '@/pages/mening/MyGroupPage';
 import { StudentTestlarPage } from '@/pages/testlar/StudentTestlarPage';
 import { TeacherTestlarPage } from '@/pages/testlar/TeacherTestlarPage';
 import { AdminTestlarPage } from '@/pages/testlar/AdminTestlarPage';
@@ -102,6 +104,8 @@ function AuthenticatedRoutes() {
     ['svazlar', '/svazlar', () => <StudentVazifalarPage />],
     ['tvazlar', '/tvazlar', () => <TeacherVazifalarPage />],
     ['avazlar', '/avazlar', () => <AdminVazifalarPage />],
+    ['tfanlarim', '/tfanlarim', () => <TeacherSubjectsPage />],
+    ['guruhim', '/guruhim', () => <MyGroupPage />],
     ['sozlamalar', '/sozlamalar', () => <SozlamalarPage />],
     ['profil', '/profil', () => <ProfilPage />],
   ];
