@@ -34,6 +34,8 @@ Baseline captured before any change: **ruff 72 errors · pytest 1 failed / 151 e
 | F02 | The three image-upload handlers wrote whatever they were sent — no extension, type or size check — into a directory served as static content from the SPA's own origin. All three now go through one validator: raster-image allowlist, 5 MB cap, chunked read, UUID filename. | new `backend/app/core/utils/upload.py`; `quiz/question/repository.py:249`, `quiz/quiz/repository.py:475`, `auth/employee/repository.py:35` | Live probes as admin against all three endpoints: `.html` payload → **400** on each; `.svg` → **400**; 6 MB PNG → **400** ("must not exceed 5MB"); valid 1×1 PNG → **200** with a URL. Disk checked after the rejected 6 MB upload: no partial file, no file over 5 MB, count back to its original 7. ruff **72 → 72**. pytest **1 failed / 151 errors → 1 failed / 151 errors**. | ✅ Done |
 | F07 | `APP_CONFIG__SERVER__IS_PROD` was documented in `.env.example`, set in the real `.env`, and did not exist in code — `extra="ignore"` swallowed it, so `/docs`, `/redoc` and `/openapi.json` were public no matter what the operator configured. Implemented it, mirroring the face-detection service which already had exactly this. | `backend/app/core/config.py:18`, `backend/app/main.py:15-21` | With the current `IS_PROD=False`: `/docs`, `/redoc`, `/openapi.json`, `/health` all still **200**. With `IS_PROD=True` injected into the environment, importing the app yields `docs_url=None`, `redoc_url=None`, `openapi_url=None`; the same probe at `False` yields the three real paths. `/health` is deliberately not gated — the compose healthcheck depends on it. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 | F08 | Every list input accepted an unbounded `limit`; `?limit=100000000` returned 200 and made the server materialise whole tables with their eager loads. All 27 schema fields and 5 raw router params now carry `ge=1, le=MAX_PAGE_SIZE` (1000). | new constant in `backend/app/core/schemas.py:25`; 23 `schemas.py` files; `auth/router.py`, `organization_structure/router.py`, `course/router.py` | Probes as admin: `limit=100000000` → **422** on `/user/`, `/students/`, `/teacher/ranking/overall`, `/group/{id}/students`, `/assignment/pending`; `limit=99999` → 422; `limit=0` → 422. Legitimate traffic unchanged: `limit=1000` → 200, `limit=200` → 200, default (no param) → 200. Frontend `tsc --noEmit` clean; its largest real request is 1000 (ranking CSV export) and still passes. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
+| F03 | `GET /api/result/{id}` returned any result to any holder of `read:result`, while the list endpoint carefully scoped by role. The role predicate is now extracted into `ResultRepository.scope_filter` and applied by both. Unauthorised reads answer 404, not 403, so the response does not confirm which ids exist. | `quiz/result/repository.py:21-95`, `quiz/router.py:490` | Probes with three real accounts against two seeded results (one owned by the student, one not): admin **200/200**; student **200** on its own, **404** on the other; teacher with no assignments **404/404** (the `Result.id == -1` branch). `GET /result/` after the refactor: admin `total=2`, student `total=1` — the count is scoped too. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
+| F04 | `GET /api/user_answers/` built every filter from the query string and none from the caller, so `?user_id=<anyone>` returned their submitted answers together with `correct_answer`. It now reuses the same `scope_filter`, restricted through the answer's `result_id`. | `quiz/user_answers/repository.py:15-38`, `quiz/router.py:534` | Probes against two seeded answers: admin sees both; student sees only its own; `?user_id=1` → **total 0**; `?result_id=2` → **total 0**. The count query shares the same filter list, so `total` cannot leak either. ruff **72 → 72**. pytest unchanged. | ✅ Done |
 
 ### F01 — notes
 
@@ -124,3 +126,32 @@ OFFSET, and adding `ge=1` there would be scope creep.
 repository function signatures (e.g. `course/assignment/repository.py:250`). Those are
 internal Python defaults invoked with an already-validated value from the router; they
 are not request inputs and carry no attack surface.
+
+### F03 / F04 — notes
+
+Fixed together: the same defect in the same module, and F04's scope is defined in
+terms of F03's.
+
+**A latent crash was found and fixed while extracting.** `list_results` computed the
+count in a second query that referenced `is_admin` / `is_teacher` / `teacher_filter`.
+Removing those locals in favour of the shared predicate would have left the count block
+raising `NameError` on every `GET /api/result/`. Caught before rebuilding; the count now
+uses the same `scope`, which also means `total` no longer reports how many rows exist
+when none of them are visible.
+
+**The fail-open for custom roles is preserved, deliberately.** `scope_filter` returns
+`None` — meaning "everything" — for a user who is neither `admin`, `teacher` nor
+`student` by role name. A role such as `dekan` holding `read:result` therefore still
+sees every result. That is F05, not F03: closing it here would have changed behaviour
+the list endpoint has always had, and silently. It is now written down in the
+docstring, and because both endpoints share one predicate, F05 becomes a one-place fix
+for this module.
+
+**Legacy rows in `user_answers` are now invisible to teachers.** Scoping goes through
+`result_id`, and that column is nullable — rows written before it existed have `NULL`
+and match no result. A student still sees their own such rows only if they carry a
+`result_id`. This instance has zero rows in the table, so nothing was observable to
+verify against; in a production database with pre-`result_id` history a teacher would
+lose access to it. Chosen deliberately: for a security fix the safe direction is deny,
+and the endpoint is not called by the SPA at all, so nothing in the product depends on
+it today.

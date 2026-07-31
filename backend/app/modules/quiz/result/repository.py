@@ -18,7 +18,57 @@ logger = logging.getLogger(__name__)
 
 
 class ResultRepository:
-    async def get_result(self, session: AsyncSession, result_id: int) -> Result:
+    async def scope_filter(self, session: AsyncSession, current_user: User):
+        """Условие «какие Result видит этот пользователь», или None — «все».
+
+        Вынесено из list_results, потому что выборка по id должна отвечать на тот
+        же вопрос теми же словами: раньше список аккуратно резал видимость по
+        роли, а `/result/{id}` не проверял ничего, и перебором id читались чужие
+        оценки вместе с доказательствами прокторинга.
+
+        ВНИМАНИЕ: у пользователя, который не admin/teacher/student (например
+        роль `dekan` с правом read:result), не срабатывает ни одна ветка и он
+        видит всё. Это F05 — авторизация по имени роли; здесь поведение
+        сохранено как есть, чтобы список и деталь не разъехались.
+        """
+        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
+        is_student = any(role.name.lower() == "student" for role in current_user.roles)
+
+        if is_admin:
+            return None
+
+        if is_teacher:
+            allowed_group_ids = (
+                await session.execute(
+                    select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+                )
+            ).scalars().all()
+
+            allowed_subject_ids = (
+                await session.execute(
+                    select(SubjectTeacher.subject_id)
+                    .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+                    .join(Employee, Teacher.employee_id == Employee.id)
+                    .where(Employee.user_id == current_user.id)
+                )
+            ).scalars().all()
+
+            if allowed_group_ids and allowed_subject_ids:
+                return Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
+            if allowed_group_ids:
+                return Result.group_id.in_(allowed_group_ids)
+            if allowed_subject_ids:
+                return Result.subject_id.in_(allowed_subject_ids)
+            # Ничего не закреплено — не видит ничего.
+            return Result.id == -1
+
+        if is_student:
+            return Result.user_id == current_user.id
+
+        return None
+
+    async def get_result(self, session: AsyncSession, result_id: int, current_user: User) -> Result:
         stmt = (
             select(Result)
             .options(
@@ -29,10 +79,17 @@ class ResultRepository:
             )
             .where(Result.id == result_id)
         )
+
+        scope = await self.scope_filter(session, current_user)
+        if scope is not None:
+            stmt = stmt.where(scope)
+
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
 
         if not obj:
+            # 404, а не 403, и для чужой записи тоже: иначе ответ сам сообщал бы,
+            # какие id существуют.
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
         return obj
@@ -62,47 +119,10 @@ class ResultRepository:
         if request.username:
             stmt = stmt.outerjoin(User, Result.user_id == User.id).outerjoin(Student, User.id == Student.user_id)
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_student = any(role.name.lower() == "student" for role in current_user.roles)
-
-        teacher_filter = None
-
-        if is_admin:
-            # Admins see everything, no role-based filter applied
-            pass
-        elif is_teacher:
-            # Get teacher's assigned groups (group_teachers.teacher_id = users.id)
-            gt_stmt = select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
-            gt_result = await session.execute(gt_stmt)
-            allowed_group_ids = gt_result.scalars().all()
-
-            # Get teacher's assigned subjects (subject_teachers.teacher_id = teachers.id)
-            st_stmt = (
-                select(SubjectTeacher.subject_id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
-            )
-            st_result = await session.execute(st_stmt)
-            allowed_subject_ids = st_result.scalars().all()
-
-            if allowed_group_ids and allowed_subject_ids:
-                teacher_filter = Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
-            elif allowed_group_ids:
-                teacher_filter = Result.group_id.in_(allowed_group_ids)
-            elif allowed_subject_ids:
-                teacher_filter = Result.subject_id.in_(allowed_subject_ids)
-            else:
-                # If a teacher has no assigned groups/subjects, they see nothing
-                teacher_filter = Result.id == -1
-
-            if teacher_filter is not None:
-                stmt = stmt.where(teacher_filter)
-
-        elif is_student:
-            # Students only see their own results
-            stmt = stmt.where(Result.user_id == current_user.id)
+        # Та же видимость, что и у выборки по id: одно условие, одно место.
+        scope = await self.scope_filter(session, current_user)
+        if scope is not None:
+            stmt = stmt.where(scope)
 
         if request.user_id:
             stmt = stmt.where(Result.user_id == request.user_id)
@@ -148,13 +168,10 @@ class ResultRepository:
                 Student, User.id == Student.user_id
             )
 
-        if is_admin:
-            # Admins see everything
-            pass
-        elif is_teacher and teacher_filter is not None:
-            count_stmt = count_stmt.where(teacher_filter)
-        elif is_student:
-            count_stmt = count_stmt.where(Result.user_id == current_user.id)
+        # Тот же scope, что и у выборки: иначе total сообщал бы, сколько записей
+        # существует на самом деле, даже когда видно из них ноль.
+        if scope is not None:
+            count_stmt = count_stmt.where(scope)
 
         if request.user_id:
             count_stmt = count_stmt.where(Result.user_id == request.user_id)

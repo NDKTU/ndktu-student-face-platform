@@ -4,7 +4,9 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.quiz.model import UserAnswers
+from app.modules.auth.model import User
+from app.modules.quiz.model import Result, UserAnswers
+from app.modules.quiz.result.repository import get_result_repository
 
 from .schemas import UserAnswersListRequest, UserAnswersListResponse
 
@@ -12,12 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 class UserAnswersRepository:
-    async def get_all(self, session: AsyncSession, data: UserAnswersListRequest) -> UserAnswersListResponse:
+    async def get_all(
+        self, session: AsyncSession, data: UserAnswersListRequest, current_user: User
+    ) -> UserAnswersListResponse:
         stmt = select(UserAnswers).options(
             selectinload(UserAnswers.question),
         )
 
         filters = []
+
+        # Раньше здесь не было ни одного условия от текущего пользователя: все
+        # фильтры приходили из query-строки, поэтому `?user_id=<чужой>` отдавал
+        # чужие ответы вместе с correct_answer — во время экзамена это готовый
+        # ключ. Видимость определяем той же областью, что и у Result: чьи
+        # попытки можно смотреть, того и ответы.
+        scope = await get_result_repository.scope_filter(session, current_user)
+        if scope is not None:
+            visible_results = select(Result.id).where(scope)
+            filters.append(UserAnswers.result_id.in_(visible_results))
         if data.result_id is not None:
             # Strict path: a specific attempt was requested — scope to its UserAnswers only.
             filters.append(UserAnswers.result_id == data.result_id)

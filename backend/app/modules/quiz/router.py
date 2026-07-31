@@ -488,9 +488,11 @@ result_router = APIRouter(
 async def get_result(
     result_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:result")),
+    current_user: User = Depends(PermissionRequired("read:result")),
 ):
-    return await get_result_repository.get_result(session=session, result_id=result_id)
+    return await get_result_repository.get_result(
+        session=session, result_id=result_id, current_user=current_user
+    )
 
 
 @result_router.get("/", response_model=ResultListResponse)
@@ -528,9 +530,9 @@ user_answers_router = APIRouter(
 async def get_user_answers(
     data: UserAnswersListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("user_answers:read")),
+    current_user: User = Depends(PermissionRequired("user_answers:read")),
 ):
-    return await user_answers_repository.get_all(session, data)
+    return await user_answers_repository.get_all(session, data, current_user=current_user)
 
 
 # ============================================================================
