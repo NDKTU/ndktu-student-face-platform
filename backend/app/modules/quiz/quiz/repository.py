@@ -1,6 +1,7 @@
 import logging
 
 from core.config import settings
+from core.utils.upload import save_image_upload
 from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -472,22 +473,7 @@ class QuizRepository:
         return new_quiz
 
     async def upload_image(self, file) -> str:
-        import os
-        import shutil
-        import uuid
-
-        # Generate unique filename
-        file_ext = file.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{file_ext}"
-
-        upload_dir = settings.question_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = upload_dir / filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        return f"{settings.file_url.http}/question/{filename}"
+        return await save_image_upload(file, settings.question_upload_dir, "question")
 
 
 get_quiz_repository = QuizRepository()
