@@ -9,6 +9,7 @@ from app.modules.organization_structure.model import Faculty
 
 from .schemas import (
     FacultyCreateRequest,
+    FacultyUpdateRequest,
     FacultyListRequest,
     FacultyListResponse,
 )
@@ -97,7 +98,7 @@ class FacultyRepository:
 
         return FacultyListResponse(total=total, page=request.page, limit=request.limit, faculties=faculties)
 
-    async def update_faculty(self, session: AsyncSession, faculty_id: int, data: FacultyCreateRequest) -> Faculty:
+    async def update_faculty(self, session: AsyncSession, faculty_id: int, data: FacultyUpdateRequest) -> Faculty:
         stmt = select(Faculty).where(Faculty.id == faculty_id)
         result = await session.execute(stmt)
         faculty = result.scalar_one_or_none()
@@ -117,12 +118,13 @@ class FacultyRepository:
                 )
             faculty.name = data.name
 
-        # Те же необязательные поля, что и при создании. None означает
-        # «не трогать»: форма присылает только то, что редактировала.
+        # Смотрим на то, что реально пришло в теле, а не на значение. `None` и
+        # «поле не прислали» — разные намерения: первое означает «очистить»,
+        # второе «не трогать». По значению их не различить, и снять декана с
+        # факультета было нечем.
         for _field in ('code', 'dekan_user_id', 'dekan_name', 'color_bg', 'color_fg'):
-            _value = getattr(data, _field, None)
-            if _value is not None:
-                setattr(faculty, _field, _value)
+            if _field in data.model_fields_set:
+                setattr(faculty, _field, getattr(data, _field))
 
         await session.commit()
         await session.refresh(faculty)

@@ -30,6 +30,7 @@ from .department.schemas import (
 from .faculty.repository import get_faculty_repository
 from .faculty.schemas import (
     FacultyCreateRequest,
+    FacultyUpdateRequest,
     FacultyCreateResponse,
     FacultyListRequest,
     FacultyListResponse,
@@ -44,6 +45,7 @@ from .group.schemas import (
 from .kafedra.repository import get_kafedra_repository
 from .kafedra.schemas import (
     KafedraCreateRequest,
+    KafedraUpdateRequest,
     KafedraCreateResponse,
     KafedraListRequest,
     KafedraListResponse,
@@ -111,7 +113,7 @@ async def list_faculties(
 )
 async def update_faculty(
     faculty_id: int,
-    data: FacultyCreateRequest,
+    data: FacultyUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:faculty")),
 ):
@@ -182,7 +184,7 @@ async def list_kafedras(
 )
 async def update_kafedra(
     kafedra_id: int,
-    data: KafedraCreateRequest,
+    data: KafedraUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:kafedra")),
 ):

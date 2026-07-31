@@ -97,6 +97,9 @@
   },
   "modal": {
     "addTitle": "{{level}} qo'shish",
-    "editTitle": "{{level}}ni tahrirlash"
+    "editTitle": "{{level}}ni tahrirlash",
+    "unassigned": "Tanlanmagan",
+    "noCandidates": "Bo'sh nomzod yo'q. «Rollar va ruxsatlar» bo'limida `{{role}}` rolini yarating va uni xodimga bering.",
+    "nameHint": "Saqlanadi: {{preview}}"
   }
 }

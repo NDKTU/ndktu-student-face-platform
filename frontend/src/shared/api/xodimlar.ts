@@ -138,3 +138,28 @@ export async function getEmployeeSensitive(id: number): Promise<EmployeeSensitiv
     address: data.address ?? '',
   };
 }
+
+/**
+ * Кандидаты на структурный пост: декан факультета или заведующий кафедрой.
+ *
+ * Фильтрует сервер, а не клиент: «кто уже занимает пост» знают только таблицы
+ * faculties/kafedras, и вычислять это по загруженному дереву значило бы
+ * повторять серверное правило второй раз и разойтись с ним.
+ */
+export type StructuralPost = 'dekan' | 'kafedra_mudiri';
+
+export interface PostCandidate {
+  userId: number;
+  fullName: string;
+}
+
+export async function getPostCandidates(post: StructuralPost): Promise<PostCandidate[]> {
+  // Роль называется так же, как пост: отдельного справочника соответствий нет,
+  // и заводить его ради двух значений незачем.
+  const rows = await getAll<ApiEmployee>('/employee/', 'employees', {
+    role: post,
+    available_post: post,
+  });
+
+  return rows.map((row) => ({ userId: row.user_id, fullName: row.full_name }));
+}

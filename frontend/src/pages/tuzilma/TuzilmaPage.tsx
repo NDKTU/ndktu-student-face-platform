@@ -200,7 +200,12 @@ export function TuzilmaPage() {
         ],
         canWrite,
         onOpen: () => drillInto({ id: f.id, name: f.name }),
-        onEdit: () => openEdit(0, f.id, { name: f.name, dekan: f.dekan }),
+        onEdit: () =>
+          openEdit(0, f.id, {
+            name: f.name,
+            post: f.dekanUserId === null ? '' : String(f.dekanUserId),
+            postName: f.dekanUserId === null ? '' : f.dekan,
+          }),
         onDelete: () => openDelete(0, f.id, f.name),
       }));
     }
@@ -222,7 +227,12 @@ export function TuzilmaPage() {
         ],
         canWrite,
         onOpen: () => drillInto({ id: k.id, name: k.name }),
-        onEdit: () => openEdit(1, k.id, { name: k.name, mudir: k.mudir }),
+        onEdit: () =>
+          openEdit(1, k.id, {
+            name: k.name,
+            post: k.mudirUserId === null ? '' : String(k.mudirUserId),
+            postName: k.mudirUserId === null ? '' : k.mudir,
+          }),
         onDelete: () => openDelete(1, k.id, k.name),
       }));
     }

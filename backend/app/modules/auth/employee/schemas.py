@@ -1,7 +1,7 @@
 from datetime import date
 
 from app.core.schemas import TashkentDatetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -136,6 +136,12 @@ class EmployeeResponse(BaseModel):
 
 class EmployeeListRequest(BaseModel):
     full_name: Optional[str] = None
+    # Сотрудники с указанной ролью (сравнение без учёта регистра): роли заводит
+    # администратор руками, и «Dekan» с «dekan» — одно и то же.
+    role: Optional[str] = None
+    # Кто ещё не занимает структурную должность. Один человек — один пост:
+    # декан факультета не может быть заодно заведующим кафедрой.
+    available_post: Optional[Literal["dekan", "kafedra_mudiri"]] = None
 
     page: int = 1
     limit: int = 10

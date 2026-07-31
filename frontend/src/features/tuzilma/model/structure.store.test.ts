@@ -41,12 +41,14 @@ function buildFixture(): Faculty[] {
       id: base,
       name: `Fakultet ${f + 1}`,
       dekan: `Dekan ${f + 1}`,
+      dekanUserId: null,
       color: { bg: '#EEF1FF', fg: '#2836C7' },
       kafedralar: [
         {
           id: base + 10,
           name: `Kafedra ${f + 1}`,
           mudir: `Mudir ${f + 1}`,
+          mudirUserId: null,
           oqituvchilar: 4,
           teachers: [],
           mutaxassisliklar: [
@@ -160,16 +162,18 @@ describe('structure store — мутации', () => {
       id: 1,
       name: 'Yangi fakultet',
       dekan: 'Test Dekan',
+      dekanUserId: 7,
       color: { bg: '#fff', fg: '#000' },
       kafedralar: [],
     };
     api.createFaculty.mockResolvedValueOnce(created);
 
-    await store().addEntity(0, { name: 'Yangi fakultet', dekan: 'Test Dekan' });
+    await store().addEntity(0, { name: 'Yangi fakultet', post: '7', postName: 'Test Dekan' });
 
     expect(api.createFaculty).toHaveBeenCalledWith({
       name: 'Yangi fakultet',
-      dekan: 'Test Dekan',
+      dekanUserId: 7,
+      dekanName: 'Test Dekan',
     });
     expect(store().faculties).toHaveLength(7);
     expect(store().faculties.at(-1)!.id).toBe(1);
@@ -183,6 +187,7 @@ describe('structure store — мутации', () => {
       id: 900,
       name: 'K',
       mudir: '—',
+      mudirUserId: null,
       oqituvchilar: 0,
       teachers: [],
       mutaxassisliklar: [],
@@ -190,7 +195,13 @@ describe('structure store — мутации', () => {
 
     await store().addEntity(1, { name: 'K' });
 
-    expect(api.createDepartment).toHaveBeenCalledWith(faculty.id, { name: 'K', mudir: undefined });
+    expect(api.createDepartment).toHaveBeenCalledWith(faculty.id, {
+      name: 'K',
+      // Поле не трогали — id не уходит вовсе, иначе сервер понял бы это как
+      // «снять мудира».
+      mudirUserId: undefined,
+      mudirName: null,
+    });
     expect(store().faculties[0]!.kafedralar.at(-1)!.id).toBe(900);
   });
 
@@ -204,6 +215,7 @@ describe('structure store — мутации', () => {
       id: department.id,
       name: 'Qayta nomlangan kafedra',
       mudir: department.mudir,
+      mudirUserId: null,
       oqituvchilar: department.oqituvchilar,
       teachers: [],
       mutaxassisliklar: [],

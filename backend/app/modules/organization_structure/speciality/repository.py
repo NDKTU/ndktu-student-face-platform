@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class SpecialityRepository:
     async def create_speciality(self, session: AsyncSession, data: SpecialityCreateRequest) -> Speciality:
-        stmt_check = select(Speciality).where(Speciality.name == data.name)
+        stmt_check = select(Speciality).where(func.lower(Speciality.name) == data.name.lower())
         if (await session.execute(stmt_check)).scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,7 +119,7 @@ class SpecialityRepository:
 
         if data.name is not None:
             stmt_check = select(Speciality).where(
-                Speciality.name == data.name, Speciality.id != speciality_id
+                func.lower(Speciality.name) == data.name.lower(), Speciality.id != speciality_id
             )
             if (await session.execute(stmt_check)).scalar_one_or_none():
                 raise HTTPException(
@@ -131,12 +131,11 @@ class SpecialityRepository:
         if data.kafedra_id is not None:
             speciality.kafedra_id = data.kafedra_id
 
-        # Те же необязательные поля, что и при создании. None означает
-        # «не трогать»: форма присылает только то, что редактировала.
+        # См. update_faculty: различаем «прислали null» (очистить) и «не
+        # прислали вовсе» (не трогать).
         for _field in ('code', 'education_form', 'academic_year'):
-            _value = getattr(data, _field, None)
-            if _value is not None:
-                setattr(speciality, _field, _value)
+            if _field in data.model_fields_set:
+                setattr(speciality, _field, getattr(data, _field))
 
         try:
             await session.commit()

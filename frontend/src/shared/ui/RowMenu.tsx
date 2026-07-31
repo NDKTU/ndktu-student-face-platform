@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface RowMenuItem {
+  /** Подпись: видна в меню и всегда доступна экранному диктору. */
   label: string;
+  /** С иконкой пункт рисуется квадратной кнопкой без текста. */
+  icon?: ReactNode;
   danger?: boolean;
   onClick: () => void;
 }
@@ -12,6 +15,8 @@ export interface RowMenuItem {
  */
 export function RowMenu({ items }: { items: RowMenuItem[] }) {
   const [open, setOpen] = useState(false);
+  // Меню из одних иконок помещается в строку и не закрывает содержимое.
+  const iconsOnly = items.length > 0 && items.every((item) => item.icon);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,21 +47,27 @@ export function RowMenu({ items }: { items: RowMenuItem[] }) {
       </button>
 
       {open && (
-        <div className="absolute top-[34px] right-0 z-30 min-w-[168px] animate-drop rounded-12 border border-line bg-surface p-1.5 shadow-popover">
+        <div
+          className={`absolute top-[34px] right-0 z-30 animate-drop rounded-12 border border-line bg-surface p-1.5 shadow-popover ${
+            iconsOnly ? 'flex gap-1' : 'min-w-[168px]'
+          }`}
+        >
           {items.map((item) => (
             <button
               key={item.label}
               type="button"
+              title={item.label}
+              aria-label={item.label}
               onClick={(e) => {
                 e.stopPropagation();
                 setOpen(false);
                 item.onClick();
               }}
-              className={`flex w-full cursor-pointer items-center gap-2.5 rounded-9 border-none bg-transparent px-[11px] py-[9px] text-13-5 font-semibold hover:bg-surface-muted ${
-                item.danger ? 'text-danger' : 'text-ink-secondary'
-              }`}
+              className={`flex cursor-pointer items-center gap-2.5 rounded-9 border-none bg-transparent text-13-5 font-semibold hover:bg-surface-muted ${
+                iconsOnly ? 'size-[34px] justify-center' : 'w-full px-[11px] py-[9px]'
+              } ${item.danger ? 'text-danger' : 'text-ink-secondary'}`}
             >
-              {item.label}
+              {item.icon ?? item.label}
             </button>
           ))}
         </div>

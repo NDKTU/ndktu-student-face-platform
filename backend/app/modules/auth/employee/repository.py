@@ -1,12 +1,13 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.modules.auth.model import Employee, Teacher, User
+from app.modules.auth.model import Employee, Role, Teacher, User, UserRole
+from app.modules.organization_structure.model import Faculty, Kafedra
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
 
@@ -126,6 +127,27 @@ class EmployeeRepository:
         if request.full_name:
             stmt = stmt.where(Employee.full_name.ilike(f"%{request.full_name}%"))
             count_stmt = count_stmt.where(Employee.full_name.ilike(f"%{request.full_name}%"))
+
+        if request.role:
+            # Подзапросом, а не join: join по many-to-many размножил бы строки у
+            # сотрудника с несколькими ролями и сломал бы count.
+            with_role = (
+                select(UserRole.user_id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(func.lower(Role.name) == request.role.strip().lower())
+            )
+            stmt = stmt.where(Employee.user_id.in_(with_role))
+            count_stmt = count_stmt.where(Employee.user_id.in_(with_role))
+
+        if request.available_post:
+            # Занятые посты берём из обеих таблиц сразу: человек, уже
+            # заведующий кафедрой, не должен предлагаться в деканы.
+            taken = union(
+                select(Faculty.dekan_user_id).where(Faculty.dekan_user_id.is_not(None)),
+                select(Kafedra.mudir_user_id).where(Kafedra.mudir_user_id.is_not(None)),
+            )
+            stmt = stmt.where(Employee.user_id.not_in(taken))
+            count_stmt = count_stmt.where(Employee.user_id.not_in(taken))
 
         stmt = stmt.order_by(desc(Employee.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)

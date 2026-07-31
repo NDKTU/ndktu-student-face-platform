@@ -67,7 +67,10 @@ export interface Speciality {
 export interface Department {
   id: number;
   name: string;
+  /** ФИО заведующего для показа; пусто — «—». */
   mudir: string;
+  /** Кто именно заведует. Форма правит id, а `mudir` — его снимок. */
+  mudirUserId: number | null;
   /** Штатная численность преподавателей кафедры. */
   oqituvchilar: number;
   /** Пул преподавателей, из которого назначаются предметы в учебном плане. */
@@ -83,7 +86,10 @@ export interface FacultyColor {
 export interface Faculty {
   id: number;
   name: string;
+  /** ФИО декана для показа; пусто — «—». */
   dekan: string;
+  /** Кто именно декан. Форма правит id, а `dekan` — его снимок. */
+  dekanUserId: number | null;
   color: FacultyColor;
   kafedralar: Department[];
 }

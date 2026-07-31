@@ -20,3 +20,15 @@ def _to_tashkent_iso(dt: datetime | None) -> str | None:
 # local time, regardless of the naive-UTC value stored in the DB column.
 # Input schemas keep plain `datetime` — clients still send tz-aware UTC.
 TashkentDatetime = Annotated[datetime, PlainSerializer(_to_tashkent_iso, return_type=str | None)]
+
+
+def normalized_name(value: str) -> str:
+    """Схлопывает пробелы и переводит в нижний регистр.
+
+    База хранит каноническую форму, красивое написание рисует фронтенд
+    (`shared/lib/displayName.ts`). Так одному и тому же правилу подчиняются и
+    проверка уникальности, и импорт из HEMIS, и то, что ввели руками, — а
+    «Konchilik», «KONCHILIK» и «konchilik  » перестают быть тремя разными
+    факультетами.
+    """
+    return " ".join(value.split()).lower()

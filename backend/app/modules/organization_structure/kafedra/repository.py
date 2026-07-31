@@ -9,6 +9,7 @@ from app.modules.organization_structure.model import Kafedra
 
 from .schemas import (
     KafedraCreateRequest,
+    KafedraUpdateRequest,
     KafedraListRequest,
     KafedraListResponse,
 )
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class KafedraRepository:
     async def create_kafedra(self, session: AsyncSession, data: KafedraCreateRequest) -> Kafedra:
-        stmt_check = select(Kafedra).where(Kafedra.name == data.name)
+        stmt_check = select(Kafedra).where(func.lower(Kafedra.name) == data.name.lower())
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
             raise HTTPException(
@@ -107,7 +108,7 @@ class KafedraRepository:
 
         return KafedraListResponse(total=total, page=request.page, limit=request.limit, kafedras=kafedras)
 
-    async def update_kafedra(self, session: AsyncSession, kafedra_id: int, data: KafedraCreateRequest) -> Kafedra:
+    async def update_kafedra(self, session: AsyncSession, kafedra_id: int, data: KafedraUpdateRequest) -> Kafedra:
         stmt = select(Kafedra).where(Kafedra.id == kafedra_id)
         result = await session.execute(stmt)
         kafedra = result.scalar_one_or_none()
@@ -117,7 +118,7 @@ class KafedraRepository:
 
         if data.name is not None:
             # Check unique name excluding current
-            stmt_check = select(Kafedra).where(Kafedra.name == data.name, Kafedra.id != kafedra_id)
+            stmt_check = select(Kafedra).where(func.lower(Kafedra.name) == data.name.lower(), Kafedra.id != kafedra_id)
             existing = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing:
                 raise HTTPException(
@@ -129,12 +130,11 @@ class KafedraRepository:
         if data.faculty_id is not None:
             kafedra.faculty_id = data.faculty_id
 
-        # Те же необязательные поля, что и при создании. None означает
-        # «не трогать»: форма присылает только то, что редактировала.
+        # См. update_faculty: различаем «прислали null» (очистить) и «не
+        # прислали вовсе» (не трогать) — иначе мудира не снять.
         for _field in ('mudir_user_id', 'mudir_name'):
-            _value = getattr(data, _field, None)
-            if _value is not None:
-                setattr(kafedra, _field, _value)
+            if _field in data.model_fields_set:
+                setattr(kafedra, _field, getattr(data, _field))
 
         await session.commit()
         await session.refresh(kafedra)

@@ -1,3 +1,4 @@
+import { displayName } from '@/shared/lib/displayName';
 import { getAll, getList, type Paged } from './envelope';
 
 /**
@@ -97,8 +98,8 @@ export async function getTeacherRanking(filters: RankingFilters = {}): Promise<P
       rank: item.rank,
       teacherId: item.teacher_id,
       fish: item.full_name,
-      kafedra: item.kafedra_name ?? '',
-      fakultet: item.faculty_name ?? '',
+      kafedra: displayName(item.kafedra_name ?? ''),
+      fakultet: displayName(item.faculty_name ?? ''),
       talabalar: item.student_count,
       ortacha: item.avg_grade,
       reyting: item.weighted_rating,
@@ -117,7 +118,7 @@ export async function getFacultyRanking(page = 1, limit = 20): Promise<Paged<Fac
     items: data.items.map((item) => ({
       rank: item.rank,
       facultyId: item.faculty_id,
-      fakultet: item.faculty_name,
+      fakultet: displayName(item.faculty_name),
       kafedralar: item.kafedra_count,
       talabalar: item.student_count,
       ortacha: item.avg_grade,
@@ -137,8 +138,8 @@ export async function getKafedraRanking(page = 1, limit = 20): Promise<Paged<Kaf
     items: data.items.map((item) => ({
       rank: item.rank,
       kafedraId: item.kafedra_id,
-      kafedra: item.kafedra_name,
-      fakultet: item.faculty_name,
+      kafedra: displayName(item.kafedra_name),
+      fakultet: displayName(item.faculty_name),
       oqituvchilar: item.teacher_count,
       talabalar: item.student_count,
       ortacha: item.avg_grade,
@@ -163,7 +164,7 @@ export interface RefOption {
 
 export async function getFacultyOptions(): Promise<RefOption[]> {
   const rows = await getAll<{ id: number; name: string }>('/faculty/', 'faculties');
-  return rows.map((row) => ({ id: row.id, name: row.name }));
+  return rows.map((row) => ({ id: row.id, name: displayName(row.name) }));
 }
 
 export async function getKafedraOptions(): Promise<RefOption[]> {
@@ -171,5 +172,5 @@ export async function getKafedraOptions(): Promise<RefOption[]> {
     '/kafedra/',
     'kafedras',
   );
-  return rows.map((row) => ({ id: row.id, name: row.name, facultyId: row.faculty_id }));
+  return rows.map((row) => ({ id: row.id, name: displayName(row.name), facultyId: row.faculty_id }));
 }

@@ -1,11 +1,11 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import TashkentDatetime, normalized_name
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class KafedraCreateRequest(BaseModel):
-    name: str
+    name: str = Field(max_length=255)
     faculty_id: int
     # Поля карточки, которые показывает дерево структуры. Все необязательные:
     # запись заводят по названию, остальное дозаполняют позже.
@@ -17,7 +17,30 @@ class KafedraCreateRequest(BaseModel):
     def name_must_not_be_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Name cannot be empty")
-        return v.strip()
+        return normalized_name(v)
+
+
+class KafedraUpdateRequest(BaseModel):
+    """Частичное обновление: форма присылает только то, что правила.
+
+    Отдельная схема, а не переиспользование Create: там `faculty_id` обязателен,
+    и правка одного названия кафедры падала с 422 «Field required». Репозиторий
+    и так проверяет каждое поле на None — не хватало только схемы.
+    """
+
+    name: Optional[str] = Field(default=None, max_length=255)
+    faculty_id: Optional[int] = None
+    mudir_user_id: Optional[int] = None
+    mudir_name: Optional[str] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def name_must_not_be_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Name cannot be empty")
+        return normalized_name(v)
 
 
 class KafedraCreateResponse(BaseModel):

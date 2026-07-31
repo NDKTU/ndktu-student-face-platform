@@ -17,13 +17,24 @@ export interface DrillStep {
 
 export type EntityDraft = Partial<{
   name: string;
-  dekan: string;
-  mudir: string;
+  /**
+   * Кто занимает пост. Строка из `<select>`: id сотрудника или пусто —
+   * «не назначен». ФИО подставляется рядом (`postName`) и уходит на сервер
+   * снимком, чтобы дерево показывало его без обхода справочника.
+   */
+  post: string;
+  postName: string;
   kod: string;
   shakl: EduForm;
   kurs: string;
   sardor: string;
 }>;
+
+/** «12» → 12, «» → null. Пустой выбор означает «снять с поста», а не «не трогать». */
+function postId(value: string | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
+  return value === '' ? null : Number(value);
+}
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -247,9 +258,17 @@ function createOnServer(level: number, drill: DrillStep[], draft: EntityDraft): 
 
   switch (level) {
     case 0:
-      return api.createFaculty({ name, dekan: draft.dekan?.trim() });
+      return api.createFaculty({
+        name,
+        dekanUserId: postId(draft.post),
+        dekanName: draft.postName ?? null,
+      });
     case 1:
-      return api.createDepartment(drill[0]!.id, { name, mudir: draft.mudir?.trim() });
+      return api.createDepartment(drill[0]!.id, {
+        name,
+        mudirUserId: postId(draft.post),
+        mudirName: draft.postName ?? null,
+      });
     case 2:
       return api.createSpeciality(drill[1]!.id, {
         name,
@@ -275,9 +294,17 @@ function updateOnServer(
 
   switch (level) {
     case 0:
-      return api.updateFaculty(id, { name, dekan: draft.dekan?.trim() });
+      return api.updateFaculty(id, {
+        name,
+        dekanUserId: postId(draft.post),
+        dekanName: draft.postName ?? null,
+      });
     case 1:
-      return api.updateDepartment(id, { name, mudir: draft.mudir?.trim() });
+      return api.updateDepartment(id, {
+        name,
+        mudirUserId: postId(draft.post),
+        mudirName: draft.postName ?? null,
+      });
     case 2:
       return api.updateSpeciality(id, { name, kod: draft.kod?.trim(), shakl: draft.shakl });
     default:

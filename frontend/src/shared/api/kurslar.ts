@@ -1,4 +1,5 @@
 import type { AdminCourse, Course, Lesson, Resource, Topic } from '@/entities/course/model/types';
+import { displayName } from '@/shared/lib/displayName';
 import { getAll } from './envelope';
 import { api } from './http';
 
@@ -96,8 +97,8 @@ function toAdminCourse(course: ApiCourse): AdminCourse {
     guruh: course.groups.map((g) => g.name).join(', '),
     guruhlar: course.groups,
     oqituvchi: course.teacher?.full_name ?? course.teacher?.username ?? '',
-    fac: course.faculty?.name ?? '',
-    kaf: course.kafedra?.name ?? '',
+    fac: displayName(course.faculty?.name ?? ''),
+    kaf: displayName(course.kafedra?.name ?? ''),
     sem: course.semester_number ?? 1,
     mavzular: course.topic_count,
     darslar: course.material_count,

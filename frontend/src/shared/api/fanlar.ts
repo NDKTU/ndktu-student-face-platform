@@ -1,4 +1,5 @@
 import type { FanRow } from '@/features/fanlar/model/fanlar.store';
+import { displayName } from '@/shared/lib/displayName';
 import { getAll } from './envelope';
 import { api } from './http';
 
@@ -33,7 +34,7 @@ function toFanRow(subject: ApiSubject): FanRow {
   return {
     id: subject.id,
     fan: subject.name,
-    kafedra: subject.kafedra?.name ?? '',
+    kafedra: displayName(subject.kafedra?.name ?? ''),
     kafedraId: subject.kafedra_id,
     kredit: subject.credit ?? 0,
     semestr: subject.semester ?? 1,

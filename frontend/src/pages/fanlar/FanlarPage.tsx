@@ -11,6 +11,7 @@ import { DataTable, TableCard, type Column } from '@/shared/ui/DataTable';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { Button } from '@/shared/ui/Button';
 import { RowMenu } from '@/shared/ui/RowMenu';
+import { PencilIcon, TrashIcon } from '@/shared/ui/icons';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { useToast } from '@/shared/ui/Toast';
@@ -107,8 +108,13 @@ export function FanlarPage() {
         <div className="flex justify-end">
           <RowMenu
             items={[
-              { label: t('action.edit'), onClick: () => openEdit(r) },
-              { label: t('action.delete'), danger: true, onClick: () => setConfirm({ id: r.id, name: r.fan }) },
+              { label: t('action.edit'), icon: <PencilIcon />, onClick: () => openEdit(r) },
+              {
+                label: t('action.delete'),
+                icon: <TrashIcon />,
+                danger: true,
+                onClick: () => setConfirm({ id: r.id, name: r.fan }),
+              },
             ]}
           />
         </div>

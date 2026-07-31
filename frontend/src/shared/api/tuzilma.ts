@@ -10,6 +10,7 @@ import type {
   Student,
   StudentStatus,
 } from '@/entities/university/model/types';
+import { displayName } from '@/shared/lib/displayName';
 import { initials } from '@/shared/lib/initials';
 import { getAll, getList } from './envelope';
 import { api, qs } from './http';
@@ -120,7 +121,7 @@ function toGroup(group: ApiGroup): Group {
 function toSpeciality(speciality: ApiSpeciality): Speciality {
   return {
     id: speciality.id,
-    name: speciality.name,
+    name: displayName(speciality.name),
     kod: speciality.code ?? '',
     shakl: (speciality.education_form as EduForm) ?? 'Kunduzgi',
     reja_yil: speciality.academic_year,
@@ -135,8 +136,9 @@ function toSpeciality(speciality: ApiSpeciality): Speciality {
 function toDepartment(kafedra: ApiKafedra): Department {
   return {
     id: kafedra.id,
-    name: kafedra.name,
+    name: displayName(kafedra.name),
     mudir: kafedra.mudir_name ?? EMPTY,
+    mudirUserId: kafedra.mudir_user_id,
     oqituvchilar: kafedra.teacher_count,
     teachers: [],
     mutaxassisliklar: kafedra.specialities.map(toSpeciality),
@@ -146,8 +148,9 @@ function toDepartment(kafedra: ApiKafedra): Department {
 function toFaculty(faculty: ApiFaculty): Faculty {
   return {
     id: faculty.id,
-    name: faculty.name,
+    name: displayName(faculty.name),
     dekan: faculty.dekan_name ?? EMPTY,
+    dekanUserId: faculty.dekan_user_id,
     color: facultyColor(faculty),
     kafedralar: faculty.kafedras.map(toDepartment),
   };
@@ -167,12 +170,24 @@ function toRejaRow(row: ApiCurriculumRow): RejaRow {
 
 export interface FacultyPayload {
   name?: string;
-  dekan?: string;
+  /**
+   * Кого назначить деканом. `null` — снять, `undefined` — не трогать: сервер
+   * различает «прислали null» и «поля не было», и только так пост очищается.
+   */
+  dekanUserId?: number | null;
+  /** Снимок ФИО: дерево показывает его, не заглядывая в справочник сотрудников. */
+  dekanName?: string | null;
 }
 
 export interface DepartmentPayload {
   name?: string;
-  mudir?: string;
+  mudirUserId?: number | null;
+  mudirName?: string | null;
+}
+
+/** Ключ попадает в тело, только если его действительно правили. */
+function post(key: string, value: number | string | null | undefined) {
+  return value === undefined ? {} : { [key]: value };
 }
 
 export interface SpecialityPayload {
@@ -204,12 +219,16 @@ export async function getTree(): Promise<Faculty[]> {
 export async function createFaculty(body: FacultyPayload): Promise<Faculty> {
   const created = await api.post<{ id: number; name: string }>('/faculty/', {
     name: body.name,
-    dekan_name: body.dekan || null,
+    ...post('dekan_user_id', body.dekanUserId),
+    ...post('dekan_name', body.dekanName),
   });
   return {
     id: created.id,
-    name: created.name,
-    dekan: body.dekan || EMPTY,
+    // Сервер приводит название к нижнему регистру — показываем не то, что
+    // ввели, а то, что действительно сохранилось.
+    name: displayName(created.name),
+    dekan: body.dekanName || EMPTY,
+    dekanUserId: body.dekanUserId ?? null,
     color: FALLBACK_COLORS[created.id % FALLBACK_COLORS.length]!,
     kafedralar: [],
   };
@@ -217,10 +236,18 @@ export async function createFaculty(body: FacultyPayload): Promise<Faculty> {
 
 export async function updateFaculty(id: number, body: FacultyPayload): Promise<Partial<Faculty>> {
   const updated = await api.put<{ id: number; name: string }>(`/faculty/${id}`, {
-    name: body.name,
-    dekan_name: body.dekan || null,
+    ...post('name', body.name),
+    ...post('dekan_user_id', body.dekanUserId),
+    ...post('dekan_name', body.dekanName),
   });
-  return { id: updated.id, name: updated.name, dekan: body.dekan || EMPTY };
+  return {
+    id: updated.id,
+    name: displayName(updated.name),
+    ...(body.dekanUserId !== undefined && {
+      dekan: body.dekanName || EMPTY,
+      dekanUserId: body.dekanUserId,
+    }),
+  };
 }
 
 export const deleteFaculty = (id: number, force = false) =>
@@ -235,12 +262,14 @@ export async function createDepartment(
   const created = await api.post<{ id: number; name: string }>('/kafedra/', {
     name: body.name,
     faculty_id: facultyId,
-    mudir_name: body.mudir || null,
+    ...post('mudir_user_id', body.mudirUserId),
+    ...post('mudir_name', body.mudirName),
   });
   return {
     id: created.id,
-    name: created.name,
-    mudir: body.mudir || EMPTY,
+    name: displayName(created.name),
+    mudir: body.mudirName || EMPTY,
+    mudirUserId: body.mudirUserId ?? null,
     oqituvchilar: 0,
     teachers: [],
     mutaxassisliklar: [],
@@ -252,10 +281,18 @@ export async function updateDepartment(
   body: DepartmentPayload,
 ): Promise<Partial<Department>> {
   const updated = await api.put<{ id: number; name: string }>(`/kafedra/${id}`, {
-    name: body.name,
-    mudir_name: body.mudir || null,
+    ...post('name', body.name),
+    ...post('mudir_user_id', body.mudirUserId),
+    ...post('mudir_name', body.mudirName),
   });
-  return { id: updated.id, name: updated.name, mudir: body.mudir || EMPTY };
+  return {
+    id: updated.id,
+    name: displayName(updated.name),
+    ...(body.mudirUserId !== undefined && {
+      mudir: body.mudirName || EMPTY,
+      mudirUserId: body.mudirUserId,
+    }),
+  };
 }
 
 export const deleteDepartment = (id: number, force = false) =>
@@ -275,7 +312,7 @@ export async function createSpeciality(
   });
   return {
     id: created.id,
-    name: created.name,
+    name: displayName(created.name),
     kod: body.kod ?? '',
     shakl: body.shakl ?? 'Kunduzgi',
     reja_yil: body.reja_yil ?? null,
@@ -291,14 +328,16 @@ export async function updateSpeciality(
   body: SpecialityPayload,
 ): Promise<Partial<Speciality>> {
   const updated = await api.put<{ id: number; name: string }>(`/speciality/${id}`, {
-    name: body.name,
-    code: body.kod,
-    education_form: body.shakl,
-    academic_year: body.reja_yil,
+    // Через тот же `post`: раньше пустые ключи улетали как `undefined` и
+    // JSON.stringify их выбрасывал — работало, но случайно.
+    ...post('name', body.name),
+    ...post('code', body.kod),
+    ...post('education_form', body.shakl),
+    ...post('academic_year', body.reja_yil),
   });
   return {
     id: updated.id,
-    name: updated.name,
+    name: displayName(updated.name),
     ...(body.kod !== undefined && { kod: body.kod }),
     ...(body.shakl !== undefined && { shakl: body.shakl }),
     ...(body.reja_yil !== undefined && { reja_yil: body.reja_yil }),

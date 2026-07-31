@@ -11,6 +11,7 @@ import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { Button } from '@/shared/ui/Button';
 import { RowMenu } from '@/shared/ui/RowMenu';
+import { PencilIcon, TrashIcon } from '@/shared/ui/icons';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { useToast } from '@/shared/ui/Toast';
@@ -273,8 +274,8 @@ function QuestionRow({
 
         <RowMenu
           items={[
-            { label: t('action.edit'), onClick: onEdit },
-            { label: t('action.delete'), danger: true, onClick: onDelete },
+            { label: t('action.edit'), icon: <PencilIcon />, onClick: onEdit },
+            { label: t('action.delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
           ]}
         />
 

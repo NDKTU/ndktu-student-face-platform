@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { RowMenu } from '@/shared/ui/RowMenu';
+import { PencilIcon, TrashIcon } from '@/shared/ui/icons';
 import { useToast } from '@/shared/ui/Toast';
 import { TopicModal, LessonModal } from './CourseModals';
 import { JournalTab } from './JournalTab';
@@ -304,6 +305,7 @@ function TopicCard({
   onLessonDrop,
 }: TopicCardProps) {
   const { t } = useTranslation('kurslar');
+  const { t: tc } = useTranslation('common');
 
   return (
     <div
@@ -330,8 +332,8 @@ function TopicCard({
         </button>
         <RowMenu
           items={[
-            { label: t('darsModal.edit'), onClick: onEdit },
-            { label: t('toast.deleted'), danger: true, onClick: onDelete },
+            { label: t('darsModal.edit'), icon: <PencilIcon />, onClick: onEdit },
+            { label: tc('delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
           ]}
         />
       </div>
@@ -375,8 +377,17 @@ function TopicCard({
                   <span className="flex-none text-12 text-ink-subtle">{lesson.dur}</span>
                   <RowMenu
                     items={[
-                      { label: t('darsModal.edit'), onClick: () => onEditLesson(lesson) },
-                      { label: t('toast.deleted'), danger: true, onClick: () => onDeleteLesson(lesson.id) },
+                      {
+                        label: t('darsModal.edit'),
+                        icon: <PencilIcon />,
+                        onClick: () => onEditLesson(lesson),
+                      },
+                      {
+                        label: tc('delete'),
+                        icon: <TrashIcon />,
+                        danger: true,
+                        onClick: () => onDeleteLesson(lesson.id),
+                      },
                     ]}
                   />
                 </div>

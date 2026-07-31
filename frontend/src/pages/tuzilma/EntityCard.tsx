@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PencilIcon, TrashIcon } from '@/shared/ui/icons';
 
 export interface CardStat {
   value: number | string;
@@ -19,7 +20,10 @@ export interface CardLead {
 }
 
 export interface EntityMenuItem {
+  /** Подпись: видна в меню, если нет иконки, и всегда — экранному диктору. */
   label: string;
+  /** С иконкой пункт становится квадратной кнопкой без текста. */
+  icon?: ReactNode;
   danger?: boolean;
   onClick: () => void;
 }
@@ -64,12 +68,15 @@ export function EntityCard({
   const { t } = useTranslation('common');
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const defaults: (EntityMenuItem | false | undefined)[] = [
+    onEdit && { label: t('edit'), icon: <PencilIcon />, onClick: onEdit },
+    onDelete && { label: t('delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
+  ];
   const items: EntityMenuItem[] =
-    menuItems ??
-    [
-      onEdit && { label: t('edit'), onClick: onEdit },
-      onDelete && { label: t('delete'), danger: true, onClick: onDelete },
-    ].filter((x): x is EntityMenuItem => Boolean(x));
+    menuItems ?? defaults.filter((x): x is EntityMenuItem => Boolean(x));
+
+  // Меню из одних иконок помещается в строку и не перекрывает карточку.
+  const iconsOnly = items.length > 0 && items.every((item) => item.icon);
 
   return (
     <div
@@ -96,7 +103,12 @@ export function EntityCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="text-15-5 leading-[1.3] font-bold tracking-[-0.01em] text-ink">
+          {/* Две строки, дальше многоточие: без ограничения длинное название
+              растягивало карточку и разъезжалась вся сетка. */}
+          <div
+            title={title}
+            className="line-clamp-2 text-15-5 leading-[1.3] font-bold tracking-[-0.01em] break-words text-ink"
+          >
             {title}
           </div>
           {subtitleNode ??
@@ -121,10 +133,16 @@ export function EntityCard({
             </button>
 
             {menuOpen && (
-              <div className="absolute top-[34px] right-0 z-30 min-w-[168px] animate-drop rounded-12 border border-line bg-surface p-1.5 shadow-popover">
+              <div
+                className={`absolute top-[34px] right-0 z-30 animate-drop rounded-12 border border-line bg-surface p-1.5 shadow-popover ${
+                  iconsOnly ? 'flex gap-1' : 'min-w-[168px]'
+                }`}
+              >
                 {items.map((item) => (
                   <MenuItem
                     key={item.label}
+                    label={item.label}
+                    iconOnly={iconsOnly}
                     danger={item.danger}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -132,7 +150,7 @@ export function EntityCard({
                       item.onClick();
                     }}
                   >
-                    {item.label}
+                    {item.icon ?? item.label}
                   </MenuItem>
                 ))}
               </div>
@@ -181,21 +199,29 @@ export function EntityCard({
 
 function MenuItem({
   children,
+  label,
+  iconOnly,
   danger,
   onClick,
 }: {
   children: React.ReactNode;
+  label: string;
+  iconOnly?: boolean;
   danger?: boolean;
   onClick: (e: React.MouseEvent) => void;
 }) {
   return (
     <button
       type="button"
+      // Подпись остаётся доступной, даже когда её не видно: без неё кнопка
+      // осталась бы для экранного диктора безымянной.
+      title={label}
+      aria-label={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`flex w-full cursor-pointer items-center gap-2.5 rounded-9 border-none bg-transparent px-[11px] py-[9px] text-13-5 font-semibold hover:bg-surface-muted ${
-        danger ? 'text-danger' : 'text-ink-secondary'
-      }`}
+      className={`flex cursor-pointer items-center gap-2.5 rounded-9 border-none bg-transparent text-13-5 font-semibold hover:bg-surface-muted ${
+        iconOnly ? 'size-[34px] justify-center' : 'w-full px-[11px] py-[9px]'
+      } ${danger ? 'text-danger' : 'text-ink-secondary'}`}
     >
       {children}
     </button>
