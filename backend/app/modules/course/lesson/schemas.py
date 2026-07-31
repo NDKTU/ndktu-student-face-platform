@@ -1,6 +1,6 @@
 from datetime import date as date_type
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -73,7 +73,7 @@ class LessonListRequest(BaseModel):
     date_from: Optional[date_type] = None
     date_to: Optional[date_type] = None
     page: int = 1
-    limit: int = 20
+    limit: int = Field(default=20, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

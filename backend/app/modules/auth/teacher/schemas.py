@@ -1,7 +1,7 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TeacherKafedraInfo(BaseModel):
@@ -91,7 +91,7 @@ class TeacherListRequest(BaseModel):
 
     page: int = 1
 
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:
@@ -195,7 +195,7 @@ class TeacherRankItem(BaseModel):
 class TeacherRankingResponse(BaseModel):
     total: int
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     teachers: list[TeacherRankItem]
     # active filters (None = no filter applied)
     faculty_id: Optional[int] = None
@@ -224,7 +224,7 @@ class FacultyRankItem(BaseModel):
 class FacultyRankingResponse(BaseModel):
     total: int
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     faculties: list[FacultyRankItem]
 
 
@@ -250,5 +250,5 @@ class KafedraRankItem(BaseModel):
 class KafedraRankingResponse(BaseModel):
     total: int
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     kafedras: list[KafedraRankItem]

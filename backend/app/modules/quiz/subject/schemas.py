@@ -1,7 +1,7 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class KafedraInfo(BaseModel):
@@ -56,7 +56,7 @@ class SubjectListRequest(BaseModel):
     page: int = 1
 
     teacher_id: Optional[int] = None
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

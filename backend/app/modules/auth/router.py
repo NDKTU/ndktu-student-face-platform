@@ -1,9 +1,10 @@
 import json
 import logging
 
+from app.core.schemas import MAX_PAGE_SIZE
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Header, Query, Request, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -605,7 +606,7 @@ async def teacher_ranking_overall(
     group_id: int | None = None,
     search: str | None = None,
     page: int = 1,
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=MAX_PAGE_SIZE),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("read:teacher")),
 ):
@@ -637,7 +638,7 @@ async def teacher_ranking_overall(
 )
 async def faculty_ranking(
     page: int = 1,
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=MAX_PAGE_SIZE),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("read:teacher")),
 ):
@@ -652,7 +653,7 @@ async def faculty_ranking(
 )
 async def kafedra_ranking(
     page: int = 1,
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=MAX_PAGE_SIZE),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("read:teacher")),
 ):

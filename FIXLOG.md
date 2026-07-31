@@ -33,6 +33,7 @@ Baseline captured before any change: **ruff 72 errors · pytest 1 failed / 151 e
 | F01 | `POST /api/user/` now requires the `create:user` permission. It previously had no authentication at all, so any anonymous caller could create an account and name its roles — including `Admin`, which bypasses every permission check. | `backend/app/modules/auth/router.py:163` | Live probe on the running stack: anonymous `POST /api/user/` → **401** (was 422, i.e. it reached body validation); anonymous payload requesting `roles:[{"name":"Admin"}]` → **401**; authenticated admin `POST` → **201** with the requested role attached; DB confirms the anonymous attempts created nothing. Control endpoint `/api/faculty/` unchanged at 401. ruff **72 → 72** (the single `I001` in the touched file is present in the `HEAD` version too). pytest **1 failed / 151 errors → 1 failed / 151 errors**. | ✅ Done |
 | F02 | The three image-upload handlers wrote whatever they were sent — no extension, type or size check — into a directory served as static content from the SPA's own origin. All three now go through one validator: raster-image allowlist, 5 MB cap, chunked read, UUID filename. | new `backend/app/core/utils/upload.py`; `quiz/question/repository.py:249`, `quiz/quiz/repository.py:475`, `auth/employee/repository.py:35` | Live probes as admin against all three endpoints: `.html` payload → **400** on each; `.svg` → **400**; 6 MB PNG → **400** ("must not exceed 5MB"); valid 1×1 PNG → **200** with a URL. Disk checked after the rejected 6 MB upload: no partial file, no file over 5 MB, count back to its original 7. ruff **72 → 72**. pytest **1 failed / 151 errors → 1 failed / 151 errors**. | ✅ Done |
 | F07 | `APP_CONFIG__SERVER__IS_PROD` was documented in `.env.example`, set in the real `.env`, and did not exist in code — `extra="ignore"` swallowed it, so `/docs`, `/redoc` and `/openapi.json` were public no matter what the operator configured. Implemented it, mirroring the face-detection service which already had exactly this. | `backend/app/core/config.py:18`, `backend/app/main.py:15-21` | With the current `IS_PROD=False`: `/docs`, `/redoc`, `/openapi.json`, `/health` all still **200**. With `IS_PROD=True` injected into the environment, importing the app yields `docs_url=None`, `redoc_url=None`, `openapi_url=None`; the same probe at `False` yields the three real paths. `/health` is deliberately not gated — the compose healthcheck depends on it. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
+| F08 | Every list input accepted an unbounded `limit`; `?limit=100000000` returned 200 and made the server materialise whole tables with their eager loads. All 27 schema fields and 5 raw router params now carry `ge=1, le=MAX_PAGE_SIZE` (1000). | new constant in `backend/app/core/schemas.py:25`; 23 `schemas.py` files; `auth/router.py`, `organization_structure/router.py`, `course/router.py` | Probes as admin: `limit=100000000` → **422** on `/user/`, `/students/`, `/teacher/ranking/overall`, `/group/{id}/students`, `/assignment/pending`; `limit=99999` → 422; `limit=0` → 422. Legitimate traffic unchanged: `limit=1000` → 200, `limit=200` → 200, default (no param) → 200. Frontend `tsc --noEmit` clean; its largest real request is 1000 (ranking CSV export) and still passes. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 
 ### F01 — notes
 
@@ -106,3 +107,20 @@ which marks it unhealthy, which blocks `backend` — it waits on
 would take the whole stack down at boot. Fixing it means either adding a `/health`
 route to face-detection or repointing the healthcheck; both are outside F07 and in a
 different service.
+
+### F08 — notes
+
+**Cap is 1000, by decision.** The frontend's bulk-fetch helper
+(`shared/api/envelope.ts:60`) pages at 200, but the ranking CSV export
+(`pages/reyting/ReytingPage.tsx:319`) asks for 1000 in a single request. A cap of 200
+would have meant rewriting that export to paginate; 1000 keeps every existing call site
+working while still removing five orders of magnitude of attack surface.
+
+**`page` was left alone.** The finding is about `limit`. Every list schema already
+guards `page < 1` in its `offset` property, so negative pages cannot produce a negative
+OFFSET, and adding `ge=1` there would be scope creep.
+
+**Repository defaults were left alone.** `limit: int = N` still appears in a handful of
+repository function signatures (e.g. `course/assignment/repository.py:250`). Those are
+internal Python defaults invoked with an already-validated value from the router; they
+are not request inputs and carry no attack surface.

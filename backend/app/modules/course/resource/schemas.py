@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RESOURCE_TYPES = Literal["file", "link", "text"]
@@ -71,7 +71,7 @@ class ResourceListRequest(BaseModel):
     course_id: Optional[int] = None
 
     page: int = 1
-    limit: int = 50
+    limit: int = Field(default=50, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

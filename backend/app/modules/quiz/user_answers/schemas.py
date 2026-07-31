@@ -1,7 +1,7 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserAnswerQuestionInfo(BaseModel):
@@ -33,7 +33,7 @@ class UserAnswerResponse(BaseModel):
 
 class UserAnswersListRequest(BaseModel):
     page: int = 1
-    limit: int = 50
+    limit: int = Field(default=50, ge=1, le=MAX_PAGE_SIZE)
     user_id: Optional[int] = None
     quiz_id: Optional[int] = None
     question_id: Optional[int] = None

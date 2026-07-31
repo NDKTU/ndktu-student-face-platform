@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class CurriculumSubjectInfo(BaseModel):
@@ -74,7 +74,7 @@ class CurriculumListRequest(BaseModel):
     semester: Optional[int] = None
     subject_id: Optional[int] = None
     page: int = 1
-    limit: int = 200
+    limit: int = Field(default=200, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

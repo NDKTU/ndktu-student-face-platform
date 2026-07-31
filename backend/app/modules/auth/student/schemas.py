@@ -1,9 +1,9 @@
 from datetime import date
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StudentBase(BaseModel):
@@ -92,7 +92,7 @@ class StudentResponse(StudentBase):
 
 class StudentListRequest(BaseModel):
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     search: str | None = None
     user_id: int | None = None
     group_id: int | None = None

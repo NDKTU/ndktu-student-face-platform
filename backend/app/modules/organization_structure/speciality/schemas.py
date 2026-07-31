@@ -1,4 +1,4 @@
-from app.core.schemas import TashkentDatetime, normalized_name
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -66,7 +66,7 @@ class SpecialityListRequest(BaseModel):
     kafedra_id: Optional[int] = None
     faculty_id: Optional[int] = None
     page: int = 1
-    limit: int = 20
+    limit: int = Field(default=20, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

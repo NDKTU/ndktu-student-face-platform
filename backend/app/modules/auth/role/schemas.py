@@ -1,4 +1,4 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -46,7 +46,7 @@ class RoleCreateResponse(BaseModel):
 
 class RoleListRequest(BaseModel):
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     name: str | None = None
 
     @property

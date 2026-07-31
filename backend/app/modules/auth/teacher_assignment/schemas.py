@@ -1,7 +1,7 @@
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TeacherAssignmentCreateRequest(BaseModel):
@@ -47,7 +47,7 @@ class TeacherAssignmentListRequest(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     page: int = 1
-    limit: int = 20
+    limit: int = Field(default=20, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

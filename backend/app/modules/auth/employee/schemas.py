@@ -1,9 +1,9 @@
 from datetime import date
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
@@ -144,7 +144,7 @@ class EmployeeListRequest(BaseModel):
     available_post: Optional[Literal["dekan", "kafedra_mudiri"]] = None
 
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
 
     @property
     def offset(self) -> int:

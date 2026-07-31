@@ -1,7 +1,7 @@
 from typing import Optional
 
-from app.core.schemas import TashkentDatetime
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ResultUserInfo(BaseModel):
@@ -87,7 +87,7 @@ class ResultListRequest(BaseModel):
     username: Optional[str] = None
 
     page: int = 1
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=MAX_PAGE_SIZE)
     sort_dir: Optional[str] = "desc"
 
     @property

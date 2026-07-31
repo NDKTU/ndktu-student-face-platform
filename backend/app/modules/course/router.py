@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from app.core.schemas import MAX_PAGE_SIZE
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -281,7 +282,7 @@ async def list_assignments(
 
 @assignment_router.get("/pending", response_model=PendingSubmissionListResponse)
 async def list_pending_submissions(
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=MAX_PAGE_SIZE),
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("read:assignment")),
 ):
