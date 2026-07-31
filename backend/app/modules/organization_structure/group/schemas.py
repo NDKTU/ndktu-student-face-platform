@@ -9,7 +9,7 @@ class GroupCreateRequest(BaseModel):
     faculty_id: int
     # Поля карточки, которые показывает дерево структуры. Все необязательные:
     # запись заводят по названию, остальное дозаполняют позже.
-    kurs: Optional[int] = None
+    kurs: Optional[int] = Field(default=None, ge=1, le=10)
     sardor_student_id: Optional[int] = None
 
     @field_validator("name", mode="before")

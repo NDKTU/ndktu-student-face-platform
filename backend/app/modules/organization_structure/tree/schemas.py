@@ -9,6 +9,7 @@ class TreeGroup(BaseModel):
     kurs: Optional[int] = None
     position: int
     sardor_student_id: Optional[int] = None
+    sardor_name: Optional[str] = None
     # Не список студентов, а их число. Состав группы приезжает отдельным
     # запросом при раскрытии карточки: на реальных данных это тысячи строк,
     # и дерево из-за них весило бы сотни килобайт на каждое открытие раздела.

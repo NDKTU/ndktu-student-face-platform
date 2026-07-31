@@ -277,10 +277,11 @@ function createOnServer(level: number, drill: DrillStep[], draft: EntityDraft): 
       });
     default:
       // faculty_id у группы обязателен на бэкенде. В форме его не спрашивают:
-      // это самый первый шаг drill-пути, по которому мы сюда и пришли.
       return api.createGroup(drill[2]!.id, drill[0]!.id, {
         name,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
+        sardorStudentId: postId(draft.sardor),
+        sardorName: draft.postName ?? null,
       });
   }
 }
@@ -311,6 +312,8 @@ function updateOnServer(
       return api.updateGroup(id, {
         name,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
+        sardorStudentId: postId(draft.sardor),
+        sardorName: draft.postName ?? null,
       });
   }
 }

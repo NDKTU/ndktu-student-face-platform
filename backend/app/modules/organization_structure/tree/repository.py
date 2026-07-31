@@ -82,6 +82,16 @@ class OrganizationTreeRepository:
             ).all()
         }
 
+        sardor_ids = [g.sardor_student_id for g in groups if g.sardor_student_id is not None]
+        sardor_names = {}
+        if sardor_ids:
+            sardor_rows = (
+                await session.execute(
+                    select(Student.id, Student.full_name).where(Student.id.in_(sardor_ids))
+                )
+            ).all()
+            sardor_names = dict(sardor_rows)
+
         def to_group(group: Group) -> TreeGroup:
             return TreeGroup(
                 id=group.id,
@@ -89,6 +99,7 @@ class OrganizationTreeRepository:
                 kurs=group.kurs,
                 position=group.position,
                 sardor_student_id=group.sardor_student_id,
+                sardor_name=sardor_names.get(group.sardor_student_id),
                 student_count=students_per_group.get(group.id, 0),
             )
 

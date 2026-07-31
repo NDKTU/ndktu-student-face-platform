@@ -83,7 +83,7 @@ class QuizRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
-        return new_quiz
+        return await self.get_quiz(session, new_quiz.id)
 
     def _eager(self):
         """Фан, группа и автор — их показывает список тестов."""
@@ -382,7 +382,7 @@ class QuizRepository:
 
         await session.commit()
         await session.refresh(quiz)
-        return quiz
+        return await self.get_quiz(session, quiz_id)
 
     async def delete_quiz(self, session: AsyncSession, quiz_id: int, force: bool = False) -> None:
         from sqlalchemy import delete as sa_delete
@@ -470,7 +470,7 @@ class QuizRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
-        return new_quiz
+        return await self.get_quiz(session, new_quiz.id)
 
     async def upload_image(self, file) -> str:
         return await save_image_upload(file, settings.question_upload_dir, "question")

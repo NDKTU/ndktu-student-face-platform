@@ -22,6 +22,7 @@ import { EntityGrid } from './EntityGrid';
 import { EntityModal } from './EntityModal';
 import { GroupDetail } from './GroupDetail';
 import { StudentDetail } from './StudentDetail';
+import { SpecialityDetail } from './SpecialityDetail';
 
 const LEVEL_KEYS = ['faculty', 'department', 'speciality', 'group'] as const;
 
@@ -55,6 +56,7 @@ export function TuzilmaPage() {
 
   const [modal, setModal] = useState<ModalState | null>(null);
   const [confirm, setConfirm] = useState<{ level: number; id: number; name: string } | null>(null);
+  const [specTab, setSpecTab] = useState<'groups' | 'curriculum'>('groups');
 
   // Текущая позиция в дереве восстанавливается из пути drill каждый рендер:
   // хранить сами объекты в состоянии нельзя — после мутации они устареют.
@@ -112,14 +114,15 @@ export function TuzilmaPage() {
 
   // Сетка сущностей — это любой уровень, кроме детали группы/студента.
   // Кнопка «Qo'shish» живёт в crumb-баре (как в эталоне), а не в шапке страницы.
-  const onGrid = !(group && speciality && faculty);
+  const isSpecialityView = Boolean(speciality && department && faculty && !group);
+  const showAddButton = canWrite && (!group && !student) && (!isSpecialityView || specTab === 'groups');
 
   return (
     <>
       <CrumbBar
         crumbs={crumbs}
         actions={
-          onGrid && canWrite ? (
+          showAddButton ? (
             <Button onClick={() => setModal({ mode: 'add', level, draft: {} })}>
               + {tc('add')}
             </Button>
@@ -148,6 +151,31 @@ export function TuzilmaPage() {
           speciality={speciality}
           faculty={faculty}
           onOpenStudent={selectStudent}
+        />
+      ) : speciality && department && faculty ? (
+        <SpecialityDetail
+          speciality={speciality}
+          department={department}
+          faculty={faculty}
+          canWrite={canWrite}
+          activeTab={specTab}
+          onTabChange={setSpecTab}
+          onOpenGroup={(id, name) => drillInto({ id, name })}
+          onAddGroup={() => setModal({ mode: 'add', level: 3, draft: {} })}
+          onEditGroup={(id, name, kurs, sardorStudentId, sardorName) =>
+            setModal({
+              mode: 'edit',
+              level: 3,
+              id,
+              draft: {
+                name,
+                kurs: String(kurs),
+                sardor: sardorStudentId ? String(sardorStudentId) : '',
+                postName: sardorName ?? '',
+              },
+            })
+          }
+          onDeleteGroup={(id, name) => setConfirm({ level: 3, id, name })}
         />
       ) : (
         <GridLevel
@@ -269,7 +297,12 @@ export function TuzilmaPage() {
         canWrite,
         onOpen: () => drillInto({ id: g.id, name: g.name }),
         onEdit: () =>
-          openEdit(3, g.id, { name: g.name, kurs: String(g.kurs), sardor: g.sardor }),
+          openEdit(3, g.id, {
+            name: g.name,
+            kurs: String(g.kurs),
+            sardor: g.sardorStudentId ? String(g.sardorStudentId) : '',
+            postName: g.sardor,
+          }),
         onDelete: () => openDelete(3, g.id, g.name),
       }));
     }

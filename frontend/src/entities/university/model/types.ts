@@ -33,6 +33,7 @@ export interface Group {
   name: string;
   kurs: number;
   sardor: string;
+  sardorStudentId?: number | null;
   /**
    * Сколько студентов в группе. Дерево структуры несёт только число: сам
    * список — это больше тысячи строк на реальных данных, и тянуть его в

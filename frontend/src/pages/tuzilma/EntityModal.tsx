@@ -5,6 +5,7 @@ import { Button } from '@/shared/ui/Button';
 import type { EntityDraft } from '@/features/tuzilma/model/structure.store';
 import type { EduForm } from '@/entities/university/model/types';
 import { getPostCandidates, type PostCandidate, type StructuralPost } from '@/shared/api/xodimlar';
+import { getSardorCandidates, type SardorCandidate } from '@/shared/api/tuzilma';
 import { displayName } from '@/shared/lib/displayName';
 
 /**
@@ -27,6 +28,7 @@ const POST_BY_LEVEL: Record<number, { post: StructuralPost; labelKey: string }> 
 };
 
 const EDU_FORMS: readonly EduForm[] = ['Kunduzgi', 'Sirtqi'];
+const KURS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 interface EntityModalProps {
   level: number;
@@ -82,6 +84,20 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
           );
         }
 
+        if (field === 'sardor') {
+          return (
+            <SardorField
+              key={field}
+              label={t('field.sardor')}
+              studentId={draft.sardor ?? ''}
+              currentName={draft.postName ?? draft.sardor ?? ''}
+              onChange={(studentId, fullName) =>
+                setDraft((d) => ({ ...d, sardor: studentId, postName: fullName }))
+              }
+            />
+          );
+        }
+
         return (
           <ModalField
             key={field}
@@ -100,16 +116,25 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
                   </option>
                 ))}
               </select>
+            ) : field === 'kurs' ? (
+              <select
+                value={draft.kurs ?? '1'}
+                onChange={(e) => set('kurs', e.target.value)}
+                className={modalInputClass}
+              >
+                {KURS_OPTIONS.map((k) => (
+                  <option key={k} value={String(k)}>
+                    {k}-kurs
+                  </option>
+                ))}
+              </select>
             ) : (
               <input
                 value={draft[field] ?? ''}
                 onChange={(e) =>
-                  // Шифр специальности — только цифры. Отсекаем при вводе, а не
-                  // сообщением после «Сохранить»: так не остаётся сомнений,
-                  // почему буква не появилась.
                   set(field, field === 'kod' ? e.target.value.replace(/\D/g, '') : e.target.value)
                 }
-                inputMode={field === 'kurs' || field === 'kod' ? 'numeric' : 'text'}
+                inputMode={field === 'kod' ? 'numeric' : 'text'}
                 maxLength={field === 'kod' ? 16 : field === 'name' && level === 0 ? 50 : undefined}
                 className={modalInputClass}
               />
@@ -123,11 +148,6 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
 
 /**
  * Выбор человека на структурный пост.
- *
- * Список приходит с сервера уже отфильтрованным — только нужная роль и только
- * свободные. Текущего назначенца сервер в него не отдаёт (он уже занят), но в
- * режиме правки его надо показать выбранным, иначе форма выглядела бы так,
- * будто пост пуст, и сохранение молча его сняло бы.
  */
 function PostField({
   post,
@@ -181,6 +201,67 @@ function PostField({
         {holderMissing && <option value={userId}>{currentName}</option>}
         {options.map((candidate) => (
           <option key={candidate.userId} value={candidate.userId}>
+            {candidate.fullName}
+          </option>
+        ))}
+      </select>
+    </ModalField>
+  );
+}
+
+/**
+ * Выбор старосты группы из списка студентов.
+ */
+function SardorField({
+  label,
+  studentId,
+  currentName,
+  onChange,
+}: {
+  label: string;
+  studentId: string;
+  currentName: string;
+  onChange: (studentId: string, fullName: string) => void;
+}) {
+  const { t } = useTranslation('tuzilma');
+  const [candidates, setCandidates] = useState<SardorCandidate[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getSardorCandidates().then(
+      (rows) => alive && setCandidates(rows),
+      () => alive && setCandidates([]),
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const options = candidates ?? [];
+  const holderMissing = studentId !== '' && !options.some((c) => String(c.id) === studentId);
+
+  return (
+    <ModalField
+      label={label}
+      hint={
+        candidates && options.length === 0 && !holderMissing
+          ? t('modal.noCandidates', { role: 'sardor' })
+          : undefined
+      }
+    >
+      <select
+        value={studentId}
+        disabled={candidates === null}
+        onChange={(e) => {
+          const picked = options.find((c) => String(c.id) === e.target.value);
+          onChange(e.target.value, picked?.fullName ?? '');
+        }}
+        className={modalInputClass}
+      >
+        <option value="">{t('modal.unassigned')}</option>
+        {holderMissing && <option value={studentId}>{currentName}</option>}
+        {options.map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
             {candidate.fullName}
           </option>
         ))}

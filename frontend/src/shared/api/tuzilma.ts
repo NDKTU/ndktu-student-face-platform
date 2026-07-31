@@ -32,6 +32,7 @@ interface ApiGroup {
   kurs: number | null;
   position: number;
   sardor_student_id: number | null;
+  sardor_name?: string | null;
   student_count: number;
 }
 
@@ -112,7 +113,8 @@ function toGroup(group: ApiGroup): Group {
     id: group.id,
     name: group.name,
     kurs: group.kurs ?? 1,
-    sardor: EMPTY,
+    sardor: group.sardor_name || EMPTY,
+    sardorStudentId: group.sardor_student_id,
     // Состав группы приезжает отдельным запросом при раскрытии карточки.
     student_count: group.student_count,
   };
@@ -200,6 +202,8 @@ export interface SpecialityPayload {
 export interface GroupPayload {
   name?: string;
   kurs?: number;
+  sardorStudentId?: number | null;
+  sardorName?: string | null;
 }
 
 export interface RejaRowPayload {
@@ -353,32 +357,39 @@ export async function createGroup(
   facultyId: number,
   body: GroupPayload,
 ): Promise<Group> {
-  const created = await api.post<{ id: number; name: string }>('/group/', {
+  const created = await api.post<ApiGroup>('/group/', {
     name: body.name,
     speciality_id: specialityId,
     // faculty_id у группы на бэкенде обязателен, а в интерфейсе его не
     // спрашивают: он однозначно известен из пути drill-down.
     faculty_id: facultyId,
     kurs: body.kurs ?? null,
+    ...post('sardor_student_id', body.sardorStudentId),
   });
   return {
     id: created.id,
     name: created.name,
     kurs: body.kurs ?? 1,
-    sardor: EMPTY,
-    student_count: 0,
+    sardor: body.sardorName || created.sardor_name || EMPTY,
+    sardorStudentId: body.sardorStudentId ?? created.sardor_student_id,
+    student_count: created.student_count ?? 0,
   };
 }
 
 export async function updateGroup(id: number, body: GroupPayload): Promise<Partial<Group>> {
-  const updated = await api.put<{ id: number; name: string }>(`/group/${id}`, {
-    name: body.name,
-    kurs: body.kurs,
+  const updated = await api.put<ApiGroup>(`/group/${id}`, {
+    ...post('name', body.name),
+    ...post('kurs', body.kurs),
+    ...post('sardor_student_id', body.sardorStudentId),
   });
   return {
     id: updated.id,
     name: updated.name,
     ...(body.kurs !== undefined && { kurs: body.kurs }),
+    ...(body.sardorStudentId !== undefined && {
+      sardorStudentId: body.sardorStudentId,
+      sardor: body.sardorName || updated.sardor_name || EMPTY,
+    }),
   };
 }
 
@@ -461,4 +472,26 @@ export async function getGroupStudents(groupId: number): Promise<Student[]> {
       initials: initials(student.full_name),
     };
   });
+}
+
+export interface SardorCandidate {
+  id: number;
+  fullName: string;
+}
+
+export async function getSardorCandidates(groupId?: number): Promise<SardorCandidate[]> {
+  try {
+    if (groupId) {
+      const students = await getGroupStudents(groupId);
+      if (students.length > 0) {
+        return students.map((s) => ({ id: s.id, fullName: s.fish }));
+      }
+    }
+    const page = await getList<{ id: number; full_name: string }>('/students/', 'students', {
+      limit: 200,
+    });
+    return page.items.map((s) => ({ id: s.id, fullName: s.full_name }));
+  } catch {
+    return [];
+  }
 }
