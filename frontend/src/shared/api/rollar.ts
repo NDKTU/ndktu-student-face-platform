@@ -29,9 +29,19 @@ export const getRoles = () => getAll<RoleWithPermissions>('/role/', 'roles');
 /** Полный словарь прав: из него строятся строки матрицы. */
 export const getPermissions = () => getAll<PermissionInfo>('/permission/', 'permissions');
 
-export const createRole = (name: string) => api.post<RoleInfo>('/role/', { name });
+/**
+ * Ответ приходит уже с правами: сервер сразу выдаёт новой роли `user:me` —
+ * без него её обладатель не смог бы даже загрузить свой профиль.
+ */
+export const createRole = (name: string) => api.post<RoleWithPermissions>('/role/', { name });
 
-export const deleteRole = (roleId: number) => api.delete(`/role/${roleId}`);
+/**
+ * `force` нужен, когда роль кому-то выдана: сервер отвечает 409 с описанием
+ * последствий, экран показывает его и повторяет запрос уже с подтверждением.
+ * Без этого удаление молча сняло бы роль со всех — у `user_roles` каскад.
+ */
+export const deleteRole = (roleId: number, force = false) =>
+  api.delete(`/role/${roleId}${force ? '?force=true' : ''}`);
 
 /**
  * Назначает роли ровно этот набор прав.

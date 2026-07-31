@@ -1,10 +1,21 @@
 from app.core.schemas import TashkentDatetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RoleCreateRequest(BaseModel):
-    name: str
+    # Столбец `roles.name` — String(50).
+    name: str = Field(max_length=50)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Role name cannot be empty")
+        # Только пробелы: регистр оставляем как ввели — имя роли видно в
+        # интерфейсе. Совпадение по имени везде идёт через `func.lower`, так
+        # что «Dekan» и «dekan» и так считаются одной ролью.
+        return " ".join(v.split())
 
 
 class RolePermissionAssignRequest(BaseModel):

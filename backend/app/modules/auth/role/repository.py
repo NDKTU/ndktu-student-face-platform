@@ -5,7 +5,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission, Role, RolePermission
+from app.modules.auth.model import Permission, Role, RolePermission, UserRole
+from app.core.lifespan.defaults import ADMIN_ROLE_NAME
 
 from .schemas import (
     RoleCreateRequest,
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 class RoleRepository:
     async def create_role(self, session: AsyncSession, data: RoleCreateRequest) -> Role:
         # Проверка на существование роли с таким именем
-        stmt_check = select(Role).where(Role.name == data.name)
+        # Без учёта регистра: везде, где роль ищут по имени, сравнение идёт
+        # через func.lower, и «Dekan» рядом с «dekan» означал бы две роли,
+        # которые система считает одной.
+        stmt_check = select(Role).where(func.lower(Role.name) == data.name.lower())
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
             raise HTTPException(
@@ -100,7 +104,9 @@ class RoleRepository:
         # Логика обновления "как в User" (явная проверка полей)
         if data.name is not None:
             # Проверяем, не занято ли новое имя другой ролью
-            stmt_check = select(Role).where(Role.name == data.name, Role.id != role_id)
+            stmt_check = select(Role).where(
+                func.lower(Role.name) == data.name.lower(), Role.id != role_id
+            )
             existing_role = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_role:
                 raise HTTPException(
@@ -113,13 +119,40 @@ class RoleRepository:
         result = await session.execute(select(Role).options(selectinload(Role.permissions)).where(Role.id == role_id))
         return result.scalar_one()
 
-    async def delete_role(self, session: AsyncSession, role_id: int) -> None:
+    async def delete_role(self, session: AsyncSession, role_id: int, force: bool = False) -> None:
         stmt = select(Role).where(Role.id == role_id)
         result = await session.execute(stmt)
         role = result.scalar_one_or_none()
 
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+
+        # Admin — единственная роль, которую сервер пропускает мимо всех
+        # проверок. Удалить её значит запереть себя снаружи системы до
+        # следующей перезагрузки, когда lifespan заведёт её заново уже пустой.
+        if role.name == ADMIN_ROLE_NAME:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"«{ADMIN_ROLE_NAME}» rolini o'chirib bo'lmaydi — tizimga kirish yo'qoladi",
+            )
+
+        user_count = (
+            await session.execute(select(func.count(UserRole.id)).where(UserRole.role_id == role_id))
+        ).scalar() or 0
+
+        # user_roles.role_id стоит ON DELETE CASCADE: удаление молча снимет роль
+        # со всех, кому она выдана, и они потеряют доступ без всякого следа.
+        if user_count and not force:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "requires_confirmation": True,
+                    "message": "Bu rolni o'chirish quyidagilarga ta'sir qiladi:",
+                    "warnings": [
+                        f"{user_count} ta foydalanuvchi bu rolni va u bergan barcha ruxsatlarni yo'qotadi"
+                    ],
+                },
+            )
 
         await session.delete(role)
         await session.commit()

@@ -2,7 +2,7 @@
   "title": "Rollar va ruxsatlar",
   "subtitle": "Rollarni yarating va resurslar boʻyicha ruxsatlarni biriktiring",
   "listTitle": "Rollar",
-  "addRole": "Yangi rol",
+  "addRole": "Rol qo'shish",
   "systemBadge": "TIZIM",
   "userCount": "{{count}} foydalanuvchi",
   "autoSaveHint": "O'zgarishlar darhol saqlanadi",
@@ -52,5 +52,12 @@
     "statistics:items": "Statistika — savol tahlili",
     "statistics:proctoring": "Statistika — proctoring",
     "statistics:psychology": "Statistika — psixologiya"
-  }
+  },
+  "roleName": "Rol nomi",
+  "roleNameHint": "Kod sifatida ishlatiladi: `dekan`, `kafedra_mudiri`. Yaratilgach unga `user:me` ruxsati beriladi — usiz rol egasi profilini ham ocholmaydi.",
+  "roleTaken": "Bunday nomli rol allaqachon bor",
+  "deleteTitle": "Rolni o'chirish",
+  "deleteConfirm": "«{{name}}» roli o'chiriladi.",
+  "deleteWarn": "«{{name}}» roli o'chiriladi.",
+  "deleteAnyway": "Baribir o'chirish"
 }

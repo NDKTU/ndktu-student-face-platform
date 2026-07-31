@@ -4,9 +4,15 @@ import { roleColor, roleLabel } from '@/entities/access/model/roles';
 import { groupPermissions } from '@/entities/access/lib/permissionGroups';
 import { useRollar } from '@/features/rollar/lib/useRollar';
 import { useRollarStore } from '@/features/rollar/model/rollar.store';
+import { usePermissions } from '@/entities/access/lib/usePermissions';
+import { ApiError } from '@/shared/api/http';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
+import { Button } from '@/shared/ui/Button';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
+import { TrashIcon } from '@/shared/ui/icons';
 import { useToast } from '@/shared/ui/Toast';
 
 /**
@@ -28,9 +34,20 @@ export function RollarPage() {
   const permissions = useRollarStore((s) => s.permissions);
   const counts = useRollarStore((s) => s.counts);
   const toggle = useRollarStore((s) => s.toggle);
+  const addRole = useRollarStore((s) => s.addRole);
+  const removeRole = useRollarStore((s) => s.removeRole);
+  const { has } = usePermissions();
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [creating, setCreating] = useState(false);
+  /** Роль к удалению; `warnings` заполняется, когда сервер попросил подтверждение. */
+  const [confirm, setConfirm] = useState<{ id: number; name: string; warnings?: string[] } | null>(
+    null,
+  );
+
+  const canCreate = has('create:role');
+  const canDelete = has('delete:role');
 
   const selected = roles.find((r) => r.id === selectedId) ?? roles[0] ?? null;
   const locked = selected?.name === SUPERUSER_ROLE;
@@ -47,6 +64,26 @@ export function RollarPage() {
       await toggle(selected.id, permissionId, granted);
       toast(t('saved'));
     } catch (e) {
+      toast(`${tc('saveError')}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  async function handleDelete(force: boolean) {
+    if (!confirm) return;
+    try {
+      await removeRole(confirm.id, force);
+      if (confirm.id === selectedId) setSelectedId(null);
+      setConfirm(null);
+      toast(tc('deleted'));
+    } catch (e) {
+      // 409 — это не сбой, а вопрос: роль кому-то выдана. Показываем, чем это
+      // грозит, и повторяем уже с подтверждением.
+      const detail = e instanceof ApiError ? (e.payload as { detail?: DeleteWarning })?.detail : null;
+      if (detail?.requires_confirmation) {
+        setConfirm({ ...confirm, warnings: detail.warnings ?? [] });
+        return;
+      }
+      setConfirm(null);
       toast(`${tc('saveError')}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
@@ -80,6 +117,14 @@ export function RollarPage() {
           <div className="rounded-16 border border-line bg-surface p-3.5 shadow-card">
             <div className="flex items-center justify-between px-1.5 pt-1 pb-3">
               <span className="text-13 font-bold text-ink-muted">{t('listTitle')}</span>
+              {canCreate && (
+                <Button
+                  className="h-[30px] rounded-9 px-2.5 text-12-5"
+                  onClick={() => setCreating(true)}
+                >
+                  + {t('addRole')}
+                </Button>
+              )}
             </div>
 
             <div className="flex flex-col gap-[3px]">
@@ -150,6 +195,19 @@ export function RollarPage() {
                           })}
                     </p>
                   </div>
+
+                  {/* Admin не удаляется: сервер это и так запретит, но кнопки,
+                      которая всегда отвечает ошибкой, быть не должно. */}
+                  {canDelete && !locked && (
+                    <Button
+                      variant="secondary"
+                      className="h-[36px] flex-none rounded-10 px-3 text-danger"
+                      onClick={() => setConfirm({ id: selected.id, name: selected.name })}
+                    >
+                      <TrashIcon />
+                      {tc('delete')}
+                    </Button>
+                  )}
                 </div>
 
                 {groups.map((group) => {
@@ -236,7 +294,94 @@ export function RollarPage() {
           </div>
         </div>
       </div>
+
+      {creating && (
+        <NewRoleModal
+          existing={roles.map((r) => r.name)}
+          onCancel={() => setCreating(false)}
+          onCreate={async (name) => {
+            try {
+              setSelectedId(await addRole(name));
+              setCreating(false);
+              toast(tc('created'));
+            } catch (e) {
+              // Форму не закрываем: введённое не должно пропасть из-за сбоя.
+              toast(`${tc('saveError')}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }}
+        />
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          title={t('deleteTitle')}
+          // Диалог принимает строку, а не разметку: переводы строк в ней не
+          // видны, поэтому предупреждения склеиваем через точку.
+          text={
+            confirm.warnings?.length
+              ? [t('deleteWarn', { name: confirm.name }), ...confirm.warnings].join(' · ')
+              : t('deleteConfirm', { name: confirm.name })
+          }
+          confirmLabel={confirm.warnings?.length ? t('deleteAnyway') : undefined}
+          onConfirm={() => void handleDelete(Boolean(confirm.warnings?.length))}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** Тело 409 на удалении: сервер описывает последствия, а не просто отказывает. */
+interface DeleteWarning {
+  requires_confirmation?: boolean;
+  message?: string;
+  warnings?: string[];
+}
+
+function NewRoleModal({
+  existing,
+  onCreate,
+  onCancel,
+}: {
+  existing: string[];
+  onCreate: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation('rollar');
+  const { t: tc } = useTranslation('common');
+  const [name, setName] = useState('');
+
+  const trimmed = name.trim();
+  // Сервер сравнивает имена без учёта регистра — проверяем так же, иначе
+  // «Dekan» выглядел бы свободным и отказ пришёл бы только после «Saqlash».
+  const taken = existing.some((r) => r.toLowerCase() === trimmed.toLowerCase());
+
+  return (
+    <Modal
+      title={t('addRole')}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onCancel}>
+            {tc('cancel')}
+          </Button>
+          <Button disabled={!trimmed || taken} onClick={() => onCreate(trimmed)}>
+            {tc('save')}
+          </Button>
+        </>
+      }
+    >
+      <ModalField label={t('roleName')} hint={taken ? t('roleTaken') : t('roleNameHint')}>
+        <input
+          value={name}
+          autoFocus
+          maxLength={50}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && trimmed && !taken && onCreate(trimmed)}
+          className={modalInputClass}
+        />
+      </ModalField>
+    </Modal>
   );
 }
 

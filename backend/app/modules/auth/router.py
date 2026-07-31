@@ -300,10 +300,11 @@ async def update_role(
 )
 async def delete_role(
     role_id: int,
+    force: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("delete:role")),
 ):
-    await get_role_repository.delete_role(session=session, role_id=role_id)
+    await get_role_repository.delete_role(session=session, role_id=role_id, force=force)
 
 
 @role_router.post(

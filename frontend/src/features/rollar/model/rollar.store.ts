@@ -17,8 +17,9 @@ interface RollarState {
   load: () => Promise<void>;
   /** Выдать или отобрать одно право у роли. */
   toggle: (roleId: number, permissionId: number, granted: boolean) => Promise<void>;
-  addRole: (name: string) => Promise<void>;
-  removeRole: (roleId: number) => Promise<void>;
+  /** Возвращает id созданной роли — экран сразу её открывает. */
+  addRole: (name: string) => Promise<number>;
+  removeRole: (roleId: number, force?: boolean) => Promise<void>;
 }
 
 /** Текущий запрос, чтобы StrictMode не слал его дважды. */
@@ -84,12 +85,24 @@ export const useRollarStore = create<RollarState>()((set, get) => ({
   },
 
   addRole: async (name) => {
+    // Ответ приходит с уже выданным `user:me` — берём права оттуда, а не
+    // подставляем пустой список, который разошёлся бы с сервером.
     const created = await api.createRole(name);
-    set((s) => ({ roles: [...s.roles, { ...created, permissions: [] }] }));
+    set((s) => ({ roles: [...s.roles, created], counts: { ...s.counts, [created.name]: 0 } }));
+    return created.id;
   },
 
-  removeRole: async (roleId) => {
-    await api.deleteRole(roleId);
-    set((s) => ({ roles: s.roles.filter((r) => r.id !== roleId) }));
+  removeRole: async (roleId, force = false) => {
+    await api.deleteRole(roleId, force);
+    set((s) => ({
+      roles: s.roles.filter((r) => r.id !== roleId),
+      // Счётчик учёток тоже уходит: иначе удалённая роль осталась бы в
+      // подписях под другими строками.
+      counts: Object.fromEntries(
+        Object.entries(s.counts).filter(
+          ([name]) => name !== s.roles.find((r) => r.id === roleId)?.name,
+        ),
+      ),
+    }));
   },
 }));
