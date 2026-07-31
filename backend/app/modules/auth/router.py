@@ -160,6 +160,7 @@ async def update_my_credentials(
 async def create_user(
     data: UserCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("create:user")),
 ):
     result = await get_user_repository.create_user(session=session, data=data)
     return result
