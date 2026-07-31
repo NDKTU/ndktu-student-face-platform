@@ -15,6 +15,12 @@ class ServerConfig(BaseModel):
     host: str
     port: int
     reload: bool = True
+    # Set to True in production — disables /docs, /redoc, /openapi.json.
+    # Тот же флаг и та же семантика, что у face-detection (его
+    # app/core/config.py:25). В .env он стоял с самого начала, но здесь поля не
+    # было, а `extra="ignore"` глотал его молча — схема оставалась открытой,
+    # хотя оператор считал, что закрыл её.
+    is_prod: bool = False
 
 
 class JwtConfig(BaseModel):

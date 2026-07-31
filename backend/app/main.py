@@ -12,7 +12,13 @@ from app.core.lifespan import lifespan
 from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.modules.router import router
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    # /health остаётся открытым: на него смотрит healthcheck в docker-compose.
+    docs_url=None if settings.server.is_prod else "/docs",
+    redoc_url=None if settings.server.is_prod else "/redoc",
+    openapi_url=None if settings.server.is_prod else "/openapi.json",
+)
 
 # Ensure upload directory (and its purpose-based subfolders) exist
 os.makedirs(settings.absolute_upload_dir, exist_ok=True)

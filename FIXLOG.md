@@ -32,6 +32,7 @@ Baseline captured before any change: **ruff 72 errors · pytest 1 failed / 151 e
 |---|---|---|---|---|
 | F01 | `POST /api/user/` now requires the `create:user` permission. It previously had no authentication at all, so any anonymous caller could create an account and name its roles — including `Admin`, which bypasses every permission check. | `backend/app/modules/auth/router.py:163` | Live probe on the running stack: anonymous `POST /api/user/` → **401** (was 422, i.e. it reached body validation); anonymous payload requesting `roles:[{"name":"Admin"}]` → **401**; authenticated admin `POST` → **201** with the requested role attached; DB confirms the anonymous attempts created nothing. Control endpoint `/api/faculty/` unchanged at 401. ruff **72 → 72** (the single `I001` in the touched file is present in the `HEAD` version too). pytest **1 failed / 151 errors → 1 failed / 151 errors**. | ✅ Done |
 | F02 | The three image-upload handlers wrote whatever they were sent — no extension, type or size check — into a directory served as static content from the SPA's own origin. All three now go through one validator: raster-image allowlist, 5 MB cap, chunked read, UUID filename. | new `backend/app/core/utils/upload.py`; `quiz/question/repository.py:249`, `quiz/quiz/repository.py:475`, `auth/employee/repository.py:35` | Live probes as admin against all three endpoints: `.html` payload → **400** on each; `.svg` → **400**; 6 MB PNG → **400** ("must not exceed 5MB"); valid 1×1 PNG → **200** with a URL. Disk checked after the rejected 6 MB upload: no partial file, no file over 5 MB, count back to its original 7. ruff **72 → 72**. pytest **1 failed / 151 errors → 1 failed / 151 errors**. | ✅ Done |
+| F07 | `APP_CONFIG__SERVER__IS_PROD` was documented in `.env.example`, set in the real `.env`, and did not exist in code — `extra="ignore"` swallowed it, so `/docs`, `/redoc` and `/openapi.json` were public no matter what the operator configured. Implemented it, mirroring the face-detection service which already had exactly this. | `backend/app/core/config.py:18`, `backend/app/main.py:15-21` | With the current `IS_PROD=False`: `/docs`, `/redoc`, `/openapi.json`, `/health` all still **200**. With `IS_PROD=True` injected into the environment, importing the app yields `docs_url=None`, `redoc_url=None`, `openapi_url=None`; the same probe at `False` yields the three real paths. `/health` is deliberately not gated — the compose healthcheck depends on it. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 
 ### F01 — notes
 
@@ -85,3 +86,23 @@ it, not by running it.
 - Files uploaded before this change were not audited or removed. The current
   `uploads/` tree holds only `.png` and `.jpg`, so nothing dangerous is stored today,
   but that is an observation about this instance, not a guarantee about production.
+
+### F07 — notes
+
+The intent was never in doubt: `face-detection/app/main.py:40-42` already does exactly
+this, with the same comment wording as `.env.example:30`. The backend simply never got
+the field. Implementing it was therefore the right call over deleting the setting.
+
+**`/health` is deliberately left open.** `docker-compose.yml:62` health-checks the
+backend with `curl -f /health`; gating it would make the container permanently
+unhealthy.
+
+**Discovered while verifying — reported as F22, not fixed here.** The
+*face-detection* service has the flag implemented but **no `/health` route** (probe:
+`localhost:8001/health` → 404), and `docker-compose.yml:28` health-checks it with
+`curl -f /docs`. So enabling `is_prod` for that service makes its healthcheck fail,
+which marks it unhealthy, which blocks `backend` — it waits on
+`face-detection: condition: service_healthy`. Turning on production hardening there
+would take the whole stack down at boot. Fixing it means either adding a `/health`
+route to face-detection or repointing the healthcheck; both are outside F07 and in a
+different service.
