@@ -47,11 +47,11 @@ uv run uvicorn app.main:app --reload
 ### Services (docker-compose)
 | Container | Port | Purpose |
 |---|---|---|
-| `nusmt_backend` | 8000 | FastAPI REST API |
+| `nusmt_backend` | 8010→8000 | FastAPI REST API |
 | `nusmt_frontend` | 3000 | React SPA served by nginx |
 | `nusmt_face_detection` | 8001 | Face-detection microservice (separate FastAPI app) |
 | `database` | 5436→5432 | PostgreSQL 17 |
-| `redis_cache` | 6379 | Redis (caching + queue) |
+| `redis_cache` | 6380→6379 | Redis (caching + queue) |
 | `nusmt_grafana` | 3001 | Grafana dashboards |
 
 In production, nginx sits in front of everything. In dev, services are exposed directly.

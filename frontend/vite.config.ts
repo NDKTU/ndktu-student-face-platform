@@ -17,8 +17,8 @@ export default defineConfig({
     // Prod'da bu yo'llarni nginx proksi qiladi, shuning uchun ilova ikkala
     // holatda ham bir xil nisbiy `/api` manzilidan foydalanadi.
     proxy: {
-      '/api': 'http://localhost:8000',
-      '/uploads': 'http://localhost:8000',
+      '/api': 'http://localhost:8010',
+      '/uploads': 'http://localhost:8010',
     },
   },
   test: {

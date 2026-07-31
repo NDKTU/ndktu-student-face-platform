@@ -1,3 +1,5 @@
+import os
+
 import pytest_asyncio
 import redis.asyncio as redis
 from core.config import settings
@@ -15,13 +17,18 @@ from sqlalchemy.pool import NullPool
 import app.core.database.models_registry  # noqa: F401
 from app.core.database.base import Base
 
+# Тесты ходят в Redis снаружи контейнера, поэтому адрес хостовой, а не `redis`.
+# Порт вынесен в docker-compose на 6380: 6379 на машине разработчика может быть
+# занят чужим Redis, и тогда наш контейнер вообще не поднимется.
+TEST_REDIS_URL = os.getenv("TEST_REDIS_URL", "redis://localhost:6380")
+
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def init_test_services():
     """
     Инициализация всех внешних сервисов (Limiter).
     """
-    test_redis = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
+    test_redis = redis.from_url(TEST_REDIS_URL, encoding="utf-8", decode_responses=True)
 
     await FastAPILimiter.init(test_redis)
 
@@ -35,7 +42,7 @@ async def clear_test_redis():
     """
     Очистка Redis перед каждым тестом, чтобы избежать ошибки 429 (Rate Limit).
     """
-    test_redis = redis.from_url("redis://localhost:6379")
+    test_redis = redis.from_url(TEST_REDIS_URL)
     await test_redis.flushdb()  # Полностью очищаем базу перед тестом
     await test_redis.aclose()
     yield
