@@ -3,7 +3,9 @@
 **Date:** 2026-07-31 · **Scope:** `backend/` (229 .py), `frontend/src` (184 .ts/.tsx),
 `face-detection/` (29 .py), 70 Alembic revisions, `docker-compose.yml`, nginx config.
 **Method:** every finding below comes from a file opened during this audit and cites
-`file:line`. Runtime probes were read-only against the running dev stack
+`file:line`. **Line numbers were re-derived after commit `ee44418`** ("modular API
+routers"), which split three monolithic routers into per-module files and moved most
+cited lines. Runtime probes were read-only against the running dev stack
 (`localhost:8010`). No code was modified.
 
 ---
@@ -67,27 +69,28 @@ operations detected"**: no model/migration drift.
 
 | ID | Severity | Area | Title | File:line |
 |---|---|---|---|---|
-| F01 | **P0** | Security | ~~`POST /api/user/` has no auth and accepts arbitrary roles → full takeover~~ **FIXED** | `backend/app/modules/auth/router.py:154` |
-| F02 | **P0** | Security | Three upload handlers accept any extension/size → stored XSS on the app origin | `backend/app/modules/quiz/question/repository.py:248` |
-| F03 | **P1** | Security | `GET /api/result/{id}` has no ownership check while the list endpoint does | `backend/app/modules/quiz/result/repository.py:21` |
-| F04 | **P1** | Security | `GET /api/user-answers/` applies no scoping whatsoever | `backend/app/modules/quiz/user_answers/repository.py:15` |
-| F05 | **P1** | Security | Data scoping keys on role *names*; fails open for every custom role (33 sites) | `backend/app/modules/quiz/question/repository.py:88` |
-| F06 | **P1** | Security | Admin detection is case-sensitive in the gate, case-insensitive in repositories | `backend/app/core/dependencies/role_checker.py:52` |
-| F07 | **P1** | Security | `IS_PROD` is documented and set, but does not exist in code — `/docs` always public | `backend/app/core/config.py:13` |
-| F08 | **P1** | Perf/DoS | No upper bound on `limit` in 27 list schemas; `?limit=100000000` returns 200 | `backend/app/modules/auth/user/schemas.py:106` |
-| F09 | **P1** | Async | Blocking file and Excel I/O inside `async def` stalls the whole worker | `backend/app/modules/quiz/question/repository.py:261` |
+| F01 | **P0** | Security | ~~`POST /api/user/` has no auth and accepts arbitrary roles → full takeover~~ **FIXED** | `backend/app/modules/auth/user/router.py:97` |
+| F02 | **P0** | Security | ~~Three upload handlers accept any extension/size → stored XSS~~ **FIXED** | `backend/app/core/utils/upload.py` |
+| F03 | **P1** | Security | ~~`GET /api/result/{id}` has no ownership check while the list endpoint does~~ **FIXED** | `backend/app/modules/quiz/result/repository.py:72` |
+| F04 | **P1** | Security | ~~`GET /api/user-answers/` applies no scoping whatsoever~~ **FIXED** | `backend/app/modules/quiz/user_answers/repository.py:17` |
+| F05 | **P1** | Security | Data scoping keys on role *names*; fails open for every custom role | `backend/app/modules/quiz/question/repository.py:91` |
+| F06 | **P1** | Security | ~~Admin detection is case-sensitive in the gate, case-insensitive in repositories~~ **FIXED** | `backend/app/core/utils/roles.py` |
+| F07 | **P1** | Security | ~~`IS_PROD` is documented and set, but does not exist in code~~ **FIXED** | `backend/app/core/config.py:23` |
+| F08 | **P1** | Perf/DoS | ~~No upper bound on `limit`; `?limit=100000000` returns 200~~ **FIXED** | `backend/app/core/schemas.py:25` |
+| F09 | **P1** | Async | ~~Blocking file and Excel I/O inside `async def` stalls the whole worker~~ **FIXED** | `backend/app/modules/quiz/question/repository.py:262` |
 | F10 | **P2** | DB | 33 FK columns unindexed, including `user_roles` on the per-request auth path | (DB introspection, see F10) |
 | F11 | **P2** | Security | Login distinguishes unknown user from wrong password → username enumeration | `backend/app/modules/auth/user/service.py:113` |
 | F12 | **P2** | Security | No password policy: any non-empty string is accepted | `backend/app/modules/auth/user/schemas.py:44` |
 | F13 | **P2** | Security | Production CORS allowlist contains `localhost` origins and a plain-`http` origin | `.env:52` |
 | F14 | **P2** | Structure | Transactions commit in 24 repositories; only 1 service owns a transaction | `backend/app/modules/auth/user/repository.py:59` |
-| F15 | **P2** | DB | `employees.user_id` FK has no `ondelete` → deleting a user 500s | `backend/app/modules/auth/model.py:212` |
+| F15 | **P2** | DB | `employees.user_id` FK has no `ondelete` → deleting a user 500s | `backend/app/modules/auth/model.py:177` |
 | F16 | **P2** | Structure | `modules/statistics/` ships stale `.pyc` files that are untracked and unroutable | `backend/app/modules/statistics/` |
 | F17 | **P3** | DB | 14 of 70 migrations have an empty `downgrade()` | `backend/app/migrations/versions/` |
 | F18 | **P3** | Docs | Comment claims plaintext passwords are stored; they are not | `backend/app/modules/auth/hemis/service.py:168` |
-| F19 | **P3** | API | 17 endpoints declare no `response_model` | `backend/app/modules/quiz/router.py:527` |
+| F19 | **P3** | API | 17 endpoints declare no `response_model` | `backend/app/modules/quiz/router.py:529` |
 | F20 | **P3** | Ops | Log filename date is frozen at import time | `backend/app/core/logging.py:74` |
-| F21 | **P1** | Security | `create:user` alone is enough to mint an `Admin` account | `backend/app/modules/auth/user/repository.py:30` |
+| F21 | **P1** | Security | `create:user` alone is enough to mint an `Admin` account | `backend/app/modules/auth/user/repository.py:34` |
+| F22 | **P1** | Ops | Enabling `is_prod` on face-detection makes its healthcheck fail and blocks the whole stack | `docker-compose.yml:28` |
 
 ### Verified clean
 
@@ -704,31 +707,59 @@ is to forbid granting any role the caller does not already have.
 
 ---
 
-## 3. Fix first — in execution order
+### F22 · P1 · Turning on production hardening for face-detection blocks the stack
 
-1. ~~**F01** — add the missing permission dependency to `POST /api/user/`.~~
-   **Done** — see `FIXLOG.md`. Its escalation half became **F21**, still open.
-2. **F07** — implement or delete `IS_PROD`. Cheap, and it stops the schema from
-   advertising F01 while you fix the rest.
-3. **F02** — reuse the existing resource-upload validator in the three unvalidated
-   handlers. Closes stored XSS and the unbounded-disk path in one change.
-4. **F08** — cap `limit`. One shared base schema, immediate DoS reduction.
-5. **F11 + F12** — single login message and a password floor. Both small, both in the
-   same file, both compound with F01.
-6. **F04** — scope `/api/user-answers/`. It leaks live exam answers and is a smaller
-   change than F03.
-7. **F03** — scope `GET /api/result/{id}` to match its own list endpoint.
-8. **F10** — index `user_roles` and `role_permissions` first, then the rest. Do it
-   before the user count grows, not after.
-9. **F06** — unify the admin comparison. Prerequisite for F05, and it removes a
-   privilege inconsistency on its own.
-10. **F09** — move blocking I/O off the event loop, now that uploads are bounded by
-    F02 and the change can be scoped.
+Found while implementing F07.
 
-F05 (role-name scoping) is the most valuable remaining item but is a multi-day
-behavioural change; schedule it as its own piece of work rather than squeezing it in.
+```yaml
+# docker-compose.yml:28  (face-detection healthcheck)
+test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+# face-detection/app/main.py:40   docs_url=None if settings.is_prod else "/docs"
+```
+
+face-detection implements `is_prod` correctly — and has **no `/health` route at all**
+(probe: `localhost:8001/health` → 404, `/docs` → 200). So its healthcheck depends on the
+very endpoint the flag removes.
+
+**Why it matters.** Set `is_prod=True` for that service and `/docs` starts returning 404.
+The healthcheck fails, the container is marked unhealthy, and `backend` never starts —
+`docker-compose.yml:55-56` makes it wait on `face-detection: condition: service_healthy`.
+The whole stack stays down, and the log says only "container unhealthy", pointing at the
+wrong service. This is a trap that springs precisely when someone hardens for production.
+
+**Fix.** Add a `/health` route to face-detection and point the healthcheck at it — the
+same shape the backend already uses. Alternatively drop the flag from that service, but
+the route is worth having regardless.
+
+**Risk:** low. **Effort:** 20 minutes.
 
 ---
+
+## 3. Fix first — in execution order
+
+**Done so far (see `FIXLOG.md`):** F01, F02, F07, F08, F03, F04, F06, F09 — both P0s and
+six of the P1s. Each was verified against the running stack and committed separately.
+
+Remaining, in the order I would take them:
+
+1. **F22** — 20 minutes, and it is a trap that springs the first time someone enables
+   production hardening. Do it before anyone sets `is_prod` anywhere.
+2. **F21** — the last open P1 in the auth path. Blocked only on the policy question in
+   §4; the code change is small either way.
+3. **F05** — the largest remaining security item and the reason the two scoping fixes
+   above still fail open for custom roles. Needs the design decision in §4 first.
+4. **F10** — 33 unindexed FKs, two of them (`user_roles`) on the per-request auth path.
+   Pure win, no behaviour change, but it is a migration and so needs approval.
+5. **F11 + F12** — login enumeration and the absent password policy. Small, independent.
+6. **F15** — `employees.user_id` needs an `ondelete`; deleting a user currently 500s.
+7. **F13** — strip `localhost` and the plain-`http` origin from the production CORS list.
+8. **F16** — delete the untracked `statistics/` `.pyc` tree.
+9. **F14** — move transactions out of the repositories. Large, mechanical, and best done
+   after the security work has settled.
+10. **F17–F20** — the P3 tail.
+
+**Before any of these:** the test suite is at 0 passed / 151 errors and `mypy` is not
+installed, so none of the above can be regression-tested. See §4.
 
 ## 4. Needs your decision
 
