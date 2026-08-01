@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import Employee, Teacher, User
 from app.modules.quiz.model import Subject, SubjectTeacher
 
@@ -72,7 +73,7 @@ class SubjectRepository:
     ) -> SubjectListResponse:
         stmt = select(Subject).options(selectinload(Subject.kafedra))
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
         teacher_filter = None
 

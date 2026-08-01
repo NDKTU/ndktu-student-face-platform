@@ -26,6 +26,14 @@ Repairing the harness touches `conftest.py` and probably a model definition
 
 Baseline captured before any change: **ruff 72 errors · pytest 1 failed / 151 errors**.
 
+**Baseline moved at commit `ee44418`** ("modular API routers", +3151/−2327, not mine):
+ruff rose to **89**. Findings fixed from F06 onward are measured against 89, not 72.
+All six earlier fixes were re-verified live after that refactor and survived it intact —
+`POST /api/user/` still 401 anonymous, `.html` upload still 400, `/docs` still gated by
+the flag, `?limit=100000000` still 422, and both scoped reads still answer correctly.
+An AST scan over the new router files found only three endpoints without an auth
+dependency: the two login routes and the client-log collector, all intentional.
+
 ---
 
 | ID | What changed | Files | How verified | Status |
@@ -36,6 +44,7 @@ Baseline captured before any change: **ruff 72 errors · pytest 1 failed / 151 e
 | F08 | Every list input accepted an unbounded `limit`; `?limit=100000000` returned 200 and made the server materialise whole tables with their eager loads. All 27 schema fields and 5 raw router params now carry `ge=1, le=MAX_PAGE_SIZE` (1000). | new constant in `backend/app/core/schemas.py:25`; 23 `schemas.py` files; `auth/router.py`, `organization_structure/router.py`, `course/router.py` | Probes as admin: `limit=100000000` → **422** on `/user/`, `/students/`, `/teacher/ranking/overall`, `/group/{id}/students`, `/assignment/pending`; `limit=99999` → 422; `limit=0` → 422. Legitimate traffic unchanged: `limit=1000` → 200, `limit=200` → 200, default (no param) → 200. Frontend `tsc --noEmit` clean; its largest real request is 1000 (ranking CSV export) and still passes. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 | F03 | `GET /api/result/{id}` returned any result to any holder of `read:result`, while the list endpoint carefully scoped by role. The role predicate is now extracted into `ResultRepository.scope_filter` and applied by both. Unauthorised reads answer 404, not 403, so the response does not confirm which ids exist. | `quiz/result/repository.py:21-95`, `quiz/router.py:490` | Probes with three real accounts against two seeded results (one owned by the student, one not): admin **200/200**; student **200** on its own, **404** on the other; teacher with no assignments **404/404** (the `Result.id == -1` branch). `GET /result/` after the refactor: admin `total=2`, student `total=1` — the count is scoped too. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 | F04 | `GET /api/user_answers/` built every filter from the query string and none from the caller, so `?user_id=<anyone>` returned their submitted answers together with `correct_answer`. It now reuses the same `scope_filter`, restricted through the answer's `result_id`. | `quiz/user_answers/repository.py:15-38`, `quiz/router.py:534` | Probes against two seeded answers: admin sees both; student sees only its own; `?user_id=1` → **total 0**; `?result_id=2` → **total 0**. The count query shares the same filter list, so `total` cannot leak either. ruff **72 → 72**. pytest unchanged. | ✅ Done |
+| F06 | "Is this user an admin?" was answered two incompatible ways: the permission gate compared exactly (`role.name == "Admin"`), sixteen call sites compared case-insensitively. A role named `admin` therefore got university-wide data visibility without the permission bypass — half the privileges, invisibly. All 16 sites now call one helper, which compares exactly. | new `backend/app/core/utils/roles.py`; `core/dependencies/role_checker.py:52`; 13 repositories and 2 of the new routers | Admin still reaches all of `/user/ /faculty/ /result/ /question/ /course/ /lesson/ /subject/ /group/` (200 each). Premise verified: creating a role named `admin` or `ADMIN` is refused with 400, because role-name uniqueness is already case-insensitive — so the narrow comparison cannot lock anyone out. ruff **89 → 89**. pytest **unchanged**. | ✅ Done |
 
 ### F01 — notes
 
@@ -155,3 +164,30 @@ verify against; in a production database with pre-`result_id` history a teacher 
 lose access to it. Chosen deliberately: for a security fix the safe direction is deny,
 and the endpoint is not called by the SPA at all, so nothing in the product depends on
 it today.
+
+### F06 — notes
+
+**Tightened rather than loosened, deliberately.** Two directions were available: make
+the gate case-insensitive (so `admin` gains the permission bypass) or make the
+repositories exact (so `admin` loses the data visibility). The second is the safe
+direction for a security fix, and the codebase supports it: `sync_admin_role` recreates
+a role named exactly `Admin` on every boot, and role-name uniqueness is case-insensitive,
+so a second role differing only in case cannot be created. Both were verified above.
+
+**Production caveat.** If some deployment has an admin-equivalent role named in another
+case, this narrows its data access. Nothing in this instance matches — the roles here are
+`Admin`, `Teacher`, `Student`, `User`, `Psixologik`, `dekan` — but that is an observation
+about one database, not a guarantee.
+
+**A bug was caught mid-change.** The first attempt substituted `is_admin = is_admin(user)`,
+which makes `is_admin` a local name and raises `UnboundLocalError` on the right-hand side.
+Reverted and redone importing under the alias `user_is_admin`, so every call site keeps
+its existing local variable name and only the predicate moves.
+
+**`teacher` and `student` are still matched by lowercased name** in the same functions.
+That is F05 and untouched here.
+
+**Lint discipline.** The import insertions produced three new `I001` errors; those three
+files were re-sorted with `ruff --fix --select I001`, scoped to exactly those paths. Net
+ruff delta is zero (the two E501s that appear to move are pre-existing lines shifted by
+one).

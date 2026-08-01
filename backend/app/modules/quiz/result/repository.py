@@ -5,6 +5,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.organization_structure.model import GroupTeacher
 from app.modules.quiz.model import Result, SubjectTeacher
@@ -31,7 +32,7 @@ class ResultRepository:
         видит всё. Это F05 — авторизация по имени роли; здесь поведение
         сохранено как есть, чтобы список и деталь не разъехались.
         """
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
         is_student = any(role.name.lower() == "student" for role in current_user.roles)
 

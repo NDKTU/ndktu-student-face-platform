@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.security import create_face_ws_token
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import Student, User
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
@@ -53,7 +54,7 @@ class QuizProcessRepository:
         result_student = await session.execute(stmt_student)
         student = result_student.scalar_one_or_none()
 
-        is_admin = any(role.name.lower() == "admin" for role in user.roles)
+        is_admin = user_is_admin(user)
         student_image_url = None
 
         if student:

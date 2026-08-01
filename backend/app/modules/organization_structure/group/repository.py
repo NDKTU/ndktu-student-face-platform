@@ -6,6 +6,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import User
 from app.modules.organization_structure.model import Group, GroupTeacher
 from app.modules.quiz.model import Result
@@ -82,7 +83,7 @@ class GroupRepository:
     ) -> GroupListResponse:
         stmt = select(Group)
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
         is_student = any(role.name.lower() == "student" for role in current_user.roles)
 

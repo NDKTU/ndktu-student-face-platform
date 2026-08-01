@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 class AssignmentRepository:
     async def _is_admin(self, user: User) -> bool:
-        return any(r.name.lower() == "admin" for r in (user.roles or []))
+        return user_is_admin(user)
 
     async def _is_student(self, user: User) -> bool:
         return any(r.name.lower() == "student" for r in (user.roles or []))

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.core.schemas import MAX_PAGE_SIZE
 from app.modules.auth.model import User
 from core.database.db_helper import db_helper
@@ -128,7 +129,7 @@ async def get_teacher_assigned_subjects(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("user:me")),
 ):
-    is_admin = any(r.name.lower() == "admin" for r in current_user.roles)
+    is_admin = user_is_admin(current_user)
     if not is_admin and user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await get_teacher_repository.get_assigned_subjects_by_user(session=session, user_id=user_id)
@@ -140,7 +141,7 @@ async def get_teacher_assigned_groups(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("user:me")),
 ):
-    is_admin = any(r.name.lower() == "admin" for r in current_user.roles)
+    is_admin = user_is_admin(current_user)
     if not is_admin and user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await get_teacher_repository.get_assigned_groups_by_user(session=session, user_id=user_id)

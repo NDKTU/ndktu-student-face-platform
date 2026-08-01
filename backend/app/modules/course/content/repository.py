@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import User
 from app.modules.course.model import (
     Course,
@@ -42,7 +43,7 @@ class CourseContentRepository:
 
     @staticmethod
     def _is_admin(user: User) -> bool:
-        return any(role.name.lower() == "admin" for role in user.roles)
+        return user_is_admin(user)
 
     async def _require_owner(self, session: AsyncSession, course_id: int, user: User) -> Course:
         """Править содержимое может автор курса или администратор.

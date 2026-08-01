@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.organization_structure.model import GroupTeacher
 from app.modules.course.model import Course, CourseGroup, Lesson, LessonResult
 from app.modules.course.course.repository import get_course_repository
@@ -107,7 +108,7 @@ class LessonRepository:
         data: LessonCreateRequest,
         current_user: User,
     ) -> Lesson:
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
 
         _, subject_teacher, _ = await self._resolve_course_context(
             session, data.course_id, current_user, data.group_id, is_admin
@@ -165,7 +166,7 @@ class LessonRepository:
             selectinload(Lesson.group),
         )
 
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
         is_teacher = await self._is_role(current_user, "teacher")
         is_student = await self._is_role(current_user, "student")
         role_filter = None
@@ -245,7 +246,7 @@ class LessonRepository:
     ) -> Lesson:
         lesson = await self.get_lesson(session=session, lesson_id=lesson_id)
 
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
 
         if not is_admin and not await get_course_repository.user_owns_course(session, lesson.course_id, current_user.id):
             raise HTTPException(
@@ -287,7 +288,7 @@ class LessonRepository:
     ) -> None:
         lesson = await self.get_lesson(session=session, lesson_id=lesson_id)
 
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
 
         if not is_admin and not await get_course_repository.user_owns_course(session, lesson.course_id, current_user.id):
             raise HTTPException(
@@ -308,7 +309,7 @@ class LessonRepository:
     ) -> LessonResultListResponse:
         lesson = await self.get_lesson(session=session, lesson_id=lesson_id)
 
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
         is_teacher = await self._is_role(current_user, "teacher")
         is_student = await self._is_role(current_user, "student")
 
@@ -379,7 +380,7 @@ class LessonRepository:
     ) -> LessonResultListResponse:
         lesson = await self.get_lesson(session=session, lesson_id=lesson_id)
 
-        is_admin = await self._is_role(current_user, "admin")
+        is_admin = user_is_admin(current_user)
         is_teacher = await self._is_role(current_user, "teacher")
 
         if not is_admin and is_teacher:

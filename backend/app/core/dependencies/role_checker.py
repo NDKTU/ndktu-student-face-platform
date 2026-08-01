@@ -12,6 +12,7 @@ from app.modules.auth.model import Role
 from app.modules.auth.model import RolePermission
 from app.modules.auth.model import User
 from app.modules.auth.model import UserRole
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.user.service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,9 @@ class PermissionRequired:
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        # Проверяем, является ли пользователь админом
-        is_admin = any(role.name == "Admin" for role in user.roles)
-
-        if is_admin:
+        # Единственная точка правды о том, кто админ (F06): раньше здесь
+        # сравнение было точным, а в репозиториях — без учёта регистра.
+        if user_is_admin(user):
             return user  # Админ имеет доступ ко всему
 
         # Для не-админов проверяем конкретное разрешение

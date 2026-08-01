@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.core.utils.roles import is_admin as user_is_admin
 from app.core.utils.upload import save_image_upload
 from app.modules.auth.model import User
 from app.modules.quiz.model import Question
@@ -64,7 +65,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -87,7 +88,7 @@ class QuestionRepository:
 
         # Check if user is teacher (not admin)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
 
         if not is_admin and is_teacher:
             # Teachers can only see their own questions
@@ -154,7 +155,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -209,7 +210,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -227,7 +228,7 @@ class QuestionRepository:
         from sqlalchemy import update
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin:
             if data.user_id != current_user.id:
                 raise HTTPException(

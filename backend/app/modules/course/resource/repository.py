@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.course.model import Course, Lesson, Resource
 from app.modules.auth.model import User
 
@@ -38,7 +39,7 @@ class ResourceRepository:
         course = (await session.execute(select(Course).where(Course.id == course_id))).scalar_one_or_none()
         if not course:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        is_admin = any(r.name.lower() == "admin" for r in (user.roles or []))
+        is_admin = user_is_admin(user)
         if not is_admin and course.teacher_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
