@@ -46,6 +46,7 @@ dependency: the two login routes and the client-log collector, all intentional.
 | F04 | `GET /api/user_answers/` built every filter from the query string and none from the caller, so `?user_id=<anyone>` returned their submitted answers together with `correct_answer`. It now reuses the same `scope_filter`, restricted through the answer's `result_id`. | `quiz/user_answers/repository.py:15-38`, `quiz/router.py:534` | Probes against two seeded answers: admin sees both; student sees only its own; `?user_id=1` → **total 0**; `?result_id=2` → **total 0**. The count query shares the same filter list, so `total` cannot leak either. ruff **72 → 72**. pytest unchanged. | ✅ Done |
 | F06 | "Is this user an admin?" was answered two incompatible ways: the permission gate compared exactly (`role.name == "Admin"`), sixteen call sites compared case-insensitively. A role named `admin` therefore got university-wide data visibility without the permission bypass — half the privileges, invisibly. All 16 sites now call one helper, which compares exactly. | new `backend/app/core/utils/roles.py`; `core/dependencies/role_checker.py:52`; 13 repositories and 2 of the new routers | Admin still reaches all of `/user/ /faculty/ /result/ /question/ /course/ /lesson/ /subject/ /group/` (200 each). Premise verified: creating a role named `admin` or `ADMIN` is refused with 400, because role-name uniqueness is already case-insensitive — so the narrow comparison cannot lock anyone out. ruff **89 → 89**. pytest **unchanged**. | ✅ Done |
 | F09 | Four blocking operations ran directly in `async def`: the disk write in the shared image uploader, the same write in the course-resource uploader, `pd.read_excel` on import and the whole openpyxl build plus `wb.save` on export. In a single-worker process each one stalls every other request, not just its own. All four now run via `starlette.concurrency.run_in_threadpool`. | `core/utils/upload.py:69-79`, `course/resource/repository.py:66-71`, `quiz/question/repository.py:262` and the new module-level `_build_questions_workbook` | Functional: Excel export returns a valid xlsx container (200, 5222 bytes, 9 zip members); image upload still 200 and the F02 `.html` guard still 400; upload directory back to its original 7 files. Concurrency: with 8 simultaneous exports in flight, `/health` answered 200 in 0.8–6.6 ms. ruff **89 → 89**. pytest **unchanged**. | ✅ Done |
+| F22 | The face-detection healthcheck curled `/docs` — the endpoint its own `is_prod` flag removes. Enabling production hardening there would have marked the container unhealthy, and `backend` waits on `condition: service_healthy`, so the whole stack would have refused to start. Added the `/health` route the service never had and repointed the check at it. | `face-detection/app/main.py:70-84`, `docker-compose.yml:28` | `/health` → **200 {"status":"ok"}**; compose reports the container **healthy** (last probe exit 0) and all 8 services are up. The failure mode itself was reproduced: with `IS_PROD=True` the app has `docs_url=None` while `/health` is still registered — the old check would 404, the new one survives. Backend ruff **89 → 89**, untouched by this finding. | ✅ Done |
 
 ### F01 — notes
 
@@ -220,3 +221,22 @@ the finding — a large `pd.read_excel` taking seconds — was not reproduced wi
 **`course/resource/repository.py` was included** even though F02 deliberately left it
 alone. F02 was about validation, which that file already did correctly; F09 is about
 blocking I/O, which it does exactly like the others.
+
+### F22 — notes
+
+**The route was clearly intended all along.** `face-detection/app/core/logging.py:14`
+already lists `/health` among the paths whose access logs are suppressed as noise. Only
+the endpoint itself was missing, which is why adding it — rather than repointing the
+check at some other existing path — is the right shape of fix.
+
+**Left unauthenticated on purpose.** Every other face-detection endpoint requires the
+shared internal token, but docker-compose cannot present one, and the response is the
+single word `ok`. Same choice the backend already made for its own `/health`.
+
+**A second problem surfaced while verifying and is recorded as F23, not fixed.** The two
+services read *different* environment variables for the same flag: the backend takes
+`APP_CONFIG__SERVER__IS_PROD` (it has an `env_prefix`), face-detection takes a bare
+`IS_PROD` (it has none). `.env` defines only the first. So setting the documented
+variable hardens the backend and silently leaves face-detection's `/docs`, `/redoc` and
+`/openapi.json` open. Fixing it means choosing which name wins — a naming decision, so it
+is written up instead of guessed at.

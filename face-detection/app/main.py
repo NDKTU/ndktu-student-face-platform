@@ -67,6 +67,22 @@ async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
 # Routes
 # ---------------------------------------------------------------------------
 
+
+@app.get("/health", include_in_schema=False)
+async def health_check() -> dict[str, str]:
+    """Проба живости для docker-compose.
+
+    Раньше healthcheck смотрел на `/docs`, а его отключает `is_prod`. То есть
+    включение продовой настройки роняло проверку, контейнер уходил в unhealthy,
+    и `backend` не стартовал вовсе — он ждёт `condition: service_healthy`.
+    Этот маршрут флагом не управляется и потому годится в пробы.
+
+    Без авторизации намеренно: docker-compose не может предъявить внутренний
+    токен, а наружу отдаётся только слово «ok».
+    """
+    return {"status": "ok"}
+
+
 app.include_router(router)
 
 

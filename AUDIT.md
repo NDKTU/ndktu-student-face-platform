@@ -90,7 +90,8 @@ operations detected"**: no model/migration drift.
 | F19 | **P3** | API | 17 endpoints declare no `response_model` | `backend/app/modules/quiz/router.py:529` |
 | F20 | **P3** | Ops | Log filename date is frozen at import time | `backend/app/core/logging.py:74` |
 | F21 | **P1** | Security | `create:user` alone is enough to mint an `Admin` account | `backend/app/modules/auth/user/repository.py:34` |
-| F22 | **P1** | Ops | Enabling `is_prod` on face-detection makes its healthcheck fail and blocks the whole stack | `docker-compose.yml:28` |
+| F22 | **P1** | Ops | ~~Enabling `is_prod` on face-detection makes its healthcheck fail and blocks the whole stack~~ **FIXED** | `docker-compose.yml:28` |
+| F23 | **P2** | Ops | The two services read *different* env vars for the same `is_prod` switch | `face-detection/app/core/config.py:11` |
 
 ### Verified clean
 
@@ -735,28 +736,56 @@ the route is worth having regardless.
 
 ---
 
+### F23 · P2 · One concept, two environment variable names
+
+Found while verifying F22.
+
+```python
+# backend/app/core/config.py:97       env_prefix="APP_CONFIG__"  → APP_CONFIG__SERVER__IS_PROD
+# face-detection/app/core/config.py:11 SettingsConfigDict(env_file=".env")  → bare IS_PROD
+```
+
+Both services read the same `.env`, both have an `is_prod` flag meaning the same thing,
+and they take it from different variables. `.env:20` defines only
+`APP_CONFIG__SERVER__IS_PROD`; face-detection ignores it (`extra="ignore"`) and falls
+back to its default `False`.
+
+**Why it matters.** An operator hardening for production sets the documented variable,
+sees the backend's `/docs` disappear, and reasonably concludes the job is done. The
+face-detection service keeps serving `/docs`, `/redoc` and `/openapi.json` — including
+its full schema for the proctoring WebSocket. It is the same failure shape as F07: a
+security setting that reports success while half of it does nothing.
+
+**Fix.** Give face-detection the same `APP_CONFIG__` prefix and nested `server.is_prod`
+shape as the backend, or document the bare `IS_PROD` in `.env.example` next to the other
+one. The first is better; the second is a stopgap. Either way it is a naming decision,
+which is why it is recorded rather than fixed.
+
+**Risk:** low. **Effort:** 30 minutes.
+
+---
+
 ## 3. Fix first — in execution order
 
-**Done so far (see `FIXLOG.md`):** F01, F02, F07, F08, F03, F04, F06, F09 — both P0s and
-six of the P1s. Each was verified against the running stack and committed separately.
+**Done so far (see `FIXLOG.md`):** F01, F02, F07, F08, F03, F04, F06, F09, F22 — both
+P0s and seven of the P1s. Each was verified against the running stack and committed separately.
 
 Remaining, in the order I would take them:
 
-1. **F22** — 20 minutes, and it is a trap that springs the first time someone enables
-   production hardening. Do it before anyone sets `is_prod` anywhere.
-2. **F21** — the last open P1 in the auth path. Blocked only on the policy question in
+1. **F21** — the last open P1 in the auth path. Blocked only on the policy question in
    §4; the code change is small either way.
-3. **F05** — the largest remaining security item and the reason the two scoping fixes
+2. **F05** — the largest remaining security item and the reason the two scoping fixes
    above still fail open for custom roles. Needs the design decision in §4 first.
-4. **F10** — 33 unindexed FKs, two of them (`user_roles`) on the per-request auth path.
+3. **F10** — 33 unindexed FKs, two of them (`user_roles`) on the per-request auth path.
    Pure win, no behaviour change, but it is a migration and so needs approval.
-5. **F11 + F12** — login enumeration and the absent password policy. Small, independent.
-6. **F15** — `employees.user_id` needs an `ondelete`; deleting a user currently 500s.
-7. **F13** — strip `localhost` and the plain-`http` origin from the production CORS list.
-8. **F16** — delete the untracked `statistics/` `.pyc` tree.
-9. **F14** — move transactions out of the repositories. Large, mechanical, and best done
+4. **F11 + F12** — login enumeration and the absent password policy. Small, independent.
+5. **F15** — `employees.user_id` needs an `ondelete`; deleting a user currently 500s.
+6. **F13** — strip `localhost` and the plain-`http` origin from the production CORS list.
+7. **F16** — delete the untracked `statistics/` `.pyc` tree.
+8. **F14** — move transactions out of the repositories. Large, mechanical, and best done
    after the security work has settled.
-10. **F17–F20** — the P3 tail.
+9. **F17–F20**
+10. **F23** — the P3 tail.
 
 **Before any of these:** the test suite is at 0 passed / 151 errors and `mypy` is not
 installed, so none of the above can be regression-tested. See §4.

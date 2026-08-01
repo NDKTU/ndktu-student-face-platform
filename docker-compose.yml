@@ -25,7 +25,10 @@ services:
     networks:
       - app_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      # /health, а не /docs: документацию убирает APP_CONFIG__SERVER__IS_PROD,
+      # и на проде проверка падала бы вместе с ней, а backend ждёт этот сервис
+      # здоровым и не поднялся бы вообще.
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
