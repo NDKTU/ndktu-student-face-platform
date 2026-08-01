@@ -5,6 +5,7 @@ import uuid
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -59,11 +60,15 @@ class ResourceRepository:
             raise HTTPException(status_code=400, detail=f"File must not exceed {max_size // (1024 * 1024)}MB")
 
         upload_dir = settings.course_resource_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
         filename = f"{uuid.uuid4()}.{ext}"
         file_path = upload_dir / filename
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
+
+        def _write() -> None:
+            os.makedirs(upload_dir, exist_ok=True)
+            file_path.write_bytes(content)
+
+        # Синхронная запись останавливает event loop целиком (F09).
+        await run_in_threadpool(_write)
 
         return f"{settings.file_url.http}/course_resources/{filename}"
 

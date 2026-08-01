@@ -19,6 +19,7 @@ from pathlib import Path
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 # Растровые форматы: ни `svg`, ни `html` сюда не попадают — они и были
 # вектором XSS. Совпадает с _IMAGE_EXTS в course/resource/repository.py.
@@ -45,26 +46,35 @@ async def save_image_upload(file: UploadFile, upload_dir: Path, url_segment: str
             detail=f"Unsupported file type: .{ext or '?'}. Allowed: {', '.join(sorted(IMAGE_EXTS))}",
         )
 
-    os.makedirs(upload_dir, exist_ok=True)
+    # Читаем по частям и обрываемся на превышении, поэтому в память попадает
+    # не больше лимита. Само чтение асинхронное, а вот запись на диск — нет,
+    # и её уносим в пул потоков (F09): в однопоточном воркере синхронный write
+    # останавливает вообще все запросы, а не только эту загрузку.
+    chunks: list[bytes] = []
+    size = 0
+    while chunk := await file.read(_CHUNK):
+        size += len(chunk)
+        if size > IMAGE_MAX_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File must not exceed {IMAGE_MAX_BYTES // (1024 * 1024)}MB",
+            )
+        chunks.append(chunk)
+
     # Имя задаём сами: расширение из filename подставляется только после
     # проверки по белому списку, поэтому в путь не попадёт ничего чужого.
     filename = f"{uuid.uuid4()}.{ext}"
     file_path = upload_dir / filename
 
-    written = 0
+    def _write() -> None:
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path.write_bytes(b"".join(chunks))
+
     try:
-        with open(file_path, "wb") as buffer:
-            while chunk := await file.read(_CHUNK):
-                written += len(chunk)
-                if written > IMAGE_MAX_BYTES:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"File must not exceed {IMAGE_MAX_BYTES // (1024 * 1024)}MB",
-                    )
-                buffer.write(chunk)
+        await run_in_threadpool(_write)
     except Exception:
-        # Не оставляем обрезок на диске: превышение лимита или обрыв соединения
-        # иначе копили бы мусор, ради ограничения которого лимит и вводится.
+        # Не оставляем обрезок на диске: обрыв записи иначе копил бы мусор,
+        # ради ограничения которого лимит и вводится.
         file_path.unlink(missing_ok=True)
         raise
 

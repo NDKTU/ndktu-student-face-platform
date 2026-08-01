@@ -45,6 +45,7 @@ dependency: the two login routes and the client-log collector, all intentional.
 | F03 | `GET /api/result/{id}` returned any result to any holder of `read:result`, while the list endpoint carefully scoped by role. The role predicate is now extracted into `ResultRepository.scope_filter` and applied by both. Unauthorised reads answer 404, not 403, so the response does not confirm which ids exist. | `quiz/result/repository.py:21-95`, `quiz/router.py:490` | Probes with three real accounts against two seeded results (one owned by the student, one not): admin **200/200**; student **200** on its own, **404** on the other; teacher with no assignments **404/404** (the `Result.id == -1` branch). `GET /result/` after the refactor: admin `total=2`, student `total=1` — the count is scoped too. ruff **72 → 72**. pytest **1 failed / 151 errors → unchanged**. | ✅ Done |
 | F04 | `GET /api/user_answers/` built every filter from the query string and none from the caller, so `?user_id=<anyone>` returned their submitted answers together with `correct_answer`. It now reuses the same `scope_filter`, restricted through the answer's `result_id`. | `quiz/user_answers/repository.py:15-38`, `quiz/router.py:534` | Probes against two seeded answers: admin sees both; student sees only its own; `?user_id=1` → **total 0**; `?result_id=2` → **total 0**. The count query shares the same filter list, so `total` cannot leak either. ruff **72 → 72**. pytest unchanged. | ✅ Done |
 | F06 | "Is this user an admin?" was answered two incompatible ways: the permission gate compared exactly (`role.name == "Admin"`), sixteen call sites compared case-insensitively. A role named `admin` therefore got university-wide data visibility without the permission bypass — half the privileges, invisibly. All 16 sites now call one helper, which compares exactly. | new `backend/app/core/utils/roles.py`; `core/dependencies/role_checker.py:52`; 13 repositories and 2 of the new routers | Admin still reaches all of `/user/ /faculty/ /result/ /question/ /course/ /lesson/ /subject/ /group/` (200 each). Premise verified: creating a role named `admin` or `ADMIN` is refused with 400, because role-name uniqueness is already case-insensitive — so the narrow comparison cannot lock anyone out. ruff **89 → 89**. pytest **unchanged**. | ✅ Done |
+| F09 | Four blocking operations ran directly in `async def`: the disk write in the shared image uploader, the same write in the course-resource uploader, `pd.read_excel` on import and the whole openpyxl build plus `wb.save` on export. In a single-worker process each one stalls every other request, not just its own. All four now run via `starlette.concurrency.run_in_threadpool`. | `core/utils/upload.py:69-79`, `course/resource/repository.py:66-71`, `quiz/question/repository.py:262` and the new module-level `_build_questions_workbook` | Functional: Excel export returns a valid xlsx container (200, 5222 bytes, 9 zip members); image upload still 200 and the F02 `.html` guard still 400; upload directory back to its original 7 files. Concurrency: with 8 simultaneous exports in flight, `/health` answered 200 in 0.8–6.6 ms. ruff **89 → 89**. pytest **unchanged**. | ✅ Done |
 
 ### F01 — notes
 
@@ -191,3 +192,31 @@ That is F05 and untouched here.
 files were re-sorted with `ruff --fix --select I001`, scoped to exactly those paths. Net
 ruff delta is zero (the two E501s that appear to move are pre-existing lines shifted by
 one).
+
+### F09 — notes
+
+**No new dependency.** `starlette.concurrency.run_in_threadpool` ships with FastAPI and
+was already installed; this was checked before writing any code.
+
+**The export needed splitting, not just wrapping.** `download_questions_excel` mixed an
+async DB query with the synchronous workbook build. The build moved to a module-level
+`_build_questions_workbook(rows)` that takes plain tuples — values are read off the ORM
+objects *before* the thread starts, so nothing can trigger a lazy load on a thread that
+has no session. Re-indenting that extracted body is the riskiest edit in this finding;
+it was checked with `ast.parse` and then by exporting a real file.
+
+**The image uploader now buffers instead of streaming to disk.** Chunked reading and the
+size check are unchanged, so memory is still bounded by the 5 MB cap, but the chunks are
+joined and written once inside the thread. Interleaving `await file.read()` with a
+threaded write per 64 KB chunk would have cost more in context switches than the write
+itself.
+
+**What the concurrency measurement does and does not show.** `/health` stayed at
+0.8–6.6 ms while eight exports ran, which demonstrates the threadpool path works and
+nothing regressed. It is not proof of the original problem's scale: this database holds
+only a handful of questions, so the export is fast either way. The case that motivated
+the finding — a large `pd.read_excel` taking seconds — was not reproduced with real data.
+
+**`course/resource/repository.py` was included** even though F02 deliberately left it
+alone. F02 was about validation, which that file already did correctly; F09 is about
+blocking I/O, which it does exactly like the others.
