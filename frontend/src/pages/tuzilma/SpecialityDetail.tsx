@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Department, Faculty, Speciality } from '@/entities/university/model/types';
+import type { Faculty, Kafedra, Speciality } from '@/entities/university/model/types';
 import { countSpecialityStudents } from '@/entities/university/lib/counters';
 import { namePrefix } from '@/shared/lib/namePrefix';
 import { EntityCard } from './EntityCard';
@@ -8,7 +8,7 @@ import { useStructureStore } from '@/features/tuzilma/model/structure.store';
 
 interface SpecialityDetailProps {
   speciality: Speciality;
-  department: Department;
+  department: Kafedra;
   faculty: Faculty;
   canWrite: boolean;
   onOpenGroup: (id: number, name: string) => void;
@@ -62,12 +62,6 @@ export function SpecialityDetail({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="rounded-6 bg-surface-alt px-2 py-0.5 font-mono text-12 font-semibold text-ink-code">
                   {speciality.kod}
-                </span>
-                <span
-                  className="rounded-6 px-2 py-0.5 text-12 font-semibold"
-                  style={{ background: 'var(--color-success-soft)', color: 'var(--color-success)' }}
-                >
-                  {speciality.shakl}
                 </span>
                 <span className="text-13-5 text-ink-subtle">{department.name}</span>
               </div>

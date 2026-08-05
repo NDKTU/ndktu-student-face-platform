@@ -79,5 +79,20 @@
   "empty": {
     "title": "Xodim topilmadi",
     "text": "Qidiruv yoki filtrlarni o'zgartiring."
+  },
+  "bolim": {
+    "title": "Bo'limlar",
+    "subtitle": "Universitet ma'muriy bo'limlari — {{count}} ta",
+    "add": "Bo'lim qo'shish",
+    "placeholder": "Masalan: Buxgalteriya",
+    "column": {
+      "name": "Bo'lim nomi"
+    },
+    "empty": {
+      "title": "Bo'lim yo'q",
+      "text": "Xodimni bo'limga biriktirish uchun avval bo'lim yarating."
+    },
+    "deleteTitle": "Bo'limni o'chirish",
+    "deleteText": "«{{name}}» bo'limi o'chiriladi. Undagi xodimlar bo'limsiz qoladi."
   }
 }

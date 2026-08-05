@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
@@ -17,15 +17,27 @@ class Faculty(Base, IdIntPk, TimestampMixin):
     __tablename__ = "faculties"
     name: Mapped[str] = mapped_column(String(50), unique=True)
 
+    # Короткий код факультета. Приходит из HEMIS (`faculty.code`, например
+    # «319-111») и служит стабильным идентификатором в отчётах: название
+    # длинное и меняется, код — нет.
     code: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
-    # Декан: ссылка на учётку, если он заведён в системе, и подпись рядом.
-    # Имя хранится отдельно, а не берётся из user: карточка структуры должна
-    # показывать декана и тогда, когда учётки у него ещё нет.
-    dekan_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    # Декан — ссылка на employees, а не на users. На users ссылаться нельзя:
+    # учётка есть и у студента, и у админа, так что деканом можно было
+    # назначить кого угодно, а имя оттуда всё равно не достать — оно живёт
+    # в employees. Отдельной подписи рядом больше нет: имя берётся join'ом,
+    # и переименование сотрудника сразу видно в карточке.
+    #
+    # unique: один человек не может быть деканом двух факультетов. Пересечение
+    # «декан и заодно заведующий кафедрой» одним UNIQUE не выражается —
+    # его по-прежнему ловит available_post в employee/repository.py.
+    dekan_employee_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("employees.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
     )
-    dekan_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Цвет карточки факультета в дереве структуры. Задаётся вручную:
     # вычислять его из названия значило бы менять оформление при переименовании.
@@ -39,9 +51,9 @@ class Faculty(Base, IdIntPk, TimestampMixin):
     def __str__(self):
         return self.name
 
+    # Группы к факультету напрямую больше не привязаны — путь к ним лежит
+    # через kafedras → specialities → groups, и он единственный.
     kafedras: Mapped[list["Kafedra"]] = relationship("Kafedra", back_populates="faculty")
-
-    groups: Mapped[list["Group"]] = relationship("Group", back_populates="faculty")
 
 
 class Kafedra(Base, IdIntPk, TimestampMixin):
@@ -51,10 +63,13 @@ class Kafedra(Base, IdIntPk, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), unique=True)
 
     # Заведующий кафедрой — по той же схеме, что декан у факультета.
-    mudir_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    mudir_employee_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("employees.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
     )
-    mudir_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="kafedras")
@@ -66,17 +81,41 @@ class Kafedra(Base, IdIntPk, TimestampMixin):
         return self.name
 
 
+# Формы обучения. Sirtqi остаётся в словаре: заочное обучение в вузах
+# Узбекистана прекращено, но записи прошлых лет должны читаться. Из выпадающих
+# списков его убирает фронтенд, а не база.
+#
+# Дублируется как Literal в organization_structure/group/schemas.py — менять
+# нужно оба места разом. Значение ENUM'а из типа не удалить (PostgreSQL этого
+# не умеет), так что новое добавлять можно, а старое — только перестать
+# предлагать.
+EDUCATION_FORMS = ("Kunduzgi", "Kechki", "Masofaviy", "Sirtqi")
+
+education_form_enum = Enum(*EDUCATION_FORMS, name="education_form")
+
+
 class Group(Base, IdIntPk, TimestampMixin):
     __tablename__ = "groups"
-    faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"))
-    speciality_id: Mapped[int | None] = mapped_column(
+
+    # RESTRICT, а не SET NULL: у группы есть студенты, и удаление специальности
+    # не должно оставлять их в записи, которая ни к какому факультету больше не
+    # относится. Раньше рядом лежал ещё faculty_id — второй, независимый путь к
+    # факультету, который ничто не держало в согласии с этим: группу можно было
+    # перевести на чужой факультет одним UPDATE, и дерево со списком групп
+    # начинали отвечать по-разному.
+    speciality_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("specialities.id", ondelete="SET NULL"),
-        nullable=True,
+        ForeignKey("specialities.id", ondelete="RESTRICT"),
+        nullable=False,
         index=True,
     )
 
     name: Mapped[str] = mapped_column(String(255), unique=True)
+
+    # Форма обучения — свойство группы, а не студента и не специальности.
+    # «8-24 ENI» — это кундузги-группа целиком; у специальности же форм может
+    # быть несколько, а её name UNIQUE и двух строк под одно направление не даёт.
+    education_form: Mapped[str | None] = mapped_column(education_form_enum, nullable=True)
 
     # Курс обучения (1..N). У выпущенных групп остаётся последним.
     kurs: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -89,8 +128,7 @@ class Group(Base, IdIntPk, TimestampMixin):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
-    faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="groups")
-    speciality: Mapped["Speciality | None"] = relationship("Speciality", back_populates="groups")
+    speciality: Mapped["Speciality"] = relationship("Speciality", back_populates="groups")
     # foreign_keys обязателен: между groups и students теперь две связи
     # (students.group_id и groups.sardor_student_id), и без указания
     # SQLAlchemy не знает, по какой из них строить состав группы.
@@ -137,8 +175,8 @@ class Speciality(Base, IdIntPk, TimestampMixin):
 
     # Код направления по классификатору («60610100»).
     code: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    # Форма обучения: Kunduzgi / Sirtqi / Kechki.
-    education_form: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Формы обучения здесь нет: name UNIQUE, и одно направление не может
+    # существовать сразу как кундузги и как сиртки. Форма живёт на группе.
     # Учебный год плана («2025/2026»), к которому относится curriculum.
     academic_year: Mapped[str | None] = mapped_column(String(16), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

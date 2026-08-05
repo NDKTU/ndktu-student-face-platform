@@ -51,10 +51,12 @@ async def list_resources(
     return await get_resource_repository.list_resources(session=session, request=data)
 
 
+# Одно сохранение урока — это до шести загрузок подряд (видео плюс вложения),
+# а повтор после обрыва сети удваивает счёт. Десяти в минуту не хватало.
 @router.post(
     "/upload",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
 async def upload_resource_file(
     file: UploadFile = File(...),

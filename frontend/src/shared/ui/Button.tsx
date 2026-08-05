@@ -16,7 +16,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({ variant = 'primary', className = '', children, ...rest }: ButtonProps) {
   return (
     <button
-      className={`inline-flex h-10 cursor-pointer items-center gap-[7px] rounded-10 px-[18px] text-13-5 font-bold ${VARIANTS[variant]} ${className}`}
+      // Отключённая кнопка должна отличаться на вид: во время загрузки видео
+      // «Saqlash» неактивна минуты, и без этого она выглядит просто сломанной.
+      className={`inline-flex h-10 cursor-pointer items-center gap-[7px] rounded-10 px-[18px] text-13-5 font-bold disabled:cursor-not-allowed disabled:opacity-55 ${VARIANTS[variant]} ${className}`}
       {...rest}
     >
       {children}

@@ -2,6 +2,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.modules.organization_structure.group.schemas import EducationForm
+
 
 class TreeGroup(BaseModel):
     id: int
@@ -10,6 +12,7 @@ class TreeGroup(BaseModel):
     position: int
     sardor_student_id: Optional[int] = None
     sardor_name: Optional[str] = None
+    education_form: Optional[EducationForm] = None
     # Не список студентов, а их число. Состав группы приезжает отдельным
     # запросом при раскрытии карточки: на реальных данных это тысячи строк,
     # и дерево из-за них весило бы сотни килобайт на каждое открытие раздела.
@@ -20,7 +23,8 @@ class TreeSpeciality(BaseModel):
     id: int
     name: str
     code: Optional[str] = None
-    education_form: Optional[str] = None
+    # Формы обучения здесь нет: у специальности name UNIQUE, и одно
+    # направление не может существовать сразу в двух формах. Форма — на группе.
     academic_year: Optional[str] = None
     position: int
     curriculum_count: int
@@ -33,8 +37,10 @@ class TreeSpeciality(BaseModel):
 class TreeKafedra(BaseModel):
     id: int
     name: str
+    # Имя приходит join'ом из employees, отдельного столбца под него нет:
+    # снимок имени расходился с карточкой сотрудника после переименования.
     mudir_name: Optional[str] = None
-    mudir_user_id: Optional[int] = None
+    mudir_employee_id: Optional[int] = None
     position: int
     teacher_count: int
     specialities: list[TreeSpeciality]
@@ -45,14 +51,13 @@ class TreeFaculty(BaseModel):
     name: str
     code: Optional[str] = None
     dekan_name: Optional[str] = None
-    dekan_user_id: Optional[int] = None
+    dekan_employee_id: Optional[int] = None
     color_bg: Optional[str] = None
     color_fg: Optional[str] = None
     position: int
+    # orphan_groups больше нет: speciality_id у группы обязателен, так что
+    # группы без специальности невыразимы и теряться им негде.
     kafedras: list[TreeKafedra]
-    # Группы факультета, не привязанные ни к одной специальности. Скрывать их
-    # нельзя: они существуют, и в дереве их иначе было бы не найти.
-    orphan_groups: list[TreeGroup]
 
 
 class OrganizationTreeResponse(BaseModel):

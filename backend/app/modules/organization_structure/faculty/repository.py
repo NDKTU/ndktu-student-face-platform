@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.schemas import normalized_name
 from app.modules.organization_structure.model import Faculty
 
 from .schemas import (
@@ -36,11 +37,13 @@ class FacultyRepository:
             )
         ).scalar_one()
 
+        await self._ensure_dekan_free(session, data.dekan_employee_id)
+
         new_faculty = Faculty(name=data.name, position=next_position)
         # Необязательные поля карточки переносим списком: перечислять их
         # по одному в конструкторе значило бы забывать новое поле при каждом
         # расширении схемы.
-        for _field in ('code', 'dekan_user_id', 'dekan_name', 'color_bg', 'color_fg'):
+        for _field in ('code', 'dekan_employee_id', 'color_bg', 'color_fg'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(new_faculty, _field, _value)
@@ -118,11 +121,14 @@ class FacultyRepository:
                 )
             faculty.name = data.name
 
+        if 'dekan_employee_id' in data.model_fields_set:
+            await self._ensure_dekan_free(session, data.dekan_employee_id, exclude_faculty_id=faculty_id)
+
         # Смотрим на то, что реально пришло в теле, а не на значение. `None` и
         # «поле не прислали» — разные намерения: первое означает «очистить»,
         # второе «не трогать». По значению их не различить, и снять декана с
         # факультета было нечем.
-        for _field in ('code', 'dekan_user_id', 'dekan_name', 'color_bg', 'color_fg'):
+        for _field in ('code', 'dekan_employee_id', 'color_bg', 'color_fg'):
             if _field in data.model_fields_set:
                 setattr(faculty, _field, getattr(data, _field))
 
@@ -130,17 +136,60 @@ class FacultyRepository:
         await session.refresh(faculty)
         return faculty
 
+    @staticmethod
+    async def _ensure_dekan_free(
+        session: AsyncSession, employee_id: int | None, exclude_faculty_id: int | None = None
+    ) -> None:
+        """Один человек — один деканат.
+
+        В базе это гарантирует UNIQUE, но её ошибка приходит наверх невнятным
+        «conflicts with an existing record». Проверяем заранее, чтобы назвать
+        факультет, на котором человек уже числится.
+        """
+        if employee_id is None:
+            return
+        stmt = select(Faculty.name).where(Faculty.dekan_employee_id == employee_id)
+        if exclude_faculty_id is not None:
+            stmt = stmt.where(Faculty.id != exclude_faculty_id)
+        taken_by = (await session.execute(stmt)).scalar_one_or_none()
+        if taken_by:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Bu xodim allaqachon «{taken_by}» fakultetining dekani",
+            )
+
+    @staticmethod
+    def _faculty_group_ids_stmt(faculty_id: int):
+        """Группы факультета: прямой ссылки больше нет, только через цепочку.
+
+        Раньше у Group был свой faculty_id, и такой запрос был одним WHERE.
+        Столбец убрали — он расходился с этой самой цепочкой, — так что путь
+        теперь ровно один.
+        """
+        from app.modules.organization_structure.model import Group, Kafedra, Speciality
+
+        return (
+            select(Group.id)
+            .join(Speciality, Speciality.id == Group.speciality_id)
+            .join(Kafedra, Kafedra.id == Speciality.kafedra_id)
+            .where(Kafedra.faculty_id == faculty_id)
+        )
+
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func, select
 
-        from app.modules.organization_structure.model import Group, Kafedra
+        from app.modules.organization_structure.model import Group, Kafedra, Speciality
+
+        group_ids_stmt = self._faculty_group_ids_stmt(faculty_id)
 
         if not force:
             kafedra_count = (
                 await session.execute(select(func.count(Kafedra.id)).where(Kafedra.faculty_id == faculty_id))
             ).scalar() or 0
             group_count = (
-                await session.execute(select(func.count(Group.id)).where(Group.faculty_id == faculty_id))
+                await session.execute(
+                    select(func.count()).select_from(group_ids_stmt.subquery())
+                )
             ).scalar() or 0
 
             if kafedra_count > 0 or group_count > 0:
@@ -161,34 +210,36 @@ class FacultyRepository:
                     },
                 )
 
-        # Proceed with forced aggressive cascade delete
+        # Proceed with forced aggressive cascade delete.
+        # Порядок теперь снизу вверх и обязателен: specialities.kafedra_id и
+        # groups.speciality_id объявлены RESTRICT, так что удалить кафедру
+        # раньше её специальностей, а специальность раньше её групп — нельзя.
+        from app.modules.organization_structure.model import GroupTeacher
 
-        # 1. Cascade delete Kafedras and their Teachers
+        group_ids = (await session.execute(group_ids_stmt)).scalars().all()
+        if group_ids:
+            await session.execute(delete(GroupTeacher).where(GroupTeacher.group_id.in_(group_ids)))
+            await session.execute(delete(Group).where(Group.id.in_(group_ids)))
+
         kafedra_ids = (
             (await session.execute(select(Kafedra.id).where(Kafedra.faculty_id == faculty_id))).scalars().all()
         )
         if kafedra_ids:
             from app.modules.auth.model import Teacher
 
+            # curriculum висит на specialities с CASCADE — отдельно не чистим.
+            await session.execute(delete(Speciality).where(Speciality.kafedra_id.in_(kafedra_ids)))
+
             teacher_ids = (
                 (await session.execute(select(Teacher.id).where(Teacher.kafedra_id.in_(kafedra_ids)))).scalars().all()
             )
             if teacher_ids:
-                from app.modules.organization_structure.model import GroupTeacher
                 from app.modules.quiz.model import SubjectTeacher
 
                 await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(Teacher).where(Teacher.id.in_(teacher_ids)))
             await session.execute(delete(Kafedra).where(Kafedra.faculty_id == faculty_id))
-
-        # 2. Cascade delete Groups
-        group_ids = (await session.execute(select(Group.id).where(Group.faculty_id == faculty_id))).scalars().all()
-        if group_ids:
-            from app.modules.organization_structure.model import GroupTeacher
-
-            await session.execute(delete(GroupTeacher).where(GroupTeacher.group_id.in_(group_ids)))
-            await session.execute(delete(Group).where(Group.faculty_id == faculty_id))
 
         stmt = select(Faculty).where(Faculty.id == faculty_id)
         result = await session.execute(stmt)
@@ -200,18 +251,21 @@ class FacultyRepository:
         await session.delete(faculty)
         await session.commit()
 
-    async def get_or_create(self, session: AsyncSession, name: str) -> Faculty:
-        stmt = select(Faculty).where(Faculty.name == name)
-        obj = (await session.execute(stmt)).scalar_one_or_none()
-        if not obj:
-            obj = Faculty(name=name)
-            session.add(obj)
-            await session.flush()
-            await session.refresh(obj)
-        return obj
+    async def find_by_name(self, session: AsyncSession, name: str) -> Faculty | None:
+        """Ищет факультет по каноническому имени, не создавая его.
+
+        Раньше здесь был get_or_create, и вход студента из HEMIS заводил
+        недостающий факультет сам. Стоило HEMIS переименовать факультет —
+        появлялся второй, и студенты молча делились между старым и новым.
+        Теперь несовпадение — это видимая ошибка входа, а не тихий раскол.
+        """
+        if not name or not name.strip():
+            return None
+        stmt = select(Faculty).where(Faculty.name == normalized_name(name))
+        return (await session.execute(stmt)).scalars().first()
 
     async def find_id_by_name(self, session: AsyncSession, name: str) -> int | None:
-        stmt = select(Faculty.id).where(Faculty.name == name)
+        stmt = select(Faculty.id).where(Faculty.name == normalized_name(name))
         return (await session.execute(stmt)).scalar_one_or_none()
 
 

@@ -139,7 +139,10 @@ class Student(Base, TimestampMixin, IdIntPk):
     university: Mapped[str] = mapped_column(String)
     specialty: Mapped[str] = mapped_column(String)
     student_status: Mapped[str] = mapped_column(String)
-    education_form: Mapped[str] = mapped_column(String)
+    # education_form здесь нет: форма обучения — свойство группы. Хранить её
+    # ещё и на студенте значило бы держать два значения, которые могут
+    # разойтись; HEMIS присылает её на студенте, но это особенность их API,
+    # а не модели предметной области.
     education_type: Mapped[str] = mapped_column(String)
     payment_form: Mapped[str] = mapped_column(String)
     education_lang: Mapped[str] = mapped_column(String)

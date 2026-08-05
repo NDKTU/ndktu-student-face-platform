@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import type {
-  Department,
   EduForm,
   Faculty,
   Group,
+  Kafedra,
   RejaRow,
   Speciality,
 } from '@/entities/university/model/types';
@@ -18,9 +18,10 @@ export interface DrillStep {
 export type EntityDraft = Partial<{
   name: string;
   /**
-   * Кто занимает пост. Строка из `<select>`: id сотрудника или пусто —
-   * «не назначен». ФИО подставляется рядом (`postName`) и уходит на сервер
-   * снимком, чтобы дерево показывало его без обхода справочника.
+   * Кто занимает пост. Строка из `<select>`: id карточки сотрудника или
+   * пусто — «не назначен». ФИО рядом (`postName`) на сервер не уходит: там
+   * его негде хранить, дерево берёт имя join'ом. Нужно только чтобы карточка
+   * обновилась сразу, не дожидаясь перезагрузки дерева.
    */
   post: string;
   postName: string;
@@ -71,7 +72,7 @@ interface StructureState {
   removeEntity: (level: number, id: number) => Promise<void>;
 
   /** Пересоздаёт план специальности пустым (семестры 1–8 остаются, строк нет). */
-  createRejaPlan: (specialityId: number, year: string, shakl: EduForm) => Promise<void>;
+  createRejaPlan: (specialityId: number, year: string) => Promise<void>;
   addRejaRow: (specialityId: number, row: RejaRow) => Promise<void>;
   /** index — позиция строки в reja специальности, а не в срезе по семестру. */
   updateRejaRow: (specialityId: number, index: number, row: RejaRow) => Promise<void>;
@@ -176,14 +177,13 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
     }));
   },
 
-  createRejaPlan: async (specialityId, year, shakl) => {
-    await api.updateSpeciality(specialityId, { shakl, reja_yil: year });
+  createRejaPlan: async (specialityId, year) => {
+    await api.updateSpeciality(specialityId, { reja_yil: year });
     await api.clearReja(specialityId);
     set((s) => ({
       rejaYears: { ...s.rejaYears, [specialityId]: year },
       faculties: mapSpeciality(s.faculties, specialityId, (sp) => ({
         ...sp,
-        shakl,
         reja_yil: year,
         reja: [],
         curriculum_count: 0,
@@ -250,7 +250,7 @@ export const useStructureStore = create<StructureState>()((set, get) => ({
   },
 }));
 
-type Entity = Faculty | Department | Speciality | Group;
+type Entity = Faculty | Kafedra | Speciality | Group;
 
 /** Родитель создаваемой записи — это предыдущий шаг drill-пути. */
 function createOnServer(level: number, drill: DrillStep[], draft: EntityDraft): Promise<Entity> {
@@ -260,25 +260,24 @@ function createOnServer(level: number, drill: DrillStep[], draft: EntityDraft): 
     case 0:
       return api.createFaculty({
         name,
-        dekanUserId: postId(draft.post),
+        dekanEmployeeId: postId(draft.post),
         dekanName: draft.postName ?? null,
       });
     case 1:
-      return api.createDepartment(drill[0]!.id, {
+      return api.createKafedra(drill[0]!.id, {
         name,
-        mudirUserId: postId(draft.post),
+        mudirEmployeeId: postId(draft.post),
         mudirName: draft.postName ?? null,
       });
     case 2:
       return api.createSpeciality(drill[1]!.id, {
         name,
         kod: draft.kod?.trim(),
-        shakl: draft.shakl,
       });
     default:
-      // faculty_id у группы обязателен на бэкенде. В форме его не спрашивают:
-      return api.createGroup(drill[2]!.id, drill[0]!.id, {
+      return api.createGroup(drill[2]!.id, {
         name,
+        shakl: draft.shakl,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
         sardorStudentId: postId(draft.sardor),
         sardorName: draft.postName ?? null,
@@ -297,20 +296,21 @@ function updateOnServer(
     case 0:
       return api.updateFaculty(id, {
         name,
-        dekanUserId: postId(draft.post),
+        dekanEmployeeId: postId(draft.post),
         dekanName: draft.postName ?? null,
       });
     case 1:
-      return api.updateDepartment(id, {
+      return api.updateKafedra(id, {
         name,
-        mudirUserId: postId(draft.post),
+        mudirEmployeeId: postId(draft.post),
         mudirName: draft.postName ?? null,
       });
     case 2:
-      return api.updateSpeciality(id, { name, kod: draft.kod?.trim(), shakl: draft.shakl });
+      return api.updateSpeciality(id, { name, kod: draft.kod?.trim() });
     default:
       return api.updateGroup(id, {
         name,
+        shakl: draft.shakl,
         kurs: draft.kurs ? Number(draft.kurs) : undefined,
         sardorStudentId: postId(draft.sardor),
         sardorName: draft.postName ?? null,
@@ -323,7 +323,7 @@ function removeOnServer(level: number, id: number): Promise<void> {
     case 0:
       return api.deleteFaculty(id);
     case 1:
-      return api.deleteDepartment(id);
+      return api.deleteKafedra(id);
     case 2:
       return api.deleteSpeciality(id);
     default:
@@ -436,7 +436,7 @@ function mapContainer(
   return faculties.map((faculty) => {
     if (faculty.id !== drill[0]?.id) return faculty;
     if (level === 1) {
-      return { ...faculty, kafedralar: update(faculty.kafedralar) as Department[] };
+      return { ...faculty, kafedralar: update(faculty.kafedralar) as Kafedra[] };
     }
 
     return {

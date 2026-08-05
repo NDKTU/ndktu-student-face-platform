@@ -16,8 +16,10 @@ export interface Employee {
    */
   roleNames: string[];
   role: string;
-  /** Подразделение: ректорат, факультет, кафедра или группа (для студента). */
+  /** Название подразделения — для показа и фильтра. */
   unit: string;
+  /** Оно же ссылкой: форма правит id, `unit` — только подпись. */
+  departmentId: number | null;
   lavozim: string;
   holati: EmployeeStatus;
   email: string;
@@ -51,7 +53,7 @@ export type EmployeeDraft = Partial<{
   address: string;
   personalPhone: string;
   lavozim: string;
-  unit: string;
+  departmentId: number | null;
   workPhone: string;
   workEmail: string;
   hire: string;

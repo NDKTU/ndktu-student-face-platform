@@ -3,8 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import type { EntityDraft } from '@/features/tuzilma/model/structure.store';
-import type { EduForm } from '@/entities/university/model/types';
-import { getPostCandidates, type PostCandidate, type StructuralPost } from '@/shared/api/xodimlar';
+import { EDU_FORMS_SELECTABLE } from '@/entities/university/model/types';
+import {
+  getPostCandidates,
+  type PostHolderCandidate,
+  type StructuralPost,
+} from '@/shared/api/xodimlar';
 import { getSardorCandidates, type SardorCandidate } from '@/shared/api/tuzilma';
 import { displayName } from '@/shared/lib/displayName';
 
@@ -17,8 +21,10 @@ type FieldName = 'name' | 'post' | 'kod' | 'shakl' | 'kurs' | 'sardor';
 const FIELDS_BY_LEVEL: Record<number, readonly FieldName[]> = {
   0: ['name', 'post'],
   1: ['name', 'post'],
-  2: ['name', 'kod', 'shakl'],
-  3: ['name', 'kurs', 'sardor'],
+  // Форма обучения на уровне группы, а не специальности: одно направление
+  // идёт сразу в нескольких формах, а у специальности name UNIQUE.
+  2: ['name', 'kod'],
+  3: ['name', 'shakl', 'kurs', 'sardor'],
 };
 
 /** Какой пост назначается на этом уровне и как подписано поле. */
@@ -27,7 +33,6 @@ const POST_BY_LEVEL: Record<number, { post: StructuralPost; labelKey: string }> 
   1: { post: 'kafedra_mudiri', labelKey: 'field.mudir' },
 };
 
-const EDU_FORMS: readonly EduForm[] = ['Kunduzgi', 'Sirtqi'];
 const KURS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 interface EntityModalProps {
@@ -75,10 +80,10 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
               key={field}
               post={config.post}
               label={t(config.labelKey)}
-              userId={draft.post ?? ''}
+              employeeId={draft.post ?? ''}
               currentName={draft.postName ?? ''}
-              onChange={(userId, fullName) =>
-                setDraft((d) => ({ ...d, post: userId, postName: fullName }))
+              onChange={(employeeId, fullName) =>
+                setDraft((d) => ({ ...d, post: employeeId, postName: fullName }))
               }
             />
           );
@@ -106,11 +111,18 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
           >
             {field === 'shakl' ? (
               <select
-                value={draft.shakl ?? 'Kunduzgi'}
+                value={draft.shakl ?? ''}
                 onChange={(e) => set('shakl', e.target.value)}
                 className={modalInputClass}
               >
-                {EDU_FORMS.map((form) => (
+                <option value="">{t('modal.unassigned')}</option>
+                {/* Sirtqi в списке нет: заочное обучение прекращено. Если оно
+                    стоит у старой группы — показываем отдельным пунктом,
+                    чтобы правка других полей его не стёрла. */}
+                {draft.shakl && !EDU_FORMS_SELECTABLE.includes(draft.shakl) && (
+                  <option value={draft.shakl}>{draft.shakl}</option>
+                )}
+                {EDU_FORMS_SELECTABLE.map((form) => (
                   <option key={form} value={form}>
                     {form}
                   </option>
@@ -152,18 +164,18 @@ export function EntityModal({ level, mode, initial, onSave, onCancel }: EntityMo
 function PostField({
   post,
   label,
-  userId,
+  employeeId,
   currentName,
   onChange,
 }: {
   post: StructuralPost;
   label: string;
-  userId: string;
+  employeeId: string;
   currentName: string;
-  onChange: (userId: string, fullName: string) => void;
+  onChange: (employeeId: string, fullName: string) => void;
 }) {
   const { t } = useTranslation('tuzilma');
-  const [candidates, setCandidates] = useState<PostCandidate[] | null>(null);
+  const [candidates, setCandidates] = useState<PostHolderCandidate[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -177,7 +189,8 @@ function PostField({
   }, [post]);
 
   const options = candidates ?? [];
-  const holderMissing = userId !== '' && !options.some((c) => String(c.userId) === userId);
+  const holderMissing =
+    employeeId !== '' && !options.some((c) => String(c.employeeId) === employeeId);
 
   return (
     <ModalField
@@ -189,18 +202,18 @@ function PostField({
       }
     >
       <select
-        value={userId}
+        value={employeeId}
         disabled={candidates === null}
         onChange={(e) => {
-          const picked = options.find((c) => String(c.userId) === e.target.value);
+          const picked = options.find((c) => String(c.employeeId) === e.target.value);
           onChange(e.target.value, picked?.fullName ?? '');
         }}
         className={modalInputClass}
       >
         <option value="">{t('modal.unassigned')}</option>
-        {holderMissing && <option value={userId}>{currentName}</option>}
+        {holderMissing && <option value={employeeId}>{currentName}</option>}
         {options.map((candidate) => (
-          <option key={candidate.userId} value={candidate.userId}>
+          <option key={candidate.employeeId} value={candidate.employeeId}>
             {candidate.fullName}
           </option>
         ))}

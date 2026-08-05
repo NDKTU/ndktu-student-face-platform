@@ -18,6 +18,10 @@ interface ApiCourse {
   semester_number: number | null;
   topic_count: number;
   material_count: number;
+  subject_id: number;
+  teacher_id: number;
+  faculty_id: number | null;
+  kafedra_id: number | null;
   subject: { id: number; name: string } | null;
   teacher: { id: number; username: string; full_name: string | null } | null;
   faculty: { id: number; name: string } | null;
@@ -63,7 +67,7 @@ function toSize(bytes: number | null): string {
 }
 
 function toResource(a: ApiMaterial['attachments'][number]): Resource {
-  return { name: a.name, url: a.url, size: toSize(a.size) };
+  return { name: a.name, url: a.url, size: toSize(a.size), bytes: a.size };
 }
 
 function toLesson(material: ApiMaterial, index: number): Lesson {
@@ -78,6 +82,9 @@ function toLesson(material: ApiMaterial, index: number): Lesson {
     done: material.completed,
     desc: material.description ?? '',
     resurslar: material.attachments.map(toResource),
+    // Дерево курса заданий не отдаёт: их спрашивает модалка урока, и только
+    // для того урока, который открыли.
+    uy: null,
   };
 }
 
@@ -102,6 +109,12 @@ function toAdminCourse(course: ApiCourse): AdminCourse {
     sem: course.semester_number ?? 1,
     mavzular: course.topic_count,
     darslar: course.material_count,
+    subjectId: course.subject_id ?? null,
+    teacherId: course.teacher_id ?? null,
+    facultyId: course.faculty_id ?? null,
+    kafedraId: course.kafedra_id ?? null,
+    groupIds: course.groups.map((g) => g.id),
+    semNumber: course.semester_number,
   };
 }
 
@@ -118,7 +131,23 @@ export interface LessonPayload {
   poster?: string;
   dur?: string;
   desc?: string;
+  /** Заменяет список вложений целиком: частичного обновления сервер не знает. */
+  attachments?: Resource[];
 }
+
+/** Поля курса. Семестр не передаём — см. `createCourse`. */
+export interface CoursePayload {
+  name: string;
+  subjectId: number;
+  teacherId: number;
+  /** Не передан — группы не трогаем (у курса их может быть несколько). */
+  groupIds?: number[];
+  facultyId?: number | null;
+  kafedraId?: number | null;
+}
+
+/** Видео в 150 МБ не укладывается в общий файловый таймаут в две минуты. */
+const VIDEO_UPLOAD_TIMEOUT_MS = 600_000;
 
 /** Список курсов уже урезан сервером: не-администратор видит только свои. */
 export async function getCourses(): Promise<AdminCourse[]> {
@@ -143,6 +172,43 @@ export async function getCourse(id: number): Promise<Course> {
   };
 }
 
+// --- Карточка курса --------------------------------------------------------
+
+function toCourseBody(body: Partial<CoursePayload>) {
+  return {
+    ...(body.name !== undefined && { name: body.name }),
+    ...(body.subjectId !== undefined && { subject_id: body.subjectId }),
+    ...(body.teacherId !== undefined && { teacher_id: body.teacherId }),
+    ...(body.groupIds !== undefined && { group_ids: body.groupIds }),
+    ...(body.facultyId !== undefined && { faculty_id: body.facultyId }),
+    ...(body.kafedraId !== undefined && { kafedra_id: body.kafedraId }),
+  };
+}
+
+/**
+ * Создаёт курс.
+ *
+ * `semester_number` сознательно не отправляется: сервер принимает только 1-2,
+ * а в интерфейсе поля семестра нет — подставлять единицу значило бы записать
+ * в базу выдуманное значение.
+ */
+export async function createCourse(body: CoursePayload): Promise<AdminCourse> {
+  return toAdminCourse(await api.post<ApiCourse>('/course/', toCourseBody(body)));
+}
+
+export async function updateCourse(id: number, body: Partial<CoursePayload>): Promise<AdminCourse> {
+  return toAdminCourse(await api.put<ApiCourse>(`/course/${id}`, toCourseBody(body)));
+}
+
+export const deleteCourse = (id: number) => api.delete(`/course/${id}`);
+
+/** Кладёт файл в uploads и возвращает ссылку на него. Строки в базе не создаёт. */
+export async function uploadCourseFile(file: File): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  return api.postForm<{ url: string }>('/resource/upload', form, VIDEO_UPLOAD_TIMEOUT_MS);
+}
+
 // --- Разделы ---------------------------------------------------------------
 
 export const createTopic = (courseId: number, body: TopicPayload) =>
@@ -164,8 +230,13 @@ function toMaterialBody(body: LessonPayload) {
     ...(body.videoType !== undefined && { video_type: body.videoType }),
     ...(body.videoSrc !== undefined && { video_url: body.videoSrc }),
     ...(body.poster !== undefined && { poster_url: body.poster }),
-    ...(body.dur !== undefined && { duration_label: body.dur }),
+    // Единицу дописываем здесь, а не в форме: `duration_label` — это готовая
+    // подпись в базе, и раньше в неё уезжало голое «40».
+    ...(body.dur !== undefined && { duration_label: body.dur ? `${body.dur} daq` : '' }),
     ...(body.desc !== undefined && { description: body.desc }),
+    ...(body.attachments !== undefined && {
+      attachments: body.attachments.map((r) => ({ name: r.name, url: r.url, size: r.bytes })),
+    }),
   };
 }
 

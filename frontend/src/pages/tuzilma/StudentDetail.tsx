@@ -14,7 +14,7 @@ interface StudentDetailProps {
   faculty: Faculty;
 }
 
-export function StudentDetail({ student, group, speciality, faculty }: StudentDetailProps) {
+export function StudentDetail({ student, group, faculty }: StudentDetailProps) {
   const { t } = useTranslation('tuzilma');
   const { t: tc } = useTranslation('common');
   const { canViewStudentSensitive: canViewSensitive } = usePermissions();
@@ -54,9 +54,11 @@ export function StudentDetail({ student, group, speciality, faculty }: StudentDe
               <span className="rounded-20 bg-surface-muted px-2.5 py-1 text-11 font-bold text-ink-muted">
                 {`${group.kurs}-kurs`}
               </span>
-              <span className="rounded-20 bg-surface-muted px-2.5 py-1 text-11 font-bold text-ink-muted">
-                {speciality.shakl}
-              </span>
+              {group.shakl && (
+                <span className="rounded-20 bg-surface-muted px-2.5 py-1 text-11 font-bold text-ink-muted">
+                  {group.shakl}
+                </span>
+              )}
             </div>
           </div>
         </div>

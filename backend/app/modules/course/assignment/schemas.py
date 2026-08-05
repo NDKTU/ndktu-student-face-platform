@@ -18,6 +18,9 @@ class SubmissionFile(BaseModel):
 class AssignmentCreateRequest(BaseModel):
     course_id: int
     lesson_id: Optional[int] = None
+    # Видеоурок, к которому привязано задание: `lesson_id` — это занятие по
+    # расписанию, а не материал курса, и путать их нельзя.
+    material_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
     description: Optional[str] = None
     deadline: datetime
@@ -29,6 +32,7 @@ class AssignmentCreateRequest(BaseModel):
 
 class AssignmentUpdateRequest(BaseModel):
     lesson_id: Optional[int] = None
+    material_id: Optional[int] = None
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = None
     deadline: Optional[datetime] = None
@@ -64,6 +68,7 @@ class AssignmentResponse(BaseModel):
     id: int
     course_id: int
     lesson_id: Optional[int] = None
+    material_id: Optional[int] = None
     created_by_user_id: Optional[int] = None
     title: str
     description: Optional[str] = None
@@ -83,6 +88,10 @@ class AssignmentResponse(BaseModel):
 class AssignmentListRequest(BaseModel):
     course_id: Optional[int] = None
     lesson_id: Optional[int] = None
+    # Фильтр нужен модалке урока: она спрашивает домашку одного материала.
+    # Без него пришлось бы тянуть все задания курса и считать статистику по
+    # каждому — четыре запроса на строку.
+    material_id: Optional[int] = None
     page: int = 1
     limit: int = Field(default=50, ge=1, le=MAX_PAGE_SIZE)
 

@@ -1,9 +1,9 @@
 import type {
-  Department,
   EduForm,
   Faculty,
   FacultyColor,
   Group,
+  Kafedra,
   RejaRow,
   Speciality,
   StatusTone,
@@ -20,8 +20,8 @@ import { api, qs } from './http';
  *
  * Здесь и только здесь встречаются имена полей сервера. Дальше по коду живут
  * узбекские названия из прототипа: `kafedralar`, `mutaxassisliklar`, `guruhlar`.
- * Отдельно стоит запомнить, что «Department» в этих типах — это кафедра;
- * у бэкенда `Department` называется совсем другое (подразделение сотрудников).
+ * Кафедра здесь и называется Kafedra. Раньше тип звался Department — так же,
+ * как у бэкенда называется подразделение сотрудников, и на этом путались.
  */
 
 // ---------------------------------------------------------------- ответы API
@@ -33,6 +33,7 @@ interface ApiGroup {
   position: number;
   sardor_student_id: number | null;
   sardor_name?: string | null;
+  education_form: EduForm | null;
   student_count: number;
 }
 
@@ -40,7 +41,6 @@ interface ApiSpeciality {
   id: number;
   name: string;
   code: string | null;
-  education_form: string | null;
   academic_year: string | null;
   position: number;
   curriculum_count: number;
@@ -52,7 +52,7 @@ interface ApiKafedra {
   id: number;
   name: string;
   mudir_name: string | null;
-  mudir_user_id: number | null;
+  mudir_employee_id: number | null;
   position: number;
   teacher_count: number;
   specialities: ApiSpeciality[];
@@ -63,12 +63,11 @@ interface ApiFaculty {
   name: string;
   code: string | null;
   dekan_name: string | null;
-  dekan_user_id: number | null;
+  dekan_employee_id: number | null;
   color_bg: string | null;
   color_fg: string | null;
   position: number;
   kafedras: ApiKafedra[];
-  orphan_groups: ApiGroup[];
 }
 
 interface ApiCurriculumRow {
@@ -112,6 +111,7 @@ function toGroup(group: ApiGroup): Group {
   return {
     id: group.id,
     name: group.name,
+    shakl: group.education_form,
     kurs: group.kurs ?? 1,
     sardor: group.sardor_name || EMPTY,
     sardorStudentId: group.sardor_student_id,
@@ -125,7 +125,6 @@ function toSpeciality(speciality: ApiSpeciality): Speciality {
     id: speciality.id,
     name: displayName(speciality.name),
     kod: speciality.code ?? '',
-    shakl: (speciality.education_form as EduForm) ?? 'Kunduzgi',
     reja_yil: speciality.academic_year,
     guruhlar: speciality.groups.map(toGroup),
     // План грузится по требованию: в дереве от него нужно только число строк.
@@ -135,12 +134,12 @@ function toSpeciality(speciality: ApiSpeciality): Speciality {
   };
 }
 
-function toDepartment(kafedra: ApiKafedra): Department {
+function toKafedra(kafedra: ApiKafedra): Kafedra {
   return {
     id: kafedra.id,
     name: displayName(kafedra.name),
     mudir: kafedra.mudir_name ?? EMPTY,
-    mudirUserId: kafedra.mudir_user_id,
+    mudirEmployeeId: kafedra.mudir_employee_id,
     oqituvchilar: kafedra.teacher_count,
     teachers: [],
     mutaxassisliklar: kafedra.specialities.map(toSpeciality),
@@ -152,9 +151,9 @@ function toFaculty(faculty: ApiFaculty): Faculty {
     id: faculty.id,
     name: displayName(faculty.name),
     dekan: faculty.dekan_name ?? EMPTY,
-    dekanUserId: faculty.dekan_user_id,
+    dekanEmployeeId: faculty.dekan_employee_id,
     color: facultyColor(faculty),
-    kafedralar: faculty.kafedras.map(toDepartment),
+    kafedralar: faculty.kafedras.map(toKafedra),
   };
 }
 
@@ -176,14 +175,19 @@ export interface FacultyPayload {
    * Кого назначить деканом. `null` — снять, `undefined` — не трогать: сервер
    * различает «прислали null» и «поля не было», и только так пост очищается.
    */
-  dekanUserId?: number | null;
-  /** Снимок ФИО: дерево показывает его, не заглядывая в справочник сотрудников. */
+  dekanEmployeeId?: number | null;
+  /**
+   * ФИО из пикера. На сервер НЕ уходит — там его больше негде хранить, имя
+   * берётся join'ом из employees. Нужно только чтобы карточка обновилась
+   * сразу, не дожидаясь перезагрузки дерева.
+   */
   dekanName?: string | null;
 }
 
-export interface DepartmentPayload {
+export interface KafedraPayload {
   name?: string;
-  mudirUserId?: number | null;
+  mudirEmployeeId?: number | null;
+  /** См. FacultyPayload.dekanName — тоже только для мгновенного показа. */
   mudirName?: string | null;
 }
 
@@ -195,12 +199,12 @@ function post(key: string, value: number | string | null | undefined) {
 export interface SpecialityPayload {
   name?: string;
   kod?: string;
-  shakl?: EduForm;
   reja_yil?: string;
 }
 
 export interface GroupPayload {
   name?: string;
+  shakl?: EduForm | null;
   kurs?: number;
   sardorStudentId?: number | null;
   sardorName?: string | null;
@@ -223,8 +227,7 @@ export async function getTree(): Promise<Faculty[]> {
 export async function createFaculty(body: FacultyPayload): Promise<Faculty> {
   const created = await api.post<{ id: number; name: string }>('/faculty/', {
     name: body.name,
-    ...post('dekan_user_id', body.dekanUserId),
-    ...post('dekan_name', body.dekanName),
+    ...post('dekan_employee_id', body.dekanEmployeeId),
   });
   return {
     id: created.id,
@@ -232,7 +235,7 @@ export async function createFaculty(body: FacultyPayload): Promise<Faculty> {
     // ввели, а то, что действительно сохранилось.
     name: displayName(created.name),
     dekan: body.dekanName || EMPTY,
-    dekanUserId: body.dekanUserId ?? null,
+    dekanEmployeeId: body.dekanEmployeeId ?? null,
     color: FALLBACK_COLORS[created.id % FALLBACK_COLORS.length]!,
     kafedralar: [],
   };
@@ -241,15 +244,14 @@ export async function createFaculty(body: FacultyPayload): Promise<Faculty> {
 export async function updateFaculty(id: number, body: FacultyPayload): Promise<Partial<Faculty>> {
   const updated = await api.put<{ id: number; name: string }>(`/faculty/${id}`, {
     ...post('name', body.name),
-    ...post('dekan_user_id', body.dekanUserId),
-    ...post('dekan_name', body.dekanName),
+    ...post('dekan_employee_id', body.dekanEmployeeId),
   });
   return {
     id: updated.id,
     name: displayName(updated.name),
-    ...(body.dekanUserId !== undefined && {
+    ...(body.dekanEmployeeId !== undefined && {
       dekan: body.dekanName || EMPTY,
-      dekanUserId: body.dekanUserId,
+      dekanEmployeeId: body.dekanEmployeeId,
     }),
   };
 }
@@ -257,49 +259,47 @@ export async function updateFaculty(id: number, body: FacultyPayload): Promise<P
 export const deleteFaculty = (id: number, force = false) =>
   api.delete(`/faculty/${id}${qs({ force: force || undefined })}`);
 
-// --- Kafedra (в типах фронта — Department) ----------------------------------
+// --- Kafedra ----------------------------------------------------------------
 
-export async function createDepartment(
+export async function createKafedra(
   facultyId: number,
-  body: DepartmentPayload,
-): Promise<Department> {
+  body: KafedraPayload,
+): Promise<Kafedra> {
   const created = await api.post<{ id: number; name: string }>('/kafedra/', {
     name: body.name,
     faculty_id: facultyId,
-    ...post('mudir_user_id', body.mudirUserId),
-    ...post('mudir_name', body.mudirName),
+    ...post('mudir_employee_id', body.mudirEmployeeId),
   });
   return {
     id: created.id,
     name: displayName(created.name),
     mudir: body.mudirName || EMPTY,
-    mudirUserId: body.mudirUserId ?? null,
+    mudirEmployeeId: body.mudirEmployeeId ?? null,
     oqituvchilar: 0,
     teachers: [],
     mutaxassisliklar: [],
   };
 }
 
-export async function updateDepartment(
+export async function updateKafedra(
   id: number,
-  body: DepartmentPayload,
-): Promise<Partial<Department>> {
+  body: KafedraPayload,
+): Promise<Partial<Kafedra>> {
   const updated = await api.put<{ id: number; name: string }>(`/kafedra/${id}`, {
     ...post('name', body.name),
-    ...post('mudir_user_id', body.mudirUserId),
-    ...post('mudir_name', body.mudirName),
+    ...post('mudir_employee_id', body.mudirEmployeeId),
   });
   return {
     id: updated.id,
     name: displayName(updated.name),
-    ...(body.mudirUserId !== undefined && {
+    ...(body.mudirEmployeeId !== undefined && {
       mudir: body.mudirName || EMPTY,
-      mudirUserId: body.mudirUserId,
+      mudirEmployeeId: body.mudirEmployeeId,
     }),
   };
 }
 
-export const deleteDepartment = (id: number, force = false) =>
+export const deleteKafedra = (id: number, force = false) =>
   api.delete(`/kafedra/${id}${qs({ force: force || undefined })}`);
 
 // --- Mutaxassislik ----------------------------------------------------------
@@ -312,13 +312,11 @@ export async function createSpeciality(
     name: body.name,
     kafedra_id: kafedraId,
     code: body.kod || null,
-    education_form: body.shakl || null,
   });
   return {
     id: created.id,
     name: displayName(created.name),
     kod: body.kod ?? '',
-    shakl: body.shakl ?? 'Kunduzgi',
     reja_yil: body.reja_yil ?? null,
     guruhlar: [],
     reja: [],
@@ -336,14 +334,12 @@ export async function updateSpeciality(
     // JSON.stringify их выбрасывал — работало, но случайно.
     ...post('name', body.name),
     ...post('code', body.kod),
-    ...post('education_form', body.shakl),
     ...post('academic_year', body.reja_yil),
   });
   return {
     id: updated.id,
     name: displayName(updated.name),
     ...(body.kod !== undefined && { kod: body.kod }),
-    ...(body.shakl !== undefined && { shakl: body.shakl }),
     ...(body.reja_yil !== undefined && { reja_yil: body.reja_yil }),
   };
 }
@@ -352,23 +348,18 @@ export const deleteSpeciality = (id: number) => api.delete(`/speciality/${id}`);
 
 // --- Guruh ------------------------------------------------------------------
 
-export async function createGroup(
-  specialityId: number,
-  facultyId: number,
-  body: GroupPayload,
-): Promise<Group> {
+export async function createGroup(specialityId: number, body: GroupPayload): Promise<Group> {
   const created = await api.post<ApiGroup>('/group/', {
     name: body.name,
     speciality_id: specialityId,
-    // faculty_id у группы на бэкенде обязателен, а в интерфейсе его не
-    // спрашивают: он однозначно известен из пути drill-down.
-    faculty_id: facultyId,
     kurs: body.kurs ?? null,
+    ...post('education_form', body.shakl),
     ...post('sardor_student_id', body.sardorStudentId),
   });
   return {
     id: created.id,
     name: created.name,
+    shakl: body.shakl ?? null,
     kurs: body.kurs ?? 1,
     sardor: body.sardorName || created.sardor_name || EMPTY,
     sardorStudentId: body.sardorStudentId ?? created.sardor_student_id,
@@ -380,12 +371,14 @@ export async function updateGroup(id: number, body: GroupPayload): Promise<Parti
   const updated = await api.put<ApiGroup>(`/group/${id}`, {
     ...post('name', body.name),
     ...post('kurs', body.kurs),
+    ...post('education_form', body.shakl),
     ...post('sardor_student_id', body.sardorStudentId),
   });
   return {
     id: updated.id,
     name: updated.name,
     ...(body.kurs !== undefined && { kurs: body.kurs }),
+    ...(body.shakl !== undefined && { shakl: body.shakl }),
     ...(body.sardorStudentId !== undefined && {
       sardorStudentId: body.sardorStudentId,
       sardor: body.sardorName || updated.sardor_name || EMPTY,

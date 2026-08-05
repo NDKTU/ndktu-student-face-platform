@@ -14,8 +14,7 @@ class FacultyCreateRequest(BaseModel):
     # Поля карточки, которые показывает дерево структуры. Все необязательные:
     # запись заводят по названию, остальное дозаполняют позже.
     code: Optional[str] = Field(default=None, max_length=CODE_MAX)
-    dekan_user_id: Optional[int] = None
-    dekan_name: Optional[str] = None
+    dekan_employee_id: Optional[int] = None
     color_bg: Optional[str] = None
     color_fg: Optional[str] = None
 
@@ -36,8 +35,7 @@ class FacultyUpdateRequest(BaseModel):
 
     name: Optional[str] = Field(default=None, max_length=NAME_MAX)
     code: Optional[str] = Field(default=None, max_length=CODE_MAX)
-    dekan_user_id: Optional[int] = None
-    dekan_name: Optional[str] = None
+    dekan_employee_id: Optional[int] = None
     color_bg: Optional[str] = None
     color_fg: Optional[str] = None
 
@@ -57,8 +55,7 @@ class FacultyCreateResponse(BaseModel):
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
     code: Optional[str] = None
-    dekan_user_id: Optional[int] = None
-    dekan_name: Optional[str] = None
+    dekan_employee_id: Optional[int] = None
     color_bg: Optional[str] = None
     color_fg: Optional[str] = None
     position: int = 0

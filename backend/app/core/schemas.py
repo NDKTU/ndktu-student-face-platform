@@ -34,8 +34,14 @@ TashkentDatetime = Annotated[datetime, PlainSerializer(_to_tashkent_iso, return_
 MAX_PAGE_SIZE = 1000
 
 
+# HEMIS отдаёт названия с типографским апострофом U+2018 («RO‘ZIQULOV»,
+# «O‘qimoqda»), формы на фронтенде — с обычным. Сравнение «в лоб» на таких
+# парах молча не совпадает, поэтому все варианты сводим к одному символу.
+_APOSTROPHES = str.maketrans({"‘": "'", "’": "'", "ʻ": "'", "ʼ": "'", "`": "'"})
+
+
 def normalized_name(value: str) -> str:
-    """Схлопывает пробелы и переводит в нижний регистр.
+    """Схлопывает пробелы, сводит апострофы к одному виду и опускает регистр.
 
     База хранит каноническую форму, красивое написание рисует фронтенд
     (`shared/lib/displayName.ts`). Так одному и тому же правилу подчиняются и
@@ -43,4 +49,4 @@ def normalized_name(value: str) -> str:
     «Konchilik», «KONCHILIK» и «konchilik  » перестают быть тремя разными
     факультетами.
     """
-    return " ".join(value.split()).lower()
+    return " ".join(value.translate(_APOSTROPHES).split()).lower()

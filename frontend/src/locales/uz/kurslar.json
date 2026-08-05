@@ -24,15 +24,55 @@
     "title": "Natija topilmadi",
     "text": "Filtrlarni o'zgartiring."
   },
+  "emptyAll": {
+    "title": "Hali kurs yaratilmagan",
+    "text": "Boshlash uchun birinchi kursni yarating."
+  },
+  "sem": {
+    "none": "—"
+  },
+  "action": {
+    "edit": "Tahrirlash",
+    "delete": "O'chirish"
+  },
+  "confirmCourse": "Bu kurs, uning barcha mavzulari va darslari o'chiriladi.",
+  "courseModal": {
+    "add": "Yangi kurs",
+    "edit": "Kursni tahrirlash",
+    "subtitle": "O'qituvchi, fan va guruhni tanlang — so'ng mavzu/dars qo'shasiz",
+    "teacher": "O'qituvchi",
+    "subject": "Fan",
+    "group": "Guruh",
+    "pickTeacher": "O'qituvchini tanlang",
+    "pickSubject": "Fanni tanlang",
+    "pickGroup": "Guruhni tanlang",
+    "submit": "Yaratish",
+    "multiGroupHint": "Bu kursga bir nechta guruh biriktirilgan — guruhlar o'zgarmaydi."
+  },
+  "validation": {
+    "teacherRequired": "O'qituvchini tanlang",
+    "subjectRequired": "Fanni tanlang",
+    "groupRequired": "Guruhni tanlang",
+    "mavzuRequired": "Mavzu nomini kiriting",
+    "titleRequired": "Dars nomini kiriting",
+    "videoRequired": "Video havolasini kiriting yoki fayl yuklang",
+    "uyTitleRequired": "Uy vazifasi nomini kiriting",
+    "uyDeadlineRequired": "Muddatni kiriting"
+  },
   "detail": {
     "lessons": "{{count}} ta dars",
     "totalLessons": "{{count}} ta dars",
+    "sectionMavzular": "Mavzular",
     "addMavzu": "Mavzu qo'shish",
     "addDars": "Dars qo'shish",
     "emptyMavzuTitle": "Hali mavzu qo'shilmagan",
     "emptyMavzuText": "Boshlash uchun birinchi mavzuni qo'shing.",
     "emptyDars": "Hali dars qo'shilmagan",
-    "metaLine": "{{oqituvchi}} · {{fac}} · {{sem}}-semestr · {{lessons}} ta dars"
+    "metaLine": "{{oqituvchi}} · {{fac}} · {{sem}}-semestr · {{lessons}} ta dars",
+    "metaLineNoSem": "{{oqituvchi}} · {{fac}} · {{lessons}} ta dars",
+    "expand": "Ochish",
+    "collapse": "Yopish",
+    "drag": "Tartibni o'zgartirish"
   },
   "video": {
     "youtube": "YouTube",
@@ -48,16 +88,44 @@
     "add": "Yangi dars",
     "edit": "Darsni tahrirlash",
     "title": "Dars nomi",
-    "videoType": "Video turi",
-    "dur": "Davomiyligi (daqiqa)",
+    "titlePlaceholder": "masalan, Nazariy kirish",
+    "videoSource": "Video manbasi",
+    "youtubeTab": "YouTube havola",
+    "uploadTab": "Video yuklash",
+    "urlPlaceholder": "https://www.youtube.com/watch?v=...",
+    "pickVideo": "Video faylni tanlang",
+    "uploading": "Yuklanmoqda…",
+    "tooBig": "Fayl {{mb}} MB dan oshmasligi kerak",
+    "dur": "Davomiyligi (daq)",
+    "durPlaceholder": "15",
     "desc": "Tavsif",
-    "videoSrc": "Video havolasi"
+    "descPlaceholder": "Dars mazmuni haqida qisqacha",
+    "videoSrc": "Video havolasi",
+    "resources": "Resurslar",
+    "addResource": "Resurs qo'shish",
+    "removeResource": "Resursni o'chirish",
+    "noResources": "Hali resurs qo'shilmagan",
+    "addUy": "Uy vazifasi qo'shish",
+    "removeUy": "Uy vazifasini olib tashlash"
+  },
+  "uy": {
+    "title": "Uy vazifasi",
+    "name": "Vazifa nomi",
+    "namePlaceholder": "masalan, 1-amaliy ish",
+    "desc": "Tavsif",
+    "descPlaceholder": "Talaba nima qilishi kerak",
+    "deadline": "Muddat",
+    "maxBall": "Maksimal ball"
   },
   "toast": {
     "mavzuAdded": "Mavzu qo'shildi",
     "mavzuSaved": "Mavzu saqlandi",
     "darsAdded": "Dars qo'shildi",
     "darsSaved": "Dars saqlandi",
+    "darsSavedNoUy": "Dars saqlandi, lekin uy vazifasi saqlanmadi",
+    "courseAdded": "Kurs yaratildi",
+    "courseSaved": "Kurs saqlandi",
+    "uploadFailed": "Faylni yuklab bo'lmadi",
     "deleted": "O'chirildi"
   },
   "confirmMavzu": "Bu mavzu va uning barcha darslari o'chiriladi.",

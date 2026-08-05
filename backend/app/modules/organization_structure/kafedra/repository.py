@@ -39,13 +39,15 @@ class KafedraRepository:
             )
         ).scalar_one()
 
+        await self._ensure_mudir_free(session, data.mudir_employee_id)
+
         new_kafedra = Kafedra(
             name=data.name, faculty_id=data.faculty_id, position=next_position
         )
         # Необязательные поля карточки переносим списком: перечислять их
         # по одному в конструкторе значило бы забывать новое поле при каждом
         # расширении схемы.
-        for _field in ('mudir_user_id', 'mudir_name'):
+        for _field in ('mudir_employee_id',):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(new_kafedra, _field, _value)
@@ -108,6 +110,23 @@ class KafedraRepository:
 
         return KafedraListResponse(total=total, page=request.page, limit=request.limit, kafedras=kafedras)
 
+    @staticmethod
+    async def _ensure_mudir_free(
+        session: AsyncSession, employee_id: int | None, exclude_kafedra_id: int | None = None
+    ) -> None:
+        """См. FacultyRepository._ensure_dekan_free — та же проверка для кафедры."""
+        if employee_id is None:
+            return
+        stmt = select(Kafedra.name).where(Kafedra.mudir_employee_id == employee_id)
+        if exclude_kafedra_id is not None:
+            stmt = stmt.where(Kafedra.id != exclude_kafedra_id)
+        taken_by = (await session.execute(stmt)).scalar_one_or_none()
+        if taken_by:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Bu xodim allaqachon «{taken_by}» kafedrasining mudiri",
+            )
+
     async def update_kafedra(self, session: AsyncSession, kafedra_id: int, data: KafedraUpdateRequest) -> Kafedra:
         stmt = select(Kafedra).where(Kafedra.id == kafedra_id)
         result = await session.execute(stmt)
@@ -130,9 +149,12 @@ class KafedraRepository:
         if data.faculty_id is not None:
             kafedra.faculty_id = data.faculty_id
 
+        if 'mudir_employee_id' in data.model_fields_set:
+            await self._ensure_mudir_free(session, data.mudir_employee_id, exclude_kafedra_id=kafedra_id)
+
         # См. update_faculty: различаем «прислали null» (очистить) и «не
         # прислали вовсе» (не трогать) — иначе мудира не снять.
-        for _field in ('mudir_user_id', 'mudir_name'):
+        for _field in ('mudir_employee_id',):
             if _field in data.model_fields_set:
                 setattr(kafedra, _field, getattr(data, _field))
 

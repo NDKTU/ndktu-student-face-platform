@@ -12,7 +12,9 @@ const GENDERS: Employee['gender'][] = ['Erkak', 'Ayol'];
 interface EmployeeModalProps {
   mode: 'add' | 'edit';
   initial: EmployeeDraft;
-  units: string[];
+  /** Справочник подразделений. Раньше сюда шли строки, вытащенные из уже
+   *  загруженных сотрудников, и назначить новое подразделение было нечем. */
+  bolimlar: { id: number; name: string }[];
   /** Роли из БД: имя — то, что уходит на сервер, label — подпись. */
   roles: { name: string; label: string }[];
   onSave: (draft: EmployeeDraft) => void;
@@ -24,7 +26,14 @@ interface EmployeeModalProps {
  * Секция «Персональные данные» — в отдельной запертой рамке и доступна на
  * редактирование только super_admin.
  */
-export function EmployeeModal({ mode, initial, units, roles, onSave, onCancel }: EmployeeModalProps) {
+export function EmployeeModal({
+  mode,
+  initial,
+  bolimlar,
+  roles,
+  onSave,
+  onCancel,
+}: EmployeeModalProps) {
   const { t } = useTranslation('xodimlar');
   const { t: tc } = useTranslation('common');
   const toast = useToast();
@@ -124,12 +133,15 @@ export function EmployeeModal({ mode, initial, units, roles, onSave, onCancel }:
           <ModalField label={t('field.lavozim')}>{field('lavozim', t('placeholder.lavozim'))}</ModalField>
           <ModalField label={t('field.unit')}>
             <select
-              value={draft.unit ?? units[0]}
-              onChange={(e) => set('unit', e.target.value)}
+              value={draft.departmentId == null ? '' : String(draft.departmentId)}
+              onChange={(e) => set('departmentId', e.target.value ? Number(e.target.value) : null)}
               className={modalInputClass}
             >
-              {units.map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
+              <option value="">{tc('notSelected')}</option>
+              {bolimlar.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
               ))}
             </select>
           </ModalField>

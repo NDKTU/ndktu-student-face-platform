@@ -291,6 +291,13 @@ class Assignment(Base, IdIntPk, TimestampMixin):
     lesson_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Задание, привязанное к видеоуроку. SET NULL, а не CASCADE: у задания
+    # висят сданные работы с оценками, и удаление урока не должно их уносить.
+    # course_id остаётся NOT NULL, поэтому осиротевшее задание не пропадает —
+    # оно просто становится общим для курса.
+    material_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("course_materials.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_by_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -303,6 +310,7 @@ class Assignment(Base, IdIntPk, TimestampMixin):
 
     course: Mapped["Course"] = relationship("Course")
     lesson: Mapped["Lesson | None"] = relationship("Lesson")
+    material: Mapped["CourseMaterial | None"] = relationship("CourseMaterial")
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_user_id])
     submissions: Mapped[list["AssignmentSubmission"]] = relationship(
         "AssignmentSubmission", back_populates="assignment", cascade="all, delete-orphan"

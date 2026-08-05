@@ -36,6 +36,8 @@ interface ApiEmployee {
   last_login_at: string | null;
   user: { id: number; username: string; roles: { id: number; name: string }[] } | null;
   department: { id: number; name: string } | null;
+  /** Заполнено, если у сотрудника есть преподавательская запись. */
+  teacher: { id: number; kafedra_id: number } | null;
 }
 
 interface ApiEmployeeSensitive {
@@ -64,6 +66,7 @@ function toEmployee(row: ApiEmployee): Employee {
     role: primary ? roleLabel(primary) : '',
     color: roleColor(primary),
     unit: row.department?.name ?? '',
+    departmentId: row.department?.id ?? null,
     lavozim: row.position_title ?? '',
     holati: statusOf(row.status),
     // У сотрудника личного email в БД нет — под именем показываем рабочий.
@@ -100,6 +103,8 @@ function toBody(draft: EmployeeDraft) {
     birth_date: draft.birth || null,
     hire_date: draft.hire || null,
     status: draft.holati || null,
+    // undefined — «не трогать», null — «убрать из подразделения».
+    ...(draft.departmentId !== undefined && { department_id: draft.departmentId }),
     jshshir: draft.jshshir || null,
     passport: draft.passport || null,
     personal_phone: draft.personalPhone || null,
@@ -153,7 +158,44 @@ export interface PostCandidate {
   fullName: string;
 }
 
-export async function getPostCandidates(post: StructuralPost): Promise<PostCandidate[]> {
+/**
+ * Кандидат на структурный пост — декана или заведующего кафедрой.
+ *
+ * Здесь id карточки сотрудника, а не учётки: посты ссылаются на employees.
+ * На users ссылаться было нельзя — учётка есть и у студента, так что деканом
+ * мог оказаться кто угодно, а ФИО оттуда всё равно не достать.
+ * Для выбора преподавателя курса нужен наоборот userId — см. PostCandidate.
+ */
+export interface PostHolderCandidate {
+  employeeId: number;
+  fullName: string;
+}
+
+/**
+ * Преподаватели для выбора владельца курса.
+ *
+ * Отбираем по наличию записи в `teachers`, а не по имени роли. Курс ссылается
+ * на `users.id`, но журнал занятий требует именно преподавательскую запись:
+ * без неё курс создастся, а вкладка «Dars jurnali» ответит 400 «User is not
+ * registered as a teacher». Роль такой проверки не даёт и вдобавок
+ * переименовывается — в базе она называется `Teacher`, а не `oqituvchi`.
+ *
+ * Дальше — две подстраховки на случай неполного справочника: роль и, если и
+ * она пуста, все сотрудники. Все три ступени считаются по одной выборке.
+ */
+export async function getTeacherOptions(): Promise<PostCandidate[]> {
+  const all = await getAll<ApiEmployee>('/employee/', 'employees');
+
+  const registered = all.filter((row) => row.teacher);
+  const byRole = all.filter((row) =>
+    (row.user?.roles ?? []).some((r) => r.name.toLowerCase() === 'teacher'),
+  );
+  const rows = registered.length ? registered : byRole.length ? byRole : all;
+
+  return rows.map((row) => ({ userId: row.user_id, fullName: row.full_name }));
+}
+
+export async function getPostCandidates(post: StructuralPost): Promise<PostHolderCandidate[]> {
   // Роль называется так же, как пост: отдельного справочника соответствий нет,
   // и заводить его ради двух значений незачем.
   const rows = await getAll<ApiEmployee>('/employee/', 'employees', {
@@ -161,5 +203,5 @@ export async function getPostCandidates(post: StructuralPost): Promise<PostCandi
     available_post: post,
   });
 
-  return rows.map((row) => ({ userId: row.user_id, fullName: row.full_name }));
+  return rows.map((row) => ({ employeeId: row.id, fullName: row.full_name }));
 }

@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EduForm } from '@/entities/university/model/types';
 import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 
-const FORMS: EduForm[] = ['Kunduzgi', 'Sirtqi'];
-
+/**
+ * План — это специальность и учебный год. Формы обучения здесь больше нет:
+ * она переехала на группу, потому что одно направление идёт сразу в
+ * нескольких формах, а у специальности name UNIQUE и двух строк не даёт.
+ */
 export interface PlanDraft {
   specialityId: number;
   year: string;
-  shakl: EduForm;
 }
 
 interface PlanModalProps {
@@ -63,19 +64,6 @@ export function PlanModal({ initial, specialities, onCreate, onCancel }: PlanMod
             placeholder={t('placeholder.year')}
             className={modalInputClass}
           />
-        </ModalField>
-        <ModalField label={t('field.shakl')}>
-          <select
-            value={draft.shakl}
-            onChange={(e) => setDraft((d) => ({ ...d, shakl: e.target.value as EduForm }))}
-            className={modalInputClass}
-          >
-            {FORMS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
         </ModalField>
       </div>
     </Modal>

@@ -28,5 +28,6 @@
   "loading": "Yuklanmoqda...",
   "loadError": "Ma'lumotni yuklab bo'lmadi",
   "retry": "Qayta urinish",
-  "saveError": "Saqlab bo'lmadi"
+  "saveError": "Saqlab bo'lmadi",
+  "notSelected": "Tanlanmagan"
 }

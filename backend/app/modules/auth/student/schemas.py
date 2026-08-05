@@ -19,7 +19,6 @@ class StudentBase(BaseModel):
     university: str
     specialty: str
     student_status: str
-    education_form: str
     education_type: str
     payment_form: str
     education_lang: str
@@ -49,7 +48,6 @@ class StudentUpdateRequest(BaseModel):
     university: Optional[str] = None
     specialty: Optional[str] = None
     student_status: Optional[str] = None
-    education_form: Optional[str] = None
     education_type: Optional[str] = None
     payment_form: Optional[str] = None
     education_lang: Optional[str] = None

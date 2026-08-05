@@ -292,8 +292,15 @@ class PsychologyRepository:
             )
 
             if request.faculty_id:
-                stmt = stmt.where(Group.faculty_id == request.faculty_id)
-                count_stmt = count_stmt.where(Group.faculty_id == request.faculty_id)
+                # У группы нет прямой ссылки на факультет — только через
+                # специальность и кафедру.
+                from app.modules.organization_structure.group.repository import (
+                    _speciality_ids_of_faculty,
+                )
+
+                of_faculty = Group.speciality_id.in_(_speciality_ids_of_faculty(request.faculty_id))
+                stmt = stmt.where(of_faculty)
+                count_stmt = count_stmt.where(of_faculty)
             if request.group_id:
                 stmt = stmt.where(Group.id == request.group_id)
                 count_stmt = count_stmt.where(Group.id == request.group_id)

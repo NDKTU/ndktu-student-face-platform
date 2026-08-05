@@ -120,6 +120,7 @@ class AssignmentRepository:
                 else None
             ),
             lesson_id=a.lesson_id,
+            material_id=a.material_id,
             created_by_user_id=a.created_by_user_id,
             title=a.title,
             description=a.description,
@@ -148,6 +149,7 @@ class AssignmentRepository:
         a = Assignment(
             course_id=data.course_id,
             lesson_id=data.lesson_id,
+            material_id=data.material_id,
             created_by_user_id=current_user.id,
             title=data.title,
             description=data.description,
@@ -170,8 +172,12 @@ class AssignmentRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
+        # Присваиваем только не-None, поэтому обнулить привязку (lesson_id,
+        # material_id) через PUT нельзя — отвязка делается удалением задания.
+        # Понадобится очистка — переходить на data.model_fields_set.
         for field in (
             "lesson_id",
+            "material_id",
             "title",
             "description",
             "deadline",
@@ -234,6 +240,9 @@ class AssignmentRepository:
         if request.lesson_id:
             stmt = stmt.where(Assignment.lesson_id == request.lesson_id)
             count_stmt = count_stmt.where(Assignment.lesson_id == request.lesson_id)
+        if request.material_id:
+            stmt = stmt.where(Assignment.material_id == request.material_id)
+            count_stmt = count_stmt.where(Assignment.material_id == request.material_id)
 
         stmt = stmt.order_by(desc(Assignment.deadline)).offset(request.offset).limit(request.limit)
         items = (await session.execute(stmt)).scalars().all()

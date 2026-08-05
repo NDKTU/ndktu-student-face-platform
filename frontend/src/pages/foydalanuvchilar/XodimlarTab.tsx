@@ -12,6 +12,7 @@ import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 import { EmployeeModal } from '../xodimlar/EmployeeModal';
+import { useBolimlar } from '@/features/bolimlar/lib/useBolimlar';
 import { employeeStatusTone } from '../xodimlar/statusTone';
 import { FilterBar, filterSelectClass, SearchInput } from './FilterBar';
 
@@ -30,6 +31,9 @@ export function XodimlarTab() {
 
   // Подразделения — из того, что уже есть в справочнике; роли — константа.
   const units = useMemo(() => unitOptions(employees), [employees]);
+  // Справочник подразделений — для формы; фильтр по-прежнему по названию,
+  // потому что фильтрует уже загруженный список.
+  const { bolimlar } = useBolimlar();
 
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
@@ -154,7 +158,7 @@ export function XodimlarTab() {
         actions={
           <Button
             className="h-[46px] rounded-12 px-5"
-            onClick={() => setModal({ mode: 'add', draft: { unit: units[0], roleNames: [] } })}
+            onClick={() => setModal({ mode: 'add', draft: { roleNames: [] } })}
           >
             + {t('add')}
           </Button>
@@ -212,7 +216,7 @@ export function XodimlarTab() {
         <EmployeeModal
           mode={modal.mode}
           initial={modal.draft}
-          units={units}
+          bolimlar={bolimlar}
           roles={assignableRoles}
           onSave={(draft) => void handleSave(draft)}
           onCancel={() => setModal(null)}

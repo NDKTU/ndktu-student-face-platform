@@ -1,5 +1,13 @@
-/** Форма обучения. */
-export type EduForm = 'Kunduzgi' | 'Sirtqi';
+/**
+ * Форма обучения. Дубль ENUM'а education_form в базе и Literal'а в
+ * organization_structure/group/schemas.py — менять нужно все три места.
+ *
+ * Sirtqi показываем, но не предлагаем: заочное обучение прекращено, а записи
+ * прошлых лет должны читаться. Список для выбора — FORMS_SELECTABLE.
+ */
+export type EduForm = 'Kunduzgi' | 'Kechki' | 'Masofaviy' | 'Sirtqi';
+
+export const EDU_FORMS_SELECTABLE: readonly EduForm[] = ['Kunduzgi', 'Kechki', 'Masofaviy'];
 
 /** Статус студента и его цветовой тон на бейдже. */
 export type StudentStatus = 'Faol' | "Akademik ta'til" | "Ta'til";
@@ -31,6 +39,11 @@ export interface Group {
   id: number;
   /** Например DI-24-01: префикс специальности, год, номер. */
   name: string;
+  /**
+   * Форма обучения. Свойство группы, а не специальности: у направления
+   * name UNIQUE, и двух строк под кундузги и сиртки оно не даёт.
+   */
+  shakl: EduForm | null;
   kurs: number;
   sardor: string;
   sardorStudentId?: number | null;
@@ -53,7 +66,6 @@ export interface Speciality {
   name: string;
   /** Код направления по классификатору, 8 цифр. */
   kod: string;
-  shakl: EduForm;
   /** Учебный год плана («2025/2026»); у сгенерированных планов его нет. */
   reja_yil?: string | null;
   guruhlar: Group[];
@@ -65,13 +77,18 @@ export interface Speciality {
   curriculum_credits: number;
 }
 
-export interface Department {
+/**
+ * Кафедра. Раньше тип назывался Department — так же, как у бэкенда называется
+ * совсем другая сущность (подразделение сотрудников вроде бухгалтерии), и на
+ * этом успели запутаться.
+ */
+export interface Kafedra {
   id: number;
   name: string;
-  /** ФИО заведующего для показа; пусто — «—». */
+  /** ФИО заведующего. Приходит с сервера join'ом из employees, форма его не шлёт. */
   mudir: string;
-  /** Кто именно заведует. Форма правит id, а `mudir` — его снимок. */
-  mudirUserId: number | null;
+  /** Карточка сотрудника, а не учётка: у студента учётка тоже есть. */
+  mudirEmployeeId: number | null;
   /** Штатная численность преподавателей кафедры. */
   oqituvchilar: number;
   /** Пул преподавателей, из которого назначаются предметы в учебном плане. */
@@ -87,12 +104,12 @@ export interface FacultyColor {
 export interface Faculty {
   id: number;
   name: string;
-  /** ФИО декана для показа; пусто — «—». */
+  /** ФИО декана. Приходит с сервера join'ом из employees, форма его не шлёт. */
   dekan: string;
-  /** Кто именно декан. Форма правит id, а `dekan` — его снимок. */
-  dekanUserId: number | null;
+  /** Карточка сотрудника, а не учётка. */
+  dekanEmployeeId: number | null;
   color: FacultyColor;
-  kafedralar: Department[];
+  kafedralar: Kafedra[];
 }
 
 export interface Person {
@@ -126,5 +143,5 @@ export interface UniversityTotals {
 }
 
 /** Уровни drill-down в модуле «Tuzilma». */
-export const STRUCTURE_LEVELS = ['faculty', 'department', 'speciality', 'group'] as const;
+export const STRUCTURE_LEVELS = ['faculty', 'kafedra', 'speciality', 'group'] as const;
 export type StructureLevel = (typeof STRUCTURE_LEVELS)[number];

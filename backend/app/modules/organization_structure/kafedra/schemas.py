@@ -9,8 +9,7 @@ class KafedraCreateRequest(BaseModel):
     faculty_id: int
     # Поля карточки, которые показывает дерево структуры. Все необязательные:
     # запись заводят по названию, остальное дозаполняют позже.
-    mudir_user_id: Optional[int] = None
-    mudir_name: Optional[str] = None
+    mudir_employee_id: Optional[int] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -30,8 +29,7 @@ class KafedraUpdateRequest(BaseModel):
 
     name: Optional[str] = Field(default=None, max_length=255)
     faculty_id: Optional[int] = None
-    mudir_user_id: Optional[int] = None
-    mudir_name: Optional[str] = None
+    mudir_employee_id: Optional[int] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -49,8 +47,7 @@ class KafedraCreateResponse(BaseModel):
     faculty_id: int
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
-    mudir_user_id: Optional[int] = None
-    mudir_name: Optional[str] = None
+    mudir_employee_id: Optional[int] = None
     position: int = 0
 
     model_config = ConfigDict(

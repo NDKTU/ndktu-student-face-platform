@@ -1,16 +1,13 @@
 import logging
-import os
-import shutil
-import uuid
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
-from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.utils.roles import is_admin as user_is_admin
+from app.core.utils.upload import DOC_LIMITS, IMAGE_LIMITS, VIDEO_LIMITS, save_upload
 from app.modules.course.model import Course, Lesson, Resource
 from app.modules.auth.model import User
 
@@ -18,10 +15,10 @@ from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListRes
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "pdf", "docx", "xlsx", "pptx"}
-_IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
-_IMAGE_MAX = 5 * 1024 * 1024
-_DOC_MAX = 20 * 1024 * 1024
+# Материалы курса — это и картинки, и раздатка, и видеоуроки, поэтому здесь
+# разрешены все три группы. Лимит берётся по расширению, так что 150 МБ
+# доступны только видео: `.pptx` по-прежнему обрывается на 20 МБ.
+COURSE_UPLOAD_LIMITS = {**IMAGE_LIMITS, **DOC_LIMITS, **VIDEO_LIMITS}
 
 
 class ResourceRepository:
@@ -48,29 +45,12 @@ class ResourceRepository:
             )
 
     async def upload_file(self, file: UploadFile) -> str:
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="File name is empty")
-        ext = file.filename.rsplit(".", 1)[-1].lower()
-        if ext not in _ALLOWED_EXTS:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
-
-        content = await file.read()
-        max_size = _IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX
-        if len(content) > max_size:
-            raise HTTPException(status_code=400, detail=f"File must not exceed {max_size // (1024 * 1024)}MB")
-
-        upload_dir = settings.course_resource_upload_dir
-        filename = f"{uuid.uuid4()}.{ext}"
-        file_path = upload_dir / filename
-
-        def _write() -> None:
-            os.makedirs(upload_dir, exist_ok=True)
-            file_path.write_bytes(content)
-
-        # Синхронная запись останавливает event loop целиком (F09).
-        await run_in_threadpool(_write)
-
-        return f"{settings.file_url.http}/course_resources/{filename}"
+        return await save_upload(
+            file,
+            settings.course_resource_upload_dir,
+            "course_resources",
+            COURSE_UPLOAD_LIMITS,
+        )
 
     async def create_resource(
         self, session: AsyncSession, data: ResourceCreateRequest, current_user: User

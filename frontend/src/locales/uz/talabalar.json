@@ -2,7 +2,8 @@
   "pageTitle": "Foydalanuvchilar",
   "tab": {
     "xodimlar": "Xodimlar",
-    "talabalar": "Talabalar"
+    "talabalar": "Talabalar",
+    "bolimlar": "Bo'limlar"
   },
   "subtitle": "Universitet talabalari — {{count}} ta",
   "add": "Talaba qo'shish",

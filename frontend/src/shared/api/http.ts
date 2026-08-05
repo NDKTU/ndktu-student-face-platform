@@ -186,7 +186,9 @@ export const api = {
   delete: (path: string) => request<void>('DELETE', path),
 
   /** Загрузка файла: картинка вопроса, аватар сотрудника, excel с вопросами. */
-  postForm: <T>(path: string, form: FormData) => request<T>('POST', path, undefined, { form }),
+  // timeoutMs — для больших файлов: двух минут по умолчанию видео не хватает.
+  postForm: <T>(path: string, form: FormData, timeoutMs?: number) =>
+    request<T>('POST', path, undefined, { form, timeoutMs }),
 
   /** Выгрузка файла: excel с банком вопросов. */
   getBlob: (path: string) => request<Blob>('GET', path, undefined, { blob: true }),

@@ -3,7 +3,7 @@ from collections import defaultdict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Student, Teacher
+from app.modules.auth.model import Employee, Student, Teacher
 from app.modules.organization_structure.model import (
     Curriculum,
     Faculty,
@@ -82,6 +82,24 @@ class OrganizationTreeRepository:
             ).all()
         }
 
+        # ФИО деканов и заведующих — одной пачкой. Столбца-снимка под них
+        # больше нет: он расходился с карточкой сотрудника после
+        # переименования. Приём тот же, что для старост ниже, — не по одному
+        # запросу на карточку.
+        post_employee_ids = {
+            *(f.dekan_employee_id for f in faculties if f.dekan_employee_id is not None),
+            *(k.mudir_employee_id for k in kafedras if k.mudir_employee_id is not None),
+        }
+        post_names: dict[int, str] = {}
+        if post_employee_ids:
+            post_names = dict(
+                (
+                    await session.execute(
+                        select(Employee.id, Employee.full_name).where(Employee.id.in_(post_employee_ids))
+                    )
+                ).all()
+            )
+
         sardor_ids = [g.sardor_student_id for g in groups if g.sardor_student_id is not None]
         sardor_names = {}
         if sardor_ids:
@@ -100,18 +118,15 @@ class OrganizationTreeRepository:
                 position=group.position,
                 sardor_student_id=group.sardor_student_id,
                 sardor_name=sardor_names.get(group.sardor_student_id),
+                education_form=group.education_form,
                 student_count=students_per_group.get(group.id, 0),
             )
 
+        # speciality_id у группы обязателен, так что ветки «группа без
+        # специальности» больше не существует — раскладываем всё разом.
         groups_by_speciality: dict[int, list[TreeGroup]] = defaultdict(list)
-        # Группа обязана принадлежать факультету, но specialityю — нет
-        # (speciality_id nullable, SET NULL при удалении специальности).
-        orphans_by_faculty: dict[int, list[TreeGroup]] = defaultdict(list)
         for group in groups:
-            if group.speciality_id is None:
-                orphans_by_faculty[group.faculty_id].append(to_group(group))
-            else:
-                groups_by_speciality[group.speciality_id].append(to_group(group))
+            groups_by_speciality[group.speciality_id].append(to_group(group))
 
         specialities_by_kafedra: dict[int, list[TreeSpeciality]] = defaultdict(list)
         for speciality in specialities:
@@ -121,7 +136,6 @@ class OrganizationTreeRepository:
                     id=speciality.id,
                     name=speciality.name,
                     code=speciality.code,
-                    education_form=speciality.education_form,
                     academic_year=speciality.academic_year,
                     position=speciality.position,
                     curriculum_count=rows,
@@ -136,8 +150,8 @@ class OrganizationTreeRepository:
                 TreeKafedra(
                     id=kafedra.id,
                     name=kafedra.name,
-                    mudir_name=kafedra.mudir_name,
-                    mudir_user_id=kafedra.mudir_user_id,
+                    mudir_name=post_names.get(kafedra.mudir_employee_id),
+                    mudir_employee_id=kafedra.mudir_employee_id,
                     position=kafedra.position,
                     teacher_count=teachers_per_kafedra.get(kafedra.id, 0),
                     specialities=specialities_by_kafedra.get(kafedra.id, []),
@@ -150,13 +164,12 @@ class OrganizationTreeRepository:
                     id=faculty.id,
                     name=faculty.name,
                     code=faculty.code,
-                    dekan_name=faculty.dekan_name,
-                    dekan_user_id=faculty.dekan_user_id,
+                    dekan_name=post_names.get(faculty.dekan_employee_id),
+                    dekan_employee_id=faculty.dekan_employee_id,
                     color_bg=faculty.color_bg,
                     color_fg=faculty.color_fg,
                     position=faculty.position,
                     kafedras=kafedras_by_faculty.get(faculty.id, []),
-                    orphan_groups=orphans_by_faculty.get(faculty.id, []),
                 )
                 for faculty in faculties
             ]

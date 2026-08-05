@@ -16,7 +16,6 @@ class SpecialityCreateRequest(BaseModel):
     # Поля карточки, которые показывает дерево структуры. Все необязательные:
     # запись заводят по названию, остальное дозаполняют позже.
     code: Optional[str] = Field(default=None, max_length=CODE_MAX, pattern=CODE_PATTERN)
-    education_form: Optional[str] = Field(default=None, max_length=32)
     academic_year: Optional[str] = Field(default=None, max_length=16)
 
     @field_validator("name", mode="before")
@@ -34,7 +33,6 @@ class SpecialityUpdateRequest(BaseModel):
     # pydantic молча выбрасывал их из запроса, и после создания шифр и форму
     # обучения нельзя было исправить вообще ничем.
     code: Optional[str] = Field(default=None, max_length=CODE_MAX, pattern=CODE_PATTERN)
-    education_form: Optional[str] = Field(default=None, max_length=32)
     academic_year: Optional[str] = Field(default=None, max_length=16)
 
     @field_validator("name", mode="before")
@@ -54,7 +52,6 @@ class SpecialityResponse(BaseModel):
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
     code: Optional[str] = None
-    education_form: Optional[str] = None
     academic_year: Optional[str] = None
     position: int = 0
 

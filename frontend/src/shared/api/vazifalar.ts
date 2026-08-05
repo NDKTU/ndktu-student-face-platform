@@ -1,3 +1,4 @@
+import type { Homework } from '@/entities/course/model/types';
 import type {
   SubmissionFile,
   TaskDetail,
@@ -5,8 +6,8 @@ import type {
   TaskSubmissionRow,
 } from '@/entities/task/model/types';
 import { initials } from '@/shared/lib/initials';
-import { getAll } from './envelope';
-import { api } from './http';
+import { getAll, getList } from './envelope';
+import { ApiError, api } from './http';
 
 /**
  * Граница до бэкенда для заданий.
@@ -28,6 +29,7 @@ interface ApiAssignmentCourse {
 interface ApiAssignment {
   id: number;
   course_id: number;
+  material_id: number | null;
   title: string;
   description: string | null;
   deadline: string;
@@ -187,6 +189,96 @@ export async function submitWork(
   });
   return toSubmission(submitted);
 }
+
+// --- Домашнее задание урока ------------------------------------------------
+
+/**
+ * Задание, привязанное к материалу курса. Живёт здесь, а не в `kurslar.ts`:
+ * задания — это домен «Vazifalar», и имена полей бэкенда должны встречаться
+ * в одном файле на домен.
+ */
+export interface HomeworkPayload {
+  courseId: number;
+  materialId: number;
+  title: string;
+  desc: string;
+  /** `YYYY-MM-DD` из `<input type="date">`. */
+  deadline: string;
+  maxBall: number;
+}
+
+/**
+ * Дата без времени превратилась бы в полночь UTC, а сервер отдаёт срок в
+ * ташкентском поясе — «20.08» читалось бы как 20 августа 05:00. Считаем
+ * сроком конец дня по местному времени.
+ */
+function toDeadlineIso(deadline: string): string {
+  return new Date(`${deadline}T23:59:59+05:00`).toISOString();
+}
+
+function toHomework(a: ApiAssignment): Homework {
+  return {
+    id: a.id,
+    title: a.title,
+    desc: a.description ?? '',
+    deadline: a.deadline.split('T')[0] ?? '',
+    maxBall: a.max_grade,
+  };
+}
+
+/**
+ * Домашка одного урока или null.
+ *
+ * 403 тоже даёт null: право `read:assignment` отдельное от `update:course`, и
+ * из-за его отсутствия модалка урока не должна переставать открываться.
+ */
+export async function getMaterialHomework(
+  courseId: number,
+  materialId: number,
+): Promise<Homework | null> {
+  try {
+    const page = await getList<ApiAssignment>('/assignment/', 'assignments', {
+      course_id: courseId,
+      material_id: materialId,
+      limit: 1,
+    });
+    const first = page.items[0];
+    return first ? toHomework(first) : null;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 403) return null;
+    throw e;
+  }
+}
+
+export async function createHomework(body: HomeworkPayload): Promise<Homework> {
+  return toHomework(
+    await api.post<ApiAssignment>('/assignment/', {
+      course_id: body.courseId,
+      material_id: body.materialId,
+      title: body.title,
+      description: body.desc,
+      deadline: toDeadlineIso(body.deadline),
+      max_grade: body.maxBall,
+    }),
+  );
+}
+
+export async function updateHomework(
+  id: number,
+  body: Partial<HomeworkPayload>,
+): Promise<Homework> {
+  return toHomework(
+    await api.put<ApiAssignment>(`/assignment/${id}`, {
+      ...(body.materialId !== undefined && { material_id: body.materialId }),
+      ...(body.title !== undefined && { title: body.title }),
+      ...(body.desc !== undefined && { description: body.desc }),
+      ...(body.deadline !== undefined && { deadline: toDeadlineIso(body.deadline) }),
+      ...(body.maxBall !== undefined && { max_grade: body.maxBall }),
+    }),
+  );
+}
+
+export const deleteHomework = (id: number) => api.delete(`/assignment/${id}`);
 
 /** Работа, ждущая проверки, вместе с контекстом задания. */
 export interface PendingSubmission {

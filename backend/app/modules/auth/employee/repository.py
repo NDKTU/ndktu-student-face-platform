@@ -129,12 +129,15 @@ class EmployeeRepository:
         if request.available_post:
             # Занятые посты берём из обеих таблиц сразу: человек, уже
             # заведующий кафедрой, не должен предлагаться в деканы.
+            # Сравниваем по employees.id: посты теперь ссылаются на карточку
+            # сотрудника, а не на учётку. На users ссылаться было нельзя —
+            # учётка есть и у студента, так что деканом мог оказаться кто угодно.
             taken = union(
-                select(Faculty.dekan_user_id).where(Faculty.dekan_user_id.is_not(None)),
-                select(Kafedra.mudir_user_id).where(Kafedra.mudir_user_id.is_not(None)),
+                select(Faculty.dekan_employee_id).where(Faculty.dekan_employee_id.is_not(None)),
+                select(Kafedra.mudir_employee_id).where(Kafedra.mudir_employee_id.is_not(None)),
             )
-            stmt = stmt.where(Employee.user_id.not_in(taken))
-            count_stmt = count_stmt.where(Employee.user_id.not_in(taken))
+            stmt = stmt.where(Employee.id.not_in(taken))
+            count_stmt = count_stmt.where(Employee.id.not_in(taken))
 
         stmt = stmt.order_by(desc(Employee.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)

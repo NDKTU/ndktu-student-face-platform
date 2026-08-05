@@ -22,6 +22,7 @@ function row(id: number, over: Partial<Employee> = {}): Employee {
     roleNames: ['super_admin'],
     role: 'Super Admin',
     unit: 'Rektorat',
+    departmentId: null,
     lavozim: 'Tizim administratori',
     holati: 'Faol',
     email: 'a.sardor@ndktu.uz',

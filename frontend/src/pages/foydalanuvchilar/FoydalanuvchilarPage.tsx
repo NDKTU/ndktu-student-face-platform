@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  unitOptions,
   useEmployeesStore,
 } from '@/features/xodimlar/model/employees.store';
 import { useStudentsStore } from '@/features/talabalar/model/students.store';
 import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { getEmployeeSensitive } from '@/shared/api/xodimlar';
 import { useRollar } from '@/features/rollar/lib/useRollar';
+import { useBolimlar } from '@/features/bolimlar/lib/useBolimlar';
 import { useRollarStore } from '@/features/rollar/model/rollar.store';
 import { roleLabel } from '@/entities/access/model/roles';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
@@ -17,8 +17,9 @@ import { EmployeeModal } from '../xodimlar/EmployeeModal';
 import { StudentDetail } from './StudentDetail';
 import { XodimlarTab } from './XodimlarTab';
 import { TalabalarTab } from './TalabalarTab';
+import { BolimlarTab } from './BolimlarTab';
 
-const TABS = ['xodimlar', 'talabalar'] as const;
+const TABS = ['xodimlar', 'talabalar', 'bolimlar'] as const;
 type Tab = (typeof TABS)[number];
 
 /** Реестр пользователей: две вкладки — сотрудники и студенты. */
@@ -70,6 +71,7 @@ export function FoydalanuvchilarPage() {
   // Роли для формы — из справочника БД: новую роль должно быть можно назначить
   // ещё до того, как её кто-то носит.
   useRollar();
+  const { bolimlar } = useBolimlar();
   const roles = useRollarStore((s) => s.roles);
   const assignableRoles = useMemo(
     () => roles.map((r) => ({ name: r.name, label: roleLabel(r.name) })),
@@ -101,7 +103,7 @@ export function FoydalanuvchilarPage() {
         <EmployeeModal
           mode="edit"
           initial={editing.draft}
-          units={unitOptions(employees)}
+          bolimlar={bolimlar}
           roles={assignableRoles}
           onSave={(draft) => void save(editing.id, draft)}
           onCancel={() => setEditing(null)}
@@ -132,7 +134,9 @@ export function FoydalanuvchilarPage() {
           ))}
         </div>
 
-        {tab === 'xodimlar' ? <XodimlarTab /> : <TalabalarTab />}
+        {tab === 'xodimlar' && <XodimlarTab />}
+        {tab === 'talabalar' && <TalabalarTab />}
+        {tab === 'bolimlar' && <BolimlarTab />}
       </div>
     </>
   );
@@ -144,7 +148,7 @@ function toDraft(e: Employee): EmployeeDraft {
     gender: e.gender,
     birth: e.birth,
     lavozim: e.lavozim,
-    unit: e.unit,
+    departmentId: e.departmentId,
     workPhone: e.workPhone,
     workEmail: e.workEmail,
     hire: e.hire,

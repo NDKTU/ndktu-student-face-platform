@@ -41,7 +41,7 @@ class SpecialityRepository:
         # Необязательные поля карточки переносим списком: перечислять их
         # по одному в конструкторе значило бы забывать новое поле при каждом
         # расширении схемы.
-        for _field in ('code', 'education_form', 'academic_year'):
+        for _field in ('code', 'academic_year'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(new_speciality, _field, _value)
@@ -133,7 +133,7 @@ class SpecialityRepository:
 
         # См. update_faculty: различаем «прислали null» (очистить) и «не
         # прислали вовсе» (не трогать).
-        for _field in ('code', 'education_form', 'academic_year'):
+        for _field in ('code', 'academic_year'):
             if _field in data.model_fields_set:
                 setattr(speciality, _field, getattr(data, _field))
 

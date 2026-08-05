@@ -3,7 +3,7 @@ import logging
 import httpx
 from core.config import settings
 from core.utils.password_hash import verify_password
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.student.repository import student_repository
@@ -151,19 +151,41 @@ class HemisLoginService:
         faculty_id: int | None = None,
         group_id: int | None = None,
     ):
-        # Faculty
+        # Факультет и группу только ищем, не заводим. Создать группу больше
+        # нечем: speciality_id обязателен, а HEMIS кафедру не присылает — в
+        # его ответе есть faculty, specialty и group, но не кафедра, так что
+        # цепочку specialities → kafedras восстановить не из чего.
+        #
+        # Прежний get_or_create заводил недостающее сам, и это было опаснее:
+        # стоило HEMIS переименовать факультет — появлялся второй, а студенты
+        # молча делились между старым и новым.
         if faculty_id:
             faculty = await get_faculty_repository.get_faculty(session, faculty_id)
         else:
-            faculty_name = self._extract_name(me_data.get("faculty")) or "Unknown"
-            faculty = await get_faculty_repository.get_or_create(session, faculty_name)
+            faculty_name = self._extract_name(me_data.get("faculty"))
+            faculty = await get_faculty_repository.find_by_name(session, faculty_name)
+            if not faculty:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"«{faculty_name}» fakulteti tizimda ro'yxatdan o'tmagan. "
+                        "Dekanatga murojaat qiling."
+                    ),
+                )
 
-        # Group
         if group_id:
             group = await get_group_repository.get_group(session, group_id)
         else:
-            group_name = self._extract_name(me_data.get("group")) or "Unknown"
-            group = await get_group_repository.get_or_create(session, group_name, faculty.id)
+            group_name = self._extract_name(me_data.get("group"))
+            group = await get_group_repository.find_by_name(session, group_name)
+            if not group:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"«{group_name}» guruhi tizimda ro'yxatdan o'tmagan. "
+                        "Dekanatga murojaat qiling."
+                    ),
+                )
 
         # User — repo hashes internally and stores both hash + plaintext
         user = await get_user_repository.get_or_create_for_hemis(session, username, password)

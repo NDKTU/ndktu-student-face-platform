@@ -151,7 +151,6 @@ class StudentDetailResponse(BaseModel):
     group: GroupResponse | None = None
     university: str | None = None
     specialty: str | None = None
-    education_form: str | None = None
     education_type: str | None = None
     payment_form: str | None = None
     education_lang: str | None = None

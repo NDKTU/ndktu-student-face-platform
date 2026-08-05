@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import type { AdminCourse, Course, Lesson } from '@/entities/course/model/types';
+import type { AdminCourse, Course, Lesson, Resource } from '@/entities/course/model/types';
 import * as api from '@/shared/api/kurslar';
+import * as tasksApi from '@/shared/api/vazifalar';
 
 /** Черновик темы. */
 export interface TopicDraft {
@@ -9,9 +10,23 @@ export interface TopicDraft {
   order: string;
 }
 
+/** Черновик домашнего задания урока. Числа — строками, как в остальных формах. */
+export interface HomeworkDraft {
+  /** Есть — правим существующее задание, нет — создаём новое. */
+  id?: number;
+  title: string;
+  desc: string;
+  /** `YYYY-MM-DD`. */
+  deadline: string;
+  maxBall: string;
+}
+
 /**
- * Черновик материала. Домашнего задания здесь нет: на бэкенде задания привязаны
- * к курсу отдельной таблицей, и ведёт их раздел «Vazifalar».
+ * Черновик материала.
+ *
+ * Домашнее задание тут опциональное: на бэкенде задания по-прежнему живут
+ * своей таблицей и принадлежат курсу, но теперь могут ссылаться и на материал.
+ * Полный список заданий ведёт раздел «Vazifalar».
  */
 export interface LessonDraft {
   title: string;
@@ -19,6 +34,17 @@ export interface LessonDraft {
   videoSrc: string;
   dur: string;
   desc: string;
+  attachments: Resource[];
+  uy: HomeworkDraft | null;
+}
+
+/** Черновик карточки курса. Имя курса собирается формой из фана и группы. */
+export interface CourseDraft {
+  subjectId: number | null;
+  teacherId: number | null;
+  groupId: number | null;
+  facultyId: number | null;
+  kafedraId: number | null;
 }
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -32,10 +58,15 @@ interface CoursesState {
   load: () => Promise<void>;
   loadCourse: (courseId: number) => Promise<void>;
 
+  addCourse: (name: string, draft: CourseDraft) => Promise<void>;
+  editCourse: (id: number, name: string, draft: CourseDraft, keepGroups: boolean) => Promise<void>;
+  removeCourse: (id: number) => Promise<void>;
+
   addTopic: (courseId: number, draft: TopicDraft) => Promise<void>;
   editTopic: (courseId: number, topicId: number, draft: TopicDraft) => Promise<void>;
   removeTopic: (courseId: number, topicId: number) => Promise<void>;
-  addLesson: (courseId: number, topicId: number, draft: LessonDraft) => Promise<void>;
+  /** Возвращает id созданного материала: домашка привязывается уже к нему. */
+  addLesson: (courseId: number, topicId: number, draft: LessonDraft) => Promise<number>;
   editLesson: (
     courseId: number,
     topicId: number,
@@ -43,6 +74,12 @@ interface CoursesState {
     draft: LessonDraft,
   ) => Promise<void>;
   removeLesson: (courseId: number, topicId: number, lessonId: number) => Promise<void>;
+  saveHomework: (
+    courseId: number,
+    materialId: number,
+    draft: HomeworkDraft | null,
+    previousId?: number,
+  ) => Promise<void>;
   reorderTopics: (courseId: number, fromId: number, toId: number) => Promise<void>;
   reorderLessons: (
     courseId: number,
@@ -84,6 +121,48 @@ export const useCoursesStore = create<CoursesState>()((set, get) => ({
     set((s) => ({ byId: { ...s.byId, [courseId]: course } }));
   },
 
+  // Карточка курса: сервер возвращает её целиком, поэтому список не
+  // перечитываем — правим ту строку, которая изменилась.
+  addCourse: async (name, draft) => {
+    const created = await api.createCourse({
+      name,
+      subjectId: draft.subjectId!,
+      teacherId: draft.teacherId!,
+      groupIds: draft.groupId ? [draft.groupId] : [],
+      facultyId: draft.facultyId,
+      kafedraId: draft.kafedraId,
+    });
+    // Сервер отдаёт список по убыванию id, поэтому новый курс — первый.
+    set((s) => ({ list: [created, ...s.list] }));
+  },
+
+  editCourse: async (id, name, draft, keepGroups) => {
+    const updated = await api.updateCourse(id, {
+      name,
+      subjectId: draft.subjectId!,
+      teacherId: draft.teacherId!,
+      // У курса групп может быть несколько, а в форме селект один. Отправить
+      // одну значило бы молча отвязать остальные — тогда группы не трогаем.
+      ...(keepGroups ? {} : { groupIds: draft.groupId ? [draft.groupId] : [] }),
+      facultyId: draft.facultyId,
+      kafedraId: draft.kafedraId,
+    });
+
+    set((s) => {
+      // Содержимое могло разойтись с новой карточкой — перечитаем при открытии.
+      const { [id]: _dropped, ...byId } = s.byId;
+      return { list: s.list.map((c) => (c.id === id ? updated : c)), byId };
+    });
+  },
+
+  removeCourse: async (id) => {
+    await api.deleteCourse(id);
+    set((s) => {
+      const { [id]: _dropped, ...byId } = s.byId;
+      return { list: s.list.filter((c) => c.id !== id), byId };
+    });
+  },
+
   // Мутации: сервер применяет изменение и пересчитывает номера/порядок,
   // после чего курс перечитывается — так клиенту не нужно дублировать эту логику.
   addTopic: async (courseId, draft) => {
@@ -102,8 +181,9 @@ export const useCoursesStore = create<CoursesState>()((set, get) => ({
   },
 
   addLesson: async (courseId, topicId, draft) => {
-    await api.createLesson(topicId, draft);
+    const created = await api.createLesson(topicId, draft);
     await refresh(set, courseId);
+    return created.id;
   },
 
   editLesson: async (courseId, _topicId, lessonId, draft) => {
@@ -114,6 +194,32 @@ export const useCoursesStore = create<CoursesState>()((set, get) => ({
   removeLesson: async (courseId, _topicId, lessonId) => {
     await api.deleteLesson(lessonId);
     await refresh(set, courseId);
+  },
+
+  /**
+   * Домашка урока: создать, обновить или снять. Снятие — это удаление
+   * задания: обнулить `material_id` через PUT бэкенд не умеет.
+   */
+  saveHomework: async (courseId, materialId, draft, previousId) => {
+    if (!draft) {
+      if (previousId) await tasksApi.deleteHomework(previousId);
+    } else if (draft.id) {
+      await tasksApi.updateHomework(draft.id, {
+        title: draft.title,
+        desc: draft.desc,
+        deadline: draft.deadline,
+        maxBall: Number(draft.maxBall) || 100,
+      });
+    } else {
+      await tasksApi.createHomework({
+        courseId,
+        materialId,
+        title: draft.title,
+        desc: draft.desc,
+        deadline: draft.deadline,
+        maxBall: Number(draft.maxBall) || 100,
+      });
+    }
   },
 
   // Drag-and-drop даёт пару «что» и «куда»; серверу уходит готовый порядок.

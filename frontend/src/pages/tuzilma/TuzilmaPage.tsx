@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
+import type { EduForm } from '@/entities/university/model/types';
 import {
   useStructureStore,
   type EntityDraft,
@@ -27,10 +28,14 @@ import { SpecialityDetail } from './SpecialityDetail';
 const LEVEL_KEYS = ['faculty', 'department', 'speciality', 'group'] as const;
 
 /** Цвета чипа формы обучения — берутся из токенов, а не задаются заново. */
-const FORM_CHIP = {
+// Sirtqi выделен: заочное обучение прекращено, такие группы остались только
+// от прошлых лет.
+const FORM_CHIP: Record<EduForm, { bg: string; fg: string }> = {
   Kunduzgi: { bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
+  Kechki: { bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
+  Masofaviy: { bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
   Sirtqi: { bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
-} as const;
+};
 
 type ModalState = { mode: 'add' | 'edit'; level: number; id?: number; draft: EntityDraft };
 
@@ -231,8 +236,8 @@ export function TuzilmaPage() {
         onEdit: () =>
           openEdit(0, f.id, {
             name: f.name,
-            post: f.dekanUserId === null ? '' : String(f.dekanUserId),
-            postName: f.dekanUserId === null ? '' : f.dekan,
+            post: f.dekanEmployeeId === null ? '' : String(f.dekanEmployeeId),
+            postName: f.dekanEmployeeId === null ? '' : f.dekan,
           }),
         onDelete: () => openDelete(0, f.id, f.name),
       }));
@@ -258,8 +263,8 @@ export function TuzilmaPage() {
         onEdit: () =>
           openEdit(1, k.id, {
             name: k.name,
-            post: k.mudirUserId === null ? '' : String(k.mudirUserId),
-            postName: k.mudirUserId === null ? '' : k.mudir,
+            post: k.mudirEmployeeId === null ? '' : String(k.mudirEmployeeId),
+            postName: k.mudirEmployeeId === null ? '' : k.mudir,
           }),
         onDelete: () => openDelete(1, k.id, k.name),
       }));
@@ -272,7 +277,11 @@ export function TuzilmaPage() {
         badgeText: namePrefix(s.name),
         badgeBg: faculty.color.bg,
         badgeFg: faculty.color.fg,
-        chips: [{ text: s.shakl, ...FORM_CHIP[s.shakl] }],
+        // Форма — свойство группы, поэтому у направления их может быть
+        // несколько. Показываем набор.
+        chips: [...new Set(s.guruhlar.map((g) => g.shakl))]
+          .filter((f): f is EduForm => f !== null)
+          .map((f) => ({ text: f, ...FORM_CHIP[f]! })),
         stats: [
           { value: s.guruhlar.length, label: t('stat.guruh') },
           { value: countSpecialityStudents(s), label: t('stat.talaba') },
@@ -280,7 +289,7 @@ export function TuzilmaPage() {
         ],
         canWrite,
         onOpen: () => drillInto({ id: s.id, name: s.name }),
-        onEdit: () => openEdit(2, s.id, { name: s.name, kod: s.kod, shakl: s.shakl }),
+        onEdit: () => openEdit(2, s.id, { name: s.name, kod: s.kod }),
         onDelete: () => openDelete(2, s.id, s.name),
       }));
     }
@@ -289,6 +298,7 @@ export function TuzilmaPage() {
       return speciality.guruhlar.map((g) => ({
         title: g.name,
         subtitle: `${g.kurs}-kurs`,
+        chips: g.shakl ? [{ text: g.shakl, ...FORM_CHIP[g.shakl]! }] : [],
         badgeText: g.name.split('-')[0] ?? '',
         badgeBg: faculty.color.bg,
         badgeFg: faculty.color.fg,
@@ -299,6 +309,7 @@ export function TuzilmaPage() {
         onEdit: () =>
           openEdit(3, g.id, {
             name: g.name,
+            shakl: g.shakl ?? undefined,
             kurs: String(g.kurs),
             sardor: g.sardorStudentId ? String(g.sardorStudentId) : '',
             postName: g.sardor,

@@ -18,6 +18,19 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 
+# Справочники HEMIS: код → каноническое значение, которое хранит наша база.
+#
+# Держим их здесь, а не в конфиге: это часть контракта с чужим API, и менять
+# их приходится вместе с кодом, который их читает. Коды взяты из ответа
+# /me — они уникальны только внутри своего справочника.
+HEMIS_DICTIONARIES: dict[str, dict[str, str]] = {
+    "gender": {"11": "Erkak", "12": "Ayol"},
+    "studentStatus": {"11": "O'qimoqda", "12": "Akademik ta'tilda", "13": "Chetlashtirilgan"},
+    "educationType": {"11": "Bakalavr", "12": "Magistr"},
+    "paymentForm": {"11": "Davlat granti", "12": "To'lov-shartnoma"},
+    "educationLang": {"11": "O'zbek", "12": "Rus", "13": "Ingliz"},
+}
+
 
 class StudentRepository:
     async def create_student(self, session: AsyncSession, data: StudentCreateRequest) -> Student:
@@ -232,10 +245,39 @@ class StudentRepository:
         faculty_name: str,
         me_data: dict,
     ) -> Student:
-        def _extract(data) -> str:
-            if isinstance(data, dict):
-                return data.get("name", "")
-            return data if isinstance(data, str) else ""
+        def _extract(data, dictionary: str | None = None) -> str:
+            """Значение справочника HEMIS.
+
+            HEMIS отдаёт их парой — `{"code": "11", "name": "Kunduzgi"}`.
+            Сопоставляем по `code`: коды стабильны, названия — нет. В них,
+            вдобавок, типографский апостроф U+2018 («O‘qimoqda»), и сравнение
+            строк молча промахивается.
+
+            Коды уникальны только внутри своего справочника: "11" — это Erkak
+            в gender, Bakalavr в educationType и Kunduzgi в educationForm,
+            поэтому таблица у каждого своя.
+
+            Незнакомый код не роняет синхронизацию: берём присланное имя и
+            пишем предупреждение — иначе один новый пункт в справочнике HEMIS
+            закрыл бы вход всем студентам.
+            """
+            if not isinstance(data, dict):
+                return data if isinstance(data, str) else ""
+
+            name = data.get("name", "")
+            code = str(data.get("code", "")) if data.get("code") is not None else ""
+            if not dictionary or not code:
+                return name
+
+            table = HEMIS_DICTIONARIES.get(dictionary, {})
+            known = table.get(code)
+            if known is None:
+                logger.warning(
+                    "HEMIS: неизвестный код %r в справочнике %r (name=%r) — берём name как есть",
+                    code, dictionary, name,
+                )
+                return name
+            return known
 
         birth_ts = me_data.get("birth_date", 0)
         try:
@@ -254,14 +296,16 @@ class StudentRepository:
             "image_path": me_data.get("image", ""),
             "birth_date": birth_date,
             "phone": me_data.get("phone", ""),
-            "gender": _extract(me_data.get("gender")),
+            "gender": _extract(me_data.get("gender"), "gender"),
             "university": me_data.get("university", ""),
             "specialty": _extract(me_data.get("specialty")),
-            "student_status": _extract(me_data.get("studentStatus")),
-            "education_form": _extract(me_data.get("educationForm")),
-            "education_type": _extract(me_data.get("educationType")),
-            "payment_form": _extract(me_data.get("paymentForm")),
-            "education_lang": _extract(me_data.get("educationLang")),
+            "student_status": _extract(me_data.get("studentStatus"), "studentStatus"),
+            # education_form не пишем: форма обучения живёт на группе. HEMIS
+            # присылает её на студенте, но это особенность их API — держать
+            # рядом второе значение значило бы дать им разойтись.
+            "education_type": _extract(me_data.get("educationType"), "educationType"),
+            "payment_form": _extract(me_data.get("paymentForm"), "paymentForm"),
+            "education_lang": _extract(me_data.get("educationLang"), "educationLang"),
             "faculty": faculty_name,
             "level": _extract(me_data.get("level")),
             "semester": _extract(me_data.get("semester")),

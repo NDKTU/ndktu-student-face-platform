@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCoursesStore, type LessonDraft, type TopicDraft } from '@/features/kurslar/model/courses.store';
+import {
+  useCoursesStore,
+  type LessonDraft,
+  type TopicDraft,
+} from '@/features/kurslar/model/courses.store';
 import type { AdminCourse, Lesson, Topic } from '@/entities/course/model/types';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
+import { getMaterialHomework } from '@/shared/api/vazifalar';
 import { shortFaculty } from '@/shared/lib/shortFaculty';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -10,11 +15,19 @@ import { ErrorState, LoadingState } from '@/shared/ui/DataState';
 import { RowMenu } from '@/shared/ui/RowMenu';
 import { PencilIcon, TrashIcon } from '@/shared/ui/icons';
 import { useToast } from '@/shared/ui/Toast';
-import { TopicModal, LessonModal } from './CourseModals';
+import { TopicModal } from './TopicModal';
+import { LessonModal } from './LessonModal';
 import { JournalTab } from './JournalTab';
 
 type TopicModalState = { mode: 'add' | 'edit'; id?: number; draft: TopicDraft };
-type LessonModalState = { mode: 'add' | 'edit'; topicId: number; id?: number; draft: LessonDraft };
+type LessonModalState = {
+  mode: 'add' | 'edit';
+  topicId: number;
+  id?: number;
+  draft: LessonDraft;
+  /** Домашка, которая была при открытии: по ней понятно, что её сняли. */
+  initialUyId?: number;
+};
 type ConfirmState =
   | { kind: 'topic'; id: number }
   | { kind: 'lesson'; topicId: number; id: number };
@@ -25,16 +38,23 @@ const EMPTY_LESSON: LessonDraft = {
   videoSrc: '',
   dur: '',
   desc: '',
+  attachments: [],
+  uy: null,
 };
+
+const GROUP_CHIP =
+  'rounded-8 bg-brand-soft px-[9px] py-[3px] font-mono text-12-5 font-semibold text-brand';
 
 export function CourseDetail({ meta }: { meta: AdminCourse }) {
   const { t } = useTranslation('kurslar');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const { has } = usePermissions();
 
   // Журнал занятий — отдельная вкладка, и она есть только у того, кто вообще
   // видит занятия: студенту без `read:lesson` показывать пустую таблицу незачем.
   const canSeeJournal = has('read:lesson');
+  const canEdit = has('update:course');
   const [tab, setTab] = useState<'content' | 'journal'>('content');
 
   const course = useCoursesStore((s) => s.byId[meta.id]);
@@ -45,6 +65,7 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
   const addLesson = useCoursesStore((s) => s.addLesson);
   const editLesson = useCoursesStore((s) => s.editLesson);
   const removeLesson = useCoursesStore((s) => s.removeLesson);
+  const saveHomework = useCoursesStore((s) => s.saveHomework);
   const reorderTopics = useCoursesStore((s) => s.reorderTopics);
   const reorderLessons = useCoursesStore((s) => s.reorderLessons);
 
@@ -90,16 +111,70 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
     }
   }
 
+  /** Открывает урок на правку, подтянув его домашку отдельным запросом. */
+  async function openLesson(topicId: number, lesson: Lesson) {
+    const uy = await getMaterialHomework(meta.id, lesson.id).catch(() => null);
+    setLessonModal({
+      mode: 'edit',
+      topicId,
+      id: lesson.id,
+      initialUyId: uy?.id,
+      draft: {
+        title: lesson.title,
+        videoType: lesson.videoType,
+        videoSrc: lesson.videoSrc,
+        dur: lesson.dur.replace(' daq', ''),
+        desc: lesson.desc,
+        attachments: lesson.resurslar,
+        uy: uy
+          ? {
+              id: uy.id,
+              title: uy.title,
+              desc: uy.desc,
+              deadline: uy.deadline,
+              maxBall: String(uy.maxBall),
+            }
+          : null,
+      },
+    });
+  }
+
   async function saveLesson(draft: LessonDraft) {
     if (!lessonModal) return;
-    try {
-      if (lessonModal.mode === 'add') {
-        await addLesson(meta.id, lessonModal.topicId, draft);
-        toast(t('toast.darsAdded'));
-      } else if (lessonModal.id) {
-        await editLesson(meta.id, lessonModal.topicId, lessonModal.id, draft);
-        toast(t('toast.darsSaved'));
+
+    if (lessonModal.mode === 'add') {
+      // Домашка ссылается на материал, а его id появляется только после
+      // создания — поэтому новый урок с заданием это всегда два запроса.
+      let materialId: number;
+      try {
+        materialId = await addLesson(meta.id, lessonModal.topicId, draft);
+      } catch (e) {
+        reportError(e);
+        return;
       }
+      toast(t('toast.darsAdded'));
+
+      if (draft.uy) {
+        try {
+          await saveHomework(meta.id, materialId, draft.uy);
+        } catch {
+          // Урок уже создан. Повторное «Saqlash» в режиме add создало бы
+          // второй, поэтому переводим модалку на редактирование созданного:
+          // тогда повтор идемпотентен.
+          toast(t('toast.darsSavedNoUy'));
+          setLessonModal((m) => m && { ...m, mode: 'edit', id: materialId });
+          return;
+        }
+      }
+      setLessonModal(null);
+      return;
+    }
+
+    if (!lessonModal.id) return;
+    try {
+      await editLesson(meta.id, lessonModal.topicId, lessonModal.id, draft);
+      await saveHomework(meta.id, lessonModal.id, draft.uy, lessonModal.initialUyId);
+      toast(t('toast.darsSaved'));
       setLessonModal(null);
     } catch (e) {
       reportError(e);
@@ -130,6 +205,19 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
     );
   }
 
+  const metaLine = meta.semNumber
+    ? t('detail.metaLine', {
+        oqituvchi: meta.oqituvchi,
+        fac: shortFaculty(meta.fac),
+        sem: meta.semNumber,
+        lessons: course.total,
+      })
+    : t('detail.metaLineNoSem', {
+        oqituvchi: meta.oqituvchi,
+        fac: shortFaculty(meta.fac),
+        lessons: course.total,
+      });
+
   return (
     <div className="mx-auto w-full max-w-[1440px] px-8 pt-7 pb-12">
       <div className="mb-5 flex flex-wrap items-start gap-4 rounded-18 border border-line bg-surface p-6 shadow-card">
@@ -137,31 +225,21 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
           <BookIcon />
         </span>
         <div className="min-w-[220px] flex-1">
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {meta.guruhlar.map((g) => (
+              <span key={g.id} className={GROUP_CHIP}>
+                {g.name}
+              </span>
+            ))}
+          </div>
           <h1 className="m-0 text-23 leading-[1.15] font-extrabold tracking-[-0.02em] text-ink">
-            {meta.guruh} · {meta.fan}
+            {meta.fan}
           </h1>
-          <div className="mt-1.5 text-13-5 text-ink-subtle">
-            {t('detail.metaLine', {
-              oqituvchi: meta.oqituvchi,
-              fac: shortFaculty(meta.fac),
-              sem: meta.sem,
-              lessons: course.total,
-            })}
+          <div className="mt-1.5 flex items-center gap-1.5 text-13-5 text-ink-subtle">
+            <UserIcon />
+            {metaLine}
           </div>
         </div>
-        {tab === 'content' && (
-          <Button
-            className="h-[38px] rounded-11 px-4"
-            onClick={() =>
-              setTopicModal({
-                mode: 'add',
-                draft: { name: '', order: String(course.mavzular.length + 1) },
-              })
-            }
-          >
-            + {t('detail.addMavzu')}
-          </Button>
-        )}
       </div>
 
       {canSeeJournal && (
@@ -183,66 +261,76 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
 
       {tab === 'journal' && canSeeJournal ? (
         <JournalTab meta={meta} />
-      ) : course.mavzular.length === 0 ? (
-        <div className="rounded-18 border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
-          <div className="mx-auto mb-3.5 grid size-[54px] place-items-center rounded-15 bg-brand-soft text-brand">
-            <BookIcon />
-          </div>
-          <h3 className="m-0 text-16 font-bold text-ink">{t('detail.emptyMavzuTitle')}</h3>
-          <p className="mx-auto mt-2 text-13-5 text-ink-subtle">{t('detail.emptyMavzuText')}</p>
-        </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {course.mavzular.map((topic) => (
-            <TopicCard
-              key={topic.id}
-              topic={topic}
-              open={!!open[topic.id]}
-              onToggleOpen={() => setOpen((o) => ({ ...o, [topic.id]: !o[topic.id] }))}
-              onEdit={() =>
-                setTopicModal({
-                  mode: 'edit',
-                  id: topic.id,
-                  draft: { name: topic.title, order: String(topic.no) },
-                })
-              }
-              onDelete={() => setConfirm({ kind: 'topic', id: topic.id })}
-              onAddLesson={() =>
-                setLessonModal({ mode: 'add', topicId: topic.id, draft: EMPTY_LESSON })
-              }
-              onEditLesson={(lesson) =>
-                setLessonModal({
-                  mode: 'edit',
-                  topicId: topic.id,
-                  id: lesson.id,
-                  draft: {
-                    title: lesson.title,
-                    videoType: lesson.videoType,
-                    videoSrc: lesson.videoSrc,
-                    dur: lesson.dur.replace(' daq', ''),
-                    desc: lesson.desc,
-                  },
-                })
-              }
-              onDeleteLesson={(lessonId) =>
-                setConfirm({ kind: 'lesson', topicId: topic.id, id: lessonId })
-              }
-              draggingTopic={dragTopic}
-              onTopicDragStart={() => setDragTopic(topic.id)}
-              onTopicDrop={() => {
-                if (dragTopic) reorderTopics(meta.id, dragTopic, topic.id).catch(reportError);
-                setDragTopic(null);
-              }}
-              dragLesson={dragLesson}
-              onLessonDragStart={(id) => setDragLesson({ topicId: topic.id, id })}
-              onLessonDrop={(id) => {
-                if (dragLesson?.topicId === topic.id)
-                  reorderLessons(meta.id, topic.id, dragLesson.id, id).catch(reportError);
-                setDragLesson(null);
-              }}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <span className="text-12 font-bold tracking-[0.04em] text-ink-subtle uppercase">
+              {t('detail.sectionMavzular')}
+            </span>
+            {canEdit && (
+              <Button
+                className="h-[38px] rounded-11 px-4"
+                onClick={() =>
+                  setTopicModal({
+                    mode: 'add',
+                    draft: { name: '', order: String(course.mavzular.length + 1) },
+                  })
+                }
+              >
+                + {t('detail.addMavzu')}
+              </Button>
+            )}
+          </div>
+
+          {course.mavzular.length === 0 ? (
+            <div className="rounded-18 border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+              <div className="mx-auto mb-3.5 grid size-[54px] place-items-center rounded-15 bg-brand-soft text-brand">
+                <BookIcon />
+              </div>
+              <h3 className="m-0 text-16 font-bold text-ink">{t('detail.emptyMavzuTitle')}</h3>
+              <p className="mx-auto mt-2 text-13-5 text-ink-subtle">{t('detail.emptyMavzuText')}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {course.mavzular.map((topic) => (
+                <TopicCard
+                  key={topic.id}
+                  topic={topic}
+                  open={!!open[topic.id]}
+                  canEdit={canEdit}
+                  onToggleOpen={() => setOpen((o) => ({ ...o, [topic.id]: !o[topic.id] }))}
+                  onEdit={() =>
+                    setTopicModal({
+                      mode: 'edit',
+                      id: topic.id,
+                      draft: { name: topic.title, order: String(topic.no) },
+                    })
+                  }
+                  onDelete={() => setConfirm({ kind: 'topic', id: topic.id })}
+                  onAddLesson={() =>
+                    setLessonModal({ mode: 'add', topicId: topic.id, draft: EMPTY_LESSON })
+                  }
+                  onEditLesson={(lesson) => void openLesson(topic.id, lesson)}
+                  onDeleteLesson={(lessonId) =>
+                    setConfirm({ kind: 'lesson', topicId: topic.id, id: lessonId })
+                  }
+                  onTopicDragStart={() => setDragTopic(topic.id)}
+                  onTopicDrop={() => {
+                    if (dragTopic) reorderTopics(meta.id, dragTopic, topic.id).catch(reportError);
+                    setDragTopic(null);
+                  }}
+                  dragLesson={dragLesson}
+                  onLessonDragStart={(id) => setDragLesson({ topicId: topic.id, id })}
+                  onLessonDrop={(id) => {
+                    if (dragLesson?.topicId === topic.id)
+                      reorderLessons(meta.id, topic.id, dragLesson.id, id).catch(reportError);
+                    setDragLesson(null);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {topicModal && (
@@ -263,7 +351,7 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
       )}
       {confirm && (
         <ConfirmDialog
-          title={t('toast.deleted')}
+          title={tc('delete')}
           text={confirm.kind === 'topic' ? t('confirmMavzu') : t('confirmDars')}
           onConfirm={() => void handleDelete()}
           onCancel={() => setConfirm(null)}
@@ -276,13 +364,13 @@ export function CourseDetail({ meta }: { meta: AdminCourse }) {
 interface TopicCardProps {
   topic: Topic;
   open: boolean;
+  canEdit: boolean;
   onToggleOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAddLesson: () => void;
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lessonId: number) => void;
-  draggingTopic: number | null;
   onTopicDragStart: () => void;
   onTopicDrop: () => void;
   dragLesson: { topicId: number; id: number } | null;
@@ -293,6 +381,7 @@ interface TopicCardProps {
 function TopicCard({
   topic,
   open,
+  canEdit,
   onToggleOpen,
   onEdit,
   onDelete,
@@ -307,35 +396,64 @@ function TopicCard({
   const { t } = useTranslation('kurslar');
   const { t: tc } = useTranslation('common');
 
+  // Тащить можно только за ручку: `draggable` включается по нажатию на неё и
+  // гаснет после перетаскивания. Дешевле, чем тянуть DnD-библиотеку ради
+  // одного экрана, и вся остальная логика перестановки остаётся прежней.
+  const [armed, setArmed] = useState(false);
+  const [armedLesson, setArmedLesson] = useState<number | null>(null);
+
   return (
     <div
-      draggable
+      draggable={armed}
       onDragStart={onTopicDragStart}
+      onDragEnd={() => setArmed(false)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onTopicDrop}
-      className="overflow-hidden rounded-14 border border-line bg-surface shadow-card"
-      style={{ background: open ? '#FBFBFE' : '#fff' }}
+      className={`overflow-hidden rounded-14 border border-line shadow-card ${
+        open ? 'bg-surface-raised' : 'bg-surface'
+      }`}
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        <span className="grid size-[34px] flex-none cursor-grab place-items-center rounded-10 bg-brand-soft text-13 font-extrabold text-brand">
+        {canEdit && (
+          <span
+            aria-hidden="true"
+            onMouseDown={() => setArmed(true)}
+            onMouseUp={() => setArmed(false)}
+            className="flex-none cursor-grab text-line-bold active:cursor-grabbing"
+          >
+            <GripIcon />
+          </span>
+        )}
+        <span className="grid size-[34px] flex-none place-items-center rounded-10 bg-brand-soft text-13 font-extrabold text-brand">
           {topic.no}
         </span>
         <button
           type="button"
           onClick={onToggleOpen}
-          className="flex flex-1 cursor-pointer items-center gap-2 border-none bg-transparent p-0 text-left"
+          className="flex flex-1 cursor-pointer flex-col items-start border-none bg-transparent p-0 text-left"
         >
           <span className="text-14-5 font-bold text-ink">{topic.title}</span>
-          <span className="text-12 font-medium text-ink-subtle">
+          <span className="mt-0.5 text-12 font-medium text-ink-subtle">
             {t('detail.lessons', { count: topic.darslar.length })}
           </span>
         </button>
-        <RowMenu
-          items={[
-            { label: t('darsModal.edit'), icon: <PencilIcon />, onClick: onEdit },
-            { label: tc('delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
-          ]}
-        />
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          aria-expanded={open}
+          aria-label={open ? t('detail.collapse') : t('detail.expand')}
+          className="grid size-[30px] flex-none cursor-pointer place-items-center rounded-8 border-none bg-transparent text-ink-subtle hover:bg-surface-muted"
+        >
+          <ChevronIcon className={open ? 'rotate-90' : ''} />
+        </button>
+        {canEdit && (
+          <RowMenu
+            items={[
+              { label: t('action.edit'), icon: <PencilIcon />, onClick: onEdit },
+              { label: tc('delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
+            ]}
+          />
+        )}
       </div>
 
       {open && (
@@ -347,11 +465,12 @@ function TopicCard({
               {topic.darslar.map((lesson) => (
                 <div
                   key={lesson.id}
-                  draggable
+                  draggable={armedLesson === lesson.id}
                   onDragStart={(e) => {
                     e.stopPropagation();
                     onLessonDragStart(lesson.id);
                   }}
+                  onDragEnd={() => setArmedLesson(null)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.stopPropagation();
@@ -359,49 +478,63 @@ function TopicCard({
                   }}
                   className="flex items-center gap-3 rounded-11 border border-surface-sunken bg-surface px-3 py-2.5"
                 >
-                  <span className="grid size-7 flex-none cursor-grab place-items-center rounded-8 bg-canvas text-12 font-bold text-ink-subtle">
+                  {canEdit && (
+                    <span
+                      aria-hidden="true"
+                      onMouseDown={() => setArmedLesson(lesson.id)}
+                      onMouseUp={() => setArmedLesson(null)}
+                      className="flex-none cursor-grab text-line-bold active:cursor-grabbing"
+                    >
+                      <GripIcon />
+                    </span>
+                  )}
+                  <span className="grid size-7 flex-none place-items-center rounded-8 bg-canvas text-12 font-bold text-ink-subtle">
                     {lesson.no}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-13-5 font-semibold text-ink">
                     {lesson.title}
                   </span>
                   <span
-                    className="flex-none rounded-20 px-2.5 py-1 text-11 font-bold"
-                    style={{
-                      background: lesson.videoType === 'youtube' ? '#FDECEC' : '#EDEFFC',
-                      color: lesson.videoType === 'youtube' ? '#C4363B' : '#2836C7',
-                    }}
+                    className={`flex-none rounded-20 px-2.5 py-1 text-11 font-bold ${
+                      lesson.videoType === 'youtube'
+                        ? 'bg-danger-soft text-danger'
+                        : 'bg-brand-soft text-brand'
+                    }`}
                   >
                     {t(`video.${lesson.videoType}`)}
                   </span>
                   <span className="flex-none text-12 text-ink-subtle">{lesson.dur}</span>
-                  <RowMenu
-                    items={[
-                      {
-                        label: t('darsModal.edit'),
-                        icon: <PencilIcon />,
-                        onClick: () => onEditLesson(lesson),
-                      },
-                      {
-                        label: tc('delete'),
-                        icon: <TrashIcon />,
-                        danger: true,
-                        onClick: () => onDeleteLesson(lesson.id),
-                      },
-                    ]}
-                  />
+                  {canEdit && (
+                    <RowMenu
+                      items={[
+                        {
+                          label: t('action.edit'),
+                          icon: <PencilIcon />,
+                          onClick: () => onEditLesson(lesson),
+                        },
+                        {
+                          label: tc('delete'),
+                          icon: <TrashIcon />,
+                          danger: true,
+                          onClick: () => onDeleteLesson(lesson.id),
+                        },
+                      ]}
+                    />
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={onAddLesson}
-            className="mt-3 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-13 font-bold text-brand hover:underline"
-          >
-            + {t('detail.addDars')}
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onAddLesson}
+              className="mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-11 border border-dashed border-line-strong bg-transparent py-2.5 text-13 font-bold text-brand hover:bg-brand-soft"
+            >
+              + {t('detail.addDars')}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -413,6 +546,36 @@ function BookIcon() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2 2 2 0 0 1 2-2h4.5A1.5 1.5 0 0 1 20 5.5V18a1 1 0 0 1-1 1h-5.5a1.5 1.5 0 0 0-2.9 0H5a1 1 0 0 1-1-1z" />
       <path d="M12 6v13" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </svg>
+  );
+}
+
+function GripIcon() {
+  return (
+    <svg width="14" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="9" cy="6" r="1.6" />
+      <circle cx="15" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" />
+      <circle cx="15" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="m9 6 6 6-6 6" />
     </svg>
   );
 }

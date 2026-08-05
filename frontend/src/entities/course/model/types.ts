@@ -4,14 +4,31 @@ export interface Resource {
   name: string;
   /** Ссылка на файл в uploads: сам файл в базе не лежит. */
   url: string;
+  /** Готовая подпись («1.2 MB») — её показывают. */
   size: string;
+  /**
+   * Исходный размер в байтах. Нужен для обратной отправки: сервер хранит
+   * число, а `size` — уже отформатированная строка, и вернуть её нельзя.
+   */
+  bytes: number | null;
+}
+
+/** Домашнее задание, привязанное к материалу (`Assignment.material_id`). */
+export interface Homework {
+  id: number;
+  title: string;
+  desc: string;
+  /** `YYYY-MM-DD`: время суток задаёт слой API, тут только дата. */
+  deadline: string;
+  maxBall: number;
 }
 
 /**
  * Материал раздела: видео, ссылка или текст.
  *
- * Домашнего задания здесь больше нет: на бэкенде задания живут своей таблицей
- * и привязаны к курсу, а не к материалу, — их ведёт раздел «Vazifalar».
+ * Домашнее задание тут появляется опционально: на бэкенде оно живёт своей
+ * таблицей и по-прежнему принадлежит курсу, но теперь может ссылаться и на
+ * конкретный материал. Список заданий целиком ведёт раздел «Vazifalar».
  */
 export interface Lesson {
   id: number;
@@ -25,6 +42,8 @@ export interface Lesson {
   done: boolean;
   desc: string;
   resurslar: Resource[];
+  /** Догружается модалкой урока, в дереве курса всегда null. */
+  uy: Homework | null;
 }
 
 export interface Topic {
@@ -62,4 +81,14 @@ export interface AdminCourse {
   /** Число разделов и материалов — приходит из счётчиков курса. */
   mavzular: number;
   darslar: number;
+
+  // Идентификаторы для формы редактирования: показывать нужно имена, а
+  // отправлять — id, и второй раз искать их по имени было бы гаданием.
+  subjectId: number | null;
+  teacherId: number | null;
+  facultyId: number | null;
+  kafedraId: number | null;
+  groupIds: number[];
+  /** Сырой номер семестра: у созданных из интерфейса курсов его нет. */
+  semNumber: number | null;
 }

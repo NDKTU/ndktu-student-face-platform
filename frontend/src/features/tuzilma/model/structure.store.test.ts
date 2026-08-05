@@ -9,9 +9,9 @@ vi.mock('@/shared/api/tuzilma', () => ({
   createFaculty: vi.fn(),
   updateFaculty: vi.fn(),
   deleteFaculty: vi.fn(),
-  createDepartment: vi.fn(),
-  updateDepartment: vi.fn(),
-  deleteDepartment: vi.fn(),
+  createKafedra: vi.fn(),
+  updateKafedra: vi.fn(),
+  deleteKafedra: vi.fn(),
   createSpeciality: vi.fn(),
   updateSpeciality: vi.fn(),
   deleteSpeciality: vi.fn(),
@@ -41,14 +41,14 @@ function buildFixture(): Faculty[] {
       id: base,
       name: `Fakultet ${f + 1}`,
       dekan: `Dekan ${f + 1}`,
-      dekanUserId: null,
+      dekanEmployeeId: null,
       color: { bg: '#EEF1FF', fg: '#2836C7' },
       kafedralar: [
         {
           id: base + 10,
           name: `Kafedra ${f + 1}`,
           mudir: `Mudir ${f + 1}`,
-          mudirUserId: null,
+          mudirEmployeeId: null,
           oqituvchilar: 4,
           teachers: [],
           mutaxassisliklar: [
@@ -56,13 +56,26 @@ function buildFixture(): Faculty[] {
               id: base + 20,
               name: `Mutaxassislik ${f + 1}`,
               kod: `6061010${f}`,
-              shakl: 'Kunduzgi' as const,
               reja_yil: null,
               curriculum_count: 3,
               curriculum_credits: 12,
               guruhlar: [
-                { id: base + 30, name: `G-${f + 1}-01`, kurs: 1, sardor: '—', student_count: 24 },
-                { id: base + 31, name: `G-${f + 1}-02`, kurs: 2, sardor: '—', student_count: 22 },
+                {
+                  id: base + 30,
+                  name: `G-${f + 1}-01`,
+                  shakl: 'Kunduzgi' as const,
+                  kurs: 1,
+                  sardor: '—',
+                  student_count: 24,
+                },
+                {
+                  id: base + 31,
+                  name: `G-${f + 1}-02`,
+                  shakl: 'Sirtqi' as const,
+                  kurs: 2,
+                  sardor: '—',
+                  student_count: 22,
+                },
               ],
               reja: [
                 { id: base + 40, fan: 'Oliy matematika', semestr: 1, kredit: 5, oqituvchi: '—' },
@@ -162,7 +175,7 @@ describe('structure store — мутации', () => {
       id: 1,
       name: 'Yangi fakultet',
       dekan: 'Test Dekan',
-      dekanUserId: 7,
+      dekanEmployeeId: 7,
       color: { bg: '#fff', fg: '#000' },
       kafedralar: [],
     };
@@ -172,7 +185,7 @@ describe('structure store — мутации', () => {
 
     expect(api.createFaculty).toHaveBeenCalledWith({
       name: 'Yangi fakultet',
-      dekanUserId: 7,
+      dekanEmployeeId: 7,
       dekanName: 'Test Dekan',
     });
     expect(store().faculties).toHaveLength(7);
@@ -183,11 +196,11 @@ describe('structure store — мутации', () => {
   it('создание кафедры уходит в факультет из drill-пути', async () => {
     const faculty = store().faculties[0]!;
     store().drillInto({ id: faculty.id, name: faculty.name });
-    api.createDepartment.mockResolvedValueOnce({
+    api.createKafedra.mockResolvedValueOnce({
       id: 900,
       name: 'K',
       mudir: '—',
-      mudirUserId: null,
+      mudirEmployeeId: null,
       oqituvchilar: 0,
       teachers: [],
       mutaxassisliklar: [],
@@ -195,11 +208,11 @@ describe('structure store — мутации', () => {
 
     await store().addEntity(1, { name: 'K' });
 
-    expect(api.createDepartment).toHaveBeenCalledWith(faculty.id, {
+    expect(api.createKafedra).toHaveBeenCalledWith(faculty.id, {
       name: 'K',
       // Поле не трогали — id не уходит вовсе, иначе сервер понял бы это как
       // «снять мудира».
-      mudirUserId: undefined,
+      mudirEmployeeId: undefined,
       mudirName: null,
     });
     expect(store().faculties[0]!.kafedralar.at(-1)!.id).toBe(900);
@@ -211,11 +224,11 @@ describe('structure store — мутации', () => {
     const department = faculty.kafedralar[0]!;
 
     // Сервер отвечает без вложенных списков — они должны остаться из состояния.
-    api.updateDepartment.mockResolvedValueOnce({
+    api.updateKafedra.mockResolvedValueOnce({
       id: department.id,
       name: 'Qayta nomlangan kafedra',
       mudir: department.mudir,
-      mudirUserId: null,
+      mudirEmployeeId: null,
       oqituvchilar: department.oqituvchilar,
       teachers: [],
       mutaxassisliklar: [],
@@ -353,18 +366,16 @@ describe('structure store — учебный план', () => {
 
   it('новый план чистит строки и сохраняет учебный год на сервере', async () => {
     const speciality = firstSpeciality();
-    api.updateSpeciality.mockResolvedValueOnce({ ...speciality, shakl: 'Sirtqi' });
+    api.updateSpeciality.mockResolvedValueOnce({ ...speciality });
     api.clearReja.mockResolvedValueOnce(undefined);
 
-    await store().createRejaPlan(speciality.id, '2026/2027', 'Sirtqi');
+    // Формы обучения у плана больше нет — она свойство группы.
+    await store().createRejaPlan(speciality.id, '2026/2027');
 
-    // Год уходит на бэкенд вместе с формой обучения.
     expect(api.updateSpeciality).toHaveBeenCalledWith(speciality.id, {
-      shakl: 'Sirtqi',
       reja_yil: '2026/2027',
     });
     expect(firstSpeciality().reja).toEqual([]);
-    expect(firstSpeciality().shakl).toBe('Sirtqi');
     expect(firstSpeciality().reja_yil).toBe('2026/2027');
     expect(store().rejaYears[speciality.id]).toBe('2026/2027');
   });

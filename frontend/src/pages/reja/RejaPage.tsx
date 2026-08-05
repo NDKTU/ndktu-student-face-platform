@@ -42,9 +42,14 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-/** Тон чипа формы обучения. */
+/**
+ * Тон чипа формы обучения. Sirtqi выделен: заочное прекращено, и такие планы
+ * остались только от прошлых лет.
+ */
 const FORM_CHIP: Record<EduForm, { bg: string; fg: string }> = {
   Kunduzgi: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
+  Kechki: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
+  Masofaviy: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
   Sirtqi: { bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
 };
 
@@ -55,7 +60,8 @@ interface PlanOption {
   label: string;
   kod: string;
   kafedra: string;
-  shakl: EduForm;
+  /** Формы, в которых реально идут группы этого направления. */
+  shakl: EduForm[];
   teachers: TeacherOption[];
   /** Строки плана. Пусты, пока специальность не открыли. */
   reja: RejaRow[];
@@ -119,7 +125,11 @@ export function RejaPage() {
             label: `${speciality.name} — ${faculty.name.replace(' fakulteti', '')}`,
             kod: speciality.kod,
             kafedra: department.name,
-            shakl: speciality.shakl,
+            // Форма живёт на группе, поэтому у направления их может быть
+            // несколько — показываем набор, а не одно значение.
+            shakl: [...new Set(speciality.guruhlar.map((g) => g.shakl))].filter(
+              (f): f is EduForm => f !== null,
+            ),
             teachers: department.teachers.map((p) => ({ short: p.short, display: p.display })),
             reja: speciality.reja,
             // Из дерева: строки плана в списке не загружены, а карточка
@@ -206,7 +216,7 @@ export function RejaPage() {
 
   async function handleCreatePlan(draft: PlanDraft) {
     try {
-      await createRejaPlan(draft.specialityId, draft.year.trim(), draft.shakl);
+      await createRejaPlan(draft.specialityId, draft.year.trim());
       setSpecId(draft.specialityId);
       setSemestr(null);
       toast(t('toast.planCreated'));
@@ -258,14 +268,12 @@ export function RejaPage() {
               setPlanModal({
                 specialityId: plans[0]?.id ?? 0,
                 year: t('placeholder.year'),
-                shakl: plans[0]?.shakl ?? 'Kunduzgi',
               })
             }
             onEditPlan={(p) =>
               setPlanModal({
                 specialityId: p.id,
                 year: rejaYears[p.id] || t('placeholder.year'),
-                shakl: p.shakl,
               })
             }
             onClearPlan={(p) => { setSpecId(p.id); setConfirm({ kind: 'plan', name: p.name }); }}
@@ -383,7 +391,7 @@ function PlansLevel({ plans, canWrite, onOpen, onNewPlan, onEditPlan, onClearPla
               badgeText={initials(plan.name)}
               badgeBg={color.bg}
               badgeFg={color.fg}
-              chips={[{ text: plan.shakl, ...FORM_CHIP[plan.shakl] }]}
+              chips={plan.shakl.map((f) => ({ text: f, ...FORM_CHIP[f]! }))}
               stats={[
                 { value: SEMESTERS.length, label: t('stat.semestr') },
                 { value: plan.fanCount, label: t('stat.fan') },

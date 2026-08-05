@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.roles import is_admin as user_is_admin
 from app.modules.auth.model import User
-from app.modules.organization_structure.model import Group, GroupTeacher
+from app.modules.organization_structure.model import Group, GroupTeacher, Kafedra, Speciality
 from app.modules.quiz.model import Result
 
 from .schemas import (
@@ -18,6 +18,20 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _speciality_ids_of_faculty(faculty_id: int):
+    """Специальности факультета — подзапросом, для фильтра групп.
+
+    Группа знает только свою специальность; факультет вычисляется через
+    kafedra. Раньше на группе лежал ещё faculty_id, но он ничем не был связан
+    с этой цепочкой и мог ей противоречить, поэтому его убрали.
+    """
+    return (
+        select(Speciality.id)
+        .join(Kafedra, Kafedra.id == Speciality.kafedra_id)
+        .where(Kafedra.faculty_id == faculty_id)
+    )
 
 
 class GroupRepository:
@@ -33,17 +47,21 @@ class GroupRepository:
         # position со server_default '0' поставил бы новую запись в начало
         # списка. Новая запись должна оказаться в конце — её место потом
         # меняют перетаскиванием, а не тем, что она только что создана.
+        # Нумерация внутри специальности, а не факультета: прямой ссылки на
+        # факультет у группы больше нет, и специальность — её ближайший родитель.
         next_position = (
             await session.execute(
-                select(func.coalesce(func.max(Group.position), 0) + 1).where(Group.faculty_id == data.faculty_id)
+                select(func.coalesce(func.max(Group.position), 0) + 1).where(
+                    Group.speciality_id == data.speciality_id
+                )
             )
         ).scalar_one()
 
-        new_group = Group(name=data.name, faculty_id=data.faculty_id, position=next_position)
+        new_group = Group(name=data.name, speciality_id=data.speciality_id, position=next_position)
         # Необязательные поля карточки переносим списком: перечислять их
         # по одному в конструкторе значило бы забывать новое поле при каждом
         # расширении схемы.
-        for _field in ('kurs', 'sardor_student_id'):
+        for _field in ('kurs', 'sardor_student_id', 'education_form'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(new_group, _field, _value)
@@ -57,7 +75,7 @@ class GroupRepository:
             logger.warning("Integrity error creating group %r: %s", data.name, e)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Group '{data.name}' conflicts with an existing record or invalid faculty_id",
+                detail=f"Group '{data.name}' conflicts with an existing record or invalid speciality_id",
             )
         except SQLAlchemyError:
             await session.rollback()
@@ -121,7 +139,9 @@ class GroupRepository:
             stmt = stmt.where(Group.name.ilike(f"%{request.name}%"))
 
         if request.faculty_id:
-            stmt = stmt.where(Group.faculty_id == request.faculty_id)
+            # Прямой ссылки на факультет у группы нет — путь только через
+            # специальность и кафедру, и он единственный.
+            stmt = stmt.where(Group.speciality_id.in_(_speciality_ids_of_faculty(request.faculty_id)))
 
         # Порядок задаётся вручную (position), а не датой создания:
         # структуру университета читают сверху вниз, а не «сначала свежее».
@@ -153,7 +173,9 @@ class GroupRepository:
         if request.name:
             count_stmt = count_stmt.where(Group.name.ilike(f"%{request.name}%"))
         if request.faculty_id:
-            count_stmt = count_stmt.where(Group.faculty_id == request.faculty_id)
+            count_stmt = count_stmt.where(
+                Group.speciality_id.in_(_speciality_ids_of_faculty(request.faculty_id))
+            )
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -179,12 +201,12 @@ class GroupRepository:
                 )
             group.name = data.name
 
-        if data.faculty_id is not None:
-            group.faculty_id = data.faculty_id
+        if data.speciality_id is not None:
+            group.speciality_id = data.speciality_id
 
         # Те же необязательные поля, что и при создании. None означает
         # «не трогать»: форма присылает только то, что редактировала.
-        for _field in ('kurs', 'sardor_student_id'):
+        for _field in ('kurs', 'sardor_student_id', 'education_form'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(group, _field, _value)
@@ -253,7 +275,15 @@ class GroupRepository:
         normalized = re.sub(r"(\d+)([a-z]{2})$", r"\1 \2", normalized)
         return clean, normalized
 
-    async def get_or_create(self, session: AsyncSession, name: str, faculty_id: int) -> Group:
+    async def find_by_name(self, session: AsyncSession, name: str) -> Group | None:
+        """Ищет группу по имени, не создавая её.
+
+        Раньше здесь был get_or_create, и вход студента из HEMIS заводил группу
+        сам. Создавать её больше нечем: speciality_id обязателен, а HEMIS
+        кафедру не присылает — цепочка specialities → kafedras остаётся
+        неизвестной. Поэтому структуру заводит администратор, а вход только
+        связывается с готовой записью.
+        """
         clean, normalized = self._normalize_name(name)
         stmt = select(Group).where(
             or_(
@@ -262,17 +292,7 @@ class GroupRepository:
                 Group.name.ilike(f"%{clean.replace(' ', '')}%"),
             )
         )
-        obj = (await session.execute(stmt)).scalar_one_or_none()
-        if not obj:
-            try:
-                obj = Group(name=normalized, faculty_id=faculty_id)
-                session.add(obj)
-                await session.flush()
-                await session.refresh(obj)
-            except IntegrityError:
-                await session.rollback()
-                obj = (await session.execute(select(Group).where(Group.name == normalized))).scalar_one()
-        return obj
+        return (await session.execute(stmt)).scalars().first()
 
     async def find_id_by_name_fuzzy(self, session: AsyncSession, name: str) -> tuple[int | None, str]:
         clean, normalized = self._normalize_name(name)
