@@ -9,8 +9,8 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.utils.roles import is_admin as user_is_admin
 from app.core.utils.upload import save_image_upload
-from app.modules.auth.model import User
-from app.modules.quiz.model import Question
+from app.modules.auth.user.model import User
+from app.modules.quiz.question.model import Question
 
 from .schemas import (
     QuestionBulkDeleteRequest,
@@ -183,7 +183,7 @@ class QuestionRepository:
         try:
             await session.flush()
 
-            from app.modules.quiz.model import QuizQuestion
+            from app.modules.quiz.quiz.model import QuizQuestion
 
             await session.execute(
                 QuizQuestion.__table__.update()

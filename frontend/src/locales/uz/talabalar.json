@@ -3,7 +3,8 @@
   "tab": {
     "xodimlar": "Xodimlar",
     "talabalar": "Talabalar",
-    "bolimlar": "Bo'limlar"
+    "bolimlar": "Bo'limlar",
+    "lavozimlar": "Lavozimlar"
   },
   "subtitle": "Universitet talabalari — {{count}} ta",
   "add": "Talaba qo'shish",

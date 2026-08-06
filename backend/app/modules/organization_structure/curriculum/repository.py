@@ -6,8 +6,10 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.organization_structure.model import Curriculum, Speciality
-from app.modules.quiz.model import Subject
+from app.modules.organization_structure.curriculum.model import Curriculum
+from app.modules.organization_structure.speciality.model import Speciality
+from app.modules.auth.teacher.model import Teacher
+from app.modules.quiz.subject.model import Subject
 
 from .schemas import (
     CurriculumCreateRequest,
@@ -71,8 +73,7 @@ class CurriculumRepository:
             subject_name=subject_name,
             semester=data.semester,
             credit=data.credit,
-            teacher_user_id=data.teacher_user_id,
-            teacher_name=data.teacher_name,
+            teacher_id=data.teacher_id,
             position=next_position,
         )
         session.add(row)
@@ -98,7 +99,8 @@ class CurriculumRepository:
     async def get_row(self, session: AsyncSession, row_id: int) -> Curriculum:
         stmt = (
             select(Curriculum)
-            .options(selectinload(Curriculum.subject))
+            .options(selectinload(Curriculum.subject),
+            selectinload(Curriculum.teacher).selectinload(Teacher.employee))
             .where(Curriculum.id == row_id)
         )
         row = (await session.execute(stmt)).scalar_one_or_none()
@@ -111,7 +113,8 @@ class CurriculumRepository:
     async def list_rows(
         self, session: AsyncSession, request: CurriculumListRequest
     ) -> CurriculumListResponse:
-        stmt = select(Curriculum).options(selectinload(Curriculum.subject))
+        stmt = select(Curriculum).options(selectinload(Curriculum.subject),
+            selectinload(Curriculum.teacher).selectinload(Teacher.employee))
         count_stmt = select(func.count()).select_from(Curriculum)
 
         for column, value in (
@@ -151,7 +154,7 @@ class CurriculumRepository:
                 session, data.subject_id, data.subject_name or row.subject_name
             )
 
-        for field in ("semester", "credit", "teacher_user_id", "teacher_name", "position"):
+        for field in ("semester", "credit", "teacher_id", "position"):
             value = getattr(data, field)
             if value is not None:
                 setattr(row, field, value)

@@ -5,7 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Permission
+from app.modules.auth.permission.model import Permission
 
 from .schemas import (
     PermissionCreateRequest,

@@ -4,15 +4,19 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from core.config import settings
-from core.utils.password_hash import verify_password
 from core.redis_client import redis_client
+from core.utils.password_hash import verify_password
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Role, Student, Teacher, User
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.role.model import Role
+from app.modules.auth.student.model import Student
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
 
 from .schemas import UserLoginRequest, UserLoginResponse
 

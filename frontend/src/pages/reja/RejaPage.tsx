@@ -7,6 +7,7 @@ import { useFanlar } from '@/features/fanlar/lib/useFanlar';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
 import { FACULTY_COLORS } from '@/entities/university/lib/facultyColors';
 import type { EduForm, RejaRow } from '@/entities/university/model/types';
+import { fetchKafedraTeachers } from '@/shared/api/tuzilma';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { Button } from '@/shared/ui/Button';
@@ -62,7 +63,8 @@ interface PlanOption {
   kafedra: string;
   /** Формы, в которых реально идут группы этого направления. */
   shakl: EduForm[];
-  teachers: TeacherOption[];
+  /** Кафедра направления — из неё берутся кандидаты в ведущие. */
+  kafedraId: number;
   /** Строки плана. Пусты, пока специальность не открыли. */
   reja: RejaRow[];
   /** Счётчики из дерева — они известны и до загрузки строк. */
@@ -125,12 +127,12 @@ export function RejaPage() {
             label: `${speciality.name} — ${faculty.name.replace(' fakulteti', '')}`,
             kod: speciality.kod,
             kafedra: department.name,
+            kafedraId: department.id,
             // Форма живёт на группе, поэтому у направления их может быть
             // несколько — показываем набор, а не одно значение.
             shakl: [...new Set(speciality.guruhlar.map((g) => g.shakl))].filter(
               (f): f is EduForm => f !== null,
             ),
-            teachers: department.teachers.map((p) => ({ short: p.short, display: p.display })),
             reja: speciality.reja,
             // Из дерева: строки плана в списке не загружены, а карточка
             // показывает «сколько фанов и кредитов» ещё до его открытия.
@@ -155,6 +157,29 @@ export function RejaPage() {
   }, [specId, loadReja]);
 
   const plan = plans.find((p) => p.id === specId) ?? null;
+
+  // Список ведущих зависит от кафедры, а не от специальности, поэтому грузим
+  // его при смене кафедры и держим отдельно от дерева.
+  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
+  const kafedraId = plan?.kafedraId ?? null;
+  useEffect(() => {
+    if (kafedraId === null) {
+      setTeachers([]);
+      return;
+    }
+    let alive = true;
+    void fetchKafedraTeachers(kafedraId)
+      .then((rows) => {
+        if (alive) setTeachers(rows.map((r) => ({ id: r.id, display: r.fullName })));
+      })
+      // Пустой список просто оставит выбор недоступным — страницу это не ломает.
+      .catch(() => {
+        if (alive) setTeachers([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [kafedraId]);
   const entries: RejaEntry[] = useMemo(
     () => (plan?.reja ?? []).map((row, index) => ({ row, index })),
     [plan],
@@ -168,7 +193,7 @@ export function RejaPage() {
         fan: '',
         semestr: String(sem),
         kredit: '3',
-        oqituvchi: plan?.teachers[0]?.short ?? '—',
+        teacherId: '',
       },
     });
   }
@@ -181,7 +206,7 @@ export function RejaPage() {
         fan: entry.row.fan,
         semestr: String(entry.row.semestr),
         kredit: String(entry.row.kredit),
-        oqituvchi: entry.row.oqituvchi,
+        teacherId: entry.row.teacherId === null ? '' : String(entry.row.teacherId),
       },
     });
   }
@@ -192,11 +217,14 @@ export function RejaPage() {
 
   async function handleSaveFan(draft: RejaFanDraft) {
     if (!plan || !fanModal) return;
+    const teacherId = draft.teacherId ? Number(draft.teacherId) : null;
     const row: RejaRow = {
       fan: draft.fan.trim(),
       semestr: Number(draft.semestr) || 1,
       kredit: Number(draft.kredit) || 0,
-      oqituvchi: draft.oqituvchi || '—',
+      // Имя — только для показа: сервер соберёт его сам и вернёт в ответе.
+      oqituvchi: teachers.find((x) => x.id === teacherId)?.display ?? '—',
+      teacherId,
     };
 
     try {
@@ -316,7 +344,7 @@ export function RejaPage() {
           mode={fanModal.mode}
           initial={fanModal.draft}
           suggestions={suggestions}
-          teachers={plan?.teachers ?? []}
+          teachers={teachers}
           onSave={handleSaveFan}
           onCancel={() => setFanModal(null)}
         />

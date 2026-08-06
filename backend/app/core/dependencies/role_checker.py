@@ -7,12 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission
-from app.modules.auth.model import Role
-from app.modules.auth.model import RolePermission
-from app.modules.auth.model import User
-from app.modules.auth.model import UserRole
 from app.core.utils.roles import is_admin as user_is_admin
+from app.modules.auth.permission.model import Permission
+from app.modules.auth.role.model import Role, RolePermission
+from app.modules.auth.user.model import User, UserRole
 from app.modules.auth.user.service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -54,19 +52,11 @@ class PermissionRequired:
         if user_is_admin(user):
             return user  # Админ имеет доступ ко всему
 
-        # Для не-админов проверяем конкретное разрешение
-        # Permissions are created at startup by init_db, no need to create here
-        perm_stmt = select(Permission).where(Permission.name == self.permission_name)
-        perm_result = await session.execute(perm_stmt)
-        perm_obj = perm_result.scalar_one_or_none()
-
-        if not perm_obj:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{self.permission_name}' not found. Restart the app to sync permissions.",
-            )
-
-        # 2. Проверяем наличие права у пользователя
+        # Есть ли у пользователя это право. Одним запросом, а не двумя: раньше
+        # перед ним шла отдельная выборка «а существует ли вообще такое право»,
+        # и она выполнялась на КАЖДОМ запросе не-админа только ради более
+        # внятного текста ошибки. Теперь её задают лишь тогда, когда проверка
+        # не прошла, — то есть на успешном пути её нет вовсе.
         perm_check_stmt = (
             select(Permission.id)
             .join(RolePermission)
@@ -78,6 +68,22 @@ class PermissionRequired:
         has_permission = perm_check_result.scalars().first()
 
         if not has_permission:
+            # Отличаем «права нет у пользователя» от «права нет в системе»:
+            # второе означает, что приложение не перезапускали после появления
+            # нового эндпоинта, и сообщение должно вести к перезапуску.
+            known = (
+                await session.execute(
+                    select(Permission.id).where(Permission.name == self.permission_name)
+                )
+            ).scalars().first()
+            if not known:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Permission '{self.permission_name}' not found. "
+                        "Restart the app to sync permissions."
+                    ),
+                )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: user lacks '{self.permission_name}' permission",

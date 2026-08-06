@@ -5,14 +5,14 @@ from sqlalchemy import Float, asc, case, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Teacher, User
-from app.modules.organization_structure.model import Faculty
-from app.modules.organization_structure.model import Group
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.organization_structure.model import Kafedra
-from app.modules.quiz.model import Result
-from app.modules.quiz.model import Subject
-from app.modules.quiz.model import SubjectTeacher
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
+from app.modules.organization_structure.faculty.model import Faculty
+from app.modules.organization_structure.group.model import Group, GroupTeacher
+from app.modules.organization_structure.kafedra.model import Kafedra
+from app.modules.quiz.result.model import Result
+from app.modules.quiz.subject.model import Subject, SubjectTeacher
 
 from .schemas import (
     FacultyRankingResponse,
@@ -136,10 +136,10 @@ class TeacherRepository:
     async def delete_teacher(self, session: AsyncSession, teacher_id: int, force: bool = False) -> None:
         from sqlalchemy import delete
 
-        from app.modules.organization_structure.model import GroupTeacher
-        from app.modules.quiz.model import Question
-        from app.modules.quiz.model import Quiz
-        from app.modules.quiz.model import SubjectTeacher
+        from app.modules.organization_structure.group.model import GroupTeacher
+        from app.modules.quiz.question.model import Question
+        from app.modules.quiz.quiz.model import Quiz
+        from app.modules.quiz.subject.model import SubjectTeacher
 
         stmt = select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
@@ -193,8 +193,8 @@ class TeacherRepository:
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
         quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.user_id == employee_user_id))).scalars().all()
         if quiz_ids:
-            from app.modules.quiz.model import QuizQuestion
-            from app.modules.quiz.model import Result
+            from app.modules.quiz.quiz.model import QuizQuestion
+            from app.modules.quiz.result.model import Result
 
             await session.execute(delete(Result).where(Result.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))
@@ -297,7 +297,14 @@ class TeacherRepository:
         stmt = (
             select(Teacher)
             .join(Teacher.employee)
-            .options(selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject))
+            # selectinload(Teacher.employee) обязателен, а не только join: ответ
+            # собирается через _flatten_employee, который читает teacher.employee.
+            # Без предзагрузки это ленивый запрос уже вне async-контекста —
+            # SQLAlchemy отвечает MissingGreenlet, и эндпоинт падал пятисоткой.
+            .options(
+                selectinload(Teacher.employee),
+                selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
+            )
             .where(Employee.user_id == user_id)
         )
 

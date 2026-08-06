@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import User
+from app.modules.auth.user.model import User
 
 from .schemas import (
     MethodCreateRequest,

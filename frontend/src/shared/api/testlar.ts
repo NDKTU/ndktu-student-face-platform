@@ -9,6 +9,7 @@ import type {
 import { initials } from '@/shared/lib/initials';
 import { getAll } from './envelope';
 import { api } from './http';
+import { groupName } from '@/shared/lib/displayName';
 
 /**
  * Граница до бэкенда для тестов.
@@ -88,7 +89,7 @@ function toMeta(quiz: ApiQuiz): TestMeta {
     name: quiz.title,
     fan: quiz.subject?.name ?? '',
     oqituvchi: quiz.teacher?.full_name ?? quiz.teacher?.username ?? '',
-    guruh: quiz.group?.name ?? '',
+    guruh: quiz.group ? groupName(quiz.group.name) : '',
     savollar: quiz.question_number,
     davomiylik: quiz.duration,
     holati: toStatus(quiz.is_active),

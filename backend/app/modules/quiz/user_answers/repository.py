@@ -4,9 +4,10 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import User
-from app.modules.quiz.model import Result, UserAnswers
+from app.modules.auth.user.model import User
+from app.modules.quiz.result.model import Result
 from app.modules.quiz.result.repository import get_result_repository
+from app.modules.quiz.user_answers.model import UserAnswers
 
 from .schemas import UserAnswersListRequest, UserAnswersListResponse
 

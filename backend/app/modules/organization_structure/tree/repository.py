@@ -3,14 +3,14 @@ from collections import defaultdict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Employee, Student, Teacher
-from app.modules.organization_structure.model import (
-    Curriculum,
-    Faculty,
-    Group,
-    Kafedra,
-    Speciality,
-)
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.student.model import Student
+from app.modules.auth.teacher.model import Teacher
+from app.modules.organization_structure.curriculum.model import Curriculum
+from app.modules.organization_structure.faculty.model import Faculty
+from app.modules.organization_structure.group.model import Group
+from app.modules.organization_structure.kafedra.model import Kafedra
+from app.modules.organization_structure.speciality.model import Speciality
 
 from .schemas import (
     OrganizationTreeResponse,

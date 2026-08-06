@@ -1,4 +1,9 @@
-export type EmployeeStatus = 'Faol' | 'Bloklangan' | "Ta'tilda";
+/**
+ * Пол. Дубль GENDERS из `core/database/enums.py` — там ENUM базы.
+ * Статуса сотрудника здесь нет: столбец `status` убран, он никогда не влиял
+ * на вход, хотя комментарий в модели это обещал.
+ */
+export type Gender = 'Erkak' | 'Ayol';
 
 /**
  * Строка справочника сотрудников. Персональных данных здесь нет: сервер
@@ -20,18 +25,19 @@ export interface Employee {
   unit: string;
   /** Оно же ссылкой: форма правит id, `unit` — только подпись. */
   departmentId: number | null;
+  /** Название должности — для показа и фильтра. */
   lavozim: string;
-  holati: EmployeeStatus;
+  /** Она же ссылкой: должность стала справочником, а не свободной строкой. */
+  jobTitleId: number | null;
   email: string;
   workEmail: string;
   login: string;
   initials: string;
   color: string;
 
-  gender: 'Erkak' | 'Ayol';
+  gender: Gender;
   birth: string;
   hire: string;
-  lastLogin: string;
   workPhone: string;
 }
 
@@ -54,11 +60,11 @@ export type EmployeeDraft = Partial<{
   personalPhone: string;
   lavozim: string;
   departmentId: number | null;
+  jobTitleId: number | null;
   workPhone: string;
   workEmail: string;
   hire: string;
   login: string;
   pwd: string;
   roleNames: string[];
-  holati: EmployeeStatus;
 }>;

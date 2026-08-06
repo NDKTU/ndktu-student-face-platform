@@ -95,7 +95,7 @@ async def async_client(async_db):
 
 @pytest_asyncio.fixture
 async def test_role(async_db):
-    from app.modules.auth.model import Role
+    from app.modules.auth.role.model import Role
 
     role = Role(name="Admin")
     async_db.add(role)
@@ -155,7 +155,7 @@ async def create_permission(async_client, access_token):
 @pytest_asyncio.fixture
 async def test_subject(async_db):
     """Create a subject directly in DB since there is no API for it"""
-    from app.modules.quiz.model import Subject
+    from app.modules.quiz.subject.model import Subject
 
     subject = Subject(name="Mathematics")
     async_db.add(subject)

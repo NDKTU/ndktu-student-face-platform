@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Role
+from app.modules.auth.role.model import Role
 
 from .defaults import ADMIN_ROLE_NAME
 

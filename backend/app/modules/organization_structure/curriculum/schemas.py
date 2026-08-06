@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
@@ -22,10 +22,9 @@ class CurriculumCreateRequest(BaseModel):
     subject_id: Optional[int] = None
     subject_name: Optional[str] = None
 
-    teacher_user_id: Optional[int] = None
-    teacher_name: Optional[str] = None
+    teacher_id: Optional[int] = None
 
-    @field_validator("subject_name", "teacher_name", mode="before")
+    @field_validator("subject_name", mode="before")
     @classmethod
     def strip_blank_to_none(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
@@ -39,11 +38,10 @@ class CurriculumUpdateRequest(BaseModel):
     credit: Optional[int] = Field(default=None, ge=0, le=60)
     subject_id: Optional[int] = None
     subject_name: Optional[str] = None
-    teacher_user_id: Optional[int] = None
-    teacher_name: Optional[str] = None
+    teacher_id: Optional[int] = None
     position: Optional[int] = None
 
-    @field_validator("subject_name", "teacher_name", mode="before")
+    @field_validator("subject_name", mode="before")
     @classmethod
     def strip_blank_to_none(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
@@ -60,13 +58,24 @@ class CurriculumResponse(BaseModel):
     subject: Optional[CurriculumSubjectInfo] = None
     semester: int
     credit: int
-    teacher_user_id: Optional[int] = None
+    teacher_id: Optional[int] = None
+    # ФИО ведущего — из карточки сотрудника, отдельного столбца под него нет.
     teacher_name: Optional[str] = None
     position: int
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def name_from_teacher(cls, data: Any) -> Any:
+        """Раньше рядом лежал снимок teacher_name, и он расходился с карточкой
+        сотрудника после переименования. Теперь имя собирается на лету."""
+        teacher = getattr(data, "teacher", None)
+        if teacher is not None and teacher.employee is not None:
+            data.__dict__["teacher_name"] = teacher.employee.full_name
+        return data
 
 
 class CurriculumListRequest(BaseModel):

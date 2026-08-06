@@ -24,7 +24,7 @@ function row(id: number, over: Partial<Employee> = {}): Employee {
     unit: 'Rektorat',
     departmentId: null,
     lavozim: 'Tizim administratori',
-    holati: 'Faol',
+    jobTitleId: null,
     email: 'a.sardor@ndktu.uz',
     workEmail: 'a.sardor@ndktu.uz',
     login: 'a.sardor',
@@ -33,7 +33,6 @@ function row(id: number, over: Partial<Employee> = {}): Employee {
     gender: 'Erkak',
     birth: '25.07.1998',
     hire: '01.09.2015',
-    lastLogin: '18.07.2026 09:12',
     workPhone: '+998 90 100-10-10',
     ...over,
   };

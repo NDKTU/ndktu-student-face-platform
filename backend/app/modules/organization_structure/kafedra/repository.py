@@ -5,13 +5,13 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.organization_structure.model import Kafedra
+from app.modules.organization_structure.kafedra.model import Kafedra
 
 from .schemas import (
     KafedraCreateRequest,
-    KafedraUpdateRequest,
     KafedraListRequest,
     KafedraListResponse,
+    KafedraUpdateRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ class KafedraRepository:
     async def delete_kafedra(self, session: AsyncSession, kafedra_id: int, force: bool = False) -> None:
         from sqlalchemy import delete
 
-        from app.modules.auth.model import Teacher
+        from app.modules.auth.teacher.model import Teacher
 
         stmt = select(Kafedra).where(Kafedra.id == kafedra_id)
         result = await session.execute(stmt)
@@ -195,8 +195,8 @@ class KafedraRepository:
             (await session.execute(select(Teacher.id).where(Teacher.kafedra_id == kafedra_id))).scalars().all()
         )
         if teacher_ids:
-            from app.modules.organization_structure.model import GroupTeacher
-            from app.modules.quiz.model import SubjectTeacher
+            from app.modules.organization_structure.group.model import GroupTeacher
+            from app.modules.quiz.subject.model import SubjectTeacher
 
             await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
             await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))

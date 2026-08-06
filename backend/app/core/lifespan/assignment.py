@@ -3,7 +3,8 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Permission, Role, RolePermission
+from app.modules.auth.permission.model import Permission
+from app.modules.auth.role.model import Role, RolePermission
 
 logger = logging.getLogger(__name__)
 

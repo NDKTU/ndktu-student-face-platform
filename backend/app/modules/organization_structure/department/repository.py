@@ -5,7 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.organization_structure.model import Department
+from app.modules.organization_structure.department.model import Department
 
 from .schemas import (
     DepartmentCreateRequest,

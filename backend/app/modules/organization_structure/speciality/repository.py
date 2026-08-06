@@ -5,7 +5,7 @@ from sqlalchemy import desc, func, join, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.organization_structure.model import Speciality
+from app.modules.organization_structure.speciality.model import Speciality
 
 from .schemas import (
     SpecialityCreateRequest,
@@ -76,7 +76,7 @@ class SpecialityRepository:
     async def list_specialities(
         self, session: AsyncSession, request: SpecialityListRequest
     ) -> SpecialityListResponse:
-        from app.modules.organization_structure.model import Kafedra
+        from app.modules.organization_structure.kafedra.model import Kafedra
 
         stmt = select(Speciality)
         count_stmt = select(func.count()).select_from(Speciality)

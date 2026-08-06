@@ -1,10 +1,10 @@
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import User
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from app.modules.auth.user.model import User
 
 from .repository import get_course_content_repository
 from .schemas import (

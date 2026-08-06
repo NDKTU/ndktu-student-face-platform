@@ -7,10 +7,14 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.upload import save_image_upload
-from app.modules.auth.model import Employee, Role, Teacher, User, UserRole
-from app.modules.organization_structure.model import Faculty, Kafedra
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.role.model import Role
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User, UserRole
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
+from app.modules.organization_structure.faculty.model import Faculty
+from app.modules.organization_structure.kafedra.model import Kafedra
 
 from .schemas import EmployeeCreateRequest, EmployeeListRequest, EmployeeListResponse, EmployeeUpdateRequest
 
@@ -27,6 +31,7 @@ class EmployeeRepository:
             selectinload(Employee.user).selectinload(User.roles),
             selectinload(Employee.teacher),
             selectinload(Employee.department),
+            selectinload(Employee.job_title),
         )
 
     def _generate_full_name(self, first_name: str, last_name: str, third_name: str) -> str:
@@ -38,18 +43,12 @@ class EmployeeRepository:
     async def create_employee(self, session: AsyncSession, data: EmployeeCreateRequest) -> Employee:
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
 
-        existing = (
-            await session.execute(select(Employee).where(Employee.full_name == full_name))
-        ).scalar_one_or_none()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Employee '{full_name}' already exists",
-            )
+        # Полных тёзок не проверяем: в Узбекистане это обычное дело, и раньше
+        # второго Каримова Азиза просто не давали завести. Уникальность личности
+        # обеспечивают ЖШШИР и паспорт, а не ФИО.
 
         # commit=False: the User insert is part of this same transaction, so a
-        # failure creating the Employee row (e.g. duplicate full_name above is
-        # already handled, but DB-level races) rolls the User insert back too.
+        # failure creating the Employee row rolls the User insert back too.
         user = await get_user_repository.create_user(
             session=session,
             data=UserCreateRequest(username=data.username, password=data.password, roles=data.roles),
@@ -68,7 +67,7 @@ class EmployeeRepository:
         )
         # Служебная карточка и персональные данные — списком: перечислять их
         # в конструкторе значило бы забывать новое поле при каждом расширении.
-        for _field in ('position_title', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'status', 'jshshir', 'passport', 'personal_phone', 'address'):
+        for _field in ('job_title_id', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'jshshir', 'passport', 'personal_phone', 'address'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(new_employee, _field, _value)
@@ -162,21 +161,10 @@ class EmployeeRepository:
 
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
 
-        if full_name != employee.full_name:
-            existing = (
-                await session.execute(
-                    select(Employee).where(Employee.full_name == full_name, Employee.id != employee_id)
-                )
-            ).scalar_one_or_none()
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Employee name already taken",
-                )
 
 
         # None означает «не трогать»: форма присылает только отредактированное.
-        for _field in ('position_title', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'status', 'jshshir', 'passport', 'personal_phone', 'address'):
+        for _field in ('job_title_id', 'work_email', 'work_phone', 'gender', 'birth_date', 'hire_date', 'jshshir', 'passport', 'personal_phone', 'address'):
             _value = getattr(data, _field, None)
             if _value is not None:
                 setattr(employee, _field, _value)

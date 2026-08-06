@@ -10,12 +10,13 @@ export interface RejaFanDraft {
   fan: string;
   semestr: string;
   kredit: string;
-  oqituvchi: string;
+  /** id карточки преподавателя; пустая строка — «не назначен». */
+  teacherId: string;
 }
 
-/** Преподаватель кафедры: в списке — полное имя, в плане хранится краткое. */
+/** Преподаватель кафедры: показываем имя, храним ссылку на его карточку. */
 export interface TeacherOption {
-  short: string;
+  id: number;
   display: string;
 }
 
@@ -113,12 +114,13 @@ export function RejaFanModal({
 
       <ModalField label={t('field.oqituvchi')}>
         <select
-          value={draft.oqituvchi}
-          onChange={(e) => set('oqituvchi', e.target.value)}
+          value={draft.teacherId}
+          onChange={(e) => set('teacherId', e.target.value)}
           className={modalInputClass}
         >
+          <option value="">{t('noTeacher')}</option>
           {teachers.map((teacher) => (
-            <option key={teacher.short} value={teacher.short}>
+            <option key={teacher.id} value={String(teacher.id)}>
               {teacher.display}
             </option>
           ))}

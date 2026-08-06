@@ -1,8 +1,11 @@
 import pytest
 from sqlalchemy import select
 
-from app.modules.auth.model import User
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject, UserAnswers
+from app.modules.auth.user.model import User
+from app.modules.quiz.question.model import Question
+from app.modules.quiz.quiz.model import Quiz, QuizQuestion
+from app.modules.quiz.subject.model import Subject
+from app.modules.quiz.user_answers.model import UserAnswers
 
 
 @pytest.mark.asyncio

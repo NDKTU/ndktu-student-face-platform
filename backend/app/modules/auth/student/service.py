@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Student
+from app.modules.auth.student.model import Student
 
 from .repository import student_repository
 from .schemas import (

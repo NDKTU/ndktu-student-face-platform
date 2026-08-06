@@ -7,13 +7,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.core.utils.roles import is_admin as user_is_admin
-from app.modules.auth.model import User
-from app.modules.course.model import (
-    Course,
-    CourseMaterial,
-    CourseMaterialProgress,
-    CourseTopic,
-)
+from app.modules.auth.user.model import User
+from app.modules.course.content.model import CourseMaterial, CourseMaterialProgress, CourseTopic
+from app.modules.course.course.model import Course
 
 from .schemas import (
     CourseContentResponse,

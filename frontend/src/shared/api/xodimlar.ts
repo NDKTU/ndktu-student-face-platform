@@ -3,7 +3,6 @@ import type {
   Employee,
   EmployeeDraft,
   EmployeeSensitive,
-  EmployeeStatus,
 } from '@/entities/employee/model/types';
 import { initials } from '@/shared/lib/initials';
 import { getAll } from './envelope';
@@ -26,16 +25,14 @@ interface ApiEmployee {
   full_name: string;
   phone_number: string | null;
   image_url: string | null;
-  position_title: string | null;
   work_email: string | null;
   work_phone: string | null;
-  gender: string | null;
+  gender: 'Erkak' | 'Ayol' | null;
   birth_date: string | null;
   hire_date: string | null;
-  status: string;
-  last_login_at: string | null;
   user: { id: number; username: string; roles: { id: number; name: string }[] } | null;
   department: { id: number; name: string } | null;
+  job_title: { id: number; name: string } | null;
   /** Заполнено, если у сотрудника есть преподавательская запись. */
   teacher: { id: number; kafedra_id: number } | null;
 }
@@ -46,12 +43,6 @@ interface ApiEmployeeSensitive {
   passport: string | null;
   personal_phone: string | null;
   address: string | null;
-}
-
-const STATUSES: EmployeeStatus[] = ['Faol', 'Bloklangan', "Ta'tilda"];
-
-function statusOf(raw: string | null): EmployeeStatus {
-  return STATUSES.find((s) => s === raw) ?? 'Faol';
 }
 
 function toEmployee(row: ApiEmployee): Employee {
@@ -67,17 +58,16 @@ function toEmployee(row: ApiEmployee): Employee {
     color: roleColor(primary),
     unit: row.department?.name ?? '',
     departmentId: row.department?.id ?? null,
-    lavozim: row.position_title ?? '',
-    holati: statusOf(row.status),
+    lavozim: row.job_title?.name ?? '',
+    jobTitleId: row.job_title?.id ?? null,
     // У сотрудника личного email в БД нет — под именем показываем рабочий.
     email: row.work_email ?? '',
     workEmail: row.work_email ?? '',
     login: row.user?.username ?? '',
     initials: initials(row.full_name),
-    gender: row.gender === 'Ayol' ? 'Ayol' : 'Erkak',
+    gender: row.gender ?? 'Erkak',
     birth: row.birth_date ?? '',
     hire: row.hire_date ?? '',
-    lastLogin: row.last_login_at ?? '—',
     workPhone: row.work_phone ?? '',
   };
 }
@@ -96,13 +86,13 @@ function toBody(draft: EmployeeDraft) {
   return {
     ...splitName(draft.fish),
     phone_number: draft.workPhone || null,
-    position_title: draft.lavozim || null,
+    // undefined — «не трогать», null — «снять должность».
+    ...(draft.jobTitleId !== undefined && { job_title_id: draft.jobTitleId }),
     work_email: draft.workEmail || null,
     work_phone: draft.workPhone || null,
     gender: draft.gender || null,
     birth_date: draft.birth || null,
     hire_date: draft.hire || null,
-    status: draft.holati || null,
     // undefined — «не трогать», null — «убрать из подразделения».
     ...(draft.departmentId !== undefined && { department_id: draft.departmentId }),
     jshshir: draft.jshshir || null,

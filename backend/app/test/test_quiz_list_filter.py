@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from app.modules.quiz.model import Quiz
+from app.modules.quiz.quiz.model import Quiz
 
 
 @pytest_asyncio.fixture

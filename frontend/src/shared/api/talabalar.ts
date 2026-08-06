@@ -7,6 +7,7 @@ import type { StatusTone, StudentStatus } from '@/entities/university/model/type
 import { initials } from '@/shared/lib/initials';
 import { getAll } from './envelope';
 import { api } from './http';
+import { groupName } from '@/shared/lib/displayName';
 
 /**
  * Граница до бэкенда для реестра студентов.
@@ -71,7 +72,7 @@ function toRow(student: ApiStudent): StudentRow {
     login: student.user?.username ?? '',
     gender: student.gender === 'f' || student.gender?.toLowerCase().startsWith('a') ? 'f' : 'm',
     sid: student.student_id_number ?? '',
-    guruh: student.group?.name ?? '',
+    guruh: student.group ? groupName(student.group.name) : '',
     fakultet: student.faculty ?? '',
     mutaxassislik: student.specialty ?? '',
     kurs: kursOf(student.level),

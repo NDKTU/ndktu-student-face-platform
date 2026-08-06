@@ -6,13 +6,13 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.schemas import normalized_name
-from app.modules.organization_structure.model import Faculty
+from app.modules.organization_structure.faculty.model import Faculty
 
 from .schemas import (
     FacultyCreateRequest,
-    FacultyUpdateRequest,
     FacultyListRequest,
     FacultyListResponse,
+    FacultyUpdateRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,9 @@ class FacultyRepository:
         Столбец убрали — он расходился с этой самой цепочкой, — так что путь
         теперь ровно один.
         """
-        from app.modules.organization_structure.model import Group, Kafedra, Speciality
+        from app.modules.organization_structure.group.model import Group
+        from app.modules.organization_structure.kafedra.model import Kafedra
+        from app.modules.organization_structure.speciality.model import Speciality
 
         return (
             select(Group.id)
@@ -178,7 +180,9 @@ class FacultyRepository:
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func, select
 
-        from app.modules.organization_structure.model import Group, Kafedra, Speciality
+        from app.modules.organization_structure.group.model import Group
+        from app.modules.organization_structure.kafedra.model import Kafedra
+        from app.modules.organization_structure.speciality.model import Speciality
 
         group_ids_stmt = self._faculty_group_ids_stmt(faculty_id)
 
@@ -214,7 +218,7 @@ class FacultyRepository:
         # Порядок теперь снизу вверх и обязателен: specialities.kafedra_id и
         # groups.speciality_id объявлены RESTRICT, так что удалить кафедру
         # раньше её специальностей, а специальность раньше её групп — нельзя.
-        from app.modules.organization_structure.model import GroupTeacher
+        from app.modules.organization_structure.group.model import GroupTeacher
 
         group_ids = (await session.execute(group_ids_stmt)).scalars().all()
         if group_ids:
@@ -225,7 +229,7 @@ class FacultyRepository:
             (await session.execute(select(Kafedra.id).where(Kafedra.faculty_id == faculty_id))).scalars().all()
         )
         if kafedra_ids:
-            from app.modules.auth.model import Teacher
+            from app.modules.auth.teacher.model import Teacher
 
             # curriculum висит на specialities с CASCADE — отдельно не чистим.
             await session.execute(delete(Speciality).where(Speciality.kafedra_id.in_(kafedra_ids)))
@@ -234,7 +238,7 @@ class FacultyRepository:
                 (await session.execute(select(Teacher.id).where(Teacher.kafedra_id.in_(kafedra_ids)))).scalars().all()
             )
             if teacher_ids:
-                from app.modules.quiz.model import SubjectTeacher
+                from app.modules.quiz.subject.model import SubjectTeacher
 
                 await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))

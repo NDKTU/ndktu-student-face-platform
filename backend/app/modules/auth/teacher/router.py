@@ -1,12 +1,12 @@
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.roles import is_admin as user_is_admin
 from app.core.schemas import MAX_PAGE_SIZE
-from app.modules.auth.model import User
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from app.core.utils.roles import is_admin as user_is_admin
+from app.modules.auth.user.model import User
 
 from .repository import get_teacher_repository
 from .schemas import (

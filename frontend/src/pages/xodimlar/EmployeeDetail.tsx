@@ -6,7 +6,6 @@ import type { Employee } from '@/entities/employee/model/types';
 import { getEmployeeSensitive } from '@/shared/api/xodimlar';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
-import { employeeStatusTone } from './statusTone';
 
 type Tab = 'umumiy' | 'maxfiy' | 'tizim';
 
@@ -21,7 +20,6 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
   const { canViewEmployeeSensitive } = usePermissions();
   const [tab, setTab] = useState<Tab>('umumiy');
 
-  const tone = employeeStatusTone(employee.holati);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-8 pt-7 pb-12">
@@ -48,12 +46,6 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
                 style={{ background: `${employee.color}1A`, color: employee.color }}
               >
                 {employee.role}
-              </span>
-              <span
-                className="rounded-20 px-[11px] py-1 text-12 font-bold"
-                style={{ background: tone.bg, color: tone.fg }}
-              >
-                {employee.holati}
               </span>
             </div>
           </div>
@@ -126,8 +118,6 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
                 rows={[
                   [t('field.login'), employee.login],
                   [t('field.role'), employee.role],
-                  [t('field.holati'), employee.holati],
-                  [t('field.lastLogin'), employee.lastLogin],
                 ]}
               />
               <div className="mt-5 border-t border-surface-sunken pt-5">

@@ -32,7 +32,10 @@ export interface RejaRow {
   fan: string;
   semestr: number;
   kredit: number;
+  /** ФИО ведущего — сервер собирает его из карточки сотрудника. Только показ. */
   oqituvchi: string;
+  /** Кто именно ведёт: ссылка на карточку преподавателя. Её и правит форма. */
+  teacherId: number | null;
 }
 
 export interface Group {
@@ -91,8 +94,6 @@ export interface Kafedra {
   mudirEmployeeId: number | null;
   /** Штатная численность преподавателей кафедры. */
   oqituvchilar: number;
-  /** Пул преподавателей, из которого назначаются предметы в учебном плане. */
-  teachers: Person[];
   mutaxassisliklar: Speciality[];
 }
 

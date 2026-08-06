@@ -6,9 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.utils.roles import is_admin as user_is_admin
-from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import Result, SubjectTeacher
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.student.model import Student
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
+from app.modules.organization_structure.group.model import GroupTeacher
+from app.modules.quiz.result.model import Result
+from app.modules.quiz.subject.model import SubjectTeacher
 
 from .schemas import (
     ResultListRequest,
@@ -202,7 +206,7 @@ class ResultRepository:
     async def delete_result(self, session: AsyncSession, result_id: int) -> None:
         from sqlalchemy import delete
 
-        from app.modules.quiz.model import UserAnswers
+        from app.modules.quiz.user_answers.model import UserAnswers
 
         stmt = select(Result).where(Result.id == result_id)
         result = await session.execute(stmt)

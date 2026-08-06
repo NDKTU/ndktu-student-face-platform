@@ -1,12 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
-import type { Employee, EmployeeDraft, EmployeeStatus } from '@/entities/employee/model/types';
+import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 
-const STATUSES: EmployeeStatus[] = ['Faol', 'Bloklangan', "Ta'tilda"];
 const GENDERS: Employee['gender'][] = ['Erkak', 'Ayol'];
 
 interface EmployeeModalProps {
@@ -15,6 +14,8 @@ interface EmployeeModalProps {
   /** Справочник подразделений. Раньше сюда шли строки, вытащенные из уже
    *  загруженных сотрудников, и назначить новое подразделение было нечем. */
   bolimlar: { id: number; name: string }[];
+  /** Справочник должностей. Раньше это была свободная строка position_title. */
+  lavozimlar: { id: number; name: string }[];
   /** Роли из БД: имя — то, что уходит на сервер, label — подпись. */
   roles: { name: string; label: string }[];
   onSave: (draft: EmployeeDraft) => void;
@@ -30,6 +31,7 @@ export function EmployeeModal({
   mode,
   initial,
   bolimlar,
+  lavozimlar,
   roles,
   onSave,
   onCancel,
@@ -130,7 +132,20 @@ export function EmployeeModal({
       {/* --- Работа --- */}
       <Section title={t('section.ish')}>
         <Row>
-          <ModalField label={t('field.lavozim')}>{field('lavozim', t('placeholder.lavozim'))}</ModalField>
+          <ModalField label={t('field.lavozim')}>
+            <select
+              value={draft.jobTitleId == null ? '' : String(draft.jobTitleId)}
+              onChange={(e) => set('jobTitleId', e.target.value ? Number(e.target.value) : null)}
+              className={modalInputClass}
+            >
+              <option value="">{tc('notSelected')}</option>
+              {lavozimlar.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.name}
+                </option>
+              ))}
+            </select>
+          </ModalField>
           <ModalField label={t('field.unit')}>
             <select
               value={draft.departmentId == null ? '' : String(draft.departmentId)}
@@ -183,17 +198,6 @@ export function EmployeeModal({
                 <option key={role.name} value={role.name}>
                   {role.label}
                 </option>
-              ))}
-            </select>
-          </ModalField>
-          <ModalField label={t('field.holati')}>
-            <select
-              value={draft.holati ?? 'Faol'}
-              onChange={(e) => set('holati', e.target.value as EmployeeStatus)}
-              className={modalInputClass}
-            >
-              {STATUSES.map((status) => (
-                <option key={status} value={status}>{status}</option>
               ))}
             </select>
           </ModalField>

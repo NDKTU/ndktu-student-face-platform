@@ -11,8 +11,12 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.security import create_face_ws_token
 from app.core.utils.roles import is_admin as user_is_admin
-from app.modules.auth.model import Student, User
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
+from app.modules.auth.student.model import Student
+from app.modules.auth.user.model import User
+from app.modules.quiz.question.model import Question
+from app.modules.quiz.quiz.model import Quiz, QuizQuestion
+from app.modules.quiz.result.model import Result
+from app.modules.quiz.user_answers.model import UserAnswers
 
 from .schemas import (
     EndQuizRequest,

@@ -107,21 +107,10 @@ class StudentListResponse(BaseModel):
     students: list[StudentResponse]
 
 
-class UserInfoResponse(BaseModel):
-    id: int
-    username: str
-    is_active: bool
-    created_at: TashkentDatetime
-    updated_at: TashkentDatetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class StudentWithUserResponse(BaseModel):
     student_id: int
     user_id: Optional[int]
     username: Optional[str]
-    is_active: Optional[bool]
     first_name: str
     last_name: str
     full_name: str

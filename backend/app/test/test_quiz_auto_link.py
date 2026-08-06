@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 
-from app.modules.quiz.model import QuizQuestion
+from app.modules.quiz.quiz.model import QuizQuestion
 
 
 @pytest_asyncio.fixture
@@ -46,7 +46,7 @@ async def setup_questions_and_quiz(auth_client, async_db, test_subject, test_use
     # Q3: Mismatch Subject (User matches)
     # Create another subject
     await auth_client.post("/subject/", json={"name": "Other Subject"})
-    from app.modules.quiz.model import Subject
+    from app.modules.quiz.subject.model import Subject
 
     s2 = Subject(name="Other Subject")
     async_db.add(s2)

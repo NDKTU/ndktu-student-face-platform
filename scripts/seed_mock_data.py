@@ -306,6 +306,15 @@ for s in subjects:
 
 # ── 8. Сотрудники и преподаватели ──────────────────────────────────────────
 
+# Должности — справочник job_titles, а не строка на сотруднике.
+JOB_TITLE_DEFS = [
+    "Professor", "Dotsent", "Katta oʻqituvchi", "Oʻqituvchi", "Assistent",
+    "Boʻlim boshligʻi", "Bosh mutaxassis", "Yetakchi mutaxassis",
+    "Mutaxassis", "Inspektor", "Buxgalter",
+]
+job_titles = [{"id": i, "name": n} for i, n in enumerate(JOB_TITLE_DEFS, start=1)]
+JOB_TITLE_ID = {n: i for i, n in enumerate(JOB_TITLE_DEFS, start=1)}
+
 employees = []
 teachers = []
 used_fullnames = set()
@@ -334,14 +343,12 @@ for kaf in kafedras:
             "last_name": last, "first_name": first, "third_name": third,
             "full_name": full, "phone_number": phone(),
             "image_url": None,
-            "position_title": random.choice(POSITIONS),
+            "job_title_id": JOB_TITLE_ID[random.choice(POSITIONS)],
             "work_email": "teacher%03d@ndktu.uz" % emp_id,
             "work_phone": "+998 79 %03d-%02d-%02d" % (random.randint(100, 999), random.randint(10, 99), random.randint(10, 99)),
             "gender": gender,
             "birth_date": date(random.randint(1965, 1995), random.randint(1, 12), random.randint(1, 28)),
             "hire_date": hire,
-            "status": "Faol" if random.random() > 0.08 else random.choice(["Taʼtilda", "Bloklangan"]),
-            "last_login_at": datetime(2026, 8, random.randint(1, 4), random.randint(8, 18), random.randint(0, 59)),
             "jshshir": jshshir(), "passport": passport(),
             "personal_phone": phone(),
             "address": "%s viloyati, %s tumani" % random.choice([(r, random.choice(d)) for r, d in REGIONS]),
@@ -376,14 +383,12 @@ for dept in departments:
             "id": emp_id, "user_id": u, "department_id": dept["id"],
             "last_name": last, "first_name": first, "third_name": third,
             "full_name": full, "phone_number": phone(), "image_url": None,
-            "position_title": random.choice(STAFF_POSITIONS),
+            "job_title_id": JOB_TITLE_ID[random.choice(STAFF_POSITIONS)],
             "work_email": "xodim%03d@ndktu.uz" % staff_count,
             "work_phone": "+998 79 %03d-%02d-%02d" % (random.randint(100, 999), random.randint(10, 99), random.randint(10, 99)),
             "gender": gender,
             "birth_date": date(random.randint(1970, 1998), random.randint(1, 12), random.randint(1, 28)),
             "hire_date": TODAY - timedelta(days=random.randint(200, 4000)),
-            "status": "Faol",
-            "last_login_at": datetime(2026, 8, random.randint(1, 4), random.randint(8, 18), random.randint(0, 59)),
             "jshshir": jshshir(), "passport": passport(), "personal_phone": phone(),
             "address": "%s viloyati, %s tumani" % random.choice([(r, random.choice(d)) for r, d in REGIONS]),
         })
@@ -478,8 +483,8 @@ for sp in specialities:
                 "id": cur_id, "speciality_id": sp["id"], "subject_id": subj_id,
                 "subject_name": subj["name"], "semester": sem,
                 "credit": subj["credit"],
-                "teacher_user_id": TEACHER_USER[t] if t else None,
-                "teacher_name": TEACHER_NAME[t] if t else None,
+                # Ссылка на карточку преподавателя; ФИО в плане больше не хранится.
+                "teacher_id": t,
                 "position": pos,
             })
 
@@ -1062,7 +1067,7 @@ WIPE = [
     "lessons", "course_groups", "courses", "teacher_assignments",
     "subject_teachers", "group_teachers", "curriculum", "teachers",
     "employees", "students", "groups", "specialities", "subjects",
-    "kafedras", "faculties", "departments", "user_roles", "users",
+    "kafedras", "faculties", "departments", "job_titles", "user_roles", "users",
 ]
 
 emit("BEGIN;")
@@ -1073,12 +1078,13 @@ insert("users", USER_COLS, users)
 insert("user_roles", ["user_id", "role_id"], user_roles)
 
 insert("departments", ["id", "name"], departments)
+insert("job_titles", ["id", "name"], job_titles)
 # employees идут раньше faculties и kafedras: декан и заведующий ссылаются
 # теперь на карточку сотрудника, а не на учётку.
 insert("employees", ["id", "user_id", "department_id", "last_name", "first_name",
                      "third_name", "full_name", "phone_number", "image_url",
-                     "position_title", "work_email", "work_phone", "gender",
-                     "birth_date", "hire_date", "status", "last_login_at",
+                     "job_title_id", "work_email", "work_phone", "gender",
+                     "birth_date", "hire_date",
                      "jshshir", "passport", "personal_phone", "address"], employees)
 insert("faculties", ["id", "name", "code", "dekan_employee_id",
                      "color_bg", "color_fg", "position"], faculties)
@@ -1108,7 +1114,7 @@ for g in groups:
          % (g["sardor_student_id"], g["id"]))
 
 insert("curriculum", ["id", "speciality_id", "subject_id", "subject_name", "semester",
-                      "credit", "teacher_user_id", "teacher_name", "position"], curriculum)
+                      "credit", "teacher_id", "position"], curriculum)
 insert("subject_teachers", ["id", "subject_id", "teacher_id"], subject_teachers)
 insert("teacher_assignments", ["id", "teacher_id", "subject_id", "group_id"], teacher_assignments)
 insert("group_teachers", ["id", "group_id", "teacher_id"], group_teachers)

@@ -10,7 +10,7 @@ import type {
   Student,
   StudentStatus,
 } from '@/entities/university/model/types';
-import { displayName } from '@/shared/lib/displayName';
+import { displayName, groupName } from '@/shared/lib/displayName';
 import { initials } from '@/shared/lib/initials';
 import { getAll, getList } from './envelope';
 import { api, qs } from './http';
@@ -77,6 +77,7 @@ interface ApiCurriculumRow {
   subject_name: string;
   semester: number;
   credit: number;
+  teacher_id: number | null;
   teacher_name: string | null;
   position: number;
 }
@@ -110,7 +111,7 @@ function facultyColor(faculty: ApiFaculty): FacultyColor {
 function toGroup(group: ApiGroup): Group {
   return {
     id: group.id,
-    name: group.name,
+    name: groupName(group.name),
     shakl: group.education_form,
     kurs: group.kurs ?? 1,
     sardor: group.sardor_name || EMPTY,
@@ -141,7 +142,6 @@ function toKafedra(kafedra: ApiKafedra): Kafedra {
     mudir: kafedra.mudir_name ?? EMPTY,
     mudirEmployeeId: kafedra.mudir_employee_id,
     oqituvchilar: kafedra.teacher_count,
-    teachers: [],
     mutaxassisliklar: kafedra.specialities.map(toSpeciality),
   };
 }
@@ -164,6 +164,7 @@ function toRejaRow(row: ApiCurriculumRow): RejaRow {
     semestr: row.semester,
     kredit: row.credit,
     oqituvchi: row.teacher_name ?? EMPTY,
+    teacherId: row.teacher_id,
   };
 }
 
@@ -210,11 +211,37 @@ export interface GroupPayload {
   sardorName?: string | null;
 }
 
+/** Преподаватель в выпадающем списке строки плана. */
+export interface CurriculumTeacher {
+  id: number;
+  fullName: string;
+}
+
+/**
+ * Преподаватели кафедры — кандидаты в ведущие по строке плана.
+ *
+ * Берём с `/teacher/`, а не из дерева: дерево несёт только счётчик
+ * `teacher_count`, а плану нужен `teachers.id`, на который и ссылается
+ * `curriculum.teacher_id`.
+ */
+export async function fetchKafedraTeachers(kafedraId: number): Promise<CurriculumTeacher[]> {
+  const rows = await getAll<{ id: number; employee: { full_name: string } | null }>(
+    '/teacher/',
+    'teachers',
+    { kafedra_id: kafedraId },
+  );
+  return rows
+    .map((row) => ({ id: row.id, fullName: displayName(row.employee?.full_name ?? '') }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
 export interface RejaRowPayload {
   fan?: string;
   semestr?: number;
   kredit?: number;
-  oqituvchi?: string;
+  /** id карточки преподавателя. Раньше сюда уходила строка «Karimov A.» —
+   *  сокращение, которое не уникально и ни с чем не связано. */
+  teacherId?: number | null;
 }
 
 export async function getTree(): Promise<Faculty[]> {
@@ -276,7 +303,6 @@ export async function createKafedra(
     mudir: body.mudirName || EMPTY,
     mudirEmployeeId: body.mudirEmployeeId ?? null,
     oqituvchilar: 0,
-    teachers: [],
     mutaxassisliklar: [],
   };
 }
@@ -358,7 +384,7 @@ export async function createGroup(specialityId: number, body: GroupPayload): Pro
   });
   return {
     id: created.id,
-    name: created.name,
+    name: groupName(created.name),
     shakl: body.shakl ?? null,
     kurs: body.kurs ?? 1,
     sardor: body.sardorName || created.sardor_name || EMPTY,
@@ -376,7 +402,7 @@ export async function updateGroup(id: number, body: GroupPayload): Promise<Parti
   });
   return {
     id: updated.id,
-    name: updated.name,
+    name: groupName(updated.name),
     ...(body.kurs !== undefined && { kurs: body.kurs }),
     ...(body.shakl !== undefined && { shakl: body.shakl }),
     ...(body.sardorStudentId !== undefined && {
@@ -408,7 +434,7 @@ export async function createRejaRow(
     subject_name: body.fan,
     semester: body.semestr,
     credit: body.kredit,
-    teacher_name: body.oqituvchi === EMPTY ? null : body.oqituvchi,
+    teacher_id: body.teacherId ?? null,
   });
   return toRejaRow(created);
 }
@@ -418,7 +444,7 @@ export async function updateRejaRow(rowId: number, body: RejaRowPayload): Promis
     subject_name: body.fan,
     semester: body.semestr,
     credit: body.kredit,
-    teacher_name: body.oqituvchi === EMPTY ? null : body.oqituvchi,
+    teacher_id: body.teacherId ?? null,
   });
   return toRejaRow(updated);
 }

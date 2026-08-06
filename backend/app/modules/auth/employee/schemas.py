@@ -5,6 +5,11 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+
+# Дубль GENDERS из app/core/database/enums.py: там ENUM базы, здесь проверка
+# на входе. Менять нужно оба места разом — Literal нельзя собрать из кортежа.
+Gender = Literal["Erkak", "Ayol"]
+
 from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 
@@ -27,6 +32,12 @@ class EmployeeDepartmentInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EmployeeJobTitleInfo(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EmployeeCreateRequest(BaseModel):
     username: str
     password: str
@@ -39,13 +50,12 @@ class EmployeeCreateRequest(BaseModel):
     roles: list[RoleRequest] = []
     # Служебная карточка: её показывает реестр «Xodimlar». Всё необязательно —
     # сотрудника заводят по ФИО и учётке, остальное дозаполняют позже.
-    position_title: Optional[str] = None
+    job_title_id: Optional[int] = None
     work_email: Optional[str] = None
     work_phone: Optional[str] = None
-    gender: Optional[str] = None
+    gender: Optional[Gender] = None
     birth_date: Optional[date] = None
     hire_date: Optional[date] = None
-    status: Optional[str] = None
     # Персональные данные. Принимаем на запись здесь, но наружу отдаём только
     # через /employee/{id}/sensitive — в EmployeeResponse их нет.
     jshshir: Optional[str] = None
@@ -84,13 +94,12 @@ class EmployeeUpdateRequest(BaseModel):
     department_id: Optional[int] = None
     # Служебная карточка: её показывает реестр «Xodimlar». Всё необязательно —
     # сотрудника заводят по ФИО и учётке, остальное дозаполняют позже.
-    position_title: Optional[str] = None
+    job_title_id: Optional[int] = None
     work_email: Optional[str] = None
     work_phone: Optional[str] = None
-    gender: Optional[str] = None
+    gender: Optional[Gender] = None
     birth_date: Optional[date] = None
     hire_date: Optional[date] = None
-    status: Optional[str] = None
     # Персональные данные. Принимаем на запись здесь, но наружу отдаём только
     # через /employee/{id}/sensitive — в EmployeeResponse их нет.
     jshshir: Optional[str] = None
@@ -118,18 +127,17 @@ class EmployeeResponse(BaseModel):
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
-    position_title: Optional[str] = None
+    job_title_id: Optional[int] = None
     work_email: Optional[str] = None
     work_phone: Optional[str] = None
-    gender: Optional[str] = None
+    gender: Optional[Gender] = None
     birth_date: Optional[date] = None
     hire_date: Optional[date] = None
-    status: str = "Faol"
-    last_login_at: Optional[TashkentDatetime] = None
 
     user: Optional[EmployeeUserInfo] = None
     teacher: Optional[EmployeeTeacherInfo] = None
     department: Optional[EmployeeDepartmentInfo] = None
+    job_title: Optional[EmployeeJobTitleInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 

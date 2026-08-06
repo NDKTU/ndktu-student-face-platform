@@ -5,10 +5,12 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.course.model import Course, CourseGroup, CourseMaterial, CourseTopic
-from app.modules.quiz.model import Subject
-from app.modules.quiz.model import SubjectTeacher
-from app.modules.auth.model import Employee, Teacher, User
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
+from app.modules.course.content.model import CourseMaterial, CourseTopic
+from app.modules.course.course.model import Course, CourseGroup
+from app.modules.quiz.subject.model import Subject, SubjectTeacher
 
 from .schemas import (
     CourseCreateRequest,

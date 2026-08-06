@@ -8,8 +8,10 @@ from sqlalchemy.orm import selectinload
 
 from app.core.utils.roles import is_admin as user_is_admin
 from app.core.utils.upload import DOC_LIMITS, IMAGE_LIMITS, VIDEO_LIMITS, save_upload
-from app.modules.course.model import Course, Lesson, Resource
-from app.modules.auth.model import User
+from app.modules.auth.user.model import User
+from app.modules.course.course.model import Course
+from app.modules.course.lesson.model import Lesson
+from app.modules.course.resource.model import Resource
 
 from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
 

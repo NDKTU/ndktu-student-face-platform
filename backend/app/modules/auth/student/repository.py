@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Student
+from app.modules.auth.student.model import Student
 
 from .schemas import (
     StudentCreateRequest,
@@ -111,7 +111,7 @@ class StudentRepository:
     async def list_students_with_users(
         self, session: AsyncSession, request: StudentListRequest
     ) -> StudentWithUserListResponse:
-        from app.modules.auth.model import User
+        from app.modules.auth.user.model import User
 
         # Query students that have a user_id and filter by student role
         stmt = (
@@ -147,7 +147,8 @@ class StudentRepository:
                     "student_id": student.id,
                     "user_id": student.user_id,
                     "username": student.user.username if student.user else None,
-                    "is_active": student.user.is_active if student.user else None,
+                    # is_active тут не отдаём: такого поля у User нет и не было —
+                    # обращение к нему роняло весь эндпоинт AttributeError'ом.
                     "first_name": student.first_name,
                     "last_name": student.last_name,
                     "full_name": student.full_name,
@@ -209,7 +210,7 @@ class StudentRepository:
     async def delete_student(self, session: AsyncSession, student_id: int, force: bool = False) -> None:
         from sqlalchemy import delete
 
-        from app.modules.quiz.model import Result
+        from app.modules.quiz.result.model import Result
 
         student = await self.get_student(session, student_id)
 

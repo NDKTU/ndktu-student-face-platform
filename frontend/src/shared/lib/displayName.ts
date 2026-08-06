@@ -39,3 +39,14 @@ function capitalize(word: string): string {
 
   return lower.slice(0, at) + lower[at]!.toLocaleUpperCase('uz') + lower.slice(at + 1);
 }
+
+/**
+ * Название группы для показа.
+ *
+ * Группы — это коды («kon-25-01», «8-24 ENI»), а не слова, и `displayName`
+ * дал бы «Kon-25-01». База хранит их в каноническом нижнем регистре, как и
+ * остальные названия, поэтому регистр для показа возвращаем здесь.
+ */
+export function groupName(name: string): string {
+  return name.toLocaleUpperCase('uz');
+}

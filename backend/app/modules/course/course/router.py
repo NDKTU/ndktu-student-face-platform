@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.roles import is_admin as user_is_admin
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
 
 from .repository import get_course_repository
 from .schemas import (
@@ -20,7 +20,7 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import User
+    from app.modules.auth.user.model import User
 
 
 def _is_admin(user: "User") -> bool:

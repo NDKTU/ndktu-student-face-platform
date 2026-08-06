@@ -8,6 +8,7 @@ import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { getEmployeeSensitive } from '@/shared/api/xodimlar';
 import { useRollar } from '@/features/rollar/lib/useRollar';
 import { useBolimlar } from '@/features/bolimlar/lib/useBolimlar';
+import { useLavozimlar } from '@/features/lavozimlar/lib/useLavozimlar';
 import { useRollarStore } from '@/features/rollar/model/rollar.store';
 import { roleLabel } from '@/entities/access/model/roles';
 import { CrumbBar } from '@/widgets/layout/CrumbBar';
@@ -18,8 +19,9 @@ import { StudentDetail } from './StudentDetail';
 import { XodimlarTab } from './XodimlarTab';
 import { TalabalarTab } from './TalabalarTab';
 import { BolimlarTab } from './BolimlarTab';
+import { LavozimlarTab } from './LavozimlarTab';
 
-const TABS = ['xodimlar', 'talabalar', 'bolimlar'] as const;
+const TABS = ['xodimlar', 'talabalar', 'bolimlar', 'lavozimlar'] as const;
 type Tab = (typeof TABS)[number];
 
 /** Реестр пользователей: две вкладки — сотрудники и студенты. */
@@ -72,6 +74,7 @@ export function FoydalanuvchilarPage() {
   // ещё до того, как её кто-то носит.
   useRollar();
   const { bolimlar } = useBolimlar();
+  const { lavozimlar } = useLavozimlar();
   const roles = useRollarStore((s) => s.roles);
   const assignableRoles = useMemo(
     () => roles.map((r) => ({ name: r.name, label: roleLabel(r.name) })),
@@ -104,6 +107,7 @@ export function FoydalanuvchilarPage() {
           mode="edit"
           initial={editing.draft}
           bolimlar={bolimlar}
+          lavozimlar={lavozimlar}
           roles={assignableRoles}
           onSave={(draft) => void save(editing.id, draft)}
           onCancel={() => setEditing(null)}
@@ -137,6 +141,7 @@ export function FoydalanuvchilarPage() {
         {tab === 'xodimlar' && <XodimlarTab />}
         {tab === 'talabalar' && <TalabalarTab />}
         {tab === 'bolimlar' && <BolimlarTab />}
+        {tab === 'lavozimlar' && <LavozimlarTab />}
       </div>
     </>
   );
@@ -154,6 +159,6 @@ function toDraft(e: Employee): EmployeeDraft {
     hire: e.hire,
     login: e.login,
     roleNames: e.roleNames,
-    holati: e.holati,
+    jobTitleId: e.jobTitleId,
   };
 }

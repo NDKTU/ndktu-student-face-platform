@@ -94,5 +94,20 @@
     },
     "deleteTitle": "Bo'limni o'chirish",
     "deleteText": "«{{name}}» bo'limi o'chiriladi. Undagi xodimlar bo'limsiz qoladi."
+  },
+  "lavozim": {
+    "title": "Lavozimlar",
+    "subtitle": "Xodimlar lavozimlari ma'lumotnomasi — {{count}} ta",
+    "add": "Lavozim qo'shish",
+    "placeholder": "Masalan: Dotsent",
+    "column": {
+      "name": "Lavozim nomi"
+    },
+    "empty": {
+      "title": "Lavozim yo'q",
+      "text": "Xodimga lavozim biriktirish uchun avval lavozim yarating."
+    },
+    "deleteTitle": "Lavozimni o'chirish",
+    "deleteText": "«{{name}}» lavozimi o'chiriladi. Bu lavozimdagi xodimlar lavozimsiz qoladi."
   }
 }

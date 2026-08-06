@@ -1,13 +1,13 @@
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.schemas import MAX_PAGE_SIZE
-from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from app.modules.auth.user.model import User
 
 from .repository import get_group_repository
 from .schemas import (
@@ -108,8 +108,8 @@ async def get_group_delete_info(
     """Returns counts of related data affected when this group is deleted."""
     from sqlalchemy import func, select
 
-    from app.modules.auth.model import Student
-    from app.modules.quiz.model import Result
+    from app.modules.auth.student.model import Student
+    from app.modules.quiz.result.model import Result
 
     student_count = (
         await session.execute(select(func.count()).select_from(Student).where(Student.group_id == group_id))

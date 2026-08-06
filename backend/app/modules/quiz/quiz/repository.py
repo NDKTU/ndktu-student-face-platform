@@ -7,9 +7,16 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, SubjectTeacher, UserAnswers
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.student.model import Student
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
+from app.modules.organization_structure.group.model import GroupTeacher
+from app.modules.quiz.question.model import Question
+from app.modules.quiz.quiz.model import Quiz, QuizQuestion
+from app.modules.quiz.result.model import Result
+from app.modules.quiz.subject.model import SubjectTeacher
+from app.modules.quiz.user_answers.model import UserAnswers
 
 from .schemas import (
     QuizAttempt,
@@ -387,7 +394,7 @@ class QuizRepository:
     async def delete_quiz(self, session: AsyncSession, quiz_id: int, force: bool = False) -> None:
         from sqlalchemy import delete as sa_delete
 
-        from app.modules.quiz.model import Result
+        from app.modules.quiz.result.model import Result
 
         stmt = select(Quiz).where(Quiz.id == quiz_id)
         result = await session.execute(stmt)

@@ -1,7 +1,7 @@
 from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TeacherAssignmentCreateRequest(BaseModel):
@@ -13,7 +13,22 @@ class TeacherAssignmentCreateRequest(BaseModel):
 class TeacherInfo(BaseModel):
     id: int
     full_name: str
+
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def name_from_employee(cls, data: Any) -> Any:
+        """ФИО у преподавателя лежит в его карточке сотрудника.
+
+        После разделения Employee/Teacher у Teacher остались только kafedra_id и
+        employee_id — full_name живёт в employees. Схема же продолжала требовать
+        его прямо с Teacher, и весь эндпоинт отвечал пятисоткой, как только в
+        teacher_assignments появлялась хоть одна строка.
+        """
+        if hasattr(data, "employee") and data.employee is not None:
+            data.__dict__["full_name"] = data.employee.full_name
+        return data
 
 
 class SubjectInfo(BaseModel):

@@ -8,9 +8,9 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import User
+from app.modules.auth.user.model import User
+from app.modules.quiz.result.model import Result
 
-from .model import Result
 from .question.repository import get_question_repository
 from .question.schemas import (
     QuestionBulkDeleteRequest,

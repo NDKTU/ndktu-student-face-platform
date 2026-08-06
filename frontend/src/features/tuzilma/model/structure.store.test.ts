@@ -50,7 +50,6 @@ function buildFixture(): Faculty[] {
           mudir: `Mudir ${f + 1}`,
           mudirEmployeeId: null,
           oqituvchilar: 4,
-          teachers: [],
           mutaxassisliklar: [
             {
               id: base + 20,
@@ -78,9 +77,9 @@ function buildFixture(): Faculty[] {
                 },
               ],
               reja: [
-                { id: base + 40, fan: 'Oliy matematika', semestr: 1, kredit: 5, oqituvchi: '—' },
-                { id: base + 41, fan: 'Fizika', semestr: 2, kredit: 4, oqituvchi: '—' },
-                { id: base + 42, fan: 'Kimyo', semestr: 2, kredit: 3, oqituvchi: '—' },
+                { id: base + 40, fan: 'Oliy matematika', semestr: 1, kredit: 5, oqituvchi: '—', teacherId: null },
+                { id: base + 41, fan: 'Fizika', semestr: 2, kredit: 4, oqituvchi: '—', teacherId: null },
+                { id: base + 42, fan: 'Kimyo', semestr: 2, kredit: 3, oqituvchi: '—', teacherId: null },
               ],
             },
           ],
@@ -202,7 +201,6 @@ describe('structure store — мутации', () => {
       mudir: '—',
       mudirEmployeeId: null,
       oqituvchilar: 0,
-      teachers: [],
       mutaxassisliklar: [],
     });
 
@@ -230,7 +228,6 @@ describe('structure store — мутации', () => {
       mudir: department.mudir,
       mudirEmployeeId: null,
       oqituvchilar: department.oqituvchilar,
-      teachers: [],
       mutaxassisliklar: [],
     });
 
@@ -306,6 +303,7 @@ describe('structure store — учебный план', () => {
       semestr: 2,
       kredit: 4,
       oqituvchi: 'Bozorov D.',
+      teacherId: 7,
     });
 
     await store().addRejaRow(speciality.id, {
@@ -313,6 +311,7 @@ describe('structure store — учебный план', () => {
       semestr: 2,
       kredit: 4,
       oqituvchi: 'Bozorov D.',
+      teacherId: 7,
     });
 
     const reja = firstSpeciality().reja;

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Permission
+from app.modules.auth.permission.model import Permission
 
 logger = logging.getLogger(__name__)
 

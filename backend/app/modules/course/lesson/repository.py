@@ -6,11 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.utils.roles import is_admin as user_is_admin
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.course.model import Course, CourseGroup, Lesson, LessonResult
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.student.model import Student
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.user.model import User
+from app.modules.course.course.model import Course, CourseGroup
 from app.modules.course.course.repository import get_course_repository
-from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.quiz.model import SubjectTeacher
+from app.modules.course.lesson.model import Lesson, LessonResult
+from app.modules.organization_structure.group.model import GroupTeacher
+from app.modules.quiz.subject.model import SubjectTeacher
 
 from .schemas import (
     LessonCreateRequest,

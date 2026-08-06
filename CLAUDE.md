@@ -61,7 +61,9 @@ The backend mounts two volumes used by both services:
 - `backend_logs` → `/face/logs`
 
 ### Backend (`backend/`)
-FastAPI app at `app/main.py`. All business-logic modules live under `app/modules/`, each with a consistent `model.py / schemas.py / repository.py / router.py` structure. The central router at `app/modules/router.py` includes all module routers under the `/api` prefix.
+FastAPI app at `app/main.py`. All business-logic modules live under `app/modules/`. A module is a folder per entity, and each entity folder holds all four of its layers: `model.py / schemas.py / repository.py / router.py` — e.g. `organization_structure/faculty/`. There is no module-level `model.py` collecting every table; a model lives next to the code that uses it. Link tables have no folder of their own and sit with their owner (`GroupTeacher` in `group/`, `UserRole` in `user/`, `QuizQuestion` in `quiz/`). `psychology` is the one exception — it is still a flat module. The central router at `app/modules/router.py` includes all module routers under the `/api` prefix.
+
+Because models are spread out, `app/core/database/models_registry.py` is the single place that imports every one of them — Alembic reads `Base.metadata` through it. If a model is missing there, `alembic revision --autogenerate` will quietly emit `drop_table` for it, so an empty autogenerate diff is the check that the registry is complete.
 
 **ORM:** SQLAlchemy 2 (async) with `AsyncSession`. All models inherit from `app.core.base.Base` and compose `IdIntPk` + `TimestampMixin` mixins. Alembic migrations live at `app/migrations/versions/`. The file `app/core/models_registry.py` must import every model so Alembic can detect them.
 

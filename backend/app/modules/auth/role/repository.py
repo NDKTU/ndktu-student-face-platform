@@ -5,8 +5,10 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission, Role, RolePermission, UserRole
 from app.core.lifespan.defaults import ADMIN_ROLE_NAME
+from app.modules.auth.permission.model import Permission
+from app.modules.auth.role.model import Role, RolePermission
+from app.modules.auth.user.model import UserRole
 
 from .schemas import (
     RoleCreateRequest,

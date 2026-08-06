@@ -5,7 +5,8 @@ from core.utils.password_hash import hash_password
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Role, User, UserRole
+from app.modules.auth.role.model import Role
+from app.modules.auth.user.model import User, UserRole
 
 logger = logging.getLogger(__name__)
 

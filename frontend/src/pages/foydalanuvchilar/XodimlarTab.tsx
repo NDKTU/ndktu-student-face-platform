@@ -5,7 +5,7 @@ import { useRollar } from '@/features/rollar/lib/useRollar';
 import { useRollarStore } from '@/features/rollar/model/rollar.store';
 import { roleLabel } from '@/entities/access/model/roles';
 import { useXodimlar } from '@/features/xodimlar/lib/useXodimlar';
-import type { Employee, EmployeeDraft, EmployeeStatus } from '@/entities/employee/model/types';
+import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { DataTable, TableCard, type Column } from '@/shared/ui/DataTable';
 import { ErrorState, LoadingState } from '@/shared/ui/DataState';
@@ -13,10 +13,9 @@ import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 import { EmployeeModal } from '../xodimlar/EmployeeModal';
 import { useBolimlar } from '@/features/bolimlar/lib/useBolimlar';
-import { employeeStatusTone } from '../xodimlar/statusTone';
+import { useLavozimlar } from '@/features/lavozimlar/lib/useLavozimlar';
 import { FilterBar, filterSelectClass, SearchInput } from './FilterBar';
 
-const STATUSES: EmployeeStatus[] = ['Faol', 'Bloklangan', "Ta'tilda"];
 
 export function XodimlarTab() {
   const { t } = useTranslation('xodimlar');
@@ -34,11 +33,11 @@ export function XodimlarTab() {
   // Справочник подразделений — для формы; фильтр по-прежнему по названию,
   // потому что фильтрует уже загруженный список.
   const { bolimlar } = useBolimlar();
+  const { lavozimlar } = useLavozimlar();
 
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
   const [unit, setUnit] = useState('');
-  const [holati, setHolati] = useState('');
   const [modal, setModal] = useState<{ mode: 'add' | 'edit'; id?: number; draft: EmployeeDraft } | null>(
     null,
   );
@@ -62,11 +61,10 @@ export function XodimlarTab() {
     return employees.filter((e) => {
       if (role && e.role !== role) return false;
       if (unit && e.unit !== unit) return false;
-      if (holati && e.holati !== holati) return false;
       if (!q) return true;
       return e.fish.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
     });
-  }, [employees, query, role, unit, holati]);
+  }, [employees, query, role, unit]);
 
   const columns: Column<Employee>[] = [
     {
@@ -110,24 +108,6 @@ export function XodimlarTab() {
       padX: 16,
       render: (e) => e.role,
       cellClass: 'text-13 font-semibold text-ink-secondary',
-    },
-    {
-      key: 'holati',
-      label: t('column.holati'),
-      width: 120,
-      padX: 16,
-      render: (e) => {
-        const tone = employeeStatusTone(e.holati);
-        return (
-          <span
-            className="rounded-20 px-[11px] py-1 text-12 font-bold"
-            style={{ background: tone.bg, color: tone.fg }}
-          >
-            {e.holati}
-          </span>
-        );
-      },
-      cellClass: '',
     },
   ];
 
@@ -185,15 +165,6 @@ export function XodimlarTab() {
             </option>
           ))}
         </select>
-
-        <select value={holati} onChange={(e) => setHolati(e.target.value)} className={filterSelectClass}>
-          <option value="">{t('filter.status')}</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
       </FilterBar>
 
       <TableCard>
@@ -217,6 +188,7 @@ export function XodimlarTab() {
           mode={modal.mode}
           initial={modal.draft}
           bolimlar={bolimlar}
+          lavozimlar={lavozimlar}
           roles={assignableRoles}
           onSave={(draft) => void handleSave(draft)}
           onCancel={() => setModal(null)}

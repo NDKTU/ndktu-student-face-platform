@@ -7,9 +7,11 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.roles import is_admin as user_is_admin
-from app.modules.auth.model import User
-from app.modules.organization_structure.model import Group, GroupTeacher, Kafedra, Speciality
-from app.modules.quiz.model import Result
+from app.modules.auth.user.model import User
+from app.modules.organization_structure.group.model import Group, GroupTeacher
+from app.modules.organization_structure.kafedra.model import Kafedra
+from app.modules.organization_structure.speciality.model import Speciality
+from app.modules.quiz.result.model import Result
 
 from .schemas import (
     GroupCreateRequest,
@@ -118,7 +120,7 @@ class GroupRepository:
             )
             already_joined_group_teacher = True
         elif is_student:
-            from app.modules.auth.model import Student
+            from app.modules.auth.student.model import Student
 
             student_stmt = select(Student.group_id).where(Student.user_id == current_user.id)
             student_result = await session.execute(student_stmt)
@@ -216,9 +218,9 @@ class GroupRepository:
         return group
 
     async def delete_group(self, session: AsyncSession, group_id: int, force: bool = False) -> None:
-        from app.modules.auth.model import Student
-        from app.modules.organization_structure.model import GroupTeacher
-        from app.modules.quiz.model import Quiz
+        from app.modules.auth.student.model import Student
+        from app.modules.organization_structure.group.model import GroupTeacher
+        from app.modules.quiz.quiz.model import Quiz
 
         stmt = select(Group).where(Group.id == group_id)
         result = await session.execute(stmt)

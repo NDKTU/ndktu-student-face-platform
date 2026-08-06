@@ -5,13 +5,16 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.roles import is_admin as user_is_admin
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
-from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
-from app.modules.auth.model import Employee, Student, User
-from app.modules.organization_structure.model import Group
-from app.modules.quiz.model import Subject
+from app.core.utils.roles import is_admin as user_is_admin
+from app.modules.auth.employee.model import Employee
+from app.modules.auth.student.model import Student
+from app.modules.auth.user.model import User
+from app.modules.course.assignment.model import Assignment, AssignmentSubmission
+from app.modules.course.course.model import Course, CourseGroup
+from app.modules.organization_structure.group.model import Group
+from app.modules.quiz.subject.model import Subject
 
 from .schemas import (
     AssignmentCourseInfo,
@@ -21,11 +24,11 @@ from .schemas import (
     AssignmentResponse,
     AssignmentStats,
     AssignmentUpdateRequest,
+    PendingSubmission,
+    PendingSubmissionListResponse,
     SubmissionGradeRequest,
     SubmissionListResponse,
     SubmissionResponse,
-    PendingSubmission,
-    PendingSubmissionListResponse,
     SubmissionSubmitRequest,
     SubmissionUserInfo,
 )

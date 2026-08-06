@@ -6,7 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import TeacherAssignment
+from app.modules.auth.teacher.model import Teacher
+from app.modules.auth.teacher_assignment.model import TeacherAssignment
 
 from .schemas import (
     TeacherAssignmentCreateRequest,
@@ -23,7 +24,7 @@ class TeacherAssignmentRepository:
         stmt = (
             select(TeacherAssignment)
             .options(
-                selectinload(TeacherAssignment.teacher),
+                selectinload(TeacherAssignment.teacher).selectinload(Teacher.employee),
                 selectinload(TeacherAssignment.subject),
                 selectinload(TeacherAssignment.group),
             )
@@ -75,7 +76,10 @@ class TeacherAssignmentRepository:
         self, session: AsyncSession, request: TeacherAssignmentListRequest
     ) -> TeacherAssignmentListResponse:
         stmt = select(TeacherAssignment).options(
-            selectinload(TeacherAssignment.teacher),
+            # employee подгружаем вместе с teacher: ФИО берётся из карточки
+            # сотрудника (см. TeacherInfo), и без этого получится ленивый
+            # запрос вне async-контекста.
+            selectinload(TeacherAssignment.teacher).selectinload(Teacher.employee),
             selectinload(TeacherAssignment.subject),
             selectinload(TeacherAssignment.group),
         )

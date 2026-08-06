@@ -11,7 +11,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import User
+    from app.modules.auth.user.model import User
 
 
 class PsychologyMethod(Base, IdIntPk, TimestampMixin):

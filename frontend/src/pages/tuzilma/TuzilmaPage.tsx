@@ -167,13 +167,14 @@ export function TuzilmaPage() {
           onTabChange={setSpecTab}
           onOpenGroup={(id, name) => drillInto({ id, name })}
           onAddGroup={() => setModal({ mode: 'add', level: 3, draft: {} })}
-          onEditGroup={(id, name, kurs, sardorStudentId, sardorName) =>
+          onEditGroup={(id, name, kurs, shakl, sardorStudentId, sardorName) =>
             setModal({
               mode: 'edit',
               level: 3,
               id,
               draft: {
                 name,
+                shakl: shakl ?? undefined,
                 kurs: String(kurs),
                 sardor: sardorStudentId ? String(sardorStudentId) : '',
                 postName: sardorName ?? '',

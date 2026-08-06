@@ -1,6 +1,14 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Faculty, Kafedra, Speciality } from '@/entities/university/model/types';
+import type { EduForm, Faculty, Kafedra, Speciality } from '@/entities/university/model/types';
+
+/** Sirtqi выделен: заочное прекращено, такие группы остались от прошлых лет. */
+const FORM_CHIP: Record<EduForm, { bg: string; fg: string }> = {
+  Kunduzgi: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
+  Kechki: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
+  Masofaviy: { bg: 'var(--color-brand-soft)', fg: 'var(--color-brand)' },
+  Sirtqi: { bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
+};
 import { countSpecialityStudents } from '@/entities/university/lib/counters';
 import { namePrefix } from '@/shared/lib/namePrefix';
 import { EntityCard } from './EntityCard';
@@ -13,7 +21,14 @@ interface SpecialityDetailProps {
   canWrite: boolean;
   onOpenGroup: (id: number, name: string) => void;
   onAddGroup: () => void;
-  onEditGroup: (id: number, name: string, kurs: number, sardorStudentId?: number, sardorName?: string) => void;
+  onEditGroup: (
+    id: number,
+    name: string,
+    kurs: number,
+    shakl: EduForm | null,
+    sardorStudentId?: number,
+    sardorName?: string,
+  ) => void;
   onDeleteGroup: (id: number, name: string) => void;
   activeTab: 'groups' | 'curriculum';
   onTabChange: (tab: 'groups' | 'curriculum') => void;
@@ -126,6 +141,9 @@ export function SpecialityDetail({
                     bg: 'var(--color-success-soft)',
                     fg: 'var(--color-success)',
                   },
+                  // Форма обучения — свойство группы, и на карточке
+                  // специальности её уже нет: показываем здесь.
+                  ...(g.shakl ? [{ text: g.shakl, ...FORM_CHIP[g.shakl] }] : []),
                 ]}
                 lead={
                   g.sardor
@@ -148,7 +166,7 @@ export function SpecialityDetail({
   );
 
   function openEditGroupHandler(g: Speciality['guruhlar'][number]) {
-    onEditGroup(g.id, g.name, g.kurs, g.sardorStudentId ?? undefined, g.sardor);
+    onEditGroup(g.id, g.name, g.kurs, g.shakl, g.sardorStudentId ?? undefined, g.sardor);
   }
 }
 
