@@ -79,17 +79,21 @@ class RoleRepository:
         return role
 
     async def list_roles(self, session: AsyncSession, request: RoleListRequest) -> RoleListResponse:
-        stmt = (
-            select(Role)
-            .options(selectinload(Role.permissions))
-            .order_by(desc(Role.created_at))
-            .offset(request.offset)
-            .limit(request.limit)
-        )
+        stmt = select(Role).options(selectinload(Role.permissions))
+        count_stmt = select(func.count()).select_from(Role)
+
+        if request.name:
+            # Один и тот же предикат на выборку и на счётчик: иначе `total`
+            # считает нефильтрованные строки и пагинация врёт.
+            name_filter = Role.name.ilike(f"%{request.name}%")
+            stmt = stmt.where(name_filter)
+            count_stmt = count_stmt.where(name_filter)
+
+        stmt = stmt.order_by(desc(Role.created_at)).offset(request.offset).limit(request.limit)
+
         result = await session.execute(stmt)
         roles = result.scalars().all()
 
-        count_stmt = select(func.count()).select_from(Role)
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
 

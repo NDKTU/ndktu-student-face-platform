@@ -87,3 +87,18 @@ async def test_delete_role(auth_client):
 async def test_delete_role_not_found(auth_client):
     responnse = await auth_client.delete("/role/112")
     assert responnse.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_roles_filters_by_name(auth_client):
+    """Фильтр подстрочный и без учёта регистра — как в остальных `list_*`."""
+    await auth_client.post("/role/", json={"name": "dekan"})
+    await auth_client.post("/role/", json={"name": "Teacher"})
+
+    response = await auth_client.get("/role/", params={"page": 1, "limit": 10, "name": "DEK"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [r["name"] for r in body["roles"]] == ["dekan"]
+    # total тоже обязан учитывать фильтр, иначе клиент нарисует лишние страницы.
+    assert body["total"] == 1
