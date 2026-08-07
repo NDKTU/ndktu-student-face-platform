@@ -25,7 +25,13 @@ class User(Base, IdIntPk, TimestampMixin):
     password: Mapped[str] = mapped_column(String(255))
 
     roles: Mapped[list["Role"]] = relationship(
-        "Role", secondary="user_roles", back_populates="users", overlaps="user_roles"
+        "Role",
+        secondary="user_roles",
+        back_populates="users",
+        overlaps="user_roles",
+        # Без явного порядка «первая» роль зависит от плана запроса: у декана их
+        # две, и бейдж с цветом аватара менялись бы между загрузками страницы.
+        order_by="Role.name",
     )
 
     student: Mapped["Student"] = relationship("Student", back_populates="user")
@@ -51,8 +57,14 @@ class User(Base, IdIntPk, TimestampMixin):
 class UserRole(Base, IdIntPk, TimestampMixin):
     __tablename__ = "user_roles"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    # Оба столбца индексируются: по ним идёт join на каждом запросе
+    # не-администратора — там, где PermissionRequired проверяет право.
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     user: Mapped["User"] = relationship("User", lazy="selectin", overlaps="roles,users")
     role: Mapped["Role"] = relationship("Role", lazy="selectin", overlaps="roles,users")
