@@ -7,6 +7,7 @@ from core.database.db_helper import db_helper
 from fastapi_limiter import FastAPILimiter
 from httpx import ASGITransport, AsyncClient
 from main import app as fastapi_app
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -45,7 +46,16 @@ async def clear_test_redis():
     test_redis = redis.from_url(TEST_REDIS_URL)
     await test_redis.flushdb()  # Полностью очищаем базу перед тестом
     await test_redis.aclose()
+
     yield
+
+    # Приложение держит Redis-клиент модульным синглтоном, а pytest-asyncio даёт
+    # каждому тесту свой event loop. Без сброса пула следующий тест получает
+    # соединение, привязанное к уже закрытому циклу, и падает с
+    # «Event loop is closed» ещё на логине.
+    from core.redis_client import redis_client as app_redis
+
+    await app_redis.aclose()
 
 
 async_engine = create_async_engine(
@@ -55,15 +65,32 @@ async_engine = create_async_engine(
 )
 
 
+async def _reset_schema(conn) -> None:
+    """Сносит схему целиком вместо `Base.metadata.drop_all`.
+
+    `students.group_id` и `groups.sardor_student_id` (староста группы) ссылаются
+    друг на друга, и топологическая сортировка в `drop_all` падает с
+    CircularDependencyError. Из-за этого teardown не отрабатывал вовсе: таблицы и
+    данные переживали прогон, и следующий запуск умирал на UniqueViolation ещё
+    в фикстурах. `DROP SCHEMA ... CASCADE` сортировки не требует и заодно
+    подчищает то, что оставил предыдущий упавший прогон.
+    """
+    await conn.execute(text("DROP SCHEMA public CASCADE"))
+    await conn.execute(text("CREATE SCHEMA public"))
+
+
 @pytest_asyncio.fixture(scope="function")
 async def async_db_engine():
     async with async_engine.begin() as conn:
+        # Сброс и на входе тоже: прогон не должен зависеть от того, чем
+        # закончился предыдущий.
+        await _reset_schema(conn)
         await conn.run_sync(Base.metadata.create_all)
 
     yield async_engine
 
     async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await _reset_schema(conn)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -105,18 +132,25 @@ async def test_role(async_db):
 
 
 @pytest_asyncio.fixture
-async def test_user(async_client, test_role):
-    payload = {
-        "username": "test_user",
-        "password": "password123",
-        "roles": [{"name": "Admin"}],
-    }
+async def test_user(async_db, test_role):
+    """Первую учётку заводим прямо в БД, а не через `POST /user/`.
 
-    response = await async_client.post("/user/", json=payload)
-    assert response.status_code == 201
-    data = response.json()
-    data["password"] = payload["password"]
-    return data
+    У того роута стоит `PermissionRequired("create:user")`, а до появления
+    первого пользователя предъявить это право некому — фикстура получала 401.
+    В приложении ту же задачу решает `ensure_admin_user` на старте, тоже в обход
+    API.
+    """
+    from core.utils.password_hash import hash_password
+
+    from app.modules.auth.user.model import User
+
+    password = "password123"
+    user = User(username="test_user", password=hash_password(password), roles=[test_role])
+    async_db.add(user)
+    await async_db.commit()
+    await async_db.refresh(user, attribute_names=["roles"])
+
+    return {"id": user.id, "username": user.username, "password": password}
 
 
 @pytest_asyncio.fixture
@@ -135,11 +169,9 @@ async def access_token(async_client, test_user):
 
 @pytest_asyncio.fixture
 async def auth_client(async_client, access_token):
-    async_client.headers.update(
-        {
-            "Authorization": access_token,
-        }
-    )
+    # Заголовок собирается ровно так же, как его шлёт фронт (`shared/api/http.ts`),
+    # и так, как его требует `_strip_bearer`: без схемы токен не принимается.
+    async_client.headers.update({"Authorization": f"Bearer {access_token}"})
     return async_client
 
 
