@@ -28,22 +28,6 @@ class UserService:
     def _session_key(user_id: int) -> str:
         return f"user:session:{user_id}"
 
-    @staticmethod
-    def _strip_bearer(header_value: str) -> str:
-        """Extract the raw JWT token from an ``Authorization`` header."""
-        if not header_value:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing Authorization header",
-            )
-        parts = header_value.strip().split(" ", 1)
-        if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Authorization header (expected 'Bearer <token>')",
-            )
-        return parts[1].strip()
-
     async def create_session_token(self, user_id: int) -> str:
         """Creates access token with a unique jti and registers it in Redis."""
         jti = str(uuid.uuid4())
@@ -68,10 +52,11 @@ class UserService:
     async def validate_session(self, token: str) -> int:
         """Decode the token, enforce Single Active Session and slide the idle TTL.
 
-        Единая точка проверки сессии для всех защищённых роутов. Возвращает user_id
-        или бросает 401 (невалидный токен / завершённая сессия) либо 503 (Redis недоступен).
+        Единая точка проверки сессии для всех защищённых роутов. Принимает голый
+        JWT: схему `Bearer` разбирает `HTTPBearer` в `core/dependencies/role_checker.py`.
+        Возвращает user_id или бросает 401 (невалидный токен / завершённая сессия)
+        либо 503 (Redis недоступен).
         """
-        token = self._strip_bearer(token)
         payload = self.token_decode(token)
         user_id = payload.get("user_id")
         jti = payload.get("jti")
@@ -122,30 +107,6 @@ class UserService:
         access_token = await self.create_session_token(user.id)
 
         return UserLoginResponse(type="Bearer", access_token=access_token)
-
-    async def get_current_user(self, session: AsyncSession, token: str) -> User:
-        # Декод + проверка Single Active Session + продление idle-TTL в одном месте.
-        user_id = await self.validate_session(token)
-
-        stmt = (
-            select(User)
-            .where(User.id == user_id)
-            .options(
-                selectinload(User.roles).selectinload(Role.permissions),
-                selectinload(User.employee).selectinload(Employee.teacher).selectinload(Teacher.kafedra),
-                selectinload(User.student).selectinload(Student.group),
-            )
-        )
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-            )
-
-        return user
 
     def token_decode(self, token: str, secret_key: str | None = None) -> dict:
         try:

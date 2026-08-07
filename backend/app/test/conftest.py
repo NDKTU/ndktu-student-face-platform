@@ -170,7 +170,7 @@ async def access_token(async_client, test_user):
 @pytest_asyncio.fixture
 async def auth_client(async_client, access_token):
     # Заголовок собирается ровно так же, как его шлёт фронт (`shared/api/http.ts`),
-    # и так, как его требует `_strip_bearer`: без схемы токен не принимается.
+    # и так, как его требует `HTTPBearer`: без схемы токен не принимается.
     async_client.headers.update({"Authorization": f"Bearer {access_token}"})
     return async_client
 

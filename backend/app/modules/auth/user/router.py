@@ -1,12 +1,14 @@
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Header, Request, status
+from core.database.db_helper import db_helper
+from core.dependencies.current_user import get_current_user_full
+from core.dependencies.role_checker import PermissionRequired
+from fastapi import APIRouter, Depends, Request, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from app.modules.auth.user.model import User
 
 from .repository import get_user_repository
 from .schemas import (
@@ -55,13 +57,13 @@ async def login(data: UserLoginRequest, session: AsyncSession = Depends(db_helpe
     return await auth_service.login(session=session, data=data)
 
 
-@router.get("/me", response_model=UserMeResponse)
-async def get_me(
-    authorization: str = Header(...),
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("user:me")),
-):
-    return await auth_service.get_current_user(session=session, token=authorization)
+@router.get(
+    "/me",
+    response_model=UserMeResponse,
+    dependencies=[Depends(PermissionRequired("user:me"))],
+)
+async def get_me(current_user: User = Depends(get_current_user_full)):
+    return current_user
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -73,16 +75,19 @@ async def logout(
     await auth_service.logout(current_user.id)
 
 
-@router.put("/me/credentials", response_model=UserCreateResponse)
+@router.put(
+    "/me/credentials",
+    response_model=UserCreateResponse,
+    dependencies=[Depends(PermissionRequired("user:me"))],
+)
 async def update_my_credentials(
     data: UserChangeCredentialsRequest,
-    authorization: str = Header(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("user:me")),
+    current_user: User = Depends(get_current_user_full),
 ):
-    current_user = await auth_service.get_current_user(session=session, token=authorization)
-    result = await get_user_repository.change_my_credentials(session=session, current_user=current_user, data=data)
-    return result
+    return await get_user_repository.change_my_credentials(
+        session=session, current_user=current_user, data=data
+    )
 
 
 @router.post(

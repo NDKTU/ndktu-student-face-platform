@@ -87,3 +87,31 @@ async def test_update_user_returns_roles(async_db_engine, test_user):
 
     assert dumped.username == "renamed_user"
     assert [r.name for r in dumped.roles] == ["Admin"]
+
+
+@pytest.mark.asyncio
+async def test_me_has_no_authorization_parameter():
+    """Заголовок читает security-схема. Отдельный `Header(...)` рисовал в Swagger
+    второе обязательное поле и заставлял валидировать сессию дважды."""
+    from main import app as fastapi_app
+
+    params = fastapi_app.openapi()["paths"]["/api/user/me"]["get"].get("parameters", [])
+
+    assert [p for p in params if p["name"].lower() == "authorization"] == []
+
+
+@pytest.mark.asyncio
+async def test_me_returns_roles(auth_client):
+    response = await auth_client.get("/user/me")
+
+    assert response.status_code == 200
+    assert [r["name"] for r in response.json()["roles"]] == ["Admin"]
+
+
+@pytest.mark.asyncio
+async def test_me_rejects_a_token_without_the_bearer_scheme(async_client, access_token):
+    async_client.headers.update({"Authorization": access_token})
+
+    response = await async_client.get("/user/me")
+
+    assert response.status_code == 401

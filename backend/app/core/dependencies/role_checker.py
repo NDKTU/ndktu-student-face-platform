@@ -2,7 +2,7 @@ import logging
 
 from core.database.db_helper import db_helper
 from fastapi import Depends, HTTPException, status
-from fastapi.security import APIKeyHeader
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -15,19 +15,26 @@ from app.modules.auth.user.service import auth_service
 
 logger = logging.getLogger(__name__)
 
+# HTTPBearer, а не APIKeyHeader: Swagger тогда сам подставляет префикс `Bearer`,
+# и сразу для всех роутов, а не только для /user/me.
 # auto_error=False: при отсутствии заголовка возвращаем 401 (а не дефолтный 403),
 # чтобы фронтовый интерсептор корректно редиректил на /login.
-api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_user_id(token: str | None = Depends(api_key_header)) -> int:
-    if not token:
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> int:
+    if credentials is None:
+        # None приходит и когда заголовка нет, и когда он есть, но без схемы
+        # `Bearer` — HTTPBearer эти случаи не различает, поэтому текст покрывает оба.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",
+            detail="Missing or malformed Authorization header (expected 'Bearer <token>')",
         )
+    # Схему уже разобрал HTTPBearer — дальше идёт голый токен.
     # Единая валидация: декод + Single Active Session + продление скользящего idle-TTL.
-    return await auth_service.validate_session(token)
+    return await auth_service.validate_session(credentials.credentials)
 
 
 class PermissionRequired:
