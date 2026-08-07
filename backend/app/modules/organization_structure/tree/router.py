@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .repository import get_tree_repository
 from .schemas import OrganizationTreeResponse

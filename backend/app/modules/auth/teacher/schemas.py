@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class TeacherKafedraInfo(BaseModel):

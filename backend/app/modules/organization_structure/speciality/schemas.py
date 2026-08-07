@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 
 NAME_MAX = 255
 # Шифр специальности — только цифры (60610300). Буквы туда попадали лишь по

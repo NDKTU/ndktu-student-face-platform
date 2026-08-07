@@ -99,6 +99,6 @@ examples/
 *.png
 
 scripts/_assets/                                                                                                                                                                        
-.claude/
-.agents/
-.stitch/
+.claude/*
+!.claude/CLAUDE.md
+!.claude/hooks/

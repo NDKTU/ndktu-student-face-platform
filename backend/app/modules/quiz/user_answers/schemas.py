@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class UserAnswerQuestionInfo(BaseModel):

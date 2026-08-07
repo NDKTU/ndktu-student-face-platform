@@ -35,10 +35,39 @@
       "Bash(curl -s -o /dev/null -w \"frontend health: %{http_code}\\\\n\" http://localhost:3000)",
       "Bash(docker cp *)",
       "Bash(docker exec database psql -U bekzod -d basic_database -c ' *)",
-      "Bash(curl -s -o /dev/null -w \"frontend: %{http_code}\\\\n\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"frontend: %{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(curl -s http://localhost:*)",
+      "mcp__playwright__browser_resize"
     ],
     "additionalDirectories": [
       "/tmp/pptx_preview"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash|mcp__playwright__browser_take_screenshot",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/no-root-images.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__playwright__browser_take_screenshot",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/collect-screenshots.py\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

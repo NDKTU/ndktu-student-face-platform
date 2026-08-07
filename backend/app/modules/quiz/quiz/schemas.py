@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 ProctoringMode = Literal["face", "standard"]
 

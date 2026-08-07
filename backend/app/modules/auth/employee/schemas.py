@@ -1,16 +1,14 @@
 from datetime import date
-
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
+from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 # Дубль GENDERS из app/core/database/enums.py: там ENUM базы, здесь проверка
 # на входе. Менять нужно оба места разом — Literal нельзя собрать из кортежа.
 Gender = Literal["Erkak", "Ayol"]
-
-from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 
 class EmployeeUserInfo(BaseModel):

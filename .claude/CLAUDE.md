@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Conventions
+
+**Images.** Every screenshot and generated image goes to `screenshots/` — never the project root. This is enforced, not advisory: a `PreToolUse` hook (`.claude/hooks/no-root-images.py`) denies any write that would drop an image file in the root, and a `PostToolUse` hook moves Playwright MCP screenshots into `screenshots/`. Images that are part of the app (`frontend/public/`, `frontend/src/assets/`, `docs/erd/`) are untouched — only the root is off limits.
+
 ## Commands
 
 ### Docker (primary workflow)

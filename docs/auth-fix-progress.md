@@ -76,77 +76,108 @@ permissions» matni saqlanib qoldi.
 
 ---
 
-## Qolgani
+### 6-bosqich — `curriculum` dagi ikkita xato (topildi va tuzatildi)
 
-### A. `curriculum/repository.py::update_row` dagi ikkita xato — YANGI TOPILDI
+Ikkalasi ham 3-bosqichdan **oldin ham** bor edi, lekin `teacher_id` ishlay
+boshlagach ko‘rinib qoldi. Har ikkisi
+`backend/app/modules/organization_structure/curriculum/repository.py` da.
 
-Bular 3-bosqichdan **oldin ham bor edi**, lekin `teacher_id` ishlay boshlagach
-ko‘rinib qoldi. Ikkalasi ham `backend/app/modules/organization_structure/curriculum/repository.py:157-160`:
+**`teacher_id: null` e’tiborsiz qolardi.** Yangilash `if value is not None`
+bo‘yicha yurar edi, ya’ni o‘qituvchini olib tashlab bo‘lmasdi — frontend esa
+«Tayinlanmagan» ni aynan `null` qilib yuboradi. Endi
+`data.model_dump(exclude_unset=True)` ishlatiladi: «yubormadi» va «ataylab `null`»
+ajratiladi. `null` faqat `teacher_id` uchun ma’noli, qolgan uch ustun `NOT NULL`.
 
-```python
-for field in ("semester", "credit", "teacher_id", "position"):
-    value = getattr(data, field)
-    if value is not None:
-        setattr(row, field, value)
-```
+**Javobdagi `teacher_name` bir so‘rov ortda qolardi.** Sessiya
+`expire_on_commit=False` bilan ishlaydi, shuning uchun `commit()` dan keyin qator
+identity-map’da yuklangan bog‘lanishlari bilan qolar, `get_row` esa uni o‘sha
+holicha qaytarardi. `get_row` ga `.execution_options(populate_existing=True)`
+qo‘shildi.
 
-**A1. `teacher_id: null` e’tiborsiz qoldiriladi.** `if value is not None` sababli
-o‘qituvchini olib tashlab bo‘lmaydi. Frontend endi «Tayinlanmagan» ni yuboradi —
-ya’ni bu yo‘l foydalanuvchiga ochiq va ishlamaydi. To‘g‘risi:
-`data.model_dump(exclude_unset=True)` bo‘yicha yurish, ya’ni «yuborilmagan» bilan
-«ataylab `null`» ni ajratish.
-
-**A2. Javobdagi `teacher_name` bir so‘rov ortda qoladi.** `update_row` oxirida
-`get_row` chaqiriladi, lekin `Curriculum` obyekti sessiya identity-map’ida qolgani
-uchun `selectinload(Curriculum.teacher)` eski bog‘lanishni qaytaradi.
-
-Takrorlash (355 — sinov qatori):
+Tekshirildi (355 — sinov qatori, tuzatishdan keyin):
 
 ```
-PUT /api/curriculum/355  {"teacher_id": 5}
-  → teacher_id 5, teacher_name «Olimova Sevara…»   ← bu 2-o‘qituvchining ismi
-PUT /api/curriculum/355  {"teacher_id": null}
-  → teacher_id 5 (o‘zgarmadi), teacher_name «Xolmatov Farrux…»  ← endi 5-niki
+POST teacher_id=2            → 2    | Olimova Sevara…
+PUT  {"teacher_id": 5}       → 5    | Xolmatov Farrux…      ← ism darhol to‘g‘ri
+PUT  {"teacher_id": null}    → None | None                  ← olib tashlash ishlaydi
+PUT  {"credit": 4}           → None | None, credit 4        ← qolgani tegilmaydi
+PUT  {"teacher_id":9,"credit":6} → 9 | Ergasheva Sevara…
 ```
 
-Yechimi: `commit()` dan keyin `session.expire(row)` yoki `get_row` da
-`populate_existing()`.
+### 7-bosqich — modellar bilan bazaning ajralib qolgani (topildi va tuzatildi)
 
-Tuzatilgandan keyin yuqoridagi ikki `PUT` ni qaytadan bosib ko‘rish kerak.
+4- va 5-bosqich bazani migratsiya orqali o‘zgartirgan, lekin **modellarga
+yozilmagan** edi. `alembic revision --autogenerate` buni darhol ko‘rsatdi: u
+o‘sha yettita indeksni va `uq_roles_name_lower` ni **o‘chirishni** taklif qildi.
 
-### B. `project.drawio`
+Modellar to‘g‘rilandi:
 
-Faylda hozir `User`, `UserRole`, `Role`, `RolePermission`, `Permission`,
-`Employee`, `Student` bor. Qo‘shiladi:
+- `index=True` — `UserRole.user_id`, `UserRole.role_id`,
+  `RolePermission.role_id`, `RolePermission.permission_id`,
+  `Student.user_id`, `Student.group_id`, `Teacher.kafedra_id`
+- `Role.name` dan `unique=True` olib tashlandi, o‘rniga:
+  `__table_args__ = (Index("uq_roles_name_lower", text("lower(name)"), unique=True),)`
+  — `func.lower("name")` yaramaydi, u `lower('name')` degan satr literalini beradi
 
-- **`Teacher`** — `id`, `kafedra_id`, `employee_id`
-- **`TeacherAssignment`** — `id`, `teacher_id`, `subject_id`, `group_id`
-- **`JobTitle`** — `id`, `name`
-- **`Employee`** dagi `position_id` → **`job_title_id`** (nomi noto‘g‘ri yozilgan)
+Shundan keyin `autogenerate` bo‘sh `upgrade()` berdi.
 
-**Bog‘lanish chiziqlari chizilmaydi** — bu talab. Mavjud beshta jadval va
-ular orasidagi to‘rtta chiziq tegilmaydi.
+> **Sabab shu yerda qoladi:** migratsiya yozganda modelni ham o‘zgartirish shart.
+> Bo‘sh `autogenerate` — buni tutadigan yagona tekshiruv.
 
-### C. Yakuniy tekshiruv
+### 8-bosqich — `project.drawio`
+
+Bajarildi. Qo‘shildi: **`Teacher`** (`id`, `kafedra_id`, `employee_id`),
+**`TeacherAssignment`** (`id`, `teacher_id`, `subject_id`, `group_id`),
+**`JobTitle`** (`id`, `name`). `Employee` dagi `position_id` → **`job_title_id`**.
+
+Bog‘lanish chiziqlari chizilmadi — `edge="1"` soni oldingidek 4 ta.
+
+---
+
+## Tekshiruv natijalari
+
+| Nima | Natija |
+|---|---|
+| `alembic revision --autogenerate` | bo‘sh `upgrade()` ✓ (vaqtinchalik fayl o‘chirildi) |
+| `auth` endpointlari (22 ta) | hammasi 200 ✓ |
+| `/teacher/ranking/{overall,faculty,kafedra}` | 200 ✓ (yo‘l `/ranking/overall`, `/ranking` emas) |
+| `/employee/me` admin uchun | 404 — to‘g‘ri, adminda xodim kartochkasi yo‘q |
+| `uv run ruff check app` | 89 → **8** xato; qolgani 8 ta `E501`, hammasi shu ishdan oldin ham bor edi |
+| `npx tsc --noEmit` | toza ✓ |
+| `npx vitest run` | 202/202 ✓ |
+| `npx vite build` | o‘tdi ✓ (chunk hajmi haqidagi ogohlantirish eski) |
+
+**Brauzerda (Playwright, `localhost:3000`):**
+
+- `/reja` → Konchilik Ishi → 1-semestr: o‘qituvchi ismlari join orqali to‘g‘ri
+  chiqadi; «Fan qo‘shish» dagi `select` kafedraning 3 ta o‘qituvchisi bilan
+  to‘lgan va boshida «Tayinlanmagan» turadi. Sinov qatori o‘qituvchi tanlab
+  saqlandi, kartochkada ism to‘g‘ri ko‘rindi, keyin o‘chirildi (352 qator).
+  **Bu ro‘yxat ilgari hech qachon to‘lmagan** — `Kafedra.teachers` doim `[]` edi.
+- `/foydalanuvchilar` → «Xodimlar»: «Lavozim» ustuni `job_titles` dan keladi,
+  «Holati» ustuni yo‘q. «Lavozimlar» tabi 11 ta yozuvni CRUD menyusi bilan
+  ko‘rsatadi. «Yangi xodim» formasida «Jinsi» (`Erkak`/`Ayol`) va «Lavozim»
+  (`Tanlanmagan` + ma’lumotnoma) `select` lari bor, `status` maydoni yo‘q.
+
+Yo‘l-yo‘lakay bitta kosmetik xato tuzatildi: tanlash ro‘yxatidagi ismlarga
+`displayName()` qo‘llanar va u «oʻgʻli»/«qizi» ni ham bosh harf bilan yozardi —
+kartochkalardagi ism bilan mos kelmasdi. Endi ism serverdan qanday kelsa, shunday
+ko‘rsatiladi.
+
+---
+
+## Muhit haqida — vaqt yo‘qotmaslik uchun
+
+**Backend manbasi konteynerga bind-mount qilinmagan**, obrazga qotirilgan.
+Shuning uchun `docker restart nusmt_backend` kod o‘zgarishini **olmaydi**. Kerak:
 
 ```bash
-# Model va baza ajralmaganini tekshirish — bo‘sh upgrade() chiqishi shart
-docker exec nusmt_backend sh -c "cd /face/app && uv run alembic revision --autogenerate -m check"
-# tekshirgandan keyin bu vaqtinchalik migratsiya o‘chiriladi
-
-cd backend && uv run ruff check app
-cd frontend && npx tsc --noEmit -p tsconfig.app.json && npx vitest run && npx vite build
+docker compose up -d --build backend        # to‘liq, sekin
+# yoki bitta fayl uchun:
+docker cp backend/app/<yo'l> nusmt_backend:/face/app/<yo'l> && docker restart nusmt_backend
 ```
 
-Endpointlar bo‘ylab: `/employee/`, `/employee/{id}`, `/employee/{id}/sensitive`,
-`/permission/`, `/role/`, `/teacher/`, `/teacher/ranking/*`, `/user/`, `/user/me`,
-`/user/role-counts`, `/students/`, `/students/with-users`, `/students/{id}/sensitive`,
-`/teacher-assignment/`, `/job-title/`.
-`/employee/me` admin uchun 404 — bu to‘g‘ri, adminda xodim kartochkasi yo‘q.
-
-Brauzerda: `/foydalanuvchilar` — xodim formasidagi gender va lavozim `select` lari,
-«Lavozimlar» tabi; `/reja` — o‘qituvchi tanlash, saqlashdan keyin ismning to‘g‘ri
-ko‘rinishi va «Tayinlanmagan» ni tanlab saqlay olish (A1 tuzatilgandan keyin).
+Bu bir marta chalg‘itdi: tuzatish yozilgan, lekin test eski kodni sinagan.
 
 ---
 

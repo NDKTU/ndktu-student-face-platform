@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 QUESTION_TYPES = Literal["text", "true_false", "scale", "image_stimulus", "image_choice", "multi_choice"]
 

@@ -1,9 +1,9 @@
 from datetime import date as date_type
-
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 ATTENDANCE_VALUES = Literal["present", "absent", "late"]
 LESSON_TYPE_VALUES = Literal["lecture", "seminar", "independent", "lab"]

@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 
 # Столбец `faculties.name` — String(50). Без явного предела длинное название
 # проходило Pydantic и падало уже в базе пятисоткой.

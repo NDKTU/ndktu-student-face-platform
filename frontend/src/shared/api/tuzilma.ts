@@ -230,8 +230,11 @@ export async function fetchKafedraTeachers(kafedraId: number): Promise<Curriculu
     'teachers',
     { kafedra_id: kafedraId },
   );
+  // Имя берём как есть: displayName ставит заглавную каждому слову и портит
+  // «oʻgʻli»/«qizi». В карточках плана ФИО и так показывается прямо с сервера —
+  // список выбора должен читаться так же.
   return rows
-    .map((row) => ({ id: row.id, fullName: displayName(row.employee?.full_name ?? '') }))
+    .map((row) => ({ id: row.id, fullName: row.employee?.full_name ?? '' }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 

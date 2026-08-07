@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class CourseSubjectInfo(BaseModel):

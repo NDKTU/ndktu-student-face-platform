@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class Teacher(Base, IdIntPk, TimestampMixin):
     __tablename__ = "teachers"
-    kafedra_id: Mapped[int] = mapped_column(ForeignKey("kafedras.id"))
+    kafedra_id: Mapped[int] = mapped_column(ForeignKey("kafedras.id"), index=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), unique=True)
 
     kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="teachers")

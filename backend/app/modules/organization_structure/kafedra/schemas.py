@@ -1,7 +1,8 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime, normalized_name
 
 
 class KafedraCreateRequest(BaseModel):

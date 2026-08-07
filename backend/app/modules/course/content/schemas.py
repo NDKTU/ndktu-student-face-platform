@@ -2,8 +2,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.schemas import TashkentDatetime
-
 VIDEO_TYPES = Literal["upload", "youtube"]
 
 

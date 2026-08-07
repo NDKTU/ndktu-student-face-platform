@@ -6,9 +6,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.auth.teacher.model import Teacher
 from app.modules.organization_structure.curriculum.model import Curriculum
 from app.modules.organization_structure.speciality.model import Speciality
-from app.modules.auth.teacher.model import Teacher
 from app.modules.quiz.subject.model import Subject
 
 from .schemas import (
@@ -102,6 +102,11 @@ class CurriculumRepository:
             .options(selectinload(Curriculum.subject),
             selectinload(Curriculum.teacher).selectinload(Teacher.employee))
             .where(Curriculum.id == row_id)
+            # Сессия живёт с expire_on_commit=False, поэтому после правки строка
+            # остаётся в identity map с уже загруженными связями, и обычный
+            # SELECT вернёт её как есть. Без этого ответ на PUT показывал
+            # прежнего ведущего: teacher_id уже новый, а teacher — старый.
+            .execution_options(populate_existing=True)
         )
         row = (await session.execute(stmt)).scalar_one_or_none()
         if row is None:
@@ -146,6 +151,12 @@ class CurriculumRepository:
     ) -> Curriculum:
         row = await self.get_row(session, row_id)
 
+        # «Поле не прислали» и «прислали null» — разные намерения, и различает их
+        # только exclude_unset. Раньше правка шла по `value is not None`, из-за
+        # чего снять ведущего было нечем: форма шлёт teacher_id: null, а он
+        # молча игнорировался.
+        sent = data.model_dump(exclude_unset=True)
+
         # subject_id меняется вместе с названием: иначе в плане осталась бы
         # подпись от прежнего фана.
         if data.subject_id is not None or data.subject_name is not None:
@@ -154,10 +165,14 @@ class CurriculumRepository:
                 session, data.subject_id, data.subject_name or row.subject_name
             )
 
-        for field in ("semester", "credit", "teacher_id", "position"):
-            value = getattr(data, field)
-            if value is not None:
-                setattr(row, field, value)
+        # teacher_id — единственный из четырёх, где null осмыслен: остальные
+        # столбцы NOT NULL, и присланный null для них — просто мусор.
+        if "teacher_id" in sent:
+            row.teacher_id = sent["teacher_id"]
+
+        for field in ("semester", "credit", "position"):
+            if sent.get(field) is not None:
+                setattr(row, field, sent[field])
 
         try:
             await session.commit()

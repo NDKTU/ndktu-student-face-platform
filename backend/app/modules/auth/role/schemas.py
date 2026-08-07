@@ -1,6 +1,6 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class RoleCreateRequest(BaseModel):

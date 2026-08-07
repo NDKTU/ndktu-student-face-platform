@@ -12,7 +12,7 @@ __all__ = [
     "Student",
     "Employee",
     "JobTitle",
-    
+
     "Faculty",
     "Kafedra",
     "Group",

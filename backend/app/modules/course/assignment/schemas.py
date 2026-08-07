@@ -1,9 +1,9 @@
 from datetime import datetime
-
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned"]
 
