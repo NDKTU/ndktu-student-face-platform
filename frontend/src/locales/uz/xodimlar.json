@@ -41,7 +41,7 @@
   "action": {
     "edit": "Tahrirlash",
     "resetPassword": "Parolni tiklash",
-    "resetSent": "Parolni tiklash havolasi yuborildi"
+    "resetDone": "Parol yangilandi"
   },
   "denied": {
     "title": "Bu ma'lumotni ko'rish uchun ruxsat yo'q",
@@ -109,5 +109,11 @@
     },
     "deleteTitle": "Lavozimni o'chirish",
     "deleteText": "«{{name}}» lavozimi o'chiriladi. Bu lavozimdagi xodimlar lavozimsiz qoladi."
+  },
+  "reset": {
+    "title": "Parolni tiklash",
+    "subtitle": "Xodim keyingi kirishda yangi paroldan foydalanadi",
+    "field": "Yangi parol",
+    "submit": "Saqlash"
   }
 }

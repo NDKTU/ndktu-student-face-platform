@@ -125,6 +125,15 @@ export async function updateEmployee(id: number, draft: EmployeeDraft): Promise<
   return toEmployee(await api.put<ApiEmployee>(`/employee/${id}`, toBody(draft)));
 }
 
+/**
+ * Админский сброс пароля. Текущий пароль не нужен — админ его не знает; сервер
+ * при этом отзывает сессию сотрудника, и тот перелогинивается с новым паролем.
+ * Требует права `reset:user_password`, иначе 403.
+ */
+export function resetEmployeePassword(userId: number, newPassword: string): Promise<void> {
+  return api.post<void>(`/user/${userId}/reset-password`, { new_password: newPassword });
+}
+
 /** Персональные данные. Требуют отдельного права, иначе 403. */
 export async function getEmployeeSensitive(id: number): Promise<EmployeeSensitive> {
   const data = await api.get<ApiEmployeeSensitive>(`/employee/${id}/sensitive`);

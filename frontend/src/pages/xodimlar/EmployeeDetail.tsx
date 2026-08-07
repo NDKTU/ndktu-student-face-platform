@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/entities/access/lib/usePermissions';
 import { SensitiveSection } from '@/entities/access/ui/SensitiveSection';
 import type { Employee } from '@/entities/employee/model/types';
-import { getEmployeeSensitive } from '@/shared/api/xodimlar';
+import { getEmployeeSensitive, resetEmployeePassword } from '@/shared/api/xodimlar';
 import { Button } from '@/shared/ui/Button';
+import { Modal, ModalField, modalInputClass } from '@/shared/ui/Modal';
 import { useToast } from '@/shared/ui/Toast';
 
 type Tab = 'umumiy' | 'maxfiy' | 'tizim';
@@ -16,12 +17,31 @@ interface EmployeeDetailProps {
 
 export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
   const { t } = useTranslation('xodimlar');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
-  const { canViewEmployeeSensitive } = usePermissions();
+  const { canViewEmployeeSensitive, has } = usePermissions();
   const [tab, setTab] = useState<Tab>('umumiy');
+  // null — модалка закрыта; строка — открыта и хранит введённый пароль.
+  const [resetPwd, setResetPwd] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  async function handleReset() {
+    if (!resetPwd?.trim() || resetting) return;
+    setResetting(true);
+    try {
+      await resetEmployeePassword(employee.userId, resetPwd);
+      toast(t('action.resetDone'));
+      setResetPwd(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResetting(false);
+    }
+  }
 
 
   return (
+    <>
     <div className="mx-auto w-full max-w-[1440px] px-8 pt-7 pb-12">
       <div className="mb-5 rounded-18 border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-start gap-[18px]">
@@ -124,16 +144,49 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
                 ]}
               />
               <div className="mt-5 border-t border-surface-sunken pt-5">
-                <Button variant="secondary" onClick={() => toast(t('action.resetSent'))}>
-                  <ResetIcon />
-                  {t('action.resetPassword')}
-                </Button>
+                {/* Без права кнопку прячем: сервер всё равно ответит 403, а
+                    кнопка, которая всегда падает, хуже её отсутствия. */}
+                {has('reset:user_password') && (
+                  <Button variant="secondary" onClick={() => setResetPwd('')}>
+                    <ResetIcon />
+                    {t('action.resetPassword')}
+                  </Button>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
     </div>
+
+    {resetPwd !== null && (
+      <Modal
+        title={t('reset.title')}
+        subtitle={t('reset.subtitle')}
+        onClose={() => setResetPwd(null)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setResetPwd(null)}>
+              {tc('cancel')}
+            </Button>
+            <Button disabled={!resetPwd.trim() || resetting} onClick={() => void handleReset()}>
+              {t('reset.submit')}
+            </Button>
+          </>
+        }
+      >
+        <ModalField label={t('reset.field')}>
+          <input
+            type="password"
+            value={resetPwd}
+            onChange={(e) => setResetPwd(e.target.value)}
+            placeholder="••••••••"
+            className={modalInputClass}
+          />
+        </ModalField>
+      </Modal>
+    )}
+    </>
   );
 }
 
