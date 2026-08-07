@@ -1,6 +1,6 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class RoleResponse(BaseModel):
@@ -48,14 +48,22 @@ class UserCreateRequest(BaseModel):
 
 
 class UserUpdateRequest(BaseModel):
-    username: str | None = None
-    password: str | None = None
+    """Пароль сюда не входит намеренно.
 
-    @field_validator("password", mode="before")
-    def validate_password(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        if not value.strip():
+    Сброс — отдельное действие под своим правом (`POST /user/{id}/reset-password`):
+    так его нельзя выполнить невзначай, оно отдельно выдаётся и отдельно видно
+    в логах. Здесь же он менялся молча и без отзыва сессии.
+    """
+
+    username: str | None = None
+
+
+class UserResetPasswordRequest(BaseModel):
+    new_password: str
+
+    @field_validator("new_password", mode="before")
+    def validate_new_password(cls, value: str) -> str:
+        if not value or not value.strip():
             raise ValueError("Password cannot be empty")
         return value.strip()
 

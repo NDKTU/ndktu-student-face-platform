@@ -4,7 +4,7 @@ import logging
 from core.database.db_helper import db_helper
 from core.dependencies.current_user import get_current_user_full
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from .schemas import (
     UserLoginRequest,
     UserLoginResponse,
     UserMeResponse,
+    UserResetPasswordRequest,
     UserRoleAssignRequest,
     UserUpdateRequest,
 )
@@ -146,6 +147,28 @@ async def update_user(
 ):
     result = await get_user_repository.update_user(session=session, user_id=user_id, data=data)
     return result
+
+
+@router.post(
+    "/{user_id}/reset-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
+async def reset_user_password(
+    user_id: int,
+    data: UserResetPasswordRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("reset:user_password")),
+):
+    """Сброс пароля админом. Отдельно от `PUT /{user_id}` и под своим правом:
+    так его нельзя выполнить невзначай, а выдать его можно не всем, у кого есть
+    `update:user`."""
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O'z parolingizni /user/me/credentials orqali o'zgartiring",
+        )
+    await get_user_repository.reset_password(session=session, user_id=user_id, new_password=data.new_password)
 
 
 @router.delete(

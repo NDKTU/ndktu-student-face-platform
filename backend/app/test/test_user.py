@@ -115,3 +115,78 @@ async def test_me_rejects_a_token_without_the_bearer_scheme(async_client, access
     response = await async_client.get("/user/me")
 
     assert response.status_code == 401
+
+
+# Ниже `auth_client` и `async_client` — один и тот же объект, у второго просто нет
+# заголовка. Подмена `Authorization` видна в обоих, поэтому она всегда делается
+# после того, как админский запрос уже выполнен.
+
+
+@pytest.mark.asyncio
+async def test_update_user_rejects_a_taken_username(auth_client, test_user):
+    """`users.username` уникален: без явной проверки был бы IntegrityError и 500."""
+    other = await auth_client.post(
+        "/user/",
+        json={"username": "second_user", "password": "password123", "roles": [{"name": "Admin"}]},
+    )
+    assert other.status_code == 201
+
+    response = await auth_client.put(
+        f"/user/{other.json()['id']}", json={"username": test_user["username"]}
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_user_no_longer_accepts_a_password(auth_client, test_user):
+    response = await auth_client.put(
+        f"/user/{test_user['id']}", json={"username": "kept_user", "password": "hacked"}
+    )
+
+    assert response.status_code == 200
+    # Пароль не изменился — вход по старому по-прежнему работает.
+    login = await auth_client.post(
+        "/user/login", json={"username": "kept_user", "password": test_user["password"]}
+    )
+    assert login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reset_password_revokes_the_target_session(auth_client, async_client, test_user):
+    """Сброс пароля обязан выбросить владельца старого токена: иначе смена
+    пароля скомпрометированной учётки ничего не даёт до истечения idle-TTL."""
+    target = await auth_client.post(
+        "/user/",
+        json={"username": "victim", "password": "password123", "roles": [{"name": "Admin"}]},
+    )
+    target_id = target.json()["id"]
+
+    login = await async_client.post(
+        "/user/login", json={"username": "victim", "password": "password123"}
+    )
+    victim_token = login.json()["access_token"]
+
+    response = await auth_client.post(
+        f"/user/{target_id}/reset-password", json={"new_password": "brand_new_pw"}
+    )
+    assert response.status_code == 204
+
+    async_client.headers.update({"Authorization": f"Bearer {victim_token}"})
+    assert (await async_client.get("/user/me")).status_code == 401
+
+    relogin = await async_client.post(
+        "/user/login", json={"username": "victim", "password": "brand_new_pw"}
+    )
+    assert relogin.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reset_password_refuses_your_own_account(auth_client, test_user):
+    """Своя смена пароля идёт через /user/me/credentials и требует текущий
+    пароль. Через админский сброс эту проверку обходить нельзя."""
+    response = await auth_client.post(
+        f"/user/{test_user['id']}/reset-password", json={"new_password": "self_service"}
+    )
+
+    assert response.status_code == 400

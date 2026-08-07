@@ -139,11 +139,18 @@ class UserRepository:
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        # Частичное обновление через Request схему
         if data.username is not None:
+            # `users.username` уникален: без этой проверки был бы IntegrityError и
+            # 500 вместо внятного 400 (в `create_user` такая проверка уже есть).
+            taken = (
+                await session.execute(select(User).where(User.username == data.username, User.id != user_id))
+            ).scalar_one_or_none()
+            if taken:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Bu foydalanuvchi nomi allaqachon band",
+                )
             user.username = data.username
-        if data.password is not None:
-            user.password = hash_password(data.password)
 
         await session.commit()
         # Адресный refresh, как в `create_user`. Голый `refresh(user)` брал только
@@ -153,6 +160,27 @@ class UserRepository:
         # обращение к нему даёт ту же ошибку.
         await session.refresh(user, attribute_names=["roles", "updated_at"])
         return user
+
+    async def reset_password(self, session: AsyncSession, user_id: int, new_password: str) -> None:
+        """Админский сброс пароля.
+
+        Текущий пароль не спрашивается — админ его не знает и знать не должен,
+        в БД только хеш. Свою учётку через этот путь не сбросить: за это отвечает
+        роут, ему видно, кто вызывает.
+        """
+        from .service import auth_service
+
+        user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        user.password = hash_password(new_password)
+        await session.commit()
+
+        # Отзываем сессию цели. Без этого владелец старого токена продолжает
+        # работать до истечения idle-TTL, и сброс пароля скомпрометированной
+        # учётки не даёт ничего. `change_my_credentials` делает то же самое.
+        await auth_service.logout(user_id)
 
     async def delete_user(self, session: AsyncSession, user_id: int, force: bool = False) -> None:
         from sqlalchemy import delete
