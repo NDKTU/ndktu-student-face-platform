@@ -146,7 +146,12 @@ class UserRepository:
             user.password = hash_password(data.password)
 
         await session.commit()
-        await session.refresh(user)
+        # Адресный refresh, как в `create_user`. Голый `refresh(user)` брал только
+        # колонки и оставлял `roles` незагруженными — Pydantic уходил в ленивый IO
+        # и падал с MissingGreenlet. `updated_at` тоже нужен явно: его заполняет
+        # сервер через onupdate, поэтому после UPDATE он остаётся просроченным, и
+        # обращение к нему даёт ту же ошибку.
+        await session.refresh(user, attribute_names=["roles", "updated_at"])
         return user
 
     async def delete_user(self, session: AsyncSession, user_id: int, force: bool = False) -> None:
