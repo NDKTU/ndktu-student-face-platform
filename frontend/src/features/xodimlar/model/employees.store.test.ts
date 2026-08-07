@@ -20,7 +20,7 @@ function row(id: number, over: Partial<Employee> = {}): Employee {
     userId: id + 100,
     fish: 'Sardor Aliyev',
     roleNames: ['super_admin'],
-    role: 'Super Admin',
+    roleLabels: ['Super Admin'],
     unit: 'Rektorat',
     departmentId: null,
     lavozim: 'Tizim administratori',

@@ -4,6 +4,7 @@ import { unitOptions, useEmployeesStore } from '@/features/xodimlar/model/employ
 import { useRollar } from '@/features/rollar/lib/useRollar';
 import { useRollarStore } from '@/features/rollar/model/rollar.store';
 import { roleLabel } from '@/entities/access/model/roles';
+import { employeeRoleOptions, matchesRole } from '@/entities/employee/lib/roles';
 import { useXodimlar } from '@/features/xodimlar/lib/useXodimlar';
 import type { Employee, EmployeeDraft } from '@/entities/employee/model/types';
 import { PageHeader } from '@/shared/ui/PageHeader';
@@ -42,10 +43,7 @@ export function XodimlarTab() {
     null,
   );
 
-  const roleOptions = useMemo(
-    () => Array.from(new Set(employees.map((e) => e.role))).sort((a, b) => a.localeCompare(b)),
-    [employees],
-  );
+  const roleOptions = useMemo(() => employeeRoleOptions(employees), [employees]);
 
   // Роли для формы — из справочника БД, а не из уже заведённых сотрудников:
   // иначе новую роль нельзя было бы назначить, пока её никто не носит.
@@ -59,7 +57,7 @@ export function XodimlarTab() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return employees.filter((e) => {
-      if (role && e.role !== role) return false;
+      if (!matchesRole(e, role)) return false;
       if (unit && e.unit !== unit) return false;
       if (!q) return true;
       return e.fish.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
@@ -104,10 +102,23 @@ export function XodimlarTab() {
     {
       key: 'role',
       label: t('column.role'),
-      width: 140,
+      width: 180,
       padX: 16,
-      render: (e) => e.role,
-      cellClass: 'text-13 font-semibold text-ink-secondary',
+      // Бейдж на каждую роль: у декана их две, и вторая — не декорация, от неё
+      // зависит, что человек может делать в системе.
+      render: (e) => (
+        <div className="flex flex-wrap gap-1">
+          {e.roleLabels.map((label) => (
+            <span
+              key={label}
+              className="rounded-6 bg-surface-sunken px-2 py-0.5 text-11-5 font-semibold text-ink-secondary"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      ),
+      cellClass: '',
     },
   ];
 

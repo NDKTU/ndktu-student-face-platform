@@ -41,12 +41,15 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
               {employee.lavozim} · {employee.unit}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <span
-                className="rounded-20 px-[11px] py-1 text-12 font-bold"
-                style={{ background: `${employee.color}1A`, color: employee.color }}
-              >
-                {employee.role}
-              </span>
+              {employee.roleLabels.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-20 px-[11px] py-1 text-12 font-bold"
+                  style={{ background: `${employee.color}1A`, color: employee.color }}
+                >
+                  {label}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -117,7 +120,7 @@ export function EmployeeDetail({ employee, onEdit }: EmployeeDetailProps) {
               <FieldGrid
                 rows={[
                   [t('field.login'), employee.login],
-                  [t('field.role'), employee.role],
+                  [t('field.role'), employee.roleLabels.join(', ')],
                 ]}
               />
               <div className="mt-5 border-t border-surface-sunken pt-5">

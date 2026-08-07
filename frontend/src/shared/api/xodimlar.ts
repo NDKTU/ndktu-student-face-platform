@@ -47,6 +47,8 @@ interface ApiEmployeeSensitive {
 
 function toEmployee(row: ApiEmployee): Employee {
   const roleNames = (row.user?.roles ?? []).map((r) => r.name);
+  // Цвет аватара — по первой роли; сервер отдаёт `User.roles` отсортированными
+  // по имени, поэтому он стабилен между загрузками.
   const primary = roleNames[0] ?? '';
 
   return {
@@ -54,7 +56,7 @@ function toEmployee(row: ApiEmployee): Employee {
     userId: row.user_id,
     fish: row.full_name,
     roleNames,
-    role: primary ? roleLabel(primary) : '',
+    roleLabels: roleNames.map(roleLabel),
     color: roleColor(primary),
     unit: row.department?.name ?? '',
     departmentId: row.department?.id ?? null,
