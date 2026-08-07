@@ -1,15 +1,6 @@
-from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class PermissionCreateRequest(BaseModel):
-    name: str
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        str_to_lower=True,
-    )
+from app.core.schemas import MAX_PAGE_SIZE, TashkentDatetime
 
 
 class PermissionCreateResponse(BaseModel):

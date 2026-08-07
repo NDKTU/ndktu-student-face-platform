@@ -34,4 +34,15 @@ async def sync_permissions(session: AsyncSession, discovered_permissions: set[st
             logger.info("All discovered permissions already exist.")
 
     existing_perms_result = await session.execute(select(Permission))
-    return {p.name: p for p in existing_perms_result.scalars().all()}
+    all_perms = {p.name: p for p in existing_perms_result.scalars().all()}
+
+    # Пока только сообщаем. Удалять начнём отдельным изменением, когда лог
+    # подтвердит, что в список попадают ровно снятые с кода права: ошибка здесь
+    # снимает право со всех ролей разом (`role_permissions` каскадный), а
+    # опирается она на то, что `discover_permissions` видит абсолютно каждую
+    # проверку.
+    orphans = sorted(name for name in all_perms if name not in discovered_permissions)
+    if orphans:
+        logger.warning(f"Orphaned permissions, no route declares them ({len(orphans)}): {orphans}")
+
+    return all_perms
