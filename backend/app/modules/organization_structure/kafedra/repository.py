@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -95,6 +96,8 @@ class KafedraRepository:
         if not kafedra:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kafedra not found")
 
+        ensure_editable(kafedra, "кафедры")
+
         if data.name is not None:
             # Check unique name excluding current
             stmt_check = select(Kafedra).where(Kafedra.name == data.name, Kafedra.id != kafedra_id)
@@ -124,6 +127,8 @@ class KafedraRepository:
 
         if not kafedra:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kafedra not found")
+
+        ensure_editable(kafedra, "кафедры")
 
         if not force:
             teacher_count = (

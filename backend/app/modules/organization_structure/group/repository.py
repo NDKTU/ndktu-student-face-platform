@@ -1,8 +1,9 @@
 import logging
 import re
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -149,6 +150,8 @@ class GroupRepository:
         if not group:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
 
+        ensure_editable(group, "группы")
+
         if data.name is not None:
             # Check unique name excluding current
             stmt_check = select(Group).where(Group.name == data.name, Group.id != group_id)
@@ -178,6 +181,8 @@ class GroupRepository:
 
         if not group:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+
+        ensure_editable(group, "группы")
 
         if not force:
             student_count = (
@@ -227,16 +232,35 @@ class GroupRepository:
         normalized = re.sub(r"(\d+)([a-z]{2})$", r"\1 \2", normalized)
         return clean, normalized
 
-    async def get_or_create(self, session: AsyncSession, name: str, faculty_id: int) -> Group:
-        clean, normalized = self._normalize_name(name)
-        stmt = select(Group).where(
-            or_(
-                Group.name == normalized,
-                Group.name == clean,
-                Group.name.ilike(f"%{clean.replace(' ', '')}%"),
+    @staticmethod
+    def _fuzzy_match_stmt(clean: str, normalized: str):
+        """Кандидаты на совпадение по имени, точные — первыми.
+
+        Имя группы больше не уникально глобально (UNIQUE заменён на составной
+        по факультету), поэтому запрос обязан быть устойчив к нескольким
+        совпадениям. Сортировка выводит точные совпадения вперёд, чтобы
+        ``.first()`` не выбрал случайное частичное.
+        """
+        return (
+            select(Group)
+            .where(
+                or_(
+                    Group.name == normalized,
+                    Group.name == clean,
+                    Group.name.ilike(f"%{clean.replace(' ', '')}%"),
+                )
+            )
+            .order_by(
+                case((Group.name == normalized, 0), (Group.name == clean, 1), else_=2),
+                Group.id,
             )
         )
-        obj = (await session.execute(stmt)).scalar_one_or_none()
+
+    async def get_or_create(self, session: AsyncSession, name: str, faculty_id: int) -> Group:
+        clean, normalized = self._normalize_name(name)
+        # .first(), а не .scalar_one_or_none(): при неуникальных именах
+        # последний бросал бы MultipleResultsFound прямо на входе студента.
+        obj = (await session.execute(self._fuzzy_match_stmt(clean, normalized))).scalars().first()
         if not obj:
             try:
                 obj = Group(name=normalized, faculty_id=faculty_id)
@@ -245,21 +269,32 @@ class GroupRepository:
                 await session.refresh(obj)
             except IntegrityError:
                 await session.rollback()
-                obj = (await session.execute(select(Group).where(Group.name == normalized))).scalar_one()
+                obj = (
+                    await session.execute(
+                        select(Group).where(
+                            Group.name == normalized,
+                            Group.faculty_id == faculty_id,
+                        )
+                    )
+                ).scalar_one()
         return obj
 
     async def find_id_by_name_fuzzy(self, session: AsyncSession, name: str) -> tuple[int | None, str]:
         clean, normalized = self._normalize_name(name)
-        stmt = select(Group.id).where(
-            or_(
-                Group.name == normalized,
-                Group.name == clean,
-                Group.name.ilike(f"%{clean.replace(' ', '')}%"),
-            )
-        )
-        group_id = (await session.execute(stmt)).scalars().first()
+        matches = (await session.execute(self._fuzzy_match_stmt(clean, normalized))).scalars().all()
+        group_id = matches[0].id if matches else None
         suggested = normalized if not group_id else name
         return group_id, suggested
+
+    async def find_candidates_by_name(self, session: AsyncSession, name: str) -> list[Group]:
+        """Все кандидаты на совпадение — для экрана сопоставления с EPOS.
+
+        В отличие от find_id_by_name_fuzzy отдаёт весь список, чтобы вызывающий
+        мог отличить однозначное совпадение от неоднозначного и не привязать
+        группу вслепую.
+        """
+        clean, normalized = self._normalize_name(name)
+        return list((await session.execute(self._fuzzy_match_stmt(clean, normalized))).scalars().all())
 
 
 get_group_repository = GroupRepository()

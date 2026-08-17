@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from core.config import settings
-from core.utils.password_hash import verify_password
 from core.redis_client import redis_client
+from core.utils.password_hash import verify_password
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Role, Student, Teacher, User
 
+from .active_check import ensure_user_active
 from .schemas import UserLoginRequest, UserLoginResponse
 
 logger = logging.getLogger(__name__)
@@ -114,6 +115,8 @@ class UserService:
 
         if not verify_password(data.password, user.password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+
+        ensure_user_active(user)
 
         access_token = await self.create_session_token(user.id)
 

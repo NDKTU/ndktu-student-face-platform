@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.core.schemas import ExternalRefFields, TashkentDatetime
 
 
 class DepartmentCreateRequest(BaseModel):
@@ -26,7 +27,7 @@ class DepartmentUpdateRequest(BaseModel):
         return v.strip()
 
 
-class DepartmentResponse(BaseModel):
+class DepartmentResponse(ExternalRefFields):
     id: int
     name: str
     created_at: TashkentDatetime

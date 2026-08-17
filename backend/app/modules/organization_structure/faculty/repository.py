@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -87,6 +88,8 @@ class FacultyRepository:
         if not faculty:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
 
+        ensure_editable(faculty, "факультета")
+
         if data.name is not None:
             stmt_check = select(Faculty).where(Faculty.name == data.name, Faculty.id != faculty_id)
             existing_faculty = (await session.execute(stmt_check)).scalar_one_or_none()
@@ -105,6 +108,8 @@ class FacultyRepository:
         from sqlalchemy import delete, func, select
 
         from app.modules.organization_structure.model import Group, Kafedra
+
+        ensure_editable(await self.get_faculty(session, faculty_id), "факультета")
 
         if not force:
             kafedra_count = (

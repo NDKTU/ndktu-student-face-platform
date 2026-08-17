@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.core.schemas import ExternalRefFields, TashkentDatetime
 
 
 class SpecialityCreateRequest(BaseModel):
@@ -30,7 +31,7 @@ class SpecialityUpdateRequest(BaseModel):
         return v
 
 
-class SpecialityResponse(BaseModel):
+class SpecialityResponse(ExternalRefFields):
     id: int
     name: str
     kafedra_id: int

@@ -1,11 +1,13 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Employee, Teacher, User
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
@@ -31,28 +33,13 @@ class EmployeeRepository:
         return f"{last_name} {first_name} {third_name}"
 
     async def upload_image(self, file) -> str:
-        import os
-        import shutil
-        import uuid
-
-        file_ext = file.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{file_ext}"
-
-        upload_dir = settings.profile_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = upload_dir / filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
+        filename = await save_image(file, settings.profile_upload_dir)
         return f"{settings.file_url.http}/profile/{filename}"
 
     async def create_employee(self, session: AsyncSession, data: EmployeeCreateRequest) -> Employee:
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
 
-        existing = (
-            await session.execute(select(Employee).where(Employee.full_name == full_name))
-        ).scalar_one_or_none()
+        existing = (await session.execute(select(Employee).where(Employee.full_name == full_name))).scalar_one_or_none()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -132,15 +119,15 @@ class EmployeeRepository:
 
         return EmployeeListResponse(total=total, page=request.page, limit=request.limit, employees=employees)
 
-    async def update_employee(
-        self, session: AsyncSession, employee_id: int, data: EmployeeUpdateRequest
-    ) -> Employee:
+    async def update_employee(self, session: AsyncSession, employee_id: int, data: EmployeeUpdateRequest) -> Employee:
         stmt = select(Employee).options(*self._eager_load_options()).where(Employee.id == employee_id)
         result = await session.execute(stmt)
         employee = result.scalar_one_or_none()
 
         if not employee:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+
+        ensure_editable(employee, "сотрудника")
 
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
 
@@ -178,6 +165,8 @@ class EmployeeRepository:
         if not employee:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
+        ensure_editable(employee, "сотрудника")
+
         teacher = (
             await session.execute(select(Teacher).where(Teacher.employee_id == employee_id))
         ).scalar_one_or_none()
@@ -187,9 +176,7 @@ class EmployeeRepository:
                 status_code=409,
                 detail={
                     "requires_confirmation": True,
-                    "message": (
-                        f"'{employee.full_name}' xodimini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:"
-                    ),
+                    "message": (f"'{employee.full_name}' xodimini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:"),
                     "warnings": ["Ushbu xodimga tegishli o'qituvchi profili o'chadi"],
                 },
             )

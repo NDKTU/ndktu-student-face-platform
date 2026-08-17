@@ -1,7 +1,8 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, join, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,9 +56,7 @@ class SpecialityRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speciality not found")
         return speciality
 
-    async def list_specialities(
-        self, session: AsyncSession, request: SpecialityListRequest
-    ) -> SpecialityListResponse:
+    async def list_specialities(self, session: AsyncSession, request: SpecialityListRequest) -> SpecialityListResponse:
         from app.modules.organization_structure.model import Kafedra
 
         stmt = select(Speciality)
@@ -92,11 +91,10 @@ class SpecialityRepository:
         self, session: AsyncSession, speciality_id: int, data: SpecialityUpdateRequest
     ) -> Speciality:
         speciality = await self.get_speciality(session, speciality_id)
+        ensure_editable(speciality, "специальности")
 
         if data.name is not None:
-            stmt_check = select(Speciality).where(
-                Speciality.name == data.name, Speciality.id != speciality_id
-            )
+            stmt_check = select(Speciality).where(Speciality.name == data.name, Speciality.id != speciality_id)
             if (await session.execute(stmt_check)).scalar_one_or_none():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -121,6 +119,7 @@ class SpecialityRepository:
 
     async def delete_speciality(self, session: AsyncSession, speciality_id: int) -> None:
         speciality = await self.get_speciality(session, speciality_id)
+        ensure_editable(speciality, "специальности")
         try:
             await session.delete(speciality)
             await session.commit()

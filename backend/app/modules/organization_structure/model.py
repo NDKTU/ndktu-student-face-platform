@@ -4,18 +4,21 @@ from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
+from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.auth.model import Employee, Student, Teacher, User
-    from app.modules.quiz.model import Quiz
-    from app.modules.quiz.model import Result
+    from app.modules.quiz.model import Quiz, Result
 
 
-class Faculty(Base, IdIntPk, TimestampMixin):
+class Faculty(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "faculties"
-    name: Mapped[str] = mapped_column(String(50), unique=True)
+    __table_args__ = (external_ref_index("faculties"),)
+
+    # 255, а не 50: названия факультетов в EPOS длиннее прежнего лимита.
+    name: Mapped[str] = mapped_column(String(255), unique=True)
 
     def __str__(self):
         return self.name
@@ -25,11 +28,17 @@ class Faculty(Base, IdIntPk, TimestampMixin):
     groups: Mapped[list["Group"]] = relationship("Group", back_populates="faculty")
 
 
-class Kafedra(Base, IdIntPk, TimestampMixin):
+class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "kafedras"
+    # Уникальность в пределах факультета, а не глобальная: одноимённые кафедры
+    # на разных факультетах — норма.
+    __table_args__ = (
+        UniqueConstraint("faculty_id", "name", name="uq_kafedras_faculty_id_name"),
+        external_ref_index("kafedras"),
+    )
 
     faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"))
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
 
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="kafedras")
 
@@ -40,8 +49,13 @@ class Kafedra(Base, IdIntPk, TimestampMixin):
         return self.name
 
 
-class Group(Base, IdIntPk, TimestampMixin):
+class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "groups"
+    __table_args__ = (
+        UniqueConstraint("faculty_id", "name", name="uq_groups_faculty_id_name"),
+        external_ref_index("groups"),
+    )
+
     faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"))
     speciality_id: Mapped[int | None] = mapped_column(
         Integer,
@@ -50,7 +64,12 @@ class Group(Base, IdIntPk, TimestampMixin):
         index=True,
     )
 
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+
+    # Приезжают из EPOS, у групп, заведённых вручную, остаются пустыми.
+    course: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    education_shape: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    student_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="groups")
     speciality: Mapped["Speciality | None"] = relationship("Speciality", back_populates="groups")
@@ -82,8 +101,12 @@ class GroupTeacher(Base, IdIntPk, TimestampMixin):
         return f"{self.group_id} - {self.teacher_id}"
 
 
-class Speciality(Base, IdIntPk, TimestampMixin):
+class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "specialities"
+    __table_args__ = (
+        UniqueConstraint("kafedra_id", "name", name="uq_specialities_kafedra_id_name"),
+        external_ref_index("specialities"),
+    )
 
     kafedra_id: Mapped[int] = mapped_column(
         Integer,
@@ -91,7 +114,10 @@ class Speciality(Base, IdIntPk, TimestampMixin):
         nullable=False,
         index=True,
     )
-    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # EPOS EducationType: Bakalavr | Magistr
+    education_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="specialities")
     groups: Mapped[list["Group"]] = relationship("Group", back_populates="speciality")
@@ -100,8 +126,11 @@ class Speciality(Base, IdIntPk, TimestampMixin):
         return self.name
 
 
-class Department(Base, IdIntPk, TimestampMixin):
+class Department(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+    """Административный отдел. В EPOS этой сущности соответствует ``section``."""
+
     __tablename__ = "departments"
+    __table_args__ = (external_ref_index("departments"),)
 
     name: Mapped[str] = mapped_column(String(255), unique=True)
 

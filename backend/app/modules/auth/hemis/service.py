@@ -4,9 +4,12 @@ import httpx
 from core.config import settings
 from core.utils.password_hash import verify_password
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.model import Employee, User
 from app.modules.auth.student.repository import student_repository
+from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.service import auth_service
 from app.modules.organization_structure.faculty.repository import get_faculty_repository
@@ -31,6 +34,9 @@ class HemisLoginService:
 
         if user and user.password:
             if verify_password(data.password, user.password):
+                # Локальный вход остаётся аварийным путём для администратора,
+                # не зависящим от доступности внешних систем.
+                ensure_user_active(user)
                 access_token = await auth_service.create_session_token(user.id)
                 return HemisLoginResponse(access_token=access_token)
             else:
@@ -40,16 +46,97 @@ class HemisLoginService:
         else:
             logger.info(f"User {data.login} not found locally or has no password, attempting Hemis login.")
 
-        return await self.request_to_hemis(session, data)
+        try:
+            return await self.request_to_hemis(session, data)
+        except HTTPException:
+            # Студенческий портал не признал логин. Если настроен сотруднический,
+            # пробуем его: это может быть преподаватель.
+            if not settings.hemis.employee_login_enabled:
+                raise
+            logger.info("Студенческий Hemis отклонил %s, пробуем сотруднический", data.login)
+            return await self.employee_login(session, data)
+
+    # ------------------------------------------------------------------ #
+    #  ВХОД ПРЕПОДАВАТЕЛЯ ЧЕРЕЗ СОТРУДНИЧЕСКИЙ HEMIS
+    # ------------------------------------------------------------------ #
+    #: Под каким ключом сотруднический Hemis отдаёт идентификатор человека,
+    #: точно не зафиксировано, поэтому проверяем несколько известных вариантов.
+    EMPLOYEE_ID_KEYS = ("employee_id_number", "employee_id", "hemis_id", "id_number", "uid")
+
+    async def employee_login(
+        self,
+        session: AsyncSession,
+        data: HemisLoginRequest,
+    ) -> HemisLoginResponse:
+        """Аутентифицирует преподавателя во внешнем Hemis и опознаёт его у нас.
+
+        Учётные записи здесь не создаются: преподаватель должен уже приехать
+        синхронизацией с EduPlan. Иначе мы завели бы пользователя без кафедры и
+        без осмысленных прав, а его связь с нагрузкой всё равно бы не собралась.
+        """
+        me_data = await self._fetch_employee_data(data.login, data.password)
+
+        hemis_id = next(
+            (str(me_data[key]) for key in self.EMPLOYEE_ID_KEYS if me_data.get(key)),
+            None,
+        )
+        if not hemis_id:
+            logger.error(
+                "Сотруднический Hemis не вернул идентификатор сотрудника. Ключи ответа: %s",
+                sorted(me_data.keys()),
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Hemis не вернул идентификатор сотрудника",
+            )
+
+        employee = (await session.execute(select(Employee).where(Employee.hemis_id == hemis_id))).scalar_one_or_none()
+
+        if employee is None:
+            logger.warning("Вход преподавателя %s: hemis_id %s не найден в зеркале", data.login, hemis_id)
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Сотрудник не найден в системе. Дождитесь синхронизации с EduPlan или обратитесь к администратору."
+                ),
+            )
+
+        user = await session.get(User, employee.user_id)
+        if user is None:
+            raise HTTPException(status_code=403, detail="У сотрудника нет учётной записи")
+
+        ensure_user_active(user)
+
+        access_token = await auth_service.create_session_token(user.id)
+        logger.info("Преподаватель %s вошёл через Hemis (hemis_id=%s)", user.username, hemis_id)
+        return HemisLoginResponse(access_token=access_token)
+
+    async def _fetch_employee_data(self, login: str, password: str) -> dict:
+        return await self._fetch_from_hemis(
+            login,
+            password,
+            settings.hemis.employee_login_url,
+            settings.hemis.employee_me_url,
+        )
 
     # ------------------------------------------------------------------ #
     #  HEMIS API REQUEST
     # ------------------------------------------------------------------ #
     async def _fetch_hemis_data(self, login: str, password: str) -> dict:
+        return await self._fetch_from_hemis(
+            login,
+            password,
+            settings.hemis.login_url,
+            settings.hemis.me_url,
+        )
+
+    @staticmethod
+    async def _fetch_from_hemis(login: str, password: str, login_url: str, me_url: str) -> dict:
+        """Логин и получение профиля. Протокол одинаков для обоих порталов Hemis."""
         try:
             async with httpx.AsyncClient() as client:
                 login_resp = await client.post(
-                    settings.hemis.login_url,
+                    login_url,
                     json={"login": login, "password": password},
                     headers={"Accept": "application/json"},
                 )
@@ -63,7 +150,7 @@ class HemisLoginService:
                 token = login_data["data"]["token"]
 
                 me_resp = await client.get(
-                    settings.hemis.me_url,
+                    me_url,
                     headers={"Authorization": f"Bearer {token}"},
                 )
                 if me_resp.status_code != 200:

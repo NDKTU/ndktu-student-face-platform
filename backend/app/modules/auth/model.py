@@ -1,23 +1,27 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
+from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.organization_structure.model import Department
-    from app.modules.organization_structure.model import Group
-    from app.modules.organization_structure.model import GroupTeacher
-    from app.modules.organization_structure.model import Kafedra
-    from app.modules.quiz.model import Question
-    from app.modules.quiz.model import Quiz
-    from app.modules.quiz.model import Result
-    from app.modules.quiz.model import Subject
-    from app.modules.quiz.model import SubjectTeacher
-    from app.modules.quiz.model import UserAnswers
+    from app.modules.organization_structure.model import Department, Group, GroupTeacher, Kafedra
+    from app.modules.quiz.model import Question, Quiz, Result, Subject, SubjectTeacher, UserAnswers
 
 
 class User(Base, IdIntPk, TimestampMixin):
@@ -25,6 +29,16 @@ class User(Base, IdIntPk, TimestampMixin):
 
     username: Mapped[str] = mapped_column(String(50), unique=True)
     password: Mapped[str] = mapped_column(String(255))
+
+    # Учётная запись, заведённая из внешней системы, при увольнении перестаёт
+    # проходить внешнюю аутентификацию — но локально остаётся живой. Флаг
+    # закрывает вход независимо от способа входа.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
 
     roles: Mapped[list["Role"]] = relationship(
         "Role", secondary="user_roles", back_populates="users", overlaps="user_roles"
@@ -147,8 +161,20 @@ class Student(Base, TimestampMixin, IdIntPk):
     user: Mapped["User"] = relationship("User", back_populates="student")
 
 
-class Employee(Base, IdIntPk, TimestampMixin):
+class Employee(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "employees"
+    __table_args__ = (
+        external_ref_index("employees"),
+        # hemis_id — идентичность человека в HEMIS, в отличие от external_id,
+        # который указывает на строку в EPOS. Именно по нему потом опознаётся
+        # вошедший преподаватель, поэтому уникальность обязательна.
+        Index(
+            "uq_employees_hemis_id",
+            "hemis_id",
+            unique=True,
+            postgresql_where=text("hemis_id IS NOT NULL"),
+        ),
+    )
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
     department_id: Mapped[int | None] = mapped_column(
@@ -160,7 +186,12 @@ class Employee(Base, IdIntPk, TimestampMixin):
     last_name: Mapped[str] = mapped_column(String(255))
     first_name: Mapped[str] = mapped_column(String(255))
     third_name: Mapped[str] = mapped_column(String(255))
-    full_name: Mapped[str] = mapped_column(String(500), unique=True)
+    # Уникальности нет: полные тёзки среди сотрудников — обычное дело.
+    full_name: Mapped[str] = mapped_column(String(500), index=True)
+
+    hemis_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    position: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    staff_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -175,10 +206,12 @@ class Employee(Base, IdIntPk, TimestampMixin):
 
 class Teacher(Base, IdIntPk, TimestampMixin):
     __tablename__ = "teachers"
-    kafedra_id: Mapped[int] = mapped_column(ForeignKey("kafedras.id"))
+    # Nullable: в EPOS преподаватель без кафедры — штатная ситуация
+    # (у них для этого есть отдельный фильтр unassigned=true).
+    kafedra_id: Mapped[int | None] = mapped_column(ForeignKey("kafedras.id"), nullable=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), unique=True)
 
-    kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="teachers")
+    kafedra: Mapped["Kafedra | None"] = relationship("Kafedra", back_populates="teachers")
 
     subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
         "SubjectTeacher",
@@ -191,10 +224,11 @@ class Teacher(Base, IdIntPk, TimestampMixin):
         return self.employee.full_name if self.employee else f"Teacher {self.id}"
 
 
-class TeacherAssignment(Base, IdIntPk, TimestampMixin):
+class TeacherAssignment(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "teacher_assignments"
     __table_args__ = (
         UniqueConstraint("teacher_id", "subject_id", "group_id", name="uq_teacher_subject_group"),
+        external_ref_index("teacher_assignments"),
     )
 
     teacher_id: Mapped[int] = mapped_column(
@@ -215,6 +249,13 @@ class TeacherAssignment(Base, IdIntPk, TimestampMixin):
         nullable=False,
         index=True,
     )
+
+    # В EduPlan на одну связку (преподаватель, предмет, группа) приходится по
+    # строке нагрузки на каждый вид занятий. Схлопываем их в одно назначение,
+    # а перечень видов сохраняем — по нему отличается, например, кто принимает
+    # оралик и якуний назорат.
+    load_types: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    semester_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     teacher: Mapped["Teacher"] = relationship("Teacher")
     subject: Mapped["Subject"] = relationship("Subject")

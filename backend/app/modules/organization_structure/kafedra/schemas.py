@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.core.schemas import ExternalRefFields, TashkentDatetime
 
 
 class KafedraCreateRequest(BaseModel):
@@ -16,7 +17,7 @@ class KafedraCreateRequest(BaseModel):
         return v.strip()
 
 
-class KafedraCreateResponse(BaseModel):
+class KafedraCreateResponse(ExternalRefFields):
     id: int
     name: str
     faculty_id: int

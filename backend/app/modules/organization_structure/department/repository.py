@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -59,9 +60,7 @@ class DepartmentRepository:
 
         return department
 
-    async def list_departments(
-        self, session: AsyncSession, request: DepartmentListRequest
-    ) -> DepartmentListResponse:
+    async def list_departments(self, session: AsyncSession, request: DepartmentListRequest) -> DepartmentListResponse:
         stmt = select(Department)
 
         if request.name:
@@ -92,6 +91,8 @@ class DepartmentRepository:
         if not department:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
+        ensure_editable(department, "отдела")
+
         if data.name is not None:
             stmt_check = select(Department).where(Department.name == data.name, Department.id != department_id)
             existing = (await session.execute(stmt_check)).scalar_one_or_none()
@@ -108,6 +109,7 @@ class DepartmentRepository:
 
     async def delete_department(self, session: AsyncSession, department_id: int) -> None:
         department = await self.get_department(session, department_id)
+        ensure_editable(department, "отдела")
         await session.delete(department)
         await session.commit()
 

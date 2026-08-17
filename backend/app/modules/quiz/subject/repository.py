@@ -1,5 +1,6 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -123,6 +124,8 @@ class SubjectRepository:
         if not subject:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
+        ensure_editable(subject, "предмета")
+
         if data.name is not None:
             stmt_check = select(Subject).where(Subject.name == data.name, Subject.id != subject_id)
             existing_subject = (await session.execute(stmt_check)).scalar_one_or_none()
@@ -143,6 +146,7 @@ class SubjectRepository:
         from app.modules.quiz.model import Question, Quiz, SubjectTeacher
 
         # Admin requested to aggressively delete the subject and its dependencies.
+        ensure_editable(await self.get_subject(session, subject_id), "предмета")
 
         if not force:
             teachers_count = (

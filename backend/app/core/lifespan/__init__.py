@@ -1,6 +1,8 @@
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
+from core.config import settings
 from core.database.db_helper import db_helper
 from fastapi import FastAPI
 from fastapi_limiter import FastAPILimiter
@@ -79,6 +81,17 @@ async def _shutdown(redis_client) -> None:
     logger.info("Closed Redis connection")
 
 
+def _start_eduplan_schedule() -> "asyncio.Task | None":
+    """Ночная синхронизация с EduPlan, если она включена и настроена."""
+    cfg = settings.eduplan
+    if not (cfg.schedule_enabled and cfg.is_configured):
+        return None
+
+    from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner
+
+    return asyncio.create_task(eduplan_sync_runner.nightly_loop())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from core.redis_client import redis_client
@@ -88,6 +101,14 @@ async def lifespan(app: FastAPI):
     await _seed_admin(app)
     await _init_rate_limiter(redis_client)
 
+    eduplan_task = _start_eduplan_schedule()
+
     yield
+
+    if eduplan_task is not None:
+        eduplan_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await eduplan_task
+        logger.info("Stopped EduPlan schedule")
 
     await _shutdown(redis_client)

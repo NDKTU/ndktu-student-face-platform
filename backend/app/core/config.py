@@ -53,8 +53,51 @@ class FileUrl(BaseModel):
 
 
 class HemisConfig(BaseModel):
+    # Студенческий портал.
     login_url: str
     me_url: str
+
+    # Сотруднический портал — отдельный хост с тем же протоколом. Пока не
+    # заполнен, вход преподавателей через Hemis просто не предлагается, и
+    # поведение установки не меняется.
+    employee_login_url: str = ""
+    employee_me_url: str = ""
+
+    @property
+    def employee_login_enabled(self) -> bool:
+        return bool(self.employee_login_url and self.employee_me_url)
+
+
+class EduPlanConfig(BaseModel):
+    """Доступ к EduPlan (EPOS) — источнику справочников оргструктуры.
+
+    Интеграция строго read-only: ни один вызов не пишет в EduPlan. По умолчанию
+    выключена, чтобы установка без выданного сервисного аккаунта поднималась
+    как раньше.
+    """
+
+    enabled: bool = False
+    base_url: str = "https://edu.plan.nsumt.uz/rest"
+    username: str = ""
+    password: str = ""
+    # Все защищённые эндпоинты EduPlan принимают X-Active-Role: у них
+    # мультиролевая модель с переключением активной роли.
+    active_role: str = ""
+    timeout: float = 30.0
+    # Размер страницы при обходе списков. 200 — компромисс между числом
+    # запросов и весом одного ответа.
+    page_size: int = 200
+
+    # Ночной прогон внутри приложения. Час — местный, по Ташкенту.
+    # Включать только если синхронизация НЕ поставлена в системный cron:
+    # два планировщика одновременно не нужны (блокировка их разведёт, но
+    # второй будет просто впустую будить приложение).
+    schedule_enabled: bool = False
+    schedule_hour: int = 3
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.enabled and self.base_url and self.username and self.password)
 
 
 class FaceServiceConfig(BaseModel):
@@ -102,6 +145,7 @@ class AppConfig(BaseSettings):
     database: DatabaseConfig
     jwt: JwtConfig
     hemis: HemisConfig
+    eduplan: EduPlanConfig = EduPlanConfig()
     face_service: FaceServiceConfig = FaceServiceConfig()
     file_url: FileUrl
     redis: RedisConfig

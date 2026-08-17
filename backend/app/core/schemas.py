@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from pydantic import PlainSerializer
+from pydantic import BaseModel, PlainSerializer
 
 TASHKENT_TZ = timezone(timedelta(hours=5))
 
@@ -20,3 +20,15 @@ def _to_tashkent_iso(dt: datetime | None) -> str | None:
 # local time, regardless of the naive-UTC value stored in the DB column.
 # Input schemas keep plain `datetime` — clients still send tz-aware UTC.
 TashkentDatetime = Annotated[datetime, PlainSerializer(_to_tashkent_iso, return_type=str | None)]
+
+
+class ExternalRefFields(BaseModel):
+    """Признаки строки-зеркала для схем ответа.
+
+    Фронтенду они нужны, чтобы показать, что запись приехала из внешней системы,
+    и не предлагать её редактировать: бэкенд такие правки всё равно отклонит.
+    """
+
+    external_source: str | None = None
+    synced_at: TashkentDatetime | None = None
+    is_active: bool = True

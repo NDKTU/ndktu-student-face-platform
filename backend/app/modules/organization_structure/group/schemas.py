@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.core.schemas import ExternalRefFields, TashkentDatetime
 
 
 class GroupCreateRequest(BaseModel):
@@ -16,7 +17,7 @@ class GroupCreateRequest(BaseModel):
         return v.strip()
 
 
-class GroupCreateResponse(BaseModel):
+class GroupCreateResponse(ExternalRefFields):
     id: int
     name: str
     faculty_id: int

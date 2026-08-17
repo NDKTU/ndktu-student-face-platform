@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +28,12 @@ help:
 	@echo "make backup-images    - Backup only uploaded images"
 	@echo "make restore FILE=path/to/backup.sql.gz - Restore (REPLACES all data) from backup"
 	@echo "make merge   FILE=path/to/backup.sql.gz - Merge backup into current DB (non-destructive)"
+	@echo ""
+	@echo "EDUPLAN (EPOS) SYNC:"
+	@echo "────────────────────"
+	@echo "make eduplan-sync      - Sync org-structure directories + workloads now"
+	@echo "make eduplan-workloads - Sync only teacher workloads"
+	@echo "make eduplan-cron      - Print the crontab line for a nightly 00:00 run"
 	@echo ""
 
 # Start development services (localhost, no nginx)
@@ -89,6 +95,20 @@ merge:
 # Zero-Downtime Deployment (prod)
 deploy:
 	@./scripts/deploy.sh
+
+# Sync org-structure directories and workloads from EduPlan (EPOS).
+# Read-only towards EduPlan; conflicts and deactivations are left to an admin.
+eduplan-sync:
+	@./scripts/eduplan_sync.sh $(ARGS)
+
+# Sync only teacher workloads (requires teachers/subjects/groups already linked)
+eduplan-workloads:
+	@./scripts/eduplan_sync.sh --workloads-only
+
+# Print the crontab line for a nightly run at 00:00 server time
+eduplan-cron:
+	@echo "# EduPlan sync — nightly at 00:00 (server must be Asia/Tashkent)"
+	@echo "0 0 * * * $(CURDIR)/scripts/eduplan_sync.sh >> /dev/null 2>&1"
 
 # Run database migrations
 migrate:

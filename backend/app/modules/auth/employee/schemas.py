@@ -1,8 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.core.schemas import ExternalRefFields, TashkentDatetime
 from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 
@@ -74,7 +74,7 @@ class EmployeeUpdateRequest(BaseModel):
         return v.strip()
 
 
-class EmployeeResponse(BaseModel):
+class EmployeeResponse(ExternalRefFields):
     id: int
     user_id: int
     first_name: str

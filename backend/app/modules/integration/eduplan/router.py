@@ -1,0 +1,121 @@
+"""Эндпоинты синхронизации с EduPlan.
+
+Наружу торчат только чтение статуса, предпросмотр и применение. Записи в
+EduPlan нет ни одной: интеграция односторонняя.
+"""
+
+import logging
+
+from core.config import settings
+from core.database.db_helper import db_helper
+from core.dependencies.role_checker import PermissionRequired
+from fastapi import APIRouter, Depends
+from fastapi_limiter.depends import RateLimiter
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .client import EduPlanClient
+from .schemas import ApplyRequest, ApplyResponse, PreviewResponse
+from .service import eduplan_sync_service
+from .sync_runner import eduplan_sync_runner
+from .workload_service import eduplan_workload_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/eduplan", tags=["EduPlan"])
+
+
+@router.get("/status")
+async def eduplan_status(
+    _: PermissionRequired = Depends(PermissionRequired("read:eduplan")),
+):
+    """Состояние интеграции: настроена ли и отвечает ли EduPlan.
+
+    Отдельная ручка нужна, чтобы отличать «не заполнены креды» от «сервис
+    недоступен» до запуска долгого предпросмотра.
+    """
+    cfg = settings.eduplan
+    if not cfg.is_configured:
+        return {
+            "configured": False,
+            "reachable": False,
+            "base_url": cfg.base_url,
+            "detail": "Не заданы APP_CONFIG__EDUPLAN__USERNAME/PASSWORD или интеграция выключена",
+        }
+
+    try:
+        async with EduPlanClient() as client:
+            years = await client.academic_years()
+        active = next((y for y in years if y.get("is_active")), None)
+        return {
+            "configured": True,
+            "reachable": True,
+            "base_url": cfg.base_url,
+            "active_academic_year": active,
+        }
+    except Exception as e:  # noqa: BLE001 — статус не должен падать пятисоткой
+        return {
+            "configured": True,
+            "reachable": False,
+            "base_url": cfg.base_url,
+            "detail": str(getattr(e, "detail", e)),
+        }
+
+
+@router.post(
+    "/preview",
+    response_model=PreviewResponse,
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
+async def eduplan_preview(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Сходить в EduPlan и показать, что изменится. Ничего не пишет."""
+    return await eduplan_sync_service.build_preview(session)
+
+
+@router.post(
+    "/apply",
+    response_model=ApplyResponse,
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
+async def eduplan_apply(
+    data: ApplyRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Применить разобранный администратором предпросмотр."""
+    return await eduplan_sync_service.apply(session, data)
+
+
+@router.post(
+    "/workloads",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
+async def eduplan_sync_workloads(
+    academic_year_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Импортировать нагрузку в связки преподаватель-предмет-группа.
+
+    Требует, чтобы преподаватели, предметы и группы уже были связаны с EduPlan:
+    нагрузка ссылается на них по external_id.
+    """
+    return await eduplan_workload_service.sync(session, academic_year_id)
+
+
+@router.post(
+    "/run",
+    dependencies=[Depends(RateLimiter(times=2, seconds=60))],
+)
+async def eduplan_run_full_sync(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Полный прогон без участия человека.
+
+    Применяет только однозначные предложения: конфликты и деактивации
+    остаются администратору. Та же точка входа, что и у ночного расписания.
+    """
+    return await eduplan_sync_runner.run(session, triggered_by="manual")

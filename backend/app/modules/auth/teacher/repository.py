@@ -1,18 +1,14 @@
 import logging
 
+from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
 from sqlalchemy import Float, asc, case, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Teacher, User
-from app.modules.organization_structure.model import Faculty
-from app.modules.organization_structure.model import Group
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.organization_structure.model import Kafedra
-from app.modules.quiz.model import Result
-from app.modules.quiz.model import Subject
-from app.modules.quiz.model import SubjectTeacher
+from app.modules.organization_structure.model import Faculty, Group, GroupTeacher, Kafedra
+from app.modules.quiz.model import Result, Subject, SubjectTeacher
 
 from .schemas import (
     FacultyRankingResponse,
@@ -48,9 +44,7 @@ class TeacherRepository:
         )
 
     async def create_teacher(self, session: AsyncSession, data: TeacherCreateRequest) -> Teacher:
-        employee = (
-            await session.execute(select(Employee).where(Employee.id == data.employee_id))
-        ).scalar_one_or_none()
+        employee = (await session.execute(select(Employee).where(Employee.id == data.employee_id))).scalar_one_or_none()
         if not employee:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
@@ -100,9 +94,7 @@ class TeacherRepository:
 
         if request.full_name:
             stmt = stmt.join(Teacher.employee).where(Employee.full_name.ilike(f"%{request.full_name}%"))
-            count_stmt = count_stmt.join(Teacher.employee).where(
-                Employee.full_name.ilike(f"%{request.full_name}%")
-            )
+            count_stmt = count_stmt.join(Teacher.employee).where(Employee.full_name.ilike(f"%{request.full_name}%"))
 
         if request.kafedra_id:
             stmt = stmt.where(Teacher.kafedra_id == request.kafedra_id)
@@ -127,6 +119,11 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
+        # У самой строки преподавателя источника нет — владение определяется
+        # карточкой сотрудника, из которой она выросла.
+        if teacher.employee is not None:
+            ensure_editable(teacher.employee, "преподавателя")
+
         teacher.kafedra_id = data.kafedra_id
 
         await session.commit()
@@ -137,9 +134,7 @@ class TeacherRepository:
         from sqlalchemy import delete
 
         from app.modules.organization_structure.model import GroupTeacher
-        from app.modules.quiz.model import Question
-        from app.modules.quiz.model import Quiz
-        from app.modules.quiz.model import SubjectTeacher
+        from app.modules.quiz.model import Question, Quiz, SubjectTeacher
 
         stmt = select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
@@ -147,6 +142,9 @@ class TeacherRepository:
 
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+        if teacher.employee is not None:
+            ensure_editable(teacher.employee, "преподавателя")
 
         employee_user_id = teacher.employee.user_id
 
@@ -193,8 +191,7 @@ class TeacherRepository:
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
         quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.user_id == employee_user_id))).scalars().all()
         if quiz_ids:
-            from app.modules.quiz.model import QuizQuestion
-            from app.modules.quiz.model import Result
+            from app.modules.quiz.model import QuizQuestion, Result
 
             await session.execute(delete(Result).where(Result.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))
