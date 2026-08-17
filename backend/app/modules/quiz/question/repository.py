@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.core.utils.image_upload import save_image
 from app.modules.auth.model import User
 from app.modules.quiz.model import Question
 
@@ -108,9 +109,7 @@ class QuestionRepository:
         questions = result.scalars().all()
 
         count_stmt = (
-            select(func.count())
-            .select_from(Question)
-            .where(Question.is_latest.is_(True), Question.is_active.is_(True))
+            select(func.count()).select_from(Question).where(Question.is_latest.is_(True), Question.is_active.is_(True))
         )
         if not is_admin and is_teacher:
             count_stmt = count_stmt.where(Question.user_id == current_user.id)
@@ -246,21 +245,7 @@ class QuestionRepository:
         return result.rowcount
 
     async def upload_image(self, file) -> str:
-        import os
-        import shutil
-        import uuid
-
-        # Generate unique filename
-        file_ext = file.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{file_ext}"
-
-        upload_dir = settings.question_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = upload_dir / filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
+        filename = await save_image(file, settings.question_upload_dir)
         return f"{settings.file_url.http}/question/{filename}"
 
     async def upload_questions_excel(

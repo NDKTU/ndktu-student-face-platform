@@ -100,7 +100,11 @@ const QuestionFormPage = () => {
             }
         } catch (error) {
             logger.error('Image upload failed', error);
-            alert('Rasm yuklashda xatolik yuz berdi');
+            // Бэкенд отклоняет файл с понятной причиной (тип, размер, битое содержимое) —
+            // без неё преподаватель видит одно и то же сообщение и для сбоя сети, и для
+            // слишком большого файла.
+            const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            alert(detail || 'Rasm yuklashda xatolik yuz berdi');
         }
     };
 

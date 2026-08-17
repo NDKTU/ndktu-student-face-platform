@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search, BookOpen, ArrowRight, ArrowLeft, Download } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { sanitizeHtml } from '@/utils/sanitize';
 import { useQuestions, useDeleteQuestion, useUploadQuestions, useBulkDeleteQuestions, useDownloadQuestionsExcel } from '@/hooks/useQuestions';
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useUsers } from '@/hooks/useUsers';
@@ -407,7 +408,7 @@ const QuestionDetailModal = ({
                     <h3 className="text-sm font-medium text-muted-foreground">Savol matni</h3>
                     <div
                         className="rounded-lg border bg-muted/50 p-4 text-sm"
-                        dangerouslySetInnerHTML={{ __html: question.text }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text) }}
                     />
                 </div>
 
@@ -426,7 +427,7 @@ const QuestionDetailModal = ({
                                 </div>
                                 <div
                                     className="w-full rounded-lg border p-3 text-sm min-h-[3rem]"
-                                    dangerouslySetInnerHTML={{ __html: option.value }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.value) }}
                                 />
                             </div>
                         ))}
