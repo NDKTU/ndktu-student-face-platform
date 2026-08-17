@@ -23,7 +23,8 @@ import { useStartQuiz, useSubmitAnswer, useEndQuiz } from '@/hooks/useQuizProces
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
-import { FACE_DETECTION_SERVICE_URL } from '@/config/env';
+import { ENABLE_QUIZ_PROCTORING, FACE_DETECTION_SERVICE_URL } from '@/config/env';
+import { useCameraAvailability } from '@/hooks/useCameraAvailability';
 import { cheatingImageService } from '@/services/cheatingImageService';
 import {
     Table,
@@ -35,10 +36,9 @@ import {
 } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/utils/utils';
-import DOMPurify from 'dompurify';
-
-// Bug#13 fix: sanitize HTML content to prevent XSS attacks
-const sanitize = (html: string) => DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+// Bug#13 fix: sanitize HTML content to prevent XSS attacks.
+// Общая реализация в utils/sanitize — список вывода HTML шире одной страницы.
+import { sanitizeHtml } from '@/utils/sanitize';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
@@ -90,6 +90,13 @@ const QuizTestPage = () => {
     const quizIdParam = searchParams.get('quizId');
     const modeParam = searchParams.get('mode');
     const [proctoringOverride, setProctoringOverride] = useState<ProctoringMode | null>(null);
+
+    // Наличие камеры проверяется до начала теста: раньше тест с режимом `face`
+    // просто шёл без надзора, и ни студент, ни преподаватель об этом не знали.
+    const selectedQuizMode = quizzesData?.quizzes.find((q) => q.id === selectedQuiz?.id)?.proctoring_mode;
+    const startNeedsCamera = ENABLE_QUIZ_PROCTORING && (proctoringOverride ?? selectedQuizMode) === 'face';
+    const { status: cameraStatus } = useCameraAvailability(isModalOpen && startNeedsCamera);
+
     const autoOpenedRef = useRef(false);
     useEffect(() => {
         if (autoOpenedRef.current || !quizIdParam) return;
@@ -126,9 +133,18 @@ const QuizTestPage = () => {
         }, {
             onSuccess: (data) => {
                 setQuizData(data);
-                setTimeLeft(data.duration * 60); // duration is in minutes
+                // Остаток времени считает сервер от момента создания попытки, поэтому
+                // перезагрузка страницы больше не выдаёт полный запас заново.
+                setTimeLeft(data.remaining_seconds);
                 setCurrentQuestionIndex(0);
-                setAnswers({});
+                // При возвращении в прерванную попытку восстанавливаем отметки,
+                // иначе студент увидит пустой бланк и станет отвечать заново.
+                const restored: Record<number, string> = {};
+                for (const submitted of data.submitted_answers ?? []) {
+                    const letter = ['A', 'B', 'C', 'D'][submitted.answer_index];
+                    if (letter) restored[submitted.question_id] = letter;
+                }
+                setAnswers(restored);
                 setPhase('quiz');
                 handleCloseStartModal();
             },
@@ -146,18 +162,18 @@ const QuizTestPage = () => {
         const question = quizData.questions.find((q) => q.id === questionId);
         if (!question) return;
 
-        const answerValue =
-            option === 'A' ? question.option_a :
-            option === 'B' ? question.option_b :
-            option === 'C' ? question.option_c :
-            option === 'D' ? question.option_d : '';
+        // Отправляется позиция варианта, а не его текст: сервер сам знает, какой
+        // порядок показал этому студенту, и сравнивает по позиции. Текст варианта
+        // в проверку правильности больше не попадает.
+        const answerIndex = ['A', 'B', 'C', 'D'].indexOf(option);
+        if (answerIndex === -1) return;
 
         // Sent immediately as the student picks — the backend already reserved
         // this question for this attempt at start_quiz, and grades it right away.
         submitAnswerMutation.mutate({
             result_id: quizData.result_id,
             question_id: questionId,
-            answer: answerValue,
+            answer_index: answerIndex,
         }, {
             onError: (error) => {
                 logger.error('Failed to submit answer', error);
@@ -374,6 +390,19 @@ const QuizTestPage = () => {
                     title={`Testni boshlash: ${selectedQuiz?.title}`}
                 >
                     <div className="space-y-4">
+                        {startNeedsCamera && cameraStatus !== 'checking' && cameraStatus !== 'available' && (
+                            <div className="flex gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                <span>
+                                    {cameraStatus === 'missing' &&
+                                        'Bu kompyuterda veb-kamera topilmadi. Bu test kamera orqali nazorat qilinadi — o‘qituvchiga murojaat qiling.'}
+                                    {cameraStatus === 'insecure' &&
+                                        'Kamera ishlamaydi: sahifa xavfsiz ulanish (https) orqali ochilmagan. Administratorga murojaat qiling.'}
+                                    {cameraStatus === 'error' &&
+                                        'Veb-kamerani tekshirib bo‘lmadi. Test kamera bilan nazorat qilinadi.'}
+                                </span>
+                            </div>
+                        )}
                         <Input
                             label="PIN Kod"
                             type="text"
@@ -608,7 +637,7 @@ const QuizTestPage = () => {
                         </span>
                         <div
                             className="text-lg font-medium leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: sanitize(currentQuestion.text) }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.text) }}
                         />
                     </div>
                 </CardHeader>
@@ -637,7 +666,7 @@ const QuizTestPage = () => {
                                     </span>
                                     <span
                                         className="pt-0.5"
-                                        dangerouslySetInnerHTML={{ __html: sanitize(option.value) }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.value) }}
                                     />
                                 </button>
                             );

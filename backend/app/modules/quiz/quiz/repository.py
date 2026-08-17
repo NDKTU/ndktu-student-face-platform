@@ -6,6 +6,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.organization_structure.model import GroupTeacher
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, SubjectTeacher
@@ -298,21 +299,7 @@ class QuizRepository:
         return new_quiz
 
     async def upload_image(self, file) -> str:
-        import os
-        import shutil
-        import uuid
-
-        # Generate unique filename
-        file_ext = file.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{file_ext}"
-
-        upload_dir = settings.question_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = upload_dir / filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
+        filename = await save_image(file, settings.question_upload_dir)
         return f"{settings.file_url.http}/question/{filename}"
 
 

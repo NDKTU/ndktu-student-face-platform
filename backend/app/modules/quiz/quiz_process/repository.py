@@ -13,6 +13,8 @@ from app.core.security import create_face_ws_token
 from app.modules.auth.model import Student, User
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
+from .attempt import grade_for, is_expired, remaining_seconds
+from .option_order import letter_at, option_order
 from .schemas import (
     EndQuizRequest,
     EndQuizResponse,
@@ -21,6 +23,7 @@ from .schemas import (
     StartQuizResponse,
     SubmitAnswerRequest,
     SubmitAnswerResponse,
+    SubmittedAnswerDTO,
     UploadCheatingImageRequest,
     UploadCheatingImageResponse,
 )
@@ -41,6 +44,39 @@ class QuizProcessRepository:
 
         if not quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+
+        # Возвращение в уже начатую попытку проверяется ДО is_active и PIN.
+        # Ответственный закрывает вход, как только все зашли; студент, у которого
+        # после этого упал браузер, иначе не смог бы вернуться в собственный тест.
+        # Он уже внутри — повторно пускать его не нужно.
+        existing = (
+            (
+                await session.execute(
+                    select(Result)
+                    .where(
+                        Result.user_id == user.id,
+                        Result.quiz_id == quiz.id,
+                        Result.status == "in_progress",
+                    )
+                    .order_by(Result.created_at.desc())
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+        if existing:
+            if is_expired(existing, quiz):
+                # Время вышло, пока студента не было. Закрываем по тем ответам,
+                # что успели дойти, — иначе попытка висела бы «в процессе» вечно,
+                # а студент остался бы заперт в ней.
+                await self._finalize_attempt(session, existing, reason="Vaqt tugadi")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Urinish vaqti tugagan. Yangi urinish uchun o'qituvchiga murojaat qiling.",
+                )
+
+            return await self._resume_attempt(session, existing, quiz, user)
 
         if not quiz.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quiz is not active")
@@ -94,22 +130,6 @@ class QuizProcessRepository:
         else:
             random.shuffle(quiz_questions)
 
-        question_dtos = []
-        for q in quiz_questions:
-            q_dict = q.to_dict(randomize_options=True)
-            opts = q_dict["options"]
-
-            question_dtos.append(
-                QuestionDTO(
-                    id=q_dict["id"],
-                    text=q_dict["text"],
-                    option_a=opts[0],
-                    option_b=opts[1],
-                    option_c=opts[2],
-                    option_d=opts[3],
-                )
-            )
-
         face_ws_token = None
         if quiz.proctoring_mode == "face":
             face_ws_token = create_face_ws_token(
@@ -123,6 +143,9 @@ class QuizProcessRepository:
         # served question fixes the exact question set a submit_answer call is
         # allowed to touch, and lets end_quiz grade against the real served count
         # instead of whatever the client claims to have answered.
+        #
+        # Попытка создаётся до сборки вопросов: расстановка вариантов выводится
+        # из result_id, поэтому он нужен раньше, чем формируются DTO.
         new_result = Result(
             user_id=user.id,
             quiz_id=quiz.id,
@@ -145,6 +168,25 @@ class QuizProcessRepository:
                 )
             )
 
+        # Перемешиваются буквы колонок, а не тексты: так порядок остаётся
+        # восстановимым в submit_answer, и правильность проверяется по позиции,
+        # а не сравнением строк.
+        question_dtos = []
+        for q in quiz_questions:
+            order = option_order(new_result.id, q.id)
+            shown = [getattr(q, f"option_{letter}") for letter in order]
+
+            question_dtos.append(
+                QuestionDTO(
+                    id=q.id,
+                    text=q.text,
+                    option_a=shown[0],
+                    option_b=shown[1],
+                    option_c=shown[2],
+                    option_d=shown[3],
+                )
+            )
+
         await session.commit()
         await session.refresh(new_result)
 
@@ -157,14 +199,131 @@ class QuizProcessRepository:
             questions=question_dtos,
             image_url=student_image_url,
             face_ws_token=face_ws_token,
+            remaining_seconds=remaining_seconds(new_result, quiz),
+            resumed=False,
         )
 
-    async def submit_answer(
-        self, session: AsyncSession, data: SubmitAnswerRequest, user: User
-    ) -> SubmitAnswerResponse:
-        result_obj = (
-            await session.execute(select(Result).where(Result.id == data.result_id))
-        ).scalar_one_or_none()
+    async def _resume_attempt(
+        self, session: AsyncSession, result_obj: Result, quiz: Quiz, user: User
+    ) -> StartQuizResponse:
+        """Возвращает студента в его же попытку: те вопросы, тот порядок, то время.
+
+        Набор вопросов зафиксирован строками UserAnswers, созданными при старте,
+        а расстановка вариантов выводится из (result_id, question_id) — поэтому
+        после сбоя студент видит ровно тот бланк, что и до него.
+        """
+        reserved = (
+            (
+                await session.execute(
+                    select(UserAnswers)
+                    .options(selectinload(UserAnswers.question))
+                    .where(UserAnswers.result_id == result_obj.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        question_dtos: list[QuestionDTO] = []
+        submitted: list[SubmittedAnswerDTO] = []
+
+        for row in reserved:
+            question = row.question
+            if not question:
+                continue
+
+            order = option_order(result_obj.id, question.id)
+            shown = [getattr(question, f"option_{letter}") for letter in order]
+
+            question_dtos.append(
+                QuestionDTO(
+                    id=question.id,
+                    text=question.text,
+                    option_a=shown[0],
+                    option_b=shown[1],
+                    option_c=shown[2],
+                    option_d=shown[3],
+                )
+            )
+
+            if row.answer is not None and row.answer in shown:
+                # Позиция нужна только чтобы подсветить выбранную кнопку. Оценка
+                # уже посчитана и лежит в is_correct, так что совпадение текстов
+                # у двух вариантов подсветит не ту кнопку, но не изменит результат.
+                submitted.append(SubmittedAnswerDTO(question_id=question.id, answer_index=shown.index(row.answer)))
+
+        student = (await session.execute(select(Student).where(Student.user_id == user.id))).scalar_one_or_none()
+
+        face_ws_token = None
+        if quiz.proctoring_mode == "face":
+            face_ws_token = create_face_ws_token(
+                user_id=user.id,
+                quiz_id=quiz.id,
+                # Токена должно хватить ровно на остаток попытки, а не на полный тест.
+                ttl_minutes=max(1, remaining_seconds(result_obj, quiz) // 60 + 5),
+            )
+
+        return StartQuizResponse(
+            result_id=result_obj.id,
+            quiz_id=quiz.id,
+            title=quiz.title,
+            duration=quiz.duration,
+            proctoring_mode=quiz.proctoring_mode,
+            questions=question_dtos,
+            image_url=student.image_path if student else None,
+            face_ws_token=face_ws_token,
+            remaining_seconds=remaining_seconds(result_obj, quiz),
+            resumed=True,
+            submitted_answers=submitted,
+        )
+
+    async def _finalize_attempt(
+        self,
+        session: AsyncSession,
+        result_obj: Result,
+        *,
+        reason: str | None = None,
+        cheating_detected: bool = False,
+        cheating_image_url: str | None = None,
+    ) -> tuple[int, int, int, int]:
+        """Закрывает попытку и выставляет оценку. Возвращает (всего, верно, неверно, оценка).
+
+        Одна и та же функция обслуживает и обычное завершение, и автоматическое
+        закрытие истёкшей попытки — иначе оценка зависела бы от того, успел ли
+        студент нажать «Завершить».
+        """
+        answers = (
+            (await session.execute(select(UserAnswers).where(UserAnswers.result_id == result_obj.id))).scalars().all()
+        )
+
+        total_questions = len(answers)
+        correct_count = sum(1 for a in answers if a.is_correct)
+        wrong_count = total_questions - correct_count
+        grade, _ = grade_for(correct_count, total_questions)
+
+        result_obj.status = "completed"
+        result_obj.finished_at = utcnow_naive()
+        result_obj.correct_answers = correct_count
+        result_obj.wrong_answers = wrong_count
+        result_obj.grade = grade
+        result_obj.cheating_detected = cheating_detected
+        result_obj.reason_for_stop = reason
+        result_obj.cheating_image_url = cheating_image_url
+
+        try:
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error finalizing result: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error while finalizing result: {e}",
+            )
+
+        return total_questions, correct_count, wrong_count, grade
+
+    async def submit_answer(self, session: AsyncSession, data: SubmitAnswerRequest, user: User) -> SubmitAnswerResponse:
+        result_obj = (await session.execute(select(Result).where(Result.id == data.result_id))).scalar_one_or_none()
 
         if not result_obj:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
@@ -174,6 +333,18 @@ class QuizProcessRepository:
 
         if result_obj.status != "in_progress":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This attempt is already completed")
+
+        # Срок попытки проверяется на сервере: без этого студент мог держать
+        # попытку открытой сколько угодно и дописывать ответы после конца теста —
+        # статус сам по себе никогда не менялся.
+        quiz = (await session.execute(select(Quiz).where(Quiz.id == result_obj.quiz_id))).scalar_one_or_none()
+
+        if quiz and is_expired(result_obj, quiz):
+            await self._finalize_attempt(session, result_obj, reason="Vaqt tugadi")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Urinish vaqti tugagan",
+            )
 
         # Only a reserved row (created at start_quiz for a question actually
         # served to this student) may be answered — anything else means the
@@ -193,14 +364,40 @@ class QuizProcessRepository:
                 detail="This question is not part of your attempt",
             )
 
-        question = (
-            await session.execute(select(Question).where(Question.id == data.question_id))
-        ).scalar_one_or_none()
+        question = (await session.execute(select(Question).where(Question.id == data.question_id))).scalar_one_or_none()
 
-        is_correct = bool(question) and data.answer == question.get_correct_text()
+        if not question:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-        reserved.answer = data.answer
-        reserved.correct_answer = question.get_correct_text() if question else None
+        if data.answer_index is not None:
+            # Основной путь: клиент присылает позицию выбранного варианта, сервер
+            # восстанавливает букву колонки по той же расстановке, что показывал.
+            # Текст ответа в сравнении не участвует вообще.
+            chosen_letter = letter_at(data.result_id, data.question_id, data.answer_index)
+            if chosen_letter is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="answer_index must be between 0 and 3",
+                )
+            is_correct = chosen_letter == question.correct_option
+            # Текст берётся из базы, а не из запроса: в отчёте будет ровно то,
+            # что лежит в вопросе.
+            chosen_text = getattr(question, f"option_{chosen_letter}")
+        else:
+            # Совместимость на время выкатки: у студента, начавшего тест до неё,
+            # в браузере остаётся старый скрипт, который шлёт текст варианта.
+            # Обрывать ему ответы посреди экзамена нельзя. Путь удаляется, когда
+            # ни одна активная попытка не может быть старше выкатки.
+            if data.answer is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Either answer_index or answer must be provided",
+                )
+            chosen_text = data.answer
+            is_correct = data.answer == question.get_correct_text()
+
+        reserved.answer = chosen_text
+        reserved.correct_answer = question.get_correct_text()
         reserved.is_correct = is_correct
 
         await session.commit()
@@ -208,9 +405,7 @@ class QuizProcessRepository:
         return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
 
     async def end_quiz(self, session: AsyncSession, data: EndQuizRequest, user: User) -> EndQuizResponse:
-        result_obj = (
-            await session.execute(select(Result).where(Result.id == data.result_id))
-        ).scalar_one_or_none()
+        result_obj = (await session.execute(select(Result).where(Result.id == data.result_id))).scalar_one_or_none()
 
         if not result_obj:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
@@ -226,43 +421,13 @@ class QuizProcessRepository:
 
         # Reserved rows at start_quiz time define the real denominator — anything
         # still unanswered here counts as wrong (student ran out of time / never got to it).
-        answers = (
-            await session.execute(select(UserAnswers).where(UserAnswers.result_id == data.result_id))
-        ).scalars().all()
-
-        total_questions = len(answers)
-        correct_count = sum(1 for a in answers if a.is_correct)
-        wrong_count = total_questions - correct_count
-
-        percentage = (correct_count / total_questions * 100) if total_questions > 0 else 0
-
-        if percentage >= 86:
-            grade = 5
-        elif percentage >= 72:
-            grade = 4
-        elif percentage >= 56:
-            grade = 3
-        else:
-            grade = 2
-
-        result_obj.status = "completed"
-        result_obj.finished_at = utcnow_naive()
-        result_obj.correct_answers = correct_count
-        result_obj.wrong_answers = wrong_count
-        result_obj.grade = grade
-        result_obj.cheating_detected = data.cheating_detected or False
-        result_obj.reason_for_stop = data.reason if data.cheating_detected else None
-        result_obj.cheating_image_url = data.cheating_image_url
-
-        try:
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Error finalizing result: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error while finalizing result: {e}",
-            )
+        total_questions, correct_count, wrong_count, grade = await self._finalize_attempt(
+            session,
+            result_obj,
+            reason=data.reason if data.cheating_detected else None,
+            cheating_detected=data.cheating_detected or False,
+            cheating_image_url=data.cheating_image_url,
+        )
 
         return EndQuizResponse(
             total_questions=total_questions,

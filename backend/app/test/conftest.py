@@ -21,7 +21,7 @@ async def init_test_services():
     """
     Инициализация всех внешних сервисов (Limiter).
     """
-    test_redis = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
+    test_redis = redis.from_url(settings.redis.url, encoding="utf-8", decode_responses=True)
 
     await FastAPILimiter.init(test_redis)
 
@@ -35,7 +35,7 @@ async def clear_test_redis():
     """
     Очистка Redis перед каждым тестом, чтобы избежать ошибки 429 (Rate Limit).
     """
-    test_redis = redis.from_url("redis://localhost:6379")
+    test_redis = redis.from_url(settings.redis.url)
     await test_redis.flushdb()  # Полностью очищаем базу перед тестом
     await test_redis.aclose()
     yield

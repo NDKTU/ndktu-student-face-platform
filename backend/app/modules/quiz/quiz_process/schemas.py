@@ -19,6 +19,11 @@ class QuestionDTO(BaseModel):
     option_d: str
 
 
+class SubmittedAnswerDTO(BaseModel):
+    question_id: int
+    answer_index: int
+
+
 class StartQuizResponse(BaseModel):
     result_id: int
     quiz_id: int
@@ -29,11 +34,32 @@ class StartQuizResponse(BaseModel):
     image_url: Optional[str] = None
     face_ws_token: Optional[str] = None
 
+    #: Сколько секунд осталось до конца попытки. Считается от момента её создания
+    #: на сервере, поэтому перезагрузка страницы не продлевает тест. Клиент ведёт
+    #: таймер от этого значения, а не от `duration`.
+    remaining_seconds: int = 0
+
+    #: True, если это возвращение в уже начатую попытку, а не новая.
+    resumed: bool = False
+
+    #: Ответы, уже данные в этой попытке, — чтобы после сбоя студент увидел
+    #: свои отметки, а не пустой бланк.
+    submitted_answers: list[SubmittedAnswerDTO] = []
+
 
 class SubmitAnswerRequest(BaseModel):
     result_id: int
     question_id: int
-    answer: str
+
+    #: Позиция выбранного варианта (0–3) в том порядке, в каком варианты были
+    #: показаны студенту. Основной способ ответа: текст в проверке не участвует,
+    #: поэтому одинаковые варианты, разные виды апострофа и HTML внутри варианта
+    #: больше не влияют на оценку.
+    answer_index: Optional[int] = None
+
+    #: Текст выбранного варианта — путь совместимости для вкладок, открытых
+    #: до выкатки. Новый клиент его не отправляет.
+    answer: Optional[str] = None
 
 
 class SubmitAnswerResponse(BaseModel):

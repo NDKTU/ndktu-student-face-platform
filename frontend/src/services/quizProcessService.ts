@@ -15,6 +15,11 @@ export interface StartQuizRequest {
     pin: string;
 }
 
+export interface SubmittedAnswerDTO {
+    question_id: number;
+    answer_index: number;
+}
+
 export interface StartQuizResponse {
     result_id: number;
     quiz_id: number;
@@ -24,12 +29,19 @@ export interface StartQuizResponse {
     questions: QuestionDTO[];
     image_url?: string;
     face_ws_token?: string;
+    /** Остаток времени по часам сервера — таймер ведётся от него, а не от duration. */
+    remaining_seconds: number;
+    /** true, если это возвращение в уже начатую попытку. */
+    resumed: boolean;
+    /** Ответы, уже данные в этой попытке (при возобновлении). */
+    submitted_answers: SubmittedAnswerDTO[];
 }
 
 export interface SubmitAnswerRequest {
     result_id: number;
     question_id: number;
-    answer: string;
+    /** Позиция выбранного варианта (0–3) в показанном студенту порядке. */
+    answer_index: number;
 }
 
 export interface SubmitAnswerResponse {

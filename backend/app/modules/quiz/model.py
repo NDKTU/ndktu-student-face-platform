@@ -2,22 +2,37 @@ import random
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
+from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import Employee, Teacher, User
+    from app.modules.auth.model import Teacher, User
     from app.modules.organization_structure.model import Group
 
 
-class Subject(Base, IdIntPk, TimestampMixin):
+class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "subjects"
+    # Уникальность в пределах кафедры: одноимённые предметы на разных кафедрах
+    # в EPOS встречаются и являются разными предметами.
+    __table_args__ = (
+        UniqueConstraint("kafedra_id", "name", name="uq_subjects_kafedra_id_name"),
+        external_ref_index("subjects"),
+    )
 
-    name: Mapped[str] = mapped_column(String(250), unique=True)
+    name: Mapped[str] = mapped_column(String(250))
+
+    kafedra_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("kafedras.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
         "SubjectTeacher",
