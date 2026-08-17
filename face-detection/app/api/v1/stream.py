@@ -9,15 +9,15 @@ ws://host/v1/video/stream
 
 import base64
 import os
-import tempfile
 import time
+from pathlib import Path
+
 import httpx
-import cv2
-import numpy as np
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.logging import get_logger
 from app.core.security import verify_ws_token
+from app.services import video_service
 from app.services.video_service import get_detector
 
 router = APIRouter()
@@ -45,7 +45,6 @@ async def realtime_stream(
         return
 
     await websocket.accept()
-    detector = get_detector()
     logger.info("WebSocket client connected: %s", websocket.client)
 
     reference_encoding = None
@@ -60,9 +59,9 @@ async def realtime_stream(
             logger.info(f"Reading local mounted file: {local_path}")
             
             if os.path.exists(local_path):
-                ref_frame = cv2.imread(local_path)
+                ref_frame = await video_service.decode_frame(Path(local_path).read_bytes())
                 if ref_frame is not None:
-                    reference_encoding = detector.get_face_encoding(ref_frame)
+                    reference_encoding = await video_service.get_face_encoding(ref_frame)
                     if reference_encoding is not None:
                         logger.info("Reference face successfully initialized from local file.")
                     else:
@@ -79,20 +78,16 @@ async def realtime_stream(
                     response.raise_for_status()
                     
                     # Save to temp file and get encoding
-                    with tempfile.NamedTemporaryFile(delete=True, suffix=".jpg") as tmp:
-                        tmp.write(response.content)
-                        tmp.flush()
-                        
-                        # Read the temp file back into an OpenCV frame
-                        ref_frame = cv2.imread(tmp.name)
-                        if ref_frame is not None:
-                            reference_encoding = detector.get_face_encoding(ref_frame)
-                            if reference_encoding is not None:
-                                logger.info("Reference face successfully initialized from URL.")
-                            else:
-                                logger.warning("Could not find a face in the provided URL image.")
+                    # Временный файл больше не нужен: кадр разбирается прямо из байтов.
+                    ref_frame = await video_service.decode_frame(response.content)
+                    if ref_frame is not None:
+                        reference_encoding = await video_service.get_face_encoding(ref_frame)
+                        if reference_encoding is not None:
+                            logger.info("Reference face successfully initialized from URL.")
                         else:
-                            logger.error("Failed to decode reference image from URL.")
+                            logger.warning("Could not find a face in the provided URL image.")
+                    else:
+                        logger.error("Failed to decode reference image from URL.")
             except Exception as e:
                 logger.error(f"Error processing reference image URL: {e}")
 
@@ -108,8 +103,7 @@ async def realtime_stream(
 
             # 2. Decode to OpenCV frame
             try:
-                nparr = np.frombuffer(base64.b64decode(data), np.uint8)
-                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                frame = await video_service.decode_frame(base64.b64decode(data))
             except Exception:
                 await websocket.send_json({"error": "invalid frame", "has_two_faces": False, "face_count": 0})
                 continue
@@ -119,15 +113,18 @@ async def realtime_stream(
                 continue
 
             # 3. Detect and Compare faces
-            face_count = detector.count_faces(frame)
+            # Каждый вызов детектора уходит в пул потоков: это счёт на процессоре,
+            # и выполненный прямо здесь он останавливал бы обслуживание всех
+            # остальных подключённых студентов на время своей работы.
+            face_count = await video_service.count_faces(frame)
             is_different_person = False
             current_time = time.time()
 
             # Recognition logic
             if face_count == 1:
                 if reference_encoding is None or (current_time - last_recognition_time >= 5.0):
-                    current_encoding = detector.get_face_encoding(frame)
-                    
+                    current_encoding = await video_service.get_face_encoding(frame)
+
                     if reference_encoding is None and current_encoding is not None:
                         # Fallback capture if no URL was provided or URL failed
                         reference_encoding = current_encoding
@@ -135,7 +132,9 @@ async def realtime_stream(
                         logger.info("Reference face captured for session (fallback).")
                     elif reference_encoding is not None and current_encoding is not None:
                         # Periodic identity verification
-                        is_match = detector.compare_faces(reference_encoding, current_encoding)
+                        # Сравнение векторов — чистая арифметика без моделей,
+                        # выносить её в пул незачем.
+                        is_match = get_detector().compare_faces(reference_encoding, current_encoding)
                         last_recognition_time = current_time
                         if not is_match:
                             is_different_person = True

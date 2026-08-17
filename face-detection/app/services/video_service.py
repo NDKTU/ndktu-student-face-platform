@@ -6,9 +6,10 @@ VideoService — orchestrates the full video analysis pipeline:
 import asyncio
 import os
 import tempfile
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
+import numpy as np
 
 from app.core.config import settings
 from app.core.exceptions import VideoUnreadableError
@@ -20,12 +21,44 @@ logger = get_logger(__name__)
 # Singleton detector — created once, reused across all requests.
 _detector: FaceDetector | None = None
 
+# Распознавание — это счёт на процессоре, а не ожидание ввода-вывода: пока оно
+# идёт, событийный цикл стоит и не обслуживает никого. Поэтому все вызовы
+# детектора уходят в отдельный пул потоков. Размер пула ограничен числом ядер:
+# потоков больше, чем ядер, здесь не ускоряют, а лишь добавляют переключений.
+_executor = ThreadPoolExecutor(
+    max_workers=max(1, (os.cpu_count() or 2)),
+    thread_name_prefix="face",
+)
+
 
 def get_detector() -> FaceDetector:
     global _detector
     if _detector is None:
         _detector = FaceDetector()
     return _detector
+
+
+async def count_faces(frame: np.ndarray) -> int:
+    """Сколько лиц в кадре. Дешёвая проверка, выполняется на каждом кадре."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, get_detector().count_faces, frame)
+
+
+async def get_face_encoding(frame: np.ndarray):
+    """Вектор лица для сверки личности. Дорогая операция — вызывать редко."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, get_detector().get_face_encoding, frame)
+
+
+async def decode_frame(payload: bytes) -> np.ndarray | None:
+    """Разбор JPEG в кадр OpenCV. Тоже счёт на процессоре, хоть и недорогой."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, _decode_frame_sync, payload)
+
+
+def _decode_frame_sync(payload: bytes) -> np.ndarray | None:
+    nparr = np.frombuffer(payload, np.uint8)
+    return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
 
 # ---------------------------------------------------------------------------
