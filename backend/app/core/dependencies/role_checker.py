@@ -7,11 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission
-from app.modules.auth.model import Role
-from app.modules.auth.model import RolePermission
-from app.modules.auth.model import User
-from app.modules.auth.model import UserRole
+from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 from app.modules.auth.user.service import auth_service
 
 logger = logging.getLogger(__name__)

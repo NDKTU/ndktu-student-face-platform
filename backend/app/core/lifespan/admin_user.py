@@ -21,9 +21,7 @@ async def ensure_admin_user(session: AsyncSession, admin_role: Role) -> None:
     password = settings.admin.password
 
     if not username or not password:
-        logger.warning(
-            "APP_CONFIG__ADMIN__USERNAME/PASSWORD not set — skipping bootstrap admin user creation."
-        )
+        logger.warning("APP_CONFIG__ADMIN__USERNAME/PASSWORD not set — skipping bootstrap admin user creation.")
         return
 
     existing = (await session.execute(select(User).where(User.username == username))).scalar_one_or_none()

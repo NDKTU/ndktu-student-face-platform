@@ -9,6 +9,18 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .assignment.repository import get_assignment_repository
+from .assignment.schemas import (
+    AssignmentCreateRequest,
+    AssignmentListRequest,
+    AssignmentListResponse,
+    AssignmentResponse,
+    AssignmentUpdateRequest,
+    SubmissionGradeRequest,
+    SubmissionListResponse,
+    SubmissionResponse,
+    SubmissionSubmitRequest,
+)
 from .course.repository import get_course_repository
 from .course.schemas import (
     CourseCreateRequest,
@@ -26,18 +38,6 @@ from .lesson.schemas import (
     LessonResultListResponse,
     LessonResultsBulkUpsertRequest,
     LessonUpdateRequest,
-)
-from .assignment.repository import get_assignment_repository
-from .assignment.schemas import (
-    AssignmentCreateRequest,
-    AssignmentListRequest,
-    AssignmentListResponse,
-    AssignmentResponse,
-    AssignmentUpdateRequest,
-    SubmissionGradeRequest,
-    SubmissionListResponse,
-    SubmissionResponse,
-    SubmissionSubmitRequest,
 )
 from .resource.repository import get_resource_repository
 from .resource.schemas import (

@@ -1,6 +1,5 @@
 import logging
 import os
-import shutil
 import uuid
 
 from core.config import settings
@@ -9,8 +8,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.course.model import Course, Lesson, Resource
 from app.modules.auth.model import User
+from app.modules.course.model import Course, Lesson, Resource
 
 from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
 
@@ -66,9 +65,7 @@ class ResourceRepository:
 
         return f"{settings.file_url.http}/course_resources/{filename}"
 
-    async def create_resource(
-        self, session: AsyncSession, data: ResourceCreateRequest, current_user: User
-    ) -> Resource:
+    async def create_resource(self, session: AsyncSession, data: ResourceCreateRequest, current_user: User) -> Resource:
         course_id = await self._resolve_course_id(session, data.course_id, data.lesson_id)
         await self._check_access(session, course_id, current_user)
 

@@ -1,7 +1,8 @@
 from typing import Optional
 
-from app.core.schemas import TashkentDatetime
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from app.core.schemas import TashkentDatetime
 
 
 class ResultUserInfo(BaseModel):

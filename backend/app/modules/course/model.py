@@ -11,13 +11,9 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.organization_structure.model import Faculty
-    from app.modules.organization_structure.model import Group
-    from app.modules.organization_structure.model import Kafedra
-    from app.modules.organization_structure.model import Speciality
-    from app.modules.quiz.model import Subject
-    from app.modules.quiz.model import SubjectTeacher
     from app.modules.auth.model import User
+    from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
+    from app.modules.quiz.model import Subject, SubjectTeacher
 
 
 class Course(Base, IdIntPk, TimestampMixin):

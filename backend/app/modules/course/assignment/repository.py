@@ -7,8 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
-from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
 from app.modules.auth.model import Employee, Student, User
+from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
 
 from .schemas import (
     AssignmentCreateRequest,

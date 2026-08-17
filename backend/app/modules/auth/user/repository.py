@@ -205,12 +205,16 @@ class UserRepository:
         # 3. Student, Teacher & Employee records (Teacher before Employee: FK order)
         await session.execute(delete(StudentModel).where(StudentModel.user_id == user_id))
         teacher_ids = (
-            await session.execute(
-                select(TeacherModel.id)
-                .join(Employee, TeacherModel.employee_id == Employee.id)
-                .where(Employee.user_id == user_id)
+            (
+                await session.execute(
+                    select(TeacherModel.id)
+                    .join(Employee, TeacherModel.employee_id == Employee.id)
+                    .where(Employee.user_id == user_id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if teacher_ids:
             await session.execute(delete(TeacherModel).where(TeacherModel.id.in_(teacher_ids)))
         await session.execute(delete(Employee).where(Employee.user_id == user_id))
@@ -322,11 +326,7 @@ class UserRepository:
 
     async def ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
         normalized_name = role_name.strip().lower()
-        role_stmt = (
-            select(Role)
-            .where(func.lower(Role.name) == normalized_name)
-            .options(selectinload(Role.permissions))
-        )
+        role_stmt = select(Role).where(func.lower(Role.name) == normalized_name).options(selectinload(Role.permissions))
         role = (await session.execute(role_stmt)).scalar_one_or_none()
         if not role:
             role = Role(name=normalized_name)

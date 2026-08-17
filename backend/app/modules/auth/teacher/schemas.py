@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
+
+from app.core.schemas import TashkentDatetime
 
 
 class TeacherKafedraInfo(BaseModel):

@@ -1,6 +1,6 @@
-from app.core.schemas import TashkentDatetime
-
 from pydantic import BaseModel, ConfigDict
+
+from app.core.schemas import TashkentDatetime
 
 
 class RoleCreateRequest(BaseModel):

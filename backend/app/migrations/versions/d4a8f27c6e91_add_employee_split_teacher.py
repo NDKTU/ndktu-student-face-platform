@@ -11,11 +11,11 @@ Revises: b7c3e9f1a2d4
 Create Date: 2026-07-02 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d4a8f27c6e91"
@@ -67,9 +67,7 @@ def upgrade() -> None:
 
     # 5. Enforce NOT NULL + FK + uniqueness on teachers.employee_id.
     op.alter_column("teachers", "employee_id", nullable=False)
-    op.create_foreign_key(
-        "teachers_employee_id_fkey", "teachers", "employees", ["employee_id"], ["id"]
-    )
+    op.create_foreign_key("teachers_employee_id_fkey", "teachers", "employees", ["employee_id"], ["id"])
     op.create_unique_constraint("teachers_employee_id_key", "teachers", ["employee_id"])
 
     # 6. Drop the old personal-info / user_id columns from teachers.

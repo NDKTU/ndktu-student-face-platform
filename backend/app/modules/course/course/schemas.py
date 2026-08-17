@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.schemas import TashkentDatetime
 
 
 class CourseSubjectInfo(BaseModel):

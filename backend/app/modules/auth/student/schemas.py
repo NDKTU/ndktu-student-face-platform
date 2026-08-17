@@ -1,9 +1,9 @@
 from datetime import date
-
-from app.core.schemas import TashkentDatetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from app.core.schemas import TashkentDatetime
 
 
 class StudentBase(BaseModel):

@@ -1,7 +1,8 @@
 from typing import List, Literal, Optional
 
-from app.core.schemas import TashkentDatetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.schemas import TashkentDatetime
 
 RESOURCE_TYPES = Literal["file", "link", "text"]
 

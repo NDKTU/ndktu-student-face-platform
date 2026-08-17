@@ -57,9 +57,7 @@ async def test_end_quiz_error_reproduction(setup_quiz_execution, auth_client):
 
     # start_quiz creates the attempt (Result) and reserves the served questions —
     # end_quiz can only finalize an attempt that was actually started.
-    start_resp = await auth_client.post(
-        "/quiz_process/start_quiz", json={"quiz_id": data["quiz_id"], "pin": "1234"}
-    )
+    start_resp = await auth_client.post("/quiz_process/start_quiz", json={"quiz_id": data["quiz_id"], "pin": "1234"})
     assert start_resp.status_code == 200
     result_id = start_resp.json()["result_id"]
 
@@ -69,9 +67,7 @@ async def test_end_quiz_error_reproduction(setup_quiz_execution, auth_client):
     )
     assert submit_resp.status_code == 200
 
-    resp = await auth_client.post(
-        "/quiz_process/end_quiz", json={"quiz_id": data["quiz_id"], "result_id": result_id}
-    )
+    resp = await auth_client.post("/quiz_process/end_quiz", json={"quiz_id": data["quiz_id"], "result_id": result_id})
 
     # We expect this to SUCCEED with 200 now
     print(resp.json())

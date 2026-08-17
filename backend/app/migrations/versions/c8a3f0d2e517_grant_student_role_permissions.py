@@ -72,6 +72,6 @@ def downgrade() -> None:
         WHERE rp.role_id = r.id
         AND rp.permission_id = p.id
         AND lower(r.name) = 'student'
-        AND p.name IN ({', '.join(f"'{name}'" for name in STUDENT_PERMISSIONS)})
+        AND p.name IN ({", ".join(f"'{name}'" for name in STUDENT_PERMISSIONS)})
         """
     )

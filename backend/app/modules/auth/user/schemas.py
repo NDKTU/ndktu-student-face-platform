@@ -1,6 +1,6 @@
-from app.core.schemas import TashkentDatetime
-
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.core.schemas import TashkentDatetime
 
 
 class RoleResponse(BaseModel):

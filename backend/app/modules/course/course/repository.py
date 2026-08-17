@@ -5,10 +5,9 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.course.model import Course, CourseGroup
-from app.modules.quiz.model import Subject
-from app.modules.quiz.model import SubjectTeacher
 from app.modules.auth.model import Employee, Teacher, User
+from app.modules.course.model import Course, CourseGroup
+from app.modules.quiz.model import Subject, SubjectTeacher
 
 from .schemas import (
     CourseCreateRequest,
@@ -55,7 +54,9 @@ class CourseRepository:
                 id=course.teacher.id,
                 username=course.teacher.username,
                 full_name=teacher_full_name,
-            ) if course.teacher else None,
+            )
+            if course.teacher
+            else None,
             faculty=CourseFacultyInfo.model_validate(course.faculty) if course.faculty else None,
             kafedra=CourseKafedraInfo.model_validate(course.kafedra) if course.kafedra else None,
             speciality=CourseSpecialityInfo.model_validate(course.speciality) if course.speciality else None,
@@ -228,7 +229,9 @@ class CourseRepository:
 
     async def get_or_create_subject_teacher_for_course(self, session: AsyncSession, course: Course) -> SubjectTeacher:
         teacher_stmt = (
-            select(Teacher).join(Employee, Teacher.employee_id == Employee.id).where(Employee.user_id == course.teacher_id)
+            select(Teacher)
+            .join(Employee, Teacher.employee_id == Employee.id)
+            .where(Employee.user_id == course.teacher_id)
         )
         teacher = (await session.execute(teacher_stmt)).scalar_one_or_none()
         if not teacher:

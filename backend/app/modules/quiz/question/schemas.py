@@ -1,7 +1,8 @@
-from app.core.schemas import TashkentDatetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from app.core.schemas import TashkentDatetime
 
 CorrectOption = Literal["a", "b", "c", "d"]
 

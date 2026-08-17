@@ -351,9 +351,7 @@ async def update_speciality(
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:speciality")),
 ):
-    return await get_speciality_repository.update_speciality(
-        session=session, speciality_id=speciality_id, data=data
-    )
+    return await get_speciality_repository.update_speciality(session=session, speciality_id=speciality_id, data=data)
 
 
 @speciality_router.delete(
@@ -421,9 +419,7 @@ async def update_department(
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:department")),
 ):
-    return await get_department_repository.update_department(
-        session=session, department_id=department_id, data=data
-    )
+    return await get_department_repository.update_department(session=session, department_id=department_id, data=data)
 
 
 @department_router.delete(

@@ -5,10 +5,10 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.course.model import Course, CourseGroup, Lesson, LessonResult
-from app.modules.course.course.repository import get_course_repository
 from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.course.course.repository import get_course_repository
+from app.modules.course.model import Course, CourseGroup, Lesson, LessonResult
+from app.modules.organization_structure.model import GroupTeacher
 from app.modules.quiz.model import SubjectTeacher
 
 from .schemas import (
@@ -246,7 +246,9 @@ class LessonRepository:
 
         is_admin = await self._is_role(current_user, "admin")
 
-        if not is_admin and not await get_course_repository.user_owns_course(session, lesson.course_id, current_user.id):
+        if not is_admin and not await get_course_repository.user_owns_course(
+            session, lesson.course_id, current_user.id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Teacher is not the owner of this Course",
@@ -288,7 +290,9 @@ class LessonRepository:
 
         is_admin = await self._is_role(current_user, "admin")
 
-        if not is_admin and not await get_course_repository.user_owns_course(session, lesson.course_id, current_user.id):
+        if not is_admin and not await get_course_repository.user_owns_course(
+            session, lesson.course_id, current_user.id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Teacher is not the owner of this Course",

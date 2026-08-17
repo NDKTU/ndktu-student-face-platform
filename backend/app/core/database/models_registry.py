@@ -11,7 +11,6 @@ __all__ = [
     "Permission",
     "Student",
     "Employee",
-    
     "Faculty",
     "Kafedra",
     "Group",

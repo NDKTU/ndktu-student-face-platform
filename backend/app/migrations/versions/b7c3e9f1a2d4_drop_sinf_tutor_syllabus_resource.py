@@ -9,12 +9,12 @@ Revises: abf2d4975379
 Create Date: 2026-06-17 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
-
 
 # revision identifiers, used by Alembic.
 revision: str = "b7c3e9f1a2d4"
@@ -134,9 +134,7 @@ def downgrade() -> None:
     # Restore the sinf_id FK columns on tables that survived the upgrade.
     op.add_column("lessons", sa.Column("sinf_id", sa.Integer(), nullable=True))
     op.create_index(op.f("ix_lessons_sinf_id"), "lessons", ["sinf_id"], unique=False)
-    op.create_foreign_key(
-        "fk_lessons_sinf_id", "lessons", "sinfs", ["sinf_id"], ["id"], ondelete="SET NULL"
-    )
+    op.create_foreign_key("fk_lessons_sinf_id", "lessons", "sinfs", ["sinf_id"], ["id"], ondelete="SET NULL")
 
     op.add_column("course_modules", sa.Column("sinf_id", sa.Integer(), nullable=False))
     op.create_index(op.f("ix_course_modules_sinf_id"), "course_modules", ["sinf_id"], unique=False)
@@ -146,9 +144,7 @@ def downgrade() -> None:
 
     op.add_column("assignments", sa.Column("sinf_id", sa.Integer(), nullable=False))
     op.create_index(op.f("ix_assignments_sinf_id"), "assignments", ["sinf_id"], unique=False)
-    op.create_foreign_key(
-        "assignments_sinf_id_fkey", "assignments", "sinfs", ["sinf_id"], ["id"], ondelete="CASCADE"
-    )
+    op.create_foreign_key("assignments_sinf_id_fkey", "assignments", "sinfs", ["sinf_id"], ["id"], ondelete="CASCADE")
 
     op.create_table(
         "resources",
