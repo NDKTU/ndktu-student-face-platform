@@ -6,6 +6,10 @@ export interface Kafedra {
     faculty_id: number;
     created_at: string;
     updated_at: string;
+    // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
+    external_source?: string | null;
+    synced_at?: string | null;
+    is_active?: boolean;
 }
 
 export interface KafedraListResponse {

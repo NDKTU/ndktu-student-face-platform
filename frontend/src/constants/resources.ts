@@ -17,6 +17,7 @@ import {
     Briefcase,
     User,
     Library,
+    Database,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -44,6 +45,10 @@ export const RESOURCES: Record<string, ResourceMeta> = {
 
     role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
     permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Ruxsatlar tizimi' },
+
+    // Пункт появляется у роли с правом read:eduplan (оно объявлено ручкой
+    // статуса интеграции) и ведёт на экран синхронизации оргструктуры.
+    eduplan:       { label: 'EduPlan sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Boshqaruv' },
 
     faculty:       { label: 'Fakultetlarni boshqarish', href: '/faculties', icon: Building2, section: 'Boshqaruv' },
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },

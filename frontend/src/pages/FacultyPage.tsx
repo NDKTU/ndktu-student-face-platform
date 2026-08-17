@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { facultyService, type Faculty } from '@/services/facultyService';
@@ -198,20 +199,32 @@ const FacultyPage = () => {
                                         onClick={() => setView({ level: 'faculty-details', faculty })}
                                     >
                                         <TableCell>{faculty.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">{faculty.name}</TableCell>
+                                        <TableCell className="font-medium capitalize">
+                                            <span className="inline-flex items-center gap-2">
+                                                {faculty.name}
+                                                <ExternalSourceBadge row={faculty} />
+                                                <InactiveBadge row={faculty} />
+                                            </span>
+                                        </TableCell>
                                         <TableCell>{new Date(faculty.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
+                                            {/* Записи зеркала не редактируются: бэкенд отклонит правку,
+                                                а следующая синхронизация вернула бы прежние значения. */}
                                             <div className="flex justify-end gap-2">
-                                                <PermissionGate permission="update:faculty">
-                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFaculty(faculty); setIsModalOpen(true); }}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:faculty">
-                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(faculty); }}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
+                                                {!isExternal(faculty) && (
+                                                    <>
+                                                        <PermissionGate permission="update:faculty">
+                                                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFaculty(faculty); setIsModalOpen(true); }}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                        <PermissionGate permission="delete:faculty">
+                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(faculty); }}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -130,10 +131,19 @@ const SubjectsPage = () => {
                                 {subjects.map((subject) => (
                                     <TableRow key={subject.id}>
                                         <TableCell>{subject.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">{subject.name}</TableCell>
+                                        <TableCell className="font-medium capitalize">
+                                            <span className="inline-flex items-center gap-2">
+                                                {subject.name}
+                                                <ExternalSourceBadge row={subject} />
+                                                <InactiveBadge row={subject} />
+                                            </span>
+                                        </TableCell>
                                         <TableCell>{new Date(subject.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
+                                            {/* Записи зеркала не редактируются: правку отклонит бэкенд. */}
                                             <div className="flex justify-end gap-2">
+                                                {!isExternal(subject) && (
+                                                  <>
                                                 <PermissionGate permission="update:subject">
                                                     <Button
                                                         variant="ghost"
@@ -153,6 +163,8 @@ const SubjectsPage = () => {
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </PermissionGate>
+                                                  </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

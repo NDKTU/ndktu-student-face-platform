@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
@@ -169,7 +170,13 @@ const GroupsPage = () => {
                                 {groups.map((group) => (
                                     <TableRow key={group.id}>
                                         <TableCell>{group.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">{group.name}</TableCell>
+                                        <TableCell className="font-medium capitalize">
+                                            <span className="inline-flex items-center gap-2">
+                                                {group.name}
+                                                <ExternalSourceBadge row={group} />
+                                                <InactiveBadge row={group} />
+                                            </span>
+                                        </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 capitalize">
                                                 {getFacultyName(group.faculty_id)}
@@ -177,17 +184,22 @@ const GroupsPage = () => {
                                         </TableCell>
                                         <TableCell>{new Date(group.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
+                                            {/* Записи зеркала не редактируются: правку отклонит бэкенд. */}
                                             <div className="flex justify-end gap-2">
-                                                <PermissionGate permission="update:group">
-                                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(group); setIsModalOpen(true); }}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:group">
-                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(group)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
+                                                {!isExternal(group) && (
+                                                    <>
+                                                        <PermissionGate permission="update:group">
+                                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(group); setIsModalOpen(true); }}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                        <PermissionGate permission="delete:group">
+                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(group)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

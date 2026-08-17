@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { useKafedras, useDeleteKafedra, useFaculties } from '@/hooks/useReferenceData';
@@ -154,7 +155,13 @@ const KafedraPage = () => {
                                 {kafedras.map((kafedra) => (
                                     <TableRow key={kafedra.id}>
                                         <TableCell>{kafedra.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">{kafedra.name}</TableCell>
+                                        <TableCell className="font-medium capitalize">
+                                            <span className="inline-flex items-center gap-2">
+                                                {kafedra.name}
+                                                <ExternalSourceBadge row={kafedra} />
+                                                <InactiveBadge row={kafedra} />
+                                            </span>
+                                        </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 capitalize">
                                                 {getFacultyName(kafedra.faculty_id)}
@@ -162,17 +169,22 @@ const KafedraPage = () => {
                                         </TableCell>
                                         <TableCell>{new Date(kafedra.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
+                                            {/* Записи зеркала не редактируются: правку отклонит бэкенд. */}
                                             <div className="flex justify-end gap-2">
-                                                <PermissionGate permission="update:kafedra">
-                                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedKafedra(kafedra); setIsModalOpen(true); }}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:kafedra">
-                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(kafedra)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
+                                                {!isExternal(kafedra) && (
+                                                    <>
+                                                        <PermissionGate permission="update:kafedra">
+                                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedKafedra(kafedra); setIsModalOpen(true); }}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                        <PermissionGate permission="delete:kafedra">
+                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(kafedra)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </PermissionGate>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

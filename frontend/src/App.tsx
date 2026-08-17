@@ -12,6 +12,7 @@ import ResultsPage from '@/pages/ResultsPage';
 import TeachersPage from '@/pages/TeachersPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import HemisSyncPage from '@/pages/HemisSyncPage';
+import EduPlanSyncPage from '@/pages/EduPlanSyncPage';
 import FacultyPage from '@/pages/FacultyPage';
 import KafedraPage from '@/pages/KafedraPage';
 import GroupsPage from '@/pages/GroupsPage';
@@ -123,6 +124,7 @@ function App() {
                 <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
                 <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />
                 <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
+                <Route path="/admin/eduplan-sync" element={<PermissionRoute permission="sync:eduplan"><EduPlanSyncPage /></PermissionRoute>} />
 
                 <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                 <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />
