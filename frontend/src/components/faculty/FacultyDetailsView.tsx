@@ -31,7 +31,7 @@ export const FacultyDetailsView = ({ faculty, onBack, onOpenKafedra, onOpenGroup
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Orqaga
                     </Button>
-                    <h1 className="text-xl font-semibold tracking-tight capitalize">{faculty.name}</h1>
+                    <h1 className="page-title capitalize">{faculty.name}</h1>
                 </div>
 
                 <div className="flex items-center gap-2 border-b border-border pb-px">

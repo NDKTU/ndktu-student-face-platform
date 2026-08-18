@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -86,8 +87,11 @@ export const EmployeeModal = ({ isOpen, onClose, employee, onSuccess }: Employee
                 roles: data.role_ids.map((id) => ({ name: roles.find((r) => r.id === id)?.name || '' })),
             },
             {
-                onSuccess: () => onSuccess(),
-                onError: (err: any) => alert(err?.response?.data?.detail || 'Xodim yaratishda xatolik'),
+                onSuccess: () => {
+                    toast.success('Xodim yaratildi');
+                    onSuccess();
+                },
+                onError: (err: any) => toast.error(err?.response?.data?.detail || 'Xodim yaratishda xatolik'),
             }
         );
     };
@@ -96,8 +100,11 @@ export const EmployeeModal = ({ isOpen, onClose, employee, onSuccess }: Employee
         updateMutation.mutate(
             { id: employee!.id, data: { ...data, phone_number: data.phone_number || undefined } },
             {
-                onSuccess: () => onSuccess(),
-                onError: (err: any) => alert(err?.response?.data?.detail || 'Xodimni yangilashda xatolik'),
+                onSuccess: () => {
+                    toast.success('Xodim yangilandi');
+                    onSuccess();
+                },
+                onError: (err: any) => toast.error(err?.response?.data?.detail || 'Xodimni yangilashda xatolik'),
             }
         );
     };
@@ -139,7 +146,7 @@ export const EmployeeModal = ({ isOpen, onClose, employee, onSuccess }: Employee
                                                             : field.value.filter((id) => id !== role.id)
                                                     );
                                                 }}
-                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                             />
                                             <label htmlFor={`emp-role-${role.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
                                                 {role.name}

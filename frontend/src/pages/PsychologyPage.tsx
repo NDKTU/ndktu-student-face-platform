@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Loader2, Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import { Brain, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useCreateMethod, useDeleteMethod, useMethods, useUpdateMethod } from '@/hooks/usePsychology';
 import { MethodBuilderModal } from '@/components/psychology/MethodBuilderModal';
 import { MethodList } from '@/components/psychology/MethodList';
@@ -14,7 +19,7 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 export default function PsychologyPage() {
     const navigate = useNavigate();
     const [page, setPage] = useState(1);
-    const { data, isLoading, isError } = useMethods(page, 20);
+    const { data, isLoading, isError, refetch } = useMethods(page, 20);
     const createMethod = useCreateMethod();
     const updateMethod = useUpdateMethod();
     const deleteMethod = useDeleteMethod();
@@ -24,17 +29,33 @@ export default function PsychologyPage() {
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
     const handleCreate = (payload: Parameters<typeof createMethod.mutate>[0]) => {
-        createMethod.mutate(payload, { onSuccess: () => setMethodModal({ open: false, editing: null }) });
+        createMethod.mutate(payload, {
+            onSuccess: () => {
+                setMethodModal({ open: false, editing: null });
+                toast.success('Metod yaratildi');
+            },
+            onError: () => toast.error('Metodni yaratishda xatolik yuz berdi'),
+        });
     };
     const handleUpdate = (payload: { name: string; description: string; instruction: Record<string, unknown> }) => {
         if (!methodModal.editing) return;
         updateMethod.mutate({ id: methodModal.editing.id, data: payload }, {
-            onSuccess: () => setMethodModal({ open: false, editing: null }),
+            onSuccess: () => {
+                setMethodModal({ open: false, editing: null });
+                toast.success('Metod saqlandi');
+            },
+            onError: () => toast.error('Metodni saqlashda xatolik yuz berdi'),
         });
     };
     const handleDeleteClick = (id: number) => {
         if (deletingId === id) {
-            deleteMethod.mutate(id, { onSuccess: () => setDeletingId(null) });
+            deleteMethod.mutate(id, {
+                onSuccess: () => {
+                    setDeletingId(null);
+                    toast.success("Metod o'chirildi");
+                },
+                onError: () => toast.error("Metodni o'chirishda xatolik yuz berdi"),
+            });
         } else {
             setDeletingId(id);
         }
@@ -46,23 +67,18 @@ export default function PsychologyPage() {
         : null;
 
     return (
-        <div className="p-6">
-            <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                        <Brain className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-semibold text-foreground">Psixologik metodlar</h1>
-                        <p className="text-xs text-muted-foreground">Test metodlarini boshqarish</p>
-                    </div>
-                </div>
-                <PermissionGate permission="create:psychology">
-                    <Button onClick={() => setMethodModal({ open: true, editing: null })}>
-                        <Plus className="mr-2 h-4 w-4" /> Yangi metod
-                    </Button>
-                </PermissionGate>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                title="Psixologik metodlar"
+                description="Test metodlarini boshqarish"
+                actions={
+                    <PermissionGate permission="create:psychology">
+                        <Button onClick={() => setMethodModal({ open: true, editing: null })}>
+                            <Plus className="mr-2 h-4 w-4" /> Yangi metod
+                        </Button>
+                    </PermissionGate>
+                }
+            />
 
             <Card>
                 <CardHeader className="pb-0">
@@ -72,24 +88,31 @@ export default function PsychologyPage() {
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <div className="mt-4 flex flex-col gap-2">
+                            {Array.from({ length: 5 }, (_, i) => (
+                                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                            ))}
                         </div>
                     ) : isError ? (
-                        <p className="py-8 text-center text-sm text-destructive">Xatolik yuz berdi</p>
+                        <ErrorState onRetry={() => refetch()} />
                     ) : !data?.methods.length ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center">
-                            <Brain className="h-10 w-10 text-muted-foreground/30" />
-                            <p className="text-sm text-muted-foreground">Metodlar mavjud emas</p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setMethodModal({ open: true, editing: null })}
-                            >
-                                Birinchi metodni yarating
-                            </Button>
-                        </div>
+                        <EmptyState
+                            icon={<Brain className="h-6 w-6" />}
+                            title="Metodlar mavjud emas"
+                            description="Hozircha birorta ham metod qo'shilmagan."
+                            action={
+                                <PermissionGate permission="create:psychology">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setMethodModal({ open: true, editing: null })}
+                                    >
+                                        Birinchi metodni yarating
+                                    </Button>
+                                </PermissionGate>
+                            }
+                        />
                     ) : (
                         <>
                             <MethodList

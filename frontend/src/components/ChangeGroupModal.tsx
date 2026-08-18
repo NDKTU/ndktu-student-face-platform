@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
@@ -47,11 +48,12 @@ export const ChangeGroupModal: React.FC<ChangeGroupModalProps> = ({ isOpen, onCl
             { id: student.id, groupId: parseInt(selectedGroupId, 10) },
             {
                 onSuccess: () => {
+                    toast.success("Talaba yangi guruhga o'tkazildi");
                     onClose();
                     onSuccess?.();
                 },
                 onError: (error: any) => {
-                    alert(error?.response?.data?.detail || 'Guruhni o\'zgartirishda xatolik yuz berdi');
+                    toast.error(error?.response?.data?.detail || 'Guruhni o\'zgartirishda xatolik yuz berdi');
                 }
             }
         );

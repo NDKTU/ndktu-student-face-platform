@@ -4,13 +4,13 @@ import type { Diagnosis } from '@/services/psychologyService';
 export function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis | null | undefined }) {
     if (!diagnosis) {
         return (
-            <div className="flex items-start gap-3 rounded-xl border border-yellow-300/60 bg-yellow-50 dark:bg-yellow-950/20 p-4">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-warning mt-0.5" />
                 <div>
-                    <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-200">
+                    <p className="text-sm font-semibold text-foreground">
                         Diagnostika sozlanmagan
                     </p>
-                    <p className="mt-0.5 text-xs text-yellow-800/80 dark:text-yellow-200/70">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                         Metod uchun skoring va interpretatsiya to'liq sozlanmagan. Javoblar saqlandi, ammo natija avtomatik aniqlanmadi.
                     </p>
                 </div>

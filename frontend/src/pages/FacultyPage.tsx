@@ -1,16 +1,17 @@
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
-import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/Table';
-import { Card, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
-import { facultyService, type Faculty } from '@/services/facultyService';
+import { facultyService, type Faculty, type FacultyStats } from '@/services/facultyService';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { Group } from '@/services/groupService';
 import type { Student } from '@/services/studentService';
 import { FacultyModal } from '@/components/faculty/FacultyModal';
@@ -19,6 +20,7 @@ import { KafedraTeachersView } from '@/components/faculty/KafedraTeachersView';
 import { GroupStudentsView } from '@/components/faculty/GroupStudentsView';
 import { StudentDetailView } from '@/components/faculty/StudentDetailView';
 import type { Kafedra } from '@/services/kafedraService';
+import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { logger } from '@/utils/logger';
 
 type View =
@@ -28,9 +30,12 @@ type View =
     | { level: 'group-students'; faculty: Faculty; group: Group }
     | { level: 'student-detail'; faculty: Faculty; group: Group; student: Student };
 
+
 const FacultyPage = () => {
     const [faculties, setFaculties] = useState<Faculty[]>([]);
+    const [stats, setStats] = useState<Map<number, FacultyStats>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
+    const [isError, setIsError] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -46,11 +51,18 @@ const FacultyPage = () => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const data = await facultyService.getFaculties(currentPage, pageSize, debouncedSearch);
+            setIsError(false);
+            const [data, statsList] = await Promise.all([
+                facultyService.getFaculties(currentPage, pageSize, debouncedSearch),
+                // Счётчики — украшение карточек: их отказ не должен ронять страницу
+                facultyService.getFacultyStats().catch(() => [] as FacultyStats[]),
+            ]);
             setFaculties(data.faculties);
+            setStats(new Map(statsList.map((s) => [s.faculty_id, s])));
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
             logger.error('Failed to fetch faculties', error);
+            setIsError(true);
         } finally {
             setIsLoading(false);
         }
@@ -76,6 +88,7 @@ const FacultyPage = () => {
         try {
             await facultyService.deleteFaculty(facultyToDelete.id, cascadeWarnings.length > 0);
             setFaculties((prev) => prev.filter((item) => item.id !== facultyToDelete.id));
+            toast.success("Fakultet o'chirildi");
             setIsDeleteModalOpen(false);
             setFacultyToDelete(null);
             setCascadeWarnings([]);
@@ -84,7 +97,7 @@ const FacultyPage = () => {
                 setCascadeWarnings(error.response.data.detail.warnings || []);
             } else {
                 logger.error("Fakultetni o'chirishda xatolik", error);
-                alert("O'chirishda xatolik yuz berdi");
+                toast.error("O'chirishda xatolik yuz berdi");
                 setIsDeleteModalOpen(false);
                 setFacultyToDelete(null);
                 setCascadeWarnings([]);
@@ -149,96 +162,117 @@ const FacultyPage = () => {
         );
     }
 
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Fakultetlar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Universitet fakultetlarini boshqarish</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Qidirish..."
-                            className="pl-8 w-[220px]"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <PermissionGate permission="create:faculty">
-                        <Button onClick={() => { setSelectedFaculty(null); setIsModalOpen(true); }}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Qo'shish
+    // Кнопки действий — общие для строки таблицы и мобильной карточки.
+    // Записи зеркала не редактируются: бэкенд отклонит правку,
+    // а следующая синхронизация вернула бы прежние значения.
+    const renderActions = (faculty: Faculty) => (
+        <div className="flex justify-end gap-2">
+            {!isExternal(faculty) && (
+                <>
+                    <PermissionGate permission="update:faculty">
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFaculty(faculty); setIsModalOpen(true); }}>
+                            <Pencil className="h-4 w-4" />
                         </Button>
                     </PermissionGate>
+                    <PermissionGate permission="delete:faculty">
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(faculty); }}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </PermissionGate>
+                </>
+            )}
+        </div>
+    );
+
+    /* Карточка факультета в стиле референса: плитка-инициалы, имя, счётчики */
+    const renderFacultyCard = (faculty: Faculty) => {
+        const s = stats.get(faculty.id);
+        return (
+            <div
+                key={faculty.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setView({ level: 'faculty-details', faculty })}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView({ level: 'faculty-details', faculty }); } }}
+                className="group flex cursor-pointer flex-col rounded-2xl border border-border/60 bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+            >
+                <div className="flex items-start gap-3">
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tileFor(faculty.id)}`}>
+                        {initialsOf(faculty.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="font-display font-semibold capitalize leading-snug text-foreground">
+                            {faculty.name}
+                        </p>
+                        <span className="mt-1 inline-flex flex-wrap items-center gap-1.5">
+                            <ExternalSourceBadge row={faculty} />
+                            <InactiveBadge row={faculty} />
+                        </span>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>{renderActions(faculty)}</div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-4">
+                    <div>
+                        <p className="font-display text-lg font-bold text-foreground">{s ? s.kafedra_count : '—'}</p>
+                        <p className="text-xs text-muted-foreground">Kafedra</p>
+                    </div>
+                    <div>
+                        <p className="font-display text-lg font-bold text-foreground">{s ? s.speciality_count : '—'}</p>
+                        <p className="text-xs text-muted-foreground">Mutaxassislik</p>
+                    </div>
+                    <div>
+                        <p className="font-display text-lg font-bold text-foreground">{s ? s.student_count : '—'}</p>
+                        <p className="text-xs text-muted-foreground">Talaba</p>
+                    </div>
                 </div>
             </div>
+        );
+    };
 
-            <Card>
-                <CardContent className="pt-6">
-                    {isLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
+    return (
+        <div className="space-y-6">
+            <PageHeader
+                title="Fakultetlar"
+                description="Universitet fakultetlarini boshqarish"
+                actions={
+                    <>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Qidirish..."
+                                className="pl-8 w-[220px]"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
                         </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">ID</TableHead>
-                                    <TableHead>Nomi</TableHead>
-                                    <TableHead>Yaratilgan sana</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {faculties.map((faculty) => (
-                                    <TableRow
-                                        key={faculty.id}
-                                        className="cursor-pointer"
-                                        onClick={() => setView({ level: 'faculty-details', faculty })}
-                                    >
-                                        <TableCell>{faculty.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">
-                                            <span className="inline-flex items-center gap-2">
-                                                {faculty.name}
-                                                <ExternalSourceBadge row={faculty} />
-                                                <InactiveBadge row={faculty} />
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>{new Date(faculty.created_at).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
-                                            {/* Записи зеркала не редактируются: бэкенд отклонит правку,
-                                                а следующая синхронизация вернула бы прежние значения. */}
-                                            <div className="flex justify-end gap-2">
-                                                {!isExternal(faculty) && (
-                                                    <>
-                                                        <PermissionGate permission="update:faculty">
-                                                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFaculty(faculty); setIsModalOpen(true); }}>
-                                                                <Pencil className="h-4 w-4" />
-                                                            </Button>
-                                                        </PermissionGate>
-                                                        <PermissionGate permission="delete:faculty">
-                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(faculty); }}>
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </PermissionGate>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {faculties.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">Fakultetlar topilmadi.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+                        <PermissionGate permission="create:faculty">
+                            <Button onClick={() => { setSelectedFaculty(null); setIsModalOpen(true); }}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Qo'shish
+                            </Button>
+                        </PermissionGate>
+                    </>
+                }
+            />
+
+            {isError ? (
+                <ErrorState onRetry={fetchData} />
+            ) : isLoading ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 6 }, (_, i) => (
+                        <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+                    ))}
+                </div>
+            ) : faculties.length === 0 ? (
+                <EmptyState
+                    title="Fakultetlar topilmadi"
+                    description="Hozircha fakultet qo'shilmagan yoki qidiruvga mos fakultet yo'q."
+                />
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {faculties.map(renderFacultyCard)}
+                </div>
+            )}
 
             <Pagination
                 currentPage={currentPage}
@@ -262,11 +296,11 @@ const FacultyPage = () => {
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu fakultetni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu fakultetni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/90">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham "${facultyToDelete?.name}" fakultetini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }

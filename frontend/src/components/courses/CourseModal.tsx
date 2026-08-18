@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -102,18 +103,24 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
 
         if (course) {
             updateMutation.mutate({ id: course.id, data: payload }, {
-                onSuccess: () => onSuccess(),
+                onSuccess: () => {
+                    toast.success('Kurs yangilandi');
+                    onSuccess();
+                },
                 onError: (error: unknown) => {
                     logger.error('Failed to update course', error);
-                    alert('Kursni yangilashda xatolik yuz berdi');
+                    toast.error('Kursni yangilashda xatolik yuz berdi');
                 },
             });
         } else {
             createMutation.mutate(payload as CourseCreateRequest, {
-                onSuccess: () => onSuccess(),
+                onSuccess: () => {
+                    toast.success('Kurs yaratildi');
+                    onSuccess();
+                },
                 onError: (error: unknown) => {
                     logger.error('Failed to create course', error);
-                    alert('Kurs yaratishda xatolik yuz berdi');
+                    toast.error('Kurs yaratishda xatolik yuz berdi');
                 },
             });
         }
@@ -147,7 +154,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                             />
                         )}
                     />
-                    {errors.subject_id && <p className="text-sm text-red-500">{errors.subject_id.message}</p>}
+                    {errors.subject_id && <p className="text-sm text-destructive">{errors.subject_id.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -165,7 +172,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                             />
                         )}
                     />
-                    {errors.teacher_id && <p className="text-sm text-red-500">{errors.teacher_id.message}</p>}
+                    {errors.teacher_id && <p className="text-sm text-destructive">{errors.teacher_id.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -248,7 +255,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                                                         : [...field.value, group.id]
                                                 );
                                             }}
-                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                                         />
                                         <label htmlFor={`course-group-${group.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
                                             {group.name}

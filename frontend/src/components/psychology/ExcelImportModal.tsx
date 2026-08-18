@@ -254,7 +254,7 @@ export function ExcelImportModal({
                         )}
 
                         {finished && progress.failed.length === 0 && (
-                            <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600">
+                            <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
                                 <CheckCircle2 className="h-4 w-4" />
                                 Hammasi muvaffaqiyatli yuklandi.
                             </div>

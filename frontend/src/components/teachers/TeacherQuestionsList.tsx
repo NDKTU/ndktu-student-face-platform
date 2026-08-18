@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
@@ -14,6 +15,9 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Loader2, Search, ArrowLeft, Plus, Pencil, Trash2, FileQuestion, Download } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useQuestions, useDeleteQuestion, useBulkDeleteQuestions, useDownloadQuestionsExcel } from '@/hooks/useQuestions';
 import type { Teacher } from '@/services/teacherService';
 import type { Question } from '@/services/questionService';
@@ -32,6 +36,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
     const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -44,7 +49,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: questionsData, isLoading: isQuestionsLoading } = useQuestions(
+    const { data: questionsData, isLoading: isQuestionsLoading, isError: isQuestionsError, refetch: refetchQuestions } = useQuestions(
         currentPage,
         pageSize,
         debouncedSearch,
@@ -81,24 +86,27 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
         if (!questionToDelete) return;
         deleteQuestionMutation.mutate(questionToDelete.id, {
             onSuccess: () => {
+                toast.success("Savol o'chirildi");
                 setIsDeleteModalOpen(false);
                 setQuestionToDelete(null);
             },
+            onError: () => toast.error("Savolni o'chirishda xatolik yuz berdi"),
         });
     };
 
-    const handleBulkDelete = () => {
-        if (window.confirm(`Haqiqatan ham "${subject.name}" faniga va ushbu o'qituvchiga tegishli BARCHA savollarni o'chirmoqchimisiz?`)) {
-            bulkDeleteMutation.mutate({
-                subject_id: subject.id,
-                user_id: teacher.employee!.user_id,
-            }, {
-                onSuccess: (data: any) => {
-                    alert(`${data.deleted_count} ta savol o'chirildi`);
-                },
-                onError: () => alert("Savollarni o'chirishda xatolik yuz berdi"),
-            });
-        }
+    const handleBulkDelete = () => setIsBulkDeleteOpen(true);
+
+    const handleConfirmBulkDelete = () => {
+        bulkDeleteMutation.mutate({
+            subject_id: subject.id,
+            user_id: teacher.employee!.user_id,
+        }, {
+            onSuccess: (data: any) => {
+                toast.success(`${data.deleted_count} ta savol o'chirildi`);
+                setIsBulkDeleteOpen(false);
+            },
+            onError: () => toast.error("Savollarni o'chirishda xatolik yuz berdi"),
+        });
     };
 
     const stripHtml = (html: string) => {
@@ -109,20 +117,20 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center gap-1">
                         <ArrowLeft className="h-4 w-4" />
                         Orqaga
                     </Button>
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
+                        <h1 className="page-title">
                             {teacher.employee!.full_name} — {subject.name}
                         </h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">Savollar ro'yxati</p>
+                        <p className="page-description mt-0.5">Savollar ro'yxati</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -158,14 +166,19 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
             <Card>
                 <CardContent className="pt-6">
                     {isQuestionsLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
+                        <div className="space-y-3">
+                            {Array.from({ length: 6 }, (_, i) => (
+                                <Skeleton key={i} className="h-10 w-full" />
+                            ))}
                         </div>
+                    ) : isQuestionsError ? (
+                        <ErrorState onRetry={() => refetchQuestions()} />
                     ) : questions.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-center">
-                            <FileQuestion className="h-12 w-12 mb-4 opacity-20" />
-                            <p>Ushbu fan va o'qituvchi uchun savollar mavjud emas.</p>
-                        </div>
+                        <EmptyState
+                            icon={<FileQuestion className="h-6 w-6" />}
+                            title="Savollar topilmadi"
+                            description="Ushbu fan va o'qituvchi uchun savollar mavjud emas."
+                        />
                     ) : (
                         <Table>
                             <TableHeader>
@@ -231,6 +244,16 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                 description="Haqiqatan ham bu savolni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi."
                 confirmText="O'chirish"
                 cancelText="Bekor qilish"
+            />
+
+            <ConfirmDialog
+                isOpen={isBulkDeleteOpen}
+                onClose={() => setIsBulkDeleteOpen(false)}
+                onConfirm={handleConfirmBulkDelete}
+                title="Barcha savollarni o'chirish"
+                description={`Haqiqatan ham "${subject.name}" faniga va ushbu o'qituvchiga tegishli BARCHA savollarni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`}
+                confirmText="O'chirish"
+                isLoading={bulkDeleteMutation.isPending}
             />
 
             <QuestionDetailModal

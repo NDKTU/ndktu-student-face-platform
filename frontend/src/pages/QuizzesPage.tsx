@@ -1,9 +1,11 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Plus, Search } from 'lucide-react';
 import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz } from '@/hooks/useQuizzes';
 import { useSubjects } from '@/hooks/useSubjects';
@@ -51,7 +53,7 @@ const QuizzesPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: quizzesData, isLoading: isQuizzesLoading } = useQuizzes(
+    const { data: quizzesData, isLoading: isQuizzesLoading, isError: isQuizzesError, refetch: refetchQuizzes } = useQuizzes(
         currentPage,
         pageSize,
         debouncedSearch,
@@ -96,6 +98,7 @@ const QuizzesPage = () => {
         if (!quizToDelete) return;
         deleteQuizMutation.mutate({ id: quizToDelete.id, force: cascadeWarnings.length > 0 }, {
             onSuccess: () => {
+                toast.success("Test o'chirildi");
                 setIsDeleteModalOpen(false);
                 setQuizToDelete(null);
                 setCascadeWarnings([]);
@@ -104,7 +107,7 @@ const QuizzesPage = () => {
                 if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                     setCascadeWarnings(error.response.data.detail.warnings || []);
                 } else {
-                    alert("O'chirishda xatolik yuz berdi");
+                    toast.error("O'chirishda xatolik yuz berdi");
                     setIsDeleteModalOpen(false);
                     setQuizToDelete(null);
                     setCascadeWarnings([]);
@@ -130,7 +133,7 @@ const QuizzesPage = () => {
                 setRepeatedQuiz(newQuiz);
             },
             onError: () => {
-                alert('Testni qayta yaratishda xatolik yuz berdi');
+                toast.error('Testni qayta yaratishda xatolik yuz berdi');
             },
         });
     };
@@ -142,7 +145,7 @@ const QuizzesPage = () => {
             question_number: quiz.question_number,
             duration: quiz.duration,
             pin: quiz.pin,
-            user_id: quiz.user_id ?? null,
+            lecturer_id: quiz.lecturer_id ?? null,
             group_id: quiz.group_id ?? null,
             subject_id: quiz.subject_id ?? null,
             is_active: !quiz.is_active,
@@ -153,9 +156,21 @@ const QuizzesPage = () => {
             onSettled: () => {
                 setIsUpdatingStatus(null);
             },
+            onSuccess: () => {
+                toast.success(payload.is_active ? 'Test faollashtirildi' : "Test faol emas holatga o'tkazildi");
+            },
             onError: (error: unknown) => {
                 logger.error('Failed to update quiz status', error);
-                alert('Test holatini yangilashda xatolik yuz berdi');
+                // Включение теста с недостаточным банком вопросов бэкенд отклоняет
+                // с 409 и внятным сообщением — показываем именно его: иначе человек
+                // не поймёт, почему переключатель не сработал.
+                const response = (error as { response?: { status?: number; data?: { detail?: { message?: string } } } })
+                    ?.response;
+                if (response?.status === 409 && response.data?.detail?.message) {
+                    toast.error(response.data.detail.message);
+                    return;
+                }
+                toast.error('Test holatini yangilashda xatolik yuz berdi');
             },
         });
     };
@@ -182,29 +197,29 @@ const QuizzesPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Testlar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Testlarni va topshiriqlarni boshqarish</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Qidirish..."
-                            className="pl-8 w-[220px]"
-                            value={searchTerm}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    {!isTeacher && (
-                        <Button onClick={handleCreateQuiz}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Test yaratish
-                        </Button>
-                    )}
-                </div>
-            </div>
+            <PageHeader
+                title="Testlar"
+                description="Testlarni va topshiriqlarni boshqarish"
+                actions={
+                    <>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Qidirish..."
+                                className="pl-8 w-[220px]"
+                                value={searchTerm}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        {!isTeacher && (
+                            <Button onClick={handleCreateQuiz}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Test yaratish
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             <QuizFilters
                 subjects={allSubjects}
@@ -227,6 +242,8 @@ const QuizzesPage = () => {
             <QuizTable
                 quizzes={quizzes}
                 isLoading={isQuizzesLoading}
+                isError={isQuizzesError}
+                onRetry={() => refetchQuizzes()}
                 isTeacher={isTeacher}
                 hasActiveFilters={hasActiveFilters}
                 isUpdatingStatusId={isUpdatingStatus}
@@ -263,11 +280,11 @@ const QuizzesPage = () => {
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu testni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu testni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/90">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham "${quizToDelete?.title}" testini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }

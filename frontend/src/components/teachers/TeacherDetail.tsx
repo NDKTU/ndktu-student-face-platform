@@ -20,13 +20,13 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={onBack}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+            <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" onClick={onBack}>
+                    <ArrowLeft className="h-4 w-4 mr-1.5" />
                     Orqaga
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">
+                    <h1 className="page-title capitalize">
                         {teacher.employee?.full_name || `O'qituvchi #${teacher.id}`}
                     </h1>
                 </div>

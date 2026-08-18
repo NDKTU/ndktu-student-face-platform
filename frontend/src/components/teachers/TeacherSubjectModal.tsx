@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -47,8 +48,11 @@ export const TeacherSubjectModal = ({ isOpen, onClose, teacher }: TeacherSubject
     const handleSave = () => {
         if (!teacher) return;
         assignSubjectsMutation.mutate({ teacher_id: teacher.id, subject_ids: selectedSubjectIds }, {
-            onSuccess: () => onClose(),
-            onError: () => alert("Fanlarni biriktirishda xatolik yuz berdi"),
+            onSuccess: () => {
+                toast.success('Fanlar biriktirildi');
+                onClose();
+            },
+            onError: () => toast.error("Fanlarni biriktirishda xatolik yuz berdi"),
         });
     };
 
@@ -72,7 +76,7 @@ export const TeacherSubjectModal = ({ isOpen, onClose, teacher }: TeacherSubject
                                 id={`subject-${subject.id}`}
                                 checked={selectedSubjectIds.includes(subject.id)}
                                 onChange={() => handleToggleSubject(subject.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                             />
                             <label htmlFor={`subject-${subject.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
                                 {subject.name}

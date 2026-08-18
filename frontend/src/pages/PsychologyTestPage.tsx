@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMethod, useSubmitTest } from '@/hooks/usePsychology';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Loader2, CheckCircle, ChevronLeft, ChevronRight, Brain } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Loader2, CheckCircle, ChevronLeft, ChevronRight, Brain, ListOrdered, Play } from 'lucide-react';
 import type { QuestionResponse, AnswerItem, Diagnosis, TestResultResponse } from '@/services/psychologyService';
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
@@ -24,13 +27,13 @@ function TrueFalseQuestion({
     const c = question.content as Record<string, string>;
     return (
         <div className="flex flex-col items-center gap-6">
-            <p className="text-center text-lg font-medium text-foreground">{c.text}</p>
-            <div className="flex gap-4">
+            <p className="text-center text-base font-medium leading-relaxed text-foreground sm:text-lg">{c.text}</p>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4">
                 {[{ label: "Ha", val: true }, { label: "Yo'q", val: false }].map(({ label, val }) => (
                     <button
                         key={label}
                         onClick={() => onChange(val)}
-                        className={`min-w-[120px] rounded-xl border-2 px-6 py-3 text-base font-semibold transition-all ${
+                        className={`min-h-[3.5rem] w-full rounded-xl border-2 p-4 text-base font-semibold transition-all sm:min-w-[9rem] ${
                             value === val
                                 ? 'border-primary bg-primary text-primary-foreground shadow-md'
                                 : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-accent'
@@ -60,13 +63,13 @@ function ScaleQuestion({
 
     return (
         <div className="flex flex-col items-center gap-6">
-            <p className="text-center text-lg font-medium text-foreground">{String(c.text ?? '')}</p>
-            <div className="flex flex-wrap justify-center gap-2">
+            <p className="text-center text-base font-medium leading-relaxed text-foreground sm:text-lg">{String(c.text ?? '')}</p>
+            <div className="flex flex-wrap justify-center gap-2.5">
                 {steps.map((n) => (
                     <button
                         key={n}
                         onClick={() => onChange(n)}
-                        className={`h-12 w-12 rounded-xl border-2 text-sm font-bold transition-all ${
+                        className={`h-13 w-13 min-h-[3.25rem] min-w-[3.25rem] rounded-xl border-2 text-base font-bold transition-all ${
                             value === n
                                 ? 'border-primary bg-primary text-primary-foreground shadow-md'
                                 : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-accent'
@@ -99,13 +102,13 @@ function TextOptionsQuestion({
     const options = (question.options ?? []) as Array<{ text: string; value: number | string }>;
     return (
         <div className="flex flex-col gap-5">
-            <p className="text-center text-lg font-medium text-foreground">{c.text}</p>
-            <div className="flex flex-col gap-2">
+            <p className="text-center text-base font-medium leading-relaxed text-foreground sm:text-lg">{c.text}</p>
+            <div className="flex flex-col gap-2.5">
                 {options.map((opt, i) => (
                     <button
                         key={i}
                         onClick={() => onChange(opt.value)}
-                        className={`rounded-xl border-2 px-4 py-3 text-left text-sm transition-all ${
+                        className={`rounded-xl border-2 p-4 text-left text-sm leading-relaxed transition-all sm:text-base ${
                             value === opt.value
                                 ? 'border-primary bg-primary/10 text-primary font-medium'
                                 : 'border-border bg-background text-foreground hover:border-primary/30 hover:bg-accent'
@@ -136,16 +139,16 @@ function ImageStimulusQuestion({
                 <img
                     src={c.image_url}
                     alt="stimulus"
-                    className="max-h-64 rounded-xl border border-border object-contain shadow"
+                    className="max-h-64 max-w-full rounded-xl border border-border object-contain shadow-sm"
                 />
             )}
-            {c.text && <p className="text-center text-base text-foreground">{c.text}</p>}
-            <div className="flex flex-col gap-2 w-full">
+            {c.text && <p className="text-center text-base leading-relaxed text-foreground">{c.text}</p>}
+            <div className="flex flex-col gap-2.5 w-full">
                 {options.map((opt, i) => (
                     <button
                         key={i}
                         onClick={() => onChange(opt.value)}
-                        className={`rounded-xl border-2 px-4 py-3 text-left text-sm transition-all ${
+                        className={`rounded-xl border-2 p-4 text-left text-sm leading-relaxed transition-all sm:text-base ${
                             value === opt.value
                                 ? 'border-primary bg-primary/10 text-primary font-medium'
                                 : 'border-border bg-background text-foreground hover:border-primary/30 hover:bg-accent'
@@ -172,19 +175,19 @@ function ImageChoiceQuestion({
     const options = (question.options ?? []) as Array<{ image_url: string; value: number | string }>;
     return (
         <div className="flex flex-col gap-5 items-center">
-            {c.text && <p className="text-center text-base text-foreground">{c.text}</p>}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {c.text && <p className="text-center text-base font-medium leading-relaxed text-foreground">{c.text}</p>}
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
                 {options.map((opt, i) => (
                     <button
                         key={i}
                         onClick={() => onChange(opt.value)}
                         className={`overflow-hidden rounded-xl border-2 transition-all ${
                             value === opt.value
-                                ? 'border-primary shadow-md'
+                                ? 'border-primary shadow-md ring-2 ring-primary/30'
                                 : 'border-border hover:border-primary/40'
                         }`}
                     >
-                        <img src={opt.image_url} alt={`option ${i + 1}`} className="h-28 w-full object-cover" />
+                        <img src={opt.image_url} alt={`option ${i + 1}`} className="h-32 w-full object-cover sm:h-28" />
                     </button>
                 ))}
             </div>
@@ -206,7 +209,7 @@ function MultiChoiceQuestion({
 
     return (
         <div className="flex flex-col gap-5">
-            <p className="text-center text-lg font-medium text-foreground">{c.text}</p>
+            <p className="text-center text-base font-medium leading-relaxed text-foreground sm:text-lg">{c.text}</p>
             {c.description && (
                 <p className="text-center text-sm text-muted-foreground">{c.description}</p>
             )}
@@ -219,7 +222,7 @@ function MultiChoiceQuestion({
                             onClick={() => onChange(opt.value)}
                             className={`overflow-hidden rounded-xl border-2 transition-all ${
                                 isSelected
-                                    ? 'border-primary shadow-md'
+                                    ? 'border-primary shadow-md ring-2 ring-primary/30'
                                     : 'border-border hover:border-primary/40'
                             }`}
                         >
@@ -227,10 +230,10 @@ function MultiChoiceQuestion({
                                 <img
                                     src={opt.image_url}
                                     alt={`variant ${i + 1}`}
-                                    className="h-28 w-full object-cover"
+                                    className="h-32 w-full object-cover sm:h-28"
                                 />
                             ) : (
-                                <div className="flex h-28 w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                                <div className="flex h-32 w-full items-center justify-center bg-muted text-sm font-medium text-muted-foreground sm:h-28">
                                     {i + 1}
                                 </div>
                             )}
@@ -269,6 +272,50 @@ function QuestionRenderer({
     }
 }
 
+// ── Intro screen ────────────────────────────────────────────────────────────
+
+function IntroScreen({ methodName, description, total, onStart, onBack }: {
+    methodName: string;
+    description: string;
+    total: number;
+    onStart: () => void;
+    onBack: () => void;
+}) {
+    return (
+        <Card>
+            <CardContent className="flex flex-col items-center gap-6 px-5 py-10 text-center sm:px-8">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                    <Brain className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                    <h1 className="text-xl font-semibold text-foreground sm:text-2xl">{methodName}</h1>
+                    {description && (
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">{description}</p>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 rounded-full bg-muted px-4 py-1.5 text-sm text-muted-foreground">
+                    <ListOrdered className="h-4 w-4" />
+                    {total} ta savol
+                </div>
+                <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
+                    Har bir savolga o'zingizga eng mos javobni tanlang. To'g'ri yoki noto'g'ri javob yo'q —
+                    samimiy javob bering. Testni yakunlash uchun barcha savollarga javob berish kerak.
+                </p>
+                <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row">
+                    <Button variant="outline" size="lg" onClick={onBack}>
+                        <ChevronLeft className="h-4 w-4" />
+                        Orqaga
+                    </Button>
+                    <Button size="lg" onClick={onStart} className="sm:min-w-[12rem]">
+                        <Play className="h-4 w-4" />
+                        Testni boshlash
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 // ── Result screen ───────────────────────────────────────────────────────────
 
 function ResultScreen({ methodName, questions, answers, diagnosis, onBack }: {
@@ -284,8 +331,8 @@ function ResultScreen({ methodName, questions, answers, diagnosis, onBack }: {
         <div className="flex flex-col gap-5 py-4">
             {/* Top icon + title */}
             <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
-                    <CheckCircle className="h-7 w-7 text-green-600" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success/15">
+                    <CheckCircle className="h-7 w-7 text-success" />
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-foreground">Test yakunlandi!</h2>
@@ -316,7 +363,7 @@ function ResultScreen({ methodName, questions, answers, diagnosis, onBack }: {
             </div>
 
             <div className="flex justify-center">
-                <Button onClick={onBack}>Orqaga</Button>
+                <Button size="lg" onClick={onBack} className="w-full sm:w-auto sm:min-w-[10rem]">Orqaga</Button>
             </div>
         </div>
     );
@@ -327,9 +374,10 @@ function ResultScreen({ methodName, questions, answers, diagnosis, onBack }: {
 export default function PsychologyTestPage() {
     const { methodId } = useParams<{ methodId: string }>();
     const navigate = useNavigate();
-    const { data: method, isLoading } = useMethod(methodId ? Number(methodId) : null);
+    const { data: method, isLoading, isError, refetch } = useMethod(methodId ? Number(methodId) : null);
     const submitTest = useSubmitTest();
 
+    const [started, setStarted] = useState(false);
     const [current, setCurrent] = useState(0);
     const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
     const [result, setResult] = useState<TestResultResponse | null>(null);
@@ -354,10 +402,24 @@ export default function PsychologyTestPage() {
         return list;
     }, [method, shuffleSeed]);
 
+    if (isError) {
+        return (
+            <div className="mx-auto w-full max-w-2xl">
+                <ErrorState onRetry={() => refetch()} />
+            </div>
+        );
+    }
+
     if (isLoading || !method) {
         return (
-            <div className="flex h-screen items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+                <Skeleton className="h-10 w-2/3" />
+                <Skeleton className="h-2 w-full rounded-full" />
+                <Skeleton className="h-72 w-full rounded-xl" />
+                <div className="flex justify-between gap-3">
+                    <Skeleton className="h-11 w-28 rounded-xl" />
+                    <Skeleton className="h-11 flex-1 rounded-xl" />
+                </div>
             </div>
         );
     }
@@ -366,23 +428,40 @@ export default function PsychologyTestPage() {
 
     if (total === 0) {
         return (
-            <div className="flex flex-col items-center gap-4 py-20 text-center">
-                <Brain className="h-10 w-10 text-muted-foreground/30" />
-                <p className="text-muted-foreground">Bu metodda hali savollar yo'q.</p>
-                <Button variant="outline" onClick={() => navigate('/psychology')}>Orqaga</Button>
+            <div className="mx-auto w-full max-w-2xl">
+                <EmptyState
+                    icon={<Brain className="h-6 w-6" />}
+                    title="Savollar yo'q"
+                    description="Bu metodda hali savollar yo'q."
+                    action={<Button variant="outline" onClick={() => navigate('/psychology')}>Orqaga</Button>}
+                />
             </div>
         );
     }
 
     if (result) {
         return (
-            <div className="mx-auto max-w-lg p-6">
+            <div className="mx-auto w-full max-w-2xl">
                 <ResultScreen
                     methodName={method.name}
                     questions={questions}
                     answers={result.answers}
                     diagnosis={result.diagnosis}
                     onBack={() => navigate(-1)}
+                />
+            </div>
+        );
+    }
+
+    if (!started) {
+        return (
+            <div className="mx-auto w-full max-w-2xl">
+                <IntroScreen
+                    methodName={method.name}
+                    description={method.description}
+                    total={total}
+                    onStart={() => setStarted(true)}
+                    onBack={() => navigate('/psychology')}
                 />
             </div>
         );
@@ -414,12 +493,13 @@ export default function PsychologyTestPage() {
     };
 
     return (
-        <div className="mx-auto max-w-lg p-4 sm:p-6">
+        <div className="mx-auto w-full max-w-2xl">
             {/* Header */}
-            <div className="mb-6 flex items-center gap-3">
+            <div className="mb-5 flex items-center gap-3">
                 <button
                     onClick={() => navigate('/psychology')}
-                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    aria-label="Orqaga"
                 >
                     <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -429,10 +509,13 @@ export default function PsychologyTestPage() {
                         {current + 1} / {total} savol
                     </p>
                 </div>
+                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                    {progress}%
+                </span>
             </div>
 
             {/* Progress bar */}
-            <div className="mb-6 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div className="mb-5 h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div
                     className="h-full rounded-full bg-primary transition-all duration-300"
                     style={{ width: `${progress}%` }}
@@ -441,7 +524,7 @@ export default function PsychologyTestPage() {
 
             {/* Question card */}
             <Card>
-                <CardContent className="py-8 px-6">
+                <CardContent className="px-4 py-6 sm:px-8 sm:py-8">
                     <QuestionRenderer
                         question={question}
                         value={currentAnswer}
@@ -454,15 +537,17 @@ export default function PsychologyTestPage() {
             <div className="mt-5 flex items-center justify-between gap-3">
                 <Button
                     variant="outline"
+                    size="lg"
                     disabled={current === 0}
                     onClick={() => setCurrent(c => c - 1)}
                 >
                     <ChevronLeft className="h-4 w-4" />
-                    Orqaga
+                    <span className="hidden sm:inline">Orqaga</span>
                 </Button>
 
                 {isLast ? (
                     <Button
+                        size="lg"
                         onClick={handleSubmit}
                         disabled={!allAnswered || submitTest.isPending}
                         className="flex-1"
@@ -472,6 +557,7 @@ export default function PsychologyTestPage() {
                     </Button>
                 ) : (
                     <Button
+                        size="lg"
                         onClick={() => setCurrent(c => c + 1)}
                         disabled={currentAnswer === null}
                         className="flex-1"
@@ -483,12 +569,12 @@ export default function PsychologyTestPage() {
             </div>
 
             {/* Answer dots */}
-            <div className="mt-5 flex flex-wrap justify-center gap-1.5">
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
                 {questions.map((q, i) => (
                     <button
                         key={q.id}
                         onClick={() => setCurrent(i)}
-                        className={`h-2.5 w-2.5 rounded-full transition-all ${
+                        className={`h-3 w-3 rounded-full transition-all ${
                             i === current
                                 ? 'bg-primary scale-125'
                                 : answers[q.id] !== undefined
@@ -496,6 +582,7 @@ export default function PsychologyTestPage() {
                                 : 'bg-muted'
                         }`}
                         title={`Savol ${i + 1}`}
+                        aria-label={`Savol ${i + 1}`}
                     />
                 ))}
             </div>

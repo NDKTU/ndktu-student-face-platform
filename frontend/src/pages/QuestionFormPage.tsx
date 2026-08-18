@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
@@ -15,12 +16,12 @@ import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQu
 import { useSubjects } from '@/hooks/useSubjects';
 
 const questionSchema = z.object({
-    subject_id: z.string().min(1, 'Subject is required'),
-    text: z.string().min(1, 'Question text is required'),
-    option_a: z.string().min(1, 'Option A is required'),
-    option_b: z.string().min(1, 'Option B is required'),
-    option_c: z.string().min(1, 'Option C is required'),
-    option_d: z.string().min(1, 'Option D is required'),
+    subject_id: z.string().min(1, 'Fan tanlanishi shart'),
+    text: z.string().min(1, 'Savol matni kiritilishi shart'),
+    option_a: z.string().min(1, 'A varianti kiritilishi shart'),
+    option_b: z.string().min(1, 'B varianti kiritilishi shart'),
+    option_c: z.string().min(1, 'C varianti kiritilishi shart'),
+    option_d: z.string().min(1, 'D varianti kiritilishi shart'),
     correct_option: z.enum(['a', 'b', 'c', 'd']),
 });
 
@@ -83,7 +84,7 @@ const QuestionFormPage = () => {
     const joditConfig = useMemo(() => {
         return {
             readonly: false,
-            placeholder: 'Start writing...',
+            placeholder: 'Yozishni boshlang...',
             uploader: {
                 insertImageAsBase64URI: false,
             },
@@ -104,7 +105,7 @@ const QuestionFormPage = () => {
             // без неё преподаватель видит одно и то же сообщение и для сбоя сети, и для
             // слишком большого файла.
             const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            alert(detail || 'Rasm yuklashda xatolik yuz berdi');
+            toast.error(detail || 'Rasm yuklashda xatolik yuz berdi');
         }
     };
 
@@ -126,7 +127,7 @@ const QuestionFormPage = () => {
 
     const onSubmit = (data: QuestionFormValues) => {
         if (!user) {
-            alert('User not authenticated');
+            toast.error('Avtorizatsiyadan o\'tilmagan');
             return;
         }
 
@@ -145,12 +146,13 @@ const QuestionFormPage = () => {
         // versioning) — we always navigate away on success rather than staying
         // on this page, so there's no stale id left referencing the old version.
         const onSuccess = () => {
+            toast.success(isEditMode ? 'Savol yangilandi' : 'Savol yaratildi');
             navigate('/questions');
         };
 
         const onError = (error: unknown) => {
             logger.error('Failed to save question', error);
-            alert('Failed to save question');
+            toast.error('Savolni saqlashda xatolik');
         }
 
         if (isEditMode && id) {
@@ -163,7 +165,7 @@ const QuestionFormPage = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -222,10 +224,17 @@ const QuestionFormPage = () => {
                 className="hidden"
             />
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
                 <Button variant="ghost" size="sm" onClick={() => navigate('/questions')}>
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeft className="h-4 w-4 mr-1.5" />
+                    Orqaga
                 </Button>
+                <div>
+                    <h1 className="page-title">{isEditMode ? 'Savolni tahrirlash' : 'Yangi savol'}</h1>
+                    <p className="page-description mt-0.5">
+                        {isEditMode ? 'Savol matni va variantlarini yangilang' : 'Savol matni va variantlarini kiriting'}
+                    </p>
+                </div>
             </div>
 
             <Card>
@@ -233,12 +242,12 @@ const QuestionFormPage = () => {
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-1 gap-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Subject</label>
+                                <label className="text-sm font-medium">Fan</label>
                                 <select
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     {...register('subject_id')}
                                 >
-                                    <option value="">Select Subject</option>
+                                    <option value="">Fanni tanlang</option>
                                     {subjects.map((s) => (
                                         <option key={s.id} value={s.id}>{s.name}</option>
                                     ))}
@@ -250,36 +259,36 @@ const QuestionFormPage = () => {
                         <Controller
                             name="text"
                             control={control}
-                            render={({ field }) => renderEditorWithUpload('Question Text', field, errors.text?.message)}
+                            render={({ field }) => renderEditorWithUpload('Savol matni', field, errors.text?.message)}
                         />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Controller
                                 name="option_a"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option A', field, errors.option_a?.message, 'a')}
+                                render={({ field }) => renderEditorWithUpload('A varianti', field, errors.option_a?.message, 'a')}
                             />
                             <Controller
                                 name="option_b"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option B', field, errors.option_b?.message, 'b')}
+                                render={({ field }) => renderEditorWithUpload('B varianti', field, errors.option_b?.message, 'b')}
                             />
                             <Controller
                                 name="option_c"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option C', field, errors.option_c?.message, 'c')}
+                                render={({ field }) => renderEditorWithUpload('C varianti', field, errors.option_c?.message, 'c')}
                             />
                             <Controller
                                 name="option_d"
                                 control={control}
-                                render={({ field }) => renderEditorWithUpload('Option D', field, errors.option_d?.message, 'd')}
+                                render={({ field }) => renderEditorWithUpload('D varianti', field, errors.option_d?.message, 'd')}
                             />
                         </div>
 
                         <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => navigate('/questions')}>Cancel</Button>
+                            <Button type="button" variant="outline" onClick={() => navigate('/questions')}>Bekor qilish</Button>
                             <Button type="submit" isLoading={isSubmitting}>
-                                {isEditMode ? 'Update Question' : 'Create Question'}
+                                {isEditMode ? 'Savolni yangilash' : 'Savol yaratish'}
                             </Button>
                         </div>
                     </form>

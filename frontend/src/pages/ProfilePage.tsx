@@ -1,59 +1,57 @@
-import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { User, Calendar, KeyRound, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User, Calendar, KeyRound, Save } from 'lucide-react';
 import { userService } from '@/services/userService';
+
+const credentialsSchema = z
+    .object({
+        current_password: z.string().min(1, 'Joriy parolni kiritish majburiy'),
+        new_username: z.string().optional(),
+        new_password: z
+            .string()
+            .optional()
+            .refine((v) => !v || v.length >= 4, "Yangi parol kamida 4 ta belgidan iborat bo'lishi kerak"),
+    })
+    .refine((data) => data.new_username || data.new_password, {
+        message: "Kamida bitta maydon (Login yoki Yangi parol) o'zgartirilishi kerak",
+        path: ['new_username'],
+    });
+
+type CredentialsForm = z.infer<typeof credentialsSchema>;
 
 const ProfilePage = () => {
     const { user } = useAuth();
-    
-    // Credentials form state
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newUsername, setNewUsername] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
-    const handleCredentialsChange = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<CredentialsForm>({
+        resolver: zodResolver(credentialsSchema),
+        defaultValues: { current_password: '', new_username: '', new_password: '' },
+    });
 
-        if (!currentPassword) {
-            setError('Joriy parolni kiritish majburiy');
-            return;
-        }
-
-        if (!newUsername && !newPassword) {
-            setError('Kamida bitta maydon (Logit yoki Yangi parol) o\'zgartirilishi kerak');
-            return;
-        }
-
+    const onSubmit = async (values: CredentialsForm) => {
         try {
-            setLoading(true);
-            const data: any = { current_password: currentPassword };
-            if (newUsername) data.new_username = newUsername;
-            if (newPassword) data.new_password = newPassword;
+            await userService.changeMyCredentials({
+                current_password: values.current_password,
+                new_username: values.new_username || undefined,
+                new_password: values.new_password || undefined,
+            });
+            toast.success("Ma'lumotlar yangilandi! Tizimga yangi ma'lumotlar bilan qayta kiring.");
 
-            await userService.changeMyCredentials(data);
-            
-            // Clean form and show message
-            setCurrentPassword('');
-            setNewUsername('');
-            setNewPassword('');
-            setSuccess('Ma\'lumotlar muvaffaqiyatli yangilandi! Tizimga yangi ma\'lumotlar bilan qayta kiring.');
-            
             // Log out user so they can login with new credentials
             setTimeout(() => {
                 window.location.href = '/login';
             }, 3000);
         } catch (err: any) {
-            setError(err.response?.data?.detail || 'Xatolik yuz berdi');
-        } finally {
-            setLoading(false);
+            toast.error(err.response?.data?.detail || 'Xatolik yuz berdi');
         }
     };
 
@@ -287,28 +285,17 @@ const ProfilePage = () => {
                     <CardDescription>O'z login va parolingizni shu yerdan yangilashingiz mumkin.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleCredentialsChange} className="space-y-4 max-w-md">
-                        {error && (
-                            <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
-                                {error}
-                            </div>
-                        )}
-                        {success && (
-                            <div className="flex items-center gap-2 p-3 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800">
-                                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                {success}
-                            </div>
-                        )}
-
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-md">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Joriy parol <span className="text-destructive">*</span></label>
                             <Input
                                 type="password"
                                 placeholder="Tasdiqlash uchun joriy parolingizni kiriting"
-                                value={currentPassword}
-                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                {...register('current_password')}
                             />
+                            {errors.current_password && (
+                                <p className="text-sm text-destructive">{errors.current_password.message}</p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -316,9 +303,11 @@ const ProfilePage = () => {
                             <Input
                                 type="text"
                                 placeholder="Ixtiyoriy: Yangi login nomini kiriting"
-                                value={newUsername}
-                                onChange={(e) => setNewUsername(e.target.value)}
+                                {...register('new_username')}
                             />
+                            {errors.new_username && (
+                                <p className="text-sm text-destructive">{errors.new_username.message}</p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -326,18 +315,16 @@ const ProfilePage = () => {
                             <Input
                                 type="password"
                                 placeholder="Ixtiyoriy: Yangi parolni kiriting (min. 4 ta belgi)"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
+                                {...register('new_password')}
                             />
+                            {errors.new_password && (
+                                <p className="text-sm text-destructive">{errors.new_password.message}</p>
+                            )}
                         </div>
 
-                        <Button type="submit" disabled={loading} className="w-full sm:w-auto mt-2">
-                            {loading ? 'Bazaga yozilmoqda...' : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Saqlash
-                                </>
-                            )}
+                        <Button type="submit" isLoading={isSubmitting} className="w-full sm:w-auto mt-2">
+                            <Save className="mr-2 h-4 w-4" />
+                            Saqlash
                         </Button>
                     </form>
                 </CardContent>

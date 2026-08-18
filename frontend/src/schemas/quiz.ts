@@ -11,7 +11,8 @@ export const quizSchema = z.object({
         "Musbat son bo'lishi kerak",
     ),
     pin: z.string().min(4, 'PIN kiritilishi shart'),
-    user_id: z.string().optional(),
+    // Ma'ruzachi: savollar uning bankidan yig'iladi, testni esa tashkilotchi yaratadi.
+    lecturer_id: z.string().optional(),
     group_id: z.string().optional(),
     subject_id: z.string().optional(),
     is_active: z.boolean(),

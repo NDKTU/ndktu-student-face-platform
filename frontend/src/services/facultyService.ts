@@ -18,12 +18,24 @@ export interface FacultyListResponse {
     faculties: Faculty[];
 }
 
+export interface FacultyStats {
+    faculty_id: number;
+    kafedra_count: number;
+    speciality_count: number;
+    student_count: number;
+}
+
 export const facultyService = {
     getFaculties: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<FacultyListResponse>('/faculty/', {
             params: { page, limit, name },
         });
         return response.data;
+    },
+
+    getFacultyStats: async (): Promise<FacultyStats[]> => {
+        const response = await api.get<{ stats: FacultyStats[] }>('/faculty/stats');
+        return response.data.stats;
     },
 
     getFacultyById: async (id: number): Promise<Faculty> => {

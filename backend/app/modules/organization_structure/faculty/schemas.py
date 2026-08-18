@@ -46,3 +46,14 @@ class FacultyListResponse(BaseModel):
     page: int
     limit: int
     faculties: list[FacultyCreateResponse]
+
+
+class FacultyStatsItem(BaseModel):
+    faculty_id: int
+    kafedra_count: int
+    speciality_count: int
+    student_count: int
+
+
+class FacultyStatsResponse(BaseModel):
+    stats: list[FacultyStatsItem]

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -60,14 +61,14 @@ export const TeacherModal = ({ isOpen, onClose, teacher, onSuccess }: TeacherMod
     const onCreateSubmit = (data: TeacherCreateFormValues) => {
         createMutation.mutate(data, {
             onSuccess: () => onSuccess(),
-            onError: (err: any) => alert(err?.response?.data?.detail || "O'qituvchi yaratishda xatolik"),
+            onError: (err: any) => toast.error(err?.response?.data?.detail || "O'qituvchi yaratishda xatolik"),
         });
     };
 
     const onUpdateSubmit = (data: TeacherUpdateFormValues) => {
         updateMutation.mutate({ id: teacher!.id, data }, {
             onSuccess: () => onSuccess(),
-            onError: () => alert("O'qituvchini yangilashda xatolik"),
+            onError: () => toast.error("O'qituvchini yangilashda xatolik"),
         });
     };
 

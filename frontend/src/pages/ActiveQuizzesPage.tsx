@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Pagination } from '@/components/ui/Pagination';
 import { Input } from '@/components/ui/Input';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Search } from 'lucide-react';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { useSubjects } from '@/hooks/useSubjects';
@@ -35,7 +36,7 @@ const ActiveQuizzesPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: quizzesData, isLoading: isQuizzesLoading } = useActiveQuizzes(
+    const { data: quizzesData, isLoading: isQuizzesLoading, isError: isQuizzesError, refetch: refetchQuizzes } = useActiveQuizzes(
         currentPage,
         pageSize,
         debouncedSearch,
@@ -75,21 +76,21 @@ const ActiveQuizzesPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Faol testlar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Hozirda faol bo'lgan testlar ro'yxati</p>
-                </div>
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Qidirish..."
-                        className="pl-8 w-[220px]"
-                        value={searchTerm}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            </div>
+            <PageHeader
+                title="Faol testlar"
+                description="Hozirda faol bo'lgan testlar ro'yxati"
+                actions={
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Qidirish..."
+                            className="pl-8 w-[220px]"
+                            value={searchTerm}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                }
+            />
 
             <QuizFilters
                 subjects={allSubjects}
@@ -111,6 +112,8 @@ const ActiveQuizzesPage = () => {
             <QuizTable
                 quizzes={quizzes}
                 isLoading={isQuizzesLoading}
+                isError={isQuizzesError}
+                onRetry={() => refetchQuizzes()}
                 isTeacher={false}
                 hasActiveFilters={hasActiveFilters}
                 isUpdatingStatusId={null}

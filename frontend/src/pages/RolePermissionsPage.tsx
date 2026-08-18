@@ -1,10 +1,14 @@
+import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { ArrowLeft, Loader2, Save, ShieldAlert } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ArrowLeft, Save, ShieldAlert } from 'lucide-react';
 import { roleService } from '@/services/roleService';
 import { permissionService, type Permission } from '@/services/permissionService';
 import { useAssignPermissions } from '@/hooks/useReferenceData';
@@ -133,10 +137,11 @@ const RolePermissionsPage = () => {
             ]);
             // Refresh current user's permissions in case admin edited their own role
             await refreshMe();
+            toast.success('Ruxsatlar saqlandi');
             setHasChanges(false);
         } catch (error) {
             logger.error('Failed to save permissions', error);
-            alert("Saqlashda xatolik yuz berdi");
+            toast.error("Saqlashda xatolik yuz berdi");
         }
     };
 
@@ -149,8 +154,35 @@ const RolePermissionsPage = () => {
 
     if (roleQuery.isLoading || permsQuery.isLoading) {
         return (
-            <div className="flex justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-9 w-24" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-4 w-36" />
+                    </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <Skeleton key={i} className="h-36 w-full rounded-xl" />
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (roleQuery.isError || permsQuery.isError) {
+        return (
+            <div className="space-y-6">
+                <Button variant="ghost" onClick={() => navigate('/roles')}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Orqaga
+                </Button>
+                <ErrorState
+                    onRetry={() => {
+                        if (roleQuery.isError) roleQuery.refetch();
+                        if (permsQuery.isError) permsQuery.refetch();
+                    }}
+                />
             </div>
         );
     }
@@ -168,23 +200,24 @@ const RolePermissionsPage = () => {
 
     return (
         <div className="space-y-6 pb-20">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                 <Button variant="ghost" onClick={() => navigate('/roles')}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Orqaga
                 </Button>
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">{role.name} ruxsatlari</h1>
-                    <p className="text-sm text-muted-foreground">Sahifa va amallar tanlash</p>
-                </div>
+                <PageHeader
+                    className="flex-1"
+                    title={`${role.name} ruxsatlari`}
+                    description="Sahifa va amallar tanlash"
+                />
             </div>
 
             {isAdminRole && (
-                <Card className="border-amber-500/40 bg-amber-500/10">
+                <Card className="border-warning/40 bg-warning/10">
                     <CardContent className="pt-6 flex items-start gap-3">
-                        <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                        <ShieldAlert className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                         <div className="text-sm">
-                            <div className="font-semibold text-amber-700">Admin rolini tahrirlab bo'lmaydi</div>
+                            <div className="font-semibold text-warning">Admin rolini tahrirlab bo'lmaydi</div>
                             <div className="text-muted-foreground">Admin barcha ruxsatlarga ega va o'zgartirilmaydi.</div>
                         </div>
                     </CardContent>
@@ -231,7 +264,7 @@ const RolePermissionsPage = () => {
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                                     checked={checked}
                                                     disabled={!readOn || isAdminRole}
                                                     onChange={(e) => togglePermission(perm, e.target.checked)}
@@ -272,7 +305,7 @@ const RolePermissionsPage = () => {
                                                     >
                                                         <input
                                                             type="checkbox"
-                                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                                             checked={checked}
                                                             disabled={isAdminRole}
                                                             onChange={(e) => togglePermission(perm, e.target.checked)}

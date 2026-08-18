@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
@@ -35,7 +36,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 // Bug#13 fix: sanitize HTML content to prevent XSS attacks.
 // Общая реализация в utils/sanitize — список вывода HTML шире одной страницы.
 import { sanitizeHtml } from '@/utils/sanitize';
@@ -218,7 +219,7 @@ const QuizTestPage = () => {
                     });
                     setPhase('results');
                 } else {
-                    alert('Testni yuborishda xatolik yuz berdi. Iltimos qayta urinib ko\'ring.');
+                    toast.error('Testni yuborishda xatolik yuz berdi. Iltimos qayta urinib ko\'ring.');
                 }
             }
         });
@@ -320,57 +321,98 @@ const QuizTestPage = () => {
                                 <p>Hozircha ishlash uchun testlar yo'q.</p>
                             </div>
                         ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Test nomi</TableHead>
-                                        <TableHead>Savollar soni</TableHead>
-                                        <TableHead>Davomiyligi</TableHead>
-                                        <TableHead>Holati</TableHead>
-                                        <TableHead className="text-right">Amal</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                            <>
+                                {/* Десктоп: таблица */}
+                                <div className="hidden md:block">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Test nomi</TableHead>
+                                                <TableHead>Savollar soni</TableHead>
+                                                <TableHead>Davomiyligi</TableHead>
+                                                <TableHead>Holati</TableHead>
+                                                <TableHead className="text-right">Amal</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {activeQuizzes.map((quiz) => (
+                                                <TableRow key={quiz.id} className={cn(!quiz.is_active && "opacity-60")}>
+                                                    <TableCell className="font-medium">{quiz.title}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Trophy className="h-4 w-4 text-muted-foreground" />
+                                                            <span>{quiz.question_number} ta savol</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Clock className="h-4 w-4 text-muted-foreground" />
+                                                            <span>{quiz.duration} daqiqa</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={cn(
+                                                            "badge",
+                                                            quiz.is_active ? "badge-success" : "badge-muted"
+                                                        )}>
+                                                            {quiz.is_active ? 'Faol' : 'Faol emas'}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button
+                                                            size="sm"
+                                                            variant={quiz.is_active ? "primary" : "outline"}
+                                                            onClick={() => handleOpenStartModal(quiz)}
+                                                            disabled={!quiz.is_active}
+                                                        >
+                                                            <PlayCircle className="mr-2 h-4 w-4" />
+                                                            {quiz.is_active ? 'Ishlash' : 'Yopiq'}
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                {/* Мобильные: карточки с крупной кнопкой */}
+                                <div className="flex flex-col gap-3 p-4 md:hidden">
                                     {activeQuizzes.map((quiz) => (
-                                        <TableRow key={quiz.id} className={cn(!quiz.is_active && "opacity-60")}>
-                                            <TableCell className="font-medium">{quiz.title}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Trophy className="h-4 w-4 text-muted-foreground" />
-                                                    <span>{quiz.question_number} ta savol</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                                    <span>{quiz.duration} daqiqa</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className={cn(
-                                                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                                                    quiz.is_active
-                                                        ? "bg-green-600 text-white dark:bg-green-500 dark:text-white"
-                                                        : "bg-muted text-muted-foreground"
-                                                )}>
+                                        <div
+                                            key={quiz.id}
+                                            className={cn(
+                                                "rounded-xl border border-border bg-background p-4",
+                                                !quiz.is_active && "opacity-60"
+                                            )}
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <p className="font-medium text-foreground">{quiz.title}</p>
+                                                <span className={cn("badge shrink-0", quiz.is_active ? "badge-success" : "badge-muted")}>
                                                     {quiz.is_active ? 'Faol' : 'Faol emas'}
                                                 </span>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    size="sm"
-                                                    variant={quiz.is_active ? "primary" : "outline"}
-                                                    onClick={() => handleOpenStartModal(quiz)}
-                                                    disabled={!quiz.is_active}
-                                                >
-                                                    <PlayCircle className="mr-2 h-4 w-4" />
-                                                    {quiz.is_active ? 'Ishlash' : 'Yopiq'}
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
+                                            </div>
+                                            <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Trophy className="h-3.5 w-3.5" />
+                                                    {quiz.question_number} savol
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock className="h-3.5 w-3.5" />
+                                                    {quiz.duration} daqiqa
+                                                </span>
+                                            </div>
+                                            <Button
+                                                className="mt-3 w-full"
+                                                variant={quiz.is_active ? "primary" : "outline"}
+                                                onClick={() => handleOpenStartModal(quiz)}
+                                                disabled={!quiz.is_active}
+                                            >
+                                                <PlayCircle className="mr-2 h-4 w-4" />
+                                                {quiz.is_active ? 'Ishlash' : 'Yopiq'}
+                                            </Button>
+                                        </div>
                                     ))}
-                                </TableBody>
-                            </Table>
+                                </div>
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -391,7 +433,7 @@ const QuizTestPage = () => {
                 >
                     <div className="space-y-4">
                         {startNeedsCamera && cameraStatus !== 'checking' && cameraStatus !== 'available' && (
-                            <div className="flex gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                            <div className="flex gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
                                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                                 <span>
                                     {cameraStatus === 'missing' &&
@@ -443,9 +485,9 @@ const QuizTestPage = () => {
             : 0;
 
         const gradeColor =
-            results.grade === 5 ? 'text-green-600' :
-                (results.grade === 4 || results.grade === 3) ? 'text-yellow-600' :
-                    'text-red-600';
+            results.grade === 5 ? 'text-success' :
+                (results.grade === 4 || results.grade === 3) ? 'text-warning' :
+                    'text-destructive';
 
         const showCheatingAlert = results.cheating_detected || false;
 
@@ -453,12 +495,12 @@ const QuizTestPage = () => {
             <div className="flex items-center justify-center min-h-[80vh]">
                 <Card className="w-full max-w-lg">
                     {showCheatingAlert && (
-                        <div className="bg-red-50 border-b border-red-200 px-6 py-4">
+                        <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-4">
                             <div className="flex gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                                 <div>
-                                    <h3 className="font-semibold text-red-900">Test to'xtatildi</h3>
-                                    <p className="text-sm text-red-700 mt-1">
+                                    <h3 className="font-semibold text-destructive">Test to'xtatildi</h3>
+                                    <p className="text-sm text-destructive/80 mt-1">
                                         {results.reason || 'Ko\'p juzli shaxs aniqlandi. Test to\'xtatildi.'}
                                     </p>
                                 </div>
@@ -466,9 +508,9 @@ const QuizTestPage = () => {
                         </div>
                     )}
                     <CardHeader className="text-center">
-                        <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${showCheatingAlert ? 'bg-red-100' : 'bg-primary/10'}`}>
+                        <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${showCheatingAlert ? 'bg-destructive/15' : 'bg-primary/10'}`}>
                             {showCheatingAlert ? (
-                                <AlertTriangle className="h-10 w-10 text-red-600" />
+                                <AlertTriangle className="h-10 w-10 text-destructive" />
                             ) : (
                                 <Trophy className="h-10 w-10 text-primary" />
                             )}
@@ -482,7 +524,7 @@ const QuizTestPage = () => {
                         <div className="space-y-6">
                             {/* Grade Circle */}
                             <div className="flex justify-center">
-                                <div className={`text-6xl font-bold ${showCheatingAlert ? 'text-red-600' : gradeColor}`}>
+                                <div className={`font-display text-6xl font-bold ${showCheatingAlert ? 'text-destructive' : gradeColor}`}>
                                     {results.grade}
                                 </div>
                             </div>
@@ -493,17 +535,17 @@ const QuizTestPage = () => {
                                     <div className="text-2xl font-bold">{results.total_questions}</div>
                                     <div className="text-xs text-muted-foreground mt-1">Jami</div>
                                 </div>
-                                <div className="rounded-lg bg-green-50 p-4 text-center">
+                                <div className="rounded-lg bg-success/10 p-4 text-center">
                                     <div className="flex items-center justify-center gap-1">
-                                        <CheckCircle className="h-4 w-4 text-green-600" />
-                                        <span className="text-2xl font-bold text-green-600">{results.correct_answers}</span>
+                                        <CheckCircle className="h-4 w-4 text-success" />
+                                        <span className="text-2xl font-bold text-success">{results.correct_answers}</span>
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">To'g'ri</div>
                                 </div>
-                                <div className="rounded-lg bg-red-50 p-4 text-center">
+                                <div className="rounded-lg bg-destructive/10 p-4 text-center">
                                     <div className="flex items-center justify-center gap-1">
-                                        <XCircle className="h-4 w-4 text-red-600" />
-                                        <span className="text-2xl font-bold text-red-600">{results.wrong_answers}</span>
+                                        <XCircle className="h-4 w-4 text-destructive" />
+                                        <span className="text-2xl font-bold text-destructive">{results.wrong_answers}</span>
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">Noto'g'ri</div>
                                 </div>
@@ -574,18 +616,18 @@ const QuizTestPage = () => {
                 />
             )}
 
-            {/* Header with timer and progress */}
-            <div className="flex items-center justify-between bg-card p-4 rounded-xl shadow-sm border border-border">
-                <div className="flex items-center gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{quizData.title}</h1>
+            {/* Header with timer and progress — на мобильных складывается в колонку */}
+            <div className="flex flex-col gap-3 bg-card p-4 rounded-xl shadow-sm border border-border sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4 min-w-0">
+                    <div className="min-w-0">
+                        <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">{quizData.title}</h1>
                         <p className="text-sm text-muted-foreground">
                             Savol: {currentQuestionIndex + 1} / {totalQuestions} • {answeredCount} javob berildi
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 shrink-0">
                     {isAdmin && (
                         <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
                             <span className="text-[10px] font-bold text-primary uppercase leading-none">
@@ -596,7 +638,7 @@ const QuizTestPage = () => {
 
                     <div className={cn(
                         "flex items-center gap-2 rounded-xl px-4 py-2 text-lg font-mono font-bold transition-all duration-300 shadow-sm",
-                        timeWarning ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-200" : "bg-muted text-foreground"
+                        timeWarning ? "bg-destructive text-destructive-foreground animate-pulse shadow-lg shadow-destructive/30" : "bg-muted text-foreground"
                     )}>
                         <Clock className={cn("h-5 w-5", timeWarning ? "animate-spin-slow" : "")} />
                         {formatTime(timeLeft)}
@@ -616,9 +658,9 @@ const QuizTestPage = () => {
                             className={cn(
                                 "h-8 w-8 rounded-full text-xs font-semibold transition-all duration-200",
                                 isCurrent
-                                    ? "bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.5)] scale-105"
+                                    ? "bg-primary text-primary-foreground shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_50%,transparent)] scale-105"
                                     : isAnswered
-                                        ? "bg-green-500/15 text-green-600 border border-green-500/30 dark:bg-green-500/10 dark:text-green-400"
+                                        ? "bg-success/15 text-success border border-success/30"
                                         : "bg-card border border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground"
                             )}
                         >
@@ -652,7 +694,7 @@ const QuizTestPage = () => {
                                     className={cn(
                                         "flex items-start gap-3 rounded-xl border border-border/80 p-4 text-left transition-all duration-200",
                                         isSelected
-                                            ? "border-primary bg-primary/5 shadow-[0_0_12px_rgba(99,102,241,0.05)]"
+                                            ? "border-primary bg-primary/5 shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_8%,transparent)]"
                                             : "border-border/60 hover:border-primary/30 hover:bg-accent/20"
                                     )}
                                 >

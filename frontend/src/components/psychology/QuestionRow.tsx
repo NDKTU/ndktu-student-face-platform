@@ -42,7 +42,7 @@ export function QuestionRow({
                 <button onClick={onEdit} className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"><Edit2 className="h-3.5 w-3.5" /></button>
                 <button
                     onClick={onDelete}
-                    className={`rounded-lg p-1.5 transition-colors ${deleteArmed ? 'bg-destructive text-white' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}`}
+                    className={`rounded-lg p-1.5 transition-colors ${deleteArmed ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'}`}
                 >
                     {deletePending
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

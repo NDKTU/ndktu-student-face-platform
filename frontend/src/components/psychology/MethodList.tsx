@@ -26,23 +26,23 @@ export function MethodList({
             {methods.map(method => (
                 <div
                     key={method.id}
-                    className="flex items-center gap-4 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:border-primary/30 hover:bg-accent/30"
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:border-primary/30 hover:bg-accent/30"
                 >
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Brain className="h-4 w-4 text-primary" />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 basis-40">
                         <p className="font-medium text-foreground truncate">{method.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{method.description}</p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <div className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
                         <ListOrdered className="h-3.5 w-3.5" />
                         <span>{method.questions.length} savol</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                         <button
                             onClick={() => onPlayTest(method.id)}
-                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors"
+                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-success hover:bg-success/10 transition-colors"
                             title="Testni boshlash"
                         >
                             <Play className="h-3.5 w-3.5" /> Test
@@ -63,7 +63,7 @@ export function MethodList({
                             onClick={() => onDeleteClick(method.id)}
                             className={`rounded-lg p-1.5 transition-colors ${
                                 deletingId === method.id
-                                    ? 'bg-destructive text-white'
+                                    ? 'bg-destructive text-destructive-foreground'
                                     : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
                             }`}
                             title={deletingId === method.id ? 'Tasdiqlash uchun yana bosing' : "O'chirish"}

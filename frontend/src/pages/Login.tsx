@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/Input';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '@/services/api';
 import { hemisService } from '@/services/hemisService';
-import { BookOpen, GraduationCap, Users } from 'lucide-react';
+import { BookOpen, GraduationCap, Users, ShieldCheck, Camera } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { BRAND } from '@/config/branding';
+import logo from '@/assets/logo.png';
 
 const staffLoginSchema = z.object({
     username: z.string().min(1, 'Foydalanuvchi nomi kiritilishi shart'),
@@ -105,51 +107,58 @@ export const Login: React.FC = () => {
 
     return (
         <div className="flex min-h-screen bg-background">
-            {/* Left side - Branding/Graphic (Hidden on mobile) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-primary/5 dark:bg-primary/10 flex-col justify-center items-center p-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-grid-slate-200/50 dark:bg-grid-slate-800/50 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:[mask-image:linear-gradient(0deg,black,rgba(0,0,0,0.6))] -z-10" />
+            {/* Левая фирменная панель — глубокий бренд-синий (скрыта на мобильных) */}
+            <div className="hidden lg:flex lg:w-1/2 bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
+                {/* Декоративные круги в тоне бренда */}
+                <div aria-hidden className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/5" />
+                <div aria-hidden className="absolute -bottom-48 -left-24 h-[28rem] w-[28rem] rounded-full bg-white/5" />
+                <div aria-hidden className="absolute bottom-24 right-16 h-40 w-40 rounded-full border border-white/10" />
 
-                <div className="max-w-md w-full space-y-8 text-center relative z-10">
-                    <div className="mx-auto w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center mb-8 shadow-sm">
-                        <GraduationCap className="h-12 w-12 text-primary" />
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-tight text-foreground">
-                        NDKTU Student Platform
+                <div className="relative z-10 flex items-center gap-3">
+                    <img src={logo} alt={BRAND.shortName} className="h-11 w-11 rounded-xl bg-white/95 object-contain p-1" />
+                    <span className="font-display text-lg font-bold text-sidebar-foreground">{BRAND.shortName}</span>
+                </div>
+
+                <div className="relative z-10 max-w-lg space-y-6">
+                    <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-sidebar-foreground text-balance">
+                        {BRAND.universityName}
                     </h1>
-                    <p className="text-lg text-muted-foreground leading-relaxed">
-                        Talabalar va o'qituvchilar uchun yagona ta'lim portaliga xush kelibsiz.
+                    <p className="text-lg leading-relaxed text-sidebar-muted">
+                        {BRAND.tagline}
                     </p>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-12">
-                        <div className="bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50 shadow-sm flex flex-col items-center gap-2">
-                            <BookOpen className="h-6 w-6 text-primary" />
-                            <span className="text-sm font-medium">Onlayn testlar</span>
-                        </div>
-                        <div className="bg-background/60 backdrop-blur-sm p-4 rounded-xl border border-border/50 shadow-sm flex flex-col items-center gap-2">
-                            <Users className="h-6 w-6 text-primary" />
-                            <span className="text-sm font-medium">O'zlashtirish nazorati</span>
-                        </div>
+                <div className="relative z-10 grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
+                        <BookOpen className="h-5 w-5 text-sidebar-accent" />
+                        <span className="text-sm font-medium text-sidebar-foreground">Onlayn testlar</span>
+                    </div>
+                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
+                        <Camera className="h-5 w-5 text-sidebar-accent" />
+                        <span className="text-sm font-medium text-sidebar-foreground">Yuz orqali nazorat</span>
+                    </div>
+                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
+                        <ShieldCheck className="h-5 w-5 text-sidebar-accent" />
+                        <span className="text-sm font-medium text-sidebar-foreground">Halol natijalar</span>
                     </div>
                 </div>
             </div>
 
-            {/* Right side - Login Form */}
+            {/* Правая часть — форма входа */}
             <div className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12">
                 <div className="w-full max-w-[400px] space-y-8 relative">
-                    {/* Mobile only header */}
+                    {/* Шапка только для мобильных */}
                     <div className="lg:hidden text-center mb-10">
-                        <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                            <GraduationCap className="h-8 w-8 text-primary" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-foreground">NDKTU Portal</h2>
+                        <img src={logo} alt={BRAND.shortName} className="mx-auto mb-4 h-16 w-16 rounded-2xl object-contain" />
+                        <h2 className="font-display text-2xl font-bold text-foreground">{BRAND.appName}</h2>
                     </div>
 
                     <div className="text-center lg:text-left space-y-2">
-                        <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                        <h2 className="font-display text-3xl font-bold tracking-tight text-foreground">
                             Tizimga kirish
                         </h2>
                         <p className="text-muted-foreground">
-                            Hududni tanlang va ma'lumotlaringizni kiriting
+                            Bo'limni tanlang va ma'lumotlaringizni kiriting
                         </p>
                     </div>
 
@@ -179,7 +188,7 @@ export const Login: React.FC = () => {
                     </div>
 
                     {notice && !error && (
-                        <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 border border-amber-500/20">
+                        <div className="rounded-md bg-warning/10 p-3 text-sm text-warning border border-warning/20">
                             {notice}
                         </div>
                     )}

@@ -1,13 +1,11 @@
+import { toast } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { type Group } from '@/services/groupService';
 import { type Faculty } from '@/services/facultyService';
 import { Button } from '@/components/ui/Button';
-import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -20,10 +18,12 @@ import { useFaculties } from '@/hooks/useReferenceData';
 import { useAuth } from '@/context/AuthContext';
 import { Combobox } from '@/components/ui/Combobox';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 
 const groupSchema = z.object({
-    name: z.string().min(1, 'Group name is required'),
-    faculty_id: z.number({ message: 'Faculty is required' }).min(1, 'Select a faculty'),
+    name: z.string().min(1, 'Guruh nomi kiritilishi shart'),
+    faculty_id: z.number({ message: 'Fakultet tanlanishi shart' }).min(1, 'Fakultetni tanlang'),
 });
 
 type GroupFormValues = z.infer<typeof groupSchema>;
@@ -52,7 +52,7 @@ const GroupsPage = () => {
     const canReadFaculty = hasPermission('read:faculty');
 
     const facultyIdParam = selectedFacultyFilter === 'all' ? undefined : Number(selectedFacultyFilter);
-    const { data: groupsData, isLoading: isGroupsLoading } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdParam);
+    const { data: groupsData, isLoading: isGroupsLoading, isError: isGroupsError, refetch } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdParam);
     const { data: facultiesData } = useFaculties(1, 100, undefined, canReadFaculty);
     const deleteGroupMutation = useDeleteGroup();
 
@@ -79,6 +79,7 @@ const GroupsPage = () => {
 
         deleteGroupMutation.mutate({ id: groupToDelete.id, force: cascadeWarnings.length > 0 }, {
             onSuccess: () => {
+                toast.success("Guruh o'chirildi");
                 setIsDeleteModalOpen(false);
                 setGroupToDelete(null);
                 setCascadeWarnings([]);
@@ -87,7 +88,7 @@ const GroupsPage = () => {
                 if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                     setCascadeWarnings(error.response.data.detail.warnings || []);
                 } else {
-                    alert("O'chirishda xatolik yuz berdi");
+                    toast.error("O'chirishda xatolik yuz berdi");
                     setIsDeleteModalOpen(false);
                     setGroupToDelete(null);
                     setCascadeWarnings([]);
@@ -105,113 +106,141 @@ const GroupsPage = () => {
         setIsModalOpen(false);
     };
 
+    // Кнопки действий — общие для строки таблицы и мобильной карточки.
+    // Записи зеркала не редактируются: правку отклонит бэкенд.
+    const renderActions = (group: Group) => (
+        <div className="flex justify-end gap-2">
+            {!isExternal(group) && (
+                <>
+                    <PermissionGate permission="update:group">
+                        <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(group); setIsModalOpen(true); }}>
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                    </PermissionGate>
+                    <PermissionGate permission="delete:group">
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(group)}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </PermissionGate>
+                </>
+            )}
+        </div>
+    );
+
+    const columns: DataTableColumn<Group>[] = [
+        { key: 'id', header: 'ID', headClassName: 'w-[80px]', cell: (group) => group.id },
+        {
+            key: 'name',
+            header: 'Nomi',
+            className: 'font-medium capitalize',
+            cell: (group) => (
+                <span className="inline-flex items-center gap-2">
+                    {group.name}
+                    <ExternalSourceBadge row={group} />
+                    <InactiveBadge row={group} />
+                </span>
+            ),
+        },
+        {
+            key: 'faculty',
+            header: 'Fakultet',
+            cell: (group) => (
+                <span className="badge badge-primary capitalize">
+                    {getFacultyName(group.faculty_id)}
+                </span>
+            ),
+        },
+        {
+            key: 'created_at',
+            header: 'Yaratilgan sana',
+            hideBelow: 'lg',
+            cell: (group) => new Date(group.created_at).toLocaleDateString(),
+        },
+        {
+            key: 'actions',
+            header: 'Amallar',
+            headClassName: 'text-right',
+            cell: (group) => renderActions(group),
+        },
+    ];
+
     return (
         <div className="space-y-6">
-            {/* Page header */}
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Guruhlar</h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">Universitet o'quv guruhlarini boshqarish</p>
-                    </div>
+            <PageHeader
+                title="Guruhlar"
+                description="Universitet o'quv guruhlarini boshqarish"
+                actions={
                     <PermissionGate permission="create:group">
                         <Button onClick={() => { setSelectedGroup(null); setIsModalOpen(true); }}>
                             <Plus className="mr-2 h-4 w-4" />
                             Qo'shish
                         </Button>
                     </PermissionGate>
+                }
+            />
+
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="relative w-full max-w-sm sm:w-auto">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Guruh nomi bo'yicha qidirish..."
+                        className="pl-8 sm:w-[300px]"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative w-full max-w-sm sm:w-auto">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Guruh nomi bo'yicha qidirish..."
-                            className="pl-8 sm:w-[300px]"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                <PermissionGate permission="read:faculty">
+                    <div className="w-full sm:w-[300px]">
+                        <Combobox
+                            options={facultyOptions}
+                            value={selectedFacultyFilter}
+                            onChange={(val: string) => {
+                                setSelectedFacultyFilter(val);
+                                setCurrentPage(1);
+                            }}
+                            placeholder="Fakultet bo'yicha saralash"
                         />
                     </div>
-                    
-                    <PermissionGate permission="read:faculty">
-                        <div className="w-full sm:w-[300px]">
-                            <Combobox
-                                options={facultyOptions}
-                                value={selectedFacultyFilter}
-                                onChange={(val: string) => {
-                                    setSelectedFacultyFilter(val);
-                                    setCurrentPage(1);
-                                }}
-                                placeholder="Fakultet bo'yicha saralash"
-                            />
-                        </div>
-                    </PermissionGate>
-                </div>
+                </PermissionGate>
             </div>
 
             <Card>
                 <CardContent className="pt-6">
-                    {isGroupsLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">ID</TableHead>
-                                    <TableHead>Nomi</TableHead>
-                                    <TableHead>Fakultet</TableHead>
-                                    <TableHead>Yaratilgan sana</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {groups.map((group) => (
-                                    <TableRow key={group.id}>
-                                        <TableCell>{group.id}</TableCell>
-                                        <TableCell className="font-medium capitalize">
-                                            <span className="inline-flex items-center gap-2">
+                    <DataTable
+                        columns={columns}
+                        data={groups}
+                        rowKey={(group) => group.id}
+                        isLoading={isGroupsLoading}
+                        isError={isGroupsError}
+                        onRetry={() => refetch()}
+                        emptyTitle="Guruhlar topilmadi"
+                        emptyDescription="Hozircha guruh qo'shilmagan yoki qidiruvga mos guruh yo'q."
+                        renderCard={(group) => (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="font-medium capitalize text-foreground">
+                                            <span className="inline-flex flex-wrap items-center gap-2">
                                                 {group.name}
                                                 <ExternalSourceBadge row={group} />
                                                 <InactiveBadge row={group} />
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 capitalize">
+                                        </p>
+                                        <p className="mt-1.5">
+                                            <span className="badge badge-primary capitalize">
                                                 {getFacultyName(group.faculty_id)}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>{new Date(group.created_at).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
-                                            {/* Записи зеркала не редактируются: правку отклонит бэкенд. */}
-                                            <div className="flex justify-end gap-2">
-                                                {!isExternal(group) && (
-                                                    <>
-                                                        <PermissionGate permission="update:group">
-                                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(group); setIsModalOpen(true); }}>
-                                                                <Pencil className="h-4 w-4" />
-                                                            </Button>
-                                                        </PermissionGate>
-                                                        <PermissionGate permission="delete:group">
-                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(group)}>
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </PermissionGate>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {groups.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Guruhlar topilmadi.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            ID: {group.id} · {new Date(group.created_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    {renderActions(group)}
+                                </div>
+                            </div>
+                        )}
+                    />
                 </CardContent>
             </Card>
 
@@ -232,11 +261,11 @@ const GroupsPage = () => {
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu guruhni o'chirish quyidagi ma'lumotlarni ham o'zgartiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu guruhni o'chirish quyidagi ma'lumotlarni ham o'zgartiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/90">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham "${groupToDelete?.name}" guruhini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }
@@ -272,13 +301,19 @@ const GroupModal = ({ isOpen, onClose, group, faculties, onSuccess }: {
     const onSubmit = (data: GroupFormValues) => {
         if (group) {
             updateMutation.mutate({ id: group.id, data }, {
-                onSuccess: (data) => onSuccess(data),
-                onError: () => alert('Guruhni yangilashda xatolik'),
+                onSuccess: (data) => {
+                    toast.success('Guruh yangilandi');
+                    onSuccess(data);
+                },
+                onError: () => toast.error('Guruhni yangilashda xatolik'),
             });
         } else {
             createMutation.mutate(data, {
-                onSuccess: (data) => onSuccess(data),
-                onError: () => alert('Guruh yaratishda xatolik'),
+                onSuccess: (data) => {
+                    toast.success('Guruh yaratildi');
+                    onSuccess(data);
+                },
+                onError: () => toast.error('Guruh yaratishda xatolik'),
             });
         }
     };

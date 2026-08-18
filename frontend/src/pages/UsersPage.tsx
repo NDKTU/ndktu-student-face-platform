@@ -1,19 +1,12 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 import { Pagination } from '@/components/ui/Pagination';
 import type { User, Role } from '@/types/auth';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Users } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -25,9 +18,11 @@ import { useRoles } from '@/hooks/useReferenceData';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { PageTabs } from '@/components/ui/PageTabs';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 
 const userSchema = z.object({
-    username: z.string().min(3, 'Username must be at least 3 characters'),
+    username: z.string().min(3, "Foydalanuvchi nomi kamida 3 ta belgidan iborat bo'lishi kerak"),
     password: z.string().optional(),
     role_ids: z.array(z.coerce.number()).min(1, 'Kamida bitta rol tanlanishi shart'),
 });
@@ -62,7 +57,12 @@ const UsersPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: usersData, isLoading: isUsersLoading } = useUsers(currentPage, pageSize, debouncedSearch);
+    const {
+        data: usersData,
+        isLoading: isUsersLoading,
+        isError: isUsersError,
+        refetch: refetchUsers,
+    } = useUsers(currentPage, pageSize, debouncedSearch);
     const { data: rolesData } = useRoles();
     const deleteUserMutation = useDeleteUser();
 
@@ -81,6 +81,7 @@ const UsersPage = () => {
         if (!userToDelete) return;
         deleteUserMutation.mutate({ id: userToDelete.id, force: cascadeWarnings.length > 0 }, {
             onSuccess: () => {
+                toast.success("Foydalanuvchi o'chirildi");
                 setIsDeleteModalOpen(false);
                 setUserToDelete(null);
                 setCascadeWarnings([]);
@@ -89,7 +90,7 @@ const UsersPage = () => {
                 if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                     setCascadeWarnings(error.response.data.detail.warnings || []);
                 } else {
-                    alert("O'chirishda xatolik yuz berdi");
+                    toast.error("O'chirishda xatolik yuz berdi");
                     setIsDeleteModalOpen(false);
                     setUserToDelete(null);
                     setCascadeWarnings([]);
@@ -103,104 +104,122 @@ const UsersPage = () => {
     };
 
     const getRoleName = (roleId?: number) => {
-        if (!roleId) return 'N/A';
+        if (!roleId) return '-';
         // Explicitly typo role to avoid implicit any if the roles array type isn't fully inferred or is loose
         const role = roles.find((r: Role) => r.id === roleId);
         return role ? role.name : `ID: ${roleId}`;
     };
 
+    const renderRowActions = (user: User) => (
+        <div className="flex justify-end gap-2">
+            <PermissionGate permission="update:user">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
+                >
+                    <Pencil className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+            <PermissionGate permission="delete:user">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteClick(user)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+        </div>
+    );
 
+    const columns: DataTableColumn<User>[] = [
+        { key: 'id', header: 'ID', cell: (user) => user.id, headClassName: 'w-[80px]' },
+        { key: 'username', header: 'Foydalanuvchi nomi', cell: (user) => user.username, className: 'font-medium' },
+        {
+            key: 'roles',
+            header: 'Rol',
+            cell: (user) => (
+                <ExpandableTags
+                    items={(user.roles || []).map(r => ({ id: r.id, name: getRoleName(r.id) }))}
+                    limit={2}
+                />
+            ),
+        },
+        {
+            key: 'created_at',
+            header: 'Yaratilgan sana',
+            cell: (user) => new Date(user.created_at).toLocaleDateString(),
+            hideBelow: 'lg',
+        },
+        {
+            key: 'actions',
+            header: <span className="block text-right">Amallar</span>,
+            cell: (user) => renderRowActions(user),
+            className: 'text-right',
+        },
+    ];
 
     return (
         <div className="space-y-6">
             <PageTabs tabs={USER_TABS} />
-            {/* Page header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Foydalanuvchilar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Tizim foydalanuvchilarini boshqarish</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Qidirish..."
-                            className="pl-8 w-[220px]"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <PermissionGate permission="create:user">
-                        <Button onClick={() => { setSelectedUser(null); setIsModalOpen(true); }}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Qo'shish
-                        </Button>
-                    </PermissionGate>
-                </div>
-            </div>
+            <PageHeader
+                title="Foydalanuvchilar"
+                description="Tizim foydalanuvchilarini boshqarish"
+                actions={
+                    <>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Qidirish..."
+                                className="pl-8 w-[220px]"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <PermissionGate permission="create:user">
+                            <Button onClick={() => { setSelectedUser(null); setIsModalOpen(true); }}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Qo'shish
+                            </Button>
+                        </PermissionGate>
+                    </>
+                }
+            />
 
             <Card>
                 <CardContent className="pt-6">
-                    {isUsersLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : users.length === 0 ? (
-                        <div className="flex justify-center p-8 text-muted-foreground">
-                            Foydalanuvchilar topilmadi.
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">ID</TableHead>
-                                    <TableHead>Foydalanuvchi nomi</TableHead>
-                                    <TableHead>Rol</TableHead>
-                                    <TableHead>Yaratilgan sana</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {users.map((user) => (
-                                    <TableRow key={user.id}>
-                                        <TableCell>{user.id}</TableCell>
-                                        <TableCell className="font-medium">{user.username}</TableCell>
-                                        <TableCell>
-                                            <ExpandableTags
-                                                items={(user.roles || []).map(r => ({ id: r.id, name: getRoleName(r.id) }))}
-                                                limit={2}
-                                            />
-                                        </TableCell>
-
-                                        <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <PermissionGate permission="update:user">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:user">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDeleteClick(user)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
+                    <DataTable
+                        columns={columns}
+                        data={users}
+                        rowKey={(user) => user.id}
+                        isLoading={isUsersLoading}
+                        isError={isUsersError}
+                        onRetry={() => refetchUsers()}
+                        emptyTitle="Foydalanuvchilar topilmadi"
+                        emptyDescription="Qidiruv mezonlariga mos foydalanuvchi yo'q."
+                        emptyIcon={<Users className="h-6 w-6" />}
+                        renderCard={(user) => (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium text-foreground">{user.username}</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            ID: {user.id} · {new Date(user.created_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    {renderRowActions(user)}
+                                </div>
+                                <div className="mt-2">
+                                    <ExpandableTags
+                                        items={(user.roles || []).map(r => ({ id: r.id, name: getRoleName(r.id) }))}
+                                        limit={2}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    />
                 </CardContent>
             </Card>
 
@@ -229,11 +248,11 @@ const UsersPage = () => {
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu foydalanuvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu foydalanuvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/80">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham '${userToDelete?.username}' foydalanuvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }
@@ -303,16 +322,17 @@ const UserModal = ({
 
             updateMutation.mutate({ id: user.id, data: payload }, {
                 onSuccess: (updatedUser: any) => {
+                    toast.success('Foydalanuvchi yangilandi');
                     onSuccess(updatedUser);
                 },
                 onError: (error) => {
                     logger.error('Failed to update user', error);
-                    alert('Foydalanuvchini yangilashda xatolik yuz berdi');
+                    toast.error('Foydalanuvchini yangilashda xatolik yuz berdi');
                 }
             });
         } else {
             if (!data.password) {
-                alert('Yangi foydalanuvchilar uchun parol talab qilinadi');
+                toast.error('Yangi foydalanuvchilar uchun parol talab qilinadi');
                 return;
             }
 
@@ -323,10 +343,13 @@ const UserModal = ({
             };
 
             createMutation.mutate(payload, {
-                onSuccess: (newUser: any) => onSuccess(newUser),
+                onSuccess: (newUser: any) => {
+                    toast.success('Foydalanuvchi yaratildi');
+                    onSuccess(newUser);
+                },
                 onError: (error: any) => {
                     logger.error('Failed to create user', error);
-                    alert('Foydalanuvchi yaratishda xatolik yuz berdi');
+                    toast.error('Foydalanuvchi yaratishda xatolik yuz berdi');
                 }
             });
         }
@@ -365,7 +388,7 @@ const UserModal = ({
                                             id={`role-${role.id}`}
                                             value={role.id}
                                             {...register('role_ids')}
-                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                         />
                                         <label htmlFor={`role-${role.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
                                             {role.name}

@@ -1,10 +1,10 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
-import { ArrowLeft, Loader2, Search, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useTeachers, useDeleteTeacher } from '@/hooks/useTeachers';
 import type { Faculty } from '@/services/facultyService';
 import type { Kafedra } from '@/services/kafedraService';
@@ -12,6 +12,7 @@ import type { Teacher } from '@/services/teacherService';
 import { Crumbs } from './Crumbs';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { TeacherModal } from '@/components/teachers/TeacherModal';
 import { TeacherGroupModal } from '@/components/teachers/TeacherGroupModal';
 import { TeacherSubjectModal } from '@/components/teachers/TeacherSubjectModal';
@@ -50,7 +51,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
     }, [searchTerm]);
 
     // Pass true for enabled, then kafedra.id to useTeachers to filter by kafedra
-    const { data: teachersData, isLoading: isTeachersLoading } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedra.id);
+    const { data: teachersData, isLoading: isTeachersLoading, isError: isTeachersError, refetch } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedra.id);
     const deleteTeacherMutation = useDeleteTeacher();
 
     const teachers = teachersData?.teachers || [];
@@ -95,6 +96,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
         if (!teacherToDelete) return;
         deleteTeacherMutation.mutate({ id: teacherToDelete.id, force: cascadeWarnings.length > 0 }, {
             onSuccess: () => {
+                toast.success("O'qituvchi o'chirildi");
                 setIsDeleteModalOpen(false);
                 setTeacherToDelete(null);
                 setCascadeWarnings([]);
@@ -103,7 +105,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                 if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                     setCascadeWarnings(error.response.data.detail.warnings || []);
                 } else {
-                    alert("O'chirishda xatolik yuz berdi");
+                    toast.error("O'chirishda xatolik yuz berdi");
                     setIsDeleteModalOpen(false);
                     setTeacherToDelete(null);
                     setCascadeWarnings([]);
@@ -116,6 +118,57 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
         setIsModalOpen(false);
         setSelectedTeacher(null);
     };
+
+    // Кнопки действий — общие для строки таблицы и мобильной карточки
+    const renderActions = (teacher: Teacher) => (
+        <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={(e) => handleAssignGroupsClick(teacher, e)}>
+                Guruhlar
+            </Button>
+            <Button variant="outline" size="sm" onClick={(e) => handleAssignSubjectsClick(teacher, e)}>
+                Fanlar
+            </Button>
+            <PermissionGate permission="update:teacher">
+                <Button variant="ghost" size="sm" onClick={(e) => handleEditClick(teacher, e)}>
+                    <Pencil className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+            <PermissionGate permission="delete:teacher">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={(e) => handleDeleteClick(teacher, e)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+        </div>
+    );
+
+    const columns: DataTableColumn<Teacher>[] = [
+        {
+            key: 'full_name',
+            header: 'F.I.SH',
+            className: 'font-medium',
+            cell: (teacher) => (
+                <div className="capitalize">{teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}</div>
+            ),
+        },
+        { key: 'username', header: 'Foydalanuvchi', hideBelow: 'lg', cell: (teacher) => teacher.employee?.user?.username || '-' },
+        {
+            key: 'created_at',
+            header: 'Yaratilgan sana',
+            hideBelow: 'lg',
+            cell: (teacher) => new Date(teacher.created_at).toLocaleDateString(),
+        },
+        {
+            key: 'actions',
+            header: 'Amallar',
+            headClassName: 'text-right',
+            cell: (teacher) => renderActions(teacher),
+        },
+    ];
 
     if (viewMode === 'detail' && selectedTeacher) {
         return <TeacherDetail teacher={selectedTeacher} onBack={handleBackToList} />;
@@ -135,7 +188,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Orqaga
                         </Button>
-                        <h1 className="text-xl font-semibold tracking-tight capitalize">{kafedra.name} — o'qituvchilar</h1>
+                        <h1 className="page-title capitalize">{kafedra.name} — o'qituvchilar</h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -159,67 +212,30 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
 
             <Card>
                 <CardContent className="pt-6">
-                    {isTeachersLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>F.I.SH</TableHead>
-                                    <TableHead>Foydalanuvchi</TableHead>
-                                    <TableHead>Yaratilgan sana</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {teachers.map((teacher) => (
-                                    <TableRow
-                                        key={teacher.id}
-                                        className="cursor-pointer hover:bg-muted/50"
-                                        onClick={() => handleViewTeacher(teacher)}
-                                    >
-                                        <TableCell className="font-medium">
-                                            <div className="capitalize">{teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}</div>
-                                        </TableCell>
-                                        <TableCell>{teacher.employee?.user?.username || '-'}</TableCell>
-                                        <TableCell>{new Date(teacher.created_at).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="outline" size="sm" onClick={(e) => handleAssignGroupsClick(teacher, e)}>
-                                                    Guruhlar
-                                                </Button>
-                                                <Button variant="outline" size="sm" onClick={(e) => handleAssignSubjectsClick(teacher, e)}>
-                                                    Fanlar
-                                                </Button>
-                                                <PermissionGate permission="update:teacher">
-                                                    <Button variant="ghost" size="sm" onClick={(e) => handleEditClick(teacher, e)}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:teacher">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={(e) => handleDeleteClick(teacher, e)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {teachers.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">O'qituvchilar topilmadi.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
+                    <DataTable
+                        columns={columns}
+                        data={teachers}
+                        rowKey={(teacher) => teacher.id}
+                        isLoading={isTeachersLoading}
+                        isError={isTeachersError}
+                        onRetry={() => refetch()}
+                        emptyTitle="O'qituvchilar topilmadi"
+                        emptyDescription="Ushbu kafedrada o'qituvchi yo'q yoki qidiruvga mos o'qituvchi topilmadi."
+                        onRowClick={handleViewTeacher}
+                        renderCard={(teacher) => (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="min-w-0">
+                                    <p className="font-medium capitalize text-foreground">
+                                        {teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {teacher.employee?.user?.username || '-'} · {new Date(teacher.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div className="mt-3">{renderActions(teacher)}</div>
+                            </div>
+                        )}
+                    />
                 </CardContent>
             </Card>
 
@@ -246,11 +262,11 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu o'qituvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu o'qituvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/90">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham "${teacherToDelete?.employee?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }

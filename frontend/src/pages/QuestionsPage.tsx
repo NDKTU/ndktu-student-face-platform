@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +15,10 @@ import {
 } from '@/components/ui/Table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search, BookOpen, ArrowRight, ArrowLeft, Download } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { sanitizeHtml } from '@/utils/sanitize';
@@ -35,8 +40,10 @@ const TeacherSubjectPicker = ({ onSelect }: { onSelect: (subject: Subject) => vo
 
     if (isLoading) {
         return (
-            <div className="flex justify-center p-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }, (_, i) => (
+                    <Skeleton key={i} className="h-36 w-full rounded-xl" />
+                ))}
             </div>
         );
     }
@@ -44,31 +51,29 @@ const TeacherSubjectPicker = ({ onSelect }: { onSelect: (subject: Subject) => vo
     if (subjects.length === 0) {
         return (
             <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                    <div className="rounded-full bg-muted p-4 mb-4">
-                        <BookOpen className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold">Fanlar biriktirilmagan</h3>
-                    <p className="text-muted-foreground mt-1 max-w-sm">
-                        Hozircha sizga hech qanday fan biriktirilmagan. Admin bilan bog'laning.
-                    </p>
+                <CardContent className="pt-6">
+                    <EmptyState
+                        icon={<BookOpen className="h-6 w-6" />}
+                        title="Fanlar biriktirilmagan"
+                        description="Hozircha sizga hech qanday fan biriktirilmagan. Admin bilan bog'laning."
+                    />
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {subjects.map((subject) => (
                 <Card
                     key={subject.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer group"
+                    className="group cursor-pointer transition-all hover:border-primary/40 hover:shadow-md"
                     onClick={() => onSelect(subject)}
                 >
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between">
-                            <span>{subject.name}</span>
-                            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <CardTitle className="flex items-center justify-between text-base">
+                            <span className="truncate">{subject.name}</span>
+                            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                         </CardTitle>
                         <CardDescription>Savollarni ko'rish uchun bosing</CardDescription>
                     </CardHeader>
@@ -124,7 +129,7 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
         setDebouncedSearch('');
     }, [subjectId]);
 
-    const { data: questionsData, isLoading: isQuestionsLoading } = useQuestions(
+    const { data: questionsData, isLoading: isQuestionsLoading, isError: isQuestionsError, refetch: refetchQuestions } = useQuestions(
         currentPage,
         pageSize,
         debouncedSearch,
@@ -158,9 +163,11 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
         if (!questionToDelete) return;
         deleteQuestionMutation.mutate(questionToDelete.id, {
             onSuccess: () => {
+                toast.success("Savol o'chirildi");
                 setIsDeleteModalOpen(false);
                 setQuestionToDelete(null);
             },
+            onError: () => toast.error("Savolni o'chirishda xatolik yuz berdi"),
         });
     };
 
@@ -175,7 +182,7 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     {onBack && (
                         <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center gap-1">
@@ -184,13 +191,13 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
                         </Button>
                     )}
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
+                        <h1 className="page-title">
                             {selectedSubjectName ? `Savollar — ${selectedSubjectName}` : 'Savollar'}
                         </h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">Savollar bankini boshqarish</p>
+                        <p className="page-description mt-0.5">Savollar bankini boshqarish</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -232,16 +239,21 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
             </div>
 
             <Card>
-                <CardContent>
+                <CardContent className="pt-6">
                     {isQuestionsLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
+                        <div className="space-y-3">
+                            {Array.from({ length: 6 }, (_, i) => (
+                                <Skeleton key={i} className="h-10 w-full" />
+                            ))}
                         </div>
+                    ) : isQuestionsError ? (
+                        <ErrorState onRetry={() => refetchQuestions()} />
                     ) : questions.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                            <FileQuestion className="h-12 w-12 mb-4 opacity-20" />
-                            <p>Savollar topilmadi. Qo'lda qo'shing yoki Excel dan import qiling.</p>
-                        </div>
+                        <EmptyState
+                            icon={<FileQuestion className="h-6 w-6" />}
+                            title="Savollar topilmadi"
+                            description="Qo'lda qo'shing yoki Excel dan import qiling."
+                        />
                     ) : (
                         <Table>
                             <TableHeader>
@@ -360,12 +372,10 @@ const QuestionsPage = () => {
             // Step 1: show subject picker
             return (
                 <div className="space-y-6">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Savollar</h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Fan tanlang — o'sha fanga tegishli savollarni ko'rasiz
-                        </p>
-                    </div>
+                    <PageHeader
+                        title="Savollar"
+                        description="Fan tanlang — o'sha fanga tegishli savollarni ko'rasiz"
+                    />
                     <TeacherSubjectPicker onSelect={setSelectedSubject} />
                 </div>
             );
@@ -479,8 +489,11 @@ const UploadModal = ({
     const handleUpload = () => {
         if (!file || !subjectId) return;
         uploadMutation.mutate({ file, subject_id: parseInt(subjectId) }, {
-            onSuccess: () => onSuccess(),
-            onError: () => alert("Faylni yuklashda xatolik yuz berdi"),
+            onSuccess: () => {
+                toast.success('Savollar muvaffaqiyatli import qilindi');
+                onSuccess();
+            },
+            onError: () => toast.error("Faylni yuklashda xatolik yuz berdi"),
         });
     };
 
@@ -506,12 +519,12 @@ const UploadModal = ({
                         type="file"
                         accept=".xlsx, .xls"
                         onChange={handleFileChange}
-                        className="block w-full text-sm text-slate-500
+                        className="block w-full text-sm text-muted-foreground
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-full file:border-0
                         file:text-sm file:font-semibold
-                        file:bg-violet-50 file:text-violet-700
-                        hover:file:bg-violet-100"
+                        file:bg-primary/10 file:text-primary
+                        hover:file:bg-primary/15"
                     />
                 </div>
                 {file && (
@@ -545,6 +558,7 @@ const BulkDeleteModal = ({
 }) => {
     const [subjectId, setSubjectId] = useState<string>(defaultSubjectId ? String(defaultSubjectId) : '');
     const [userId, setUserId] = useState<string>('');
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const bulkDeleteMutation = useBulkDeleteQuestions();
     const { data: usersData, isLoading: isUsersLoading } = useUsers(1, 1000); // Fetch all users for selection
     const users = usersData?.users || [];
@@ -556,22 +570,25 @@ const BulkDeleteModal = ({
 
     const handleDelete = () => {
         if (!subjectId || !userId) {
-            alert("Iltimos, fan va foydalanuvchini tanlang");
+            toast.error("Iltimos, fan va foydalanuvchini tanlang");
             return;
         }
 
-        if (window.confirm("Haqiqatan ham ushbu fan va foydalanuvchiga tegishli BARCHA savollarni o'chirmoqchimisiz?")) {
-            bulkDeleteMutation.mutate({ 
-                subject_id: parseInt(subjectId), 
-                user_id: parseInt(userId) 
-            }, {
-                onSuccess: (data: any) => {
-                    alert(`${data.deleted_count} ta savol o'chirildi`);
-                    onSuccess();
-                },
-                onError: () => alert("Savollarni o'chirishda xatolik yuz berdi"),
-            });
-        }
+        setIsConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = () => {
+        bulkDeleteMutation.mutate({
+            subject_id: parseInt(subjectId),
+            user_id: parseInt(userId)
+        }, {
+            onSuccess: (data: any) => {
+                toast.success(`${data.deleted_count} ta savol o'chirildi`);
+                setIsConfirmOpen(false);
+                onSuccess();
+            },
+            onError: () => toast.error("Savollarni o'chirishda xatolik yuz berdi"),
+        });
     };
 
     return (
@@ -627,6 +644,16 @@ const BulkDeleteModal = ({
                         O'chirish
                     </Button>
                 </div>
+
+                <ConfirmDialog
+                    isOpen={isConfirmOpen}
+                    onClose={() => setIsConfirmOpen(false)}
+                    onConfirm={handleConfirmDelete}
+                    title="Savollarni ommaviy o'chirish"
+                    description="Haqiqatan ham ushbu fan va foydalanuvchiga tegishli BARCHA savollarni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi."
+                    confirmText="O'chirish"
+                    isLoading={bulkDeleteMutation.isPending}
+                />
             </div>
         </Modal>
     );

@@ -26,6 +26,19 @@ export const useQuiz = (id: number) => {
     });
 };
 
+/**
+ * Ma'ruzachining bankida nechta savol borligi. Tashkilotchi testni yig'ishdan oldin
+ * shu songa qarab savollar yetarli ekanini biladi — aks holda test auditoriyada
+ * yetarli savolsiz ochilardi.
+ */
+export const useAvailableQuestions = (lecturer_id?: number, subject_id?: number) => {
+    return useQuery({
+        queryKey: ['available-questions', lecturer_id, subject_id],
+        queryFn: () => quizService.getAvailableQuestions(lecturer_id!, subject_id!),
+        enabled: !!lecturer_id && !!subject_id,
+    });
+};
+
 export const useCreateQuiz = () => {
     const queryClient = useQueryClient();
     return useMutation({

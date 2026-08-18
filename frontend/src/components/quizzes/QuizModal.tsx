@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
-import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
+import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
@@ -57,9 +58,11 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const isActive = watch('is_active');
     const proctoringMode = watch('proctoring_mode');
-    const selectedUserId = watch('user_id');
+    const selectedLecturerId = watch('lecturer_id');
+    const selectedSubjectId = watch('subject_id');
+    const questionNumber = watch('question_number');
 
-    const effectiveUserId = isTeacher ? user?.id?.toString() : selectedUserId;
+    const effectiveUserId = isTeacher ? user?.id?.toString() : selectedLecturerId;
 
     const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
@@ -95,7 +98,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 question_number: quiz.question_number.toString(),
                 duration: quiz.duration.toString(),
                 pin: quiz.pin,
-                user_id: quiz.user_id ? quiz.user_id.toString() : '',
+                lecturer_id: quiz.lecturer_id ? quiz.lecturer_id.toString() : '',
                 group_id: quiz.group_id ? quiz.group_id.toString() : '',
                 subject_id: quiz.subject_id ? quiz.subject_id.toString() : '',
                 is_active: quiz.is_active,
@@ -107,7 +110,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 question_number: '10',
                 duration: '30',
                 pin: Math.random().toString().slice(2, 6),
-                user_id: isTeacher && user?.id ? user.id.toString() : '',
+                lecturer_id: isTeacher && user?.id ? user.id.toString() : '',
                 group_id: '',
                 subject_id: '',
                 is_active: false,
@@ -121,19 +124,44 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             setValue('subject_id', '');
             setValue('group_id', '');
         }
-    }, [selectedUserId, isOpen, quiz, isTeacher]);
+    }, [selectedLecturerId, isOpen, quiz, isTeacher]);
+
+    // Сколько вопросов в банке выбранного лектора по выбранному предмету. Без этого
+    // организатор не знает, загрузил ли лектор вопросы, и узнал бы об этом только
+    // в аудитории — активный тест требует не меньше вопросов, чем question_number.
+    const { data: availableData } = useAvailableQuestions(
+        effectiveUserId ? parseInt(effectiveUserId, 10) : undefined,
+        selectedSubjectId ? parseInt(selectedSubjectId, 10) : undefined,
+    );
+    const available = availableData?.available;
+    const requested = parseInt(questionNumber ?? '', 10);
+    const notEnough = available !== undefined && !isNaN(requested) && requested > available;
+
+    /**
+     * 409 от бэкенда несёт осмысленное сообщение (не хватает вопросов, смена
+     * лектора запрещена) — показываем его, а не общее «произошла ошибка».
+     */
+    const showError = (error: unknown, fallback: string) => {
+        const detail = (error as { response?: { status?: number; data?: { detail?: { message?: string } } } })
+            ?.response;
+        if (detail?.status === 409 && detail.data?.detail?.message) {
+            toast.error(detail.data.detail.message);
+            return;
+        }
+        toast.error(fallback);
+    };
 
     const onSubmit = (data: QuizFormValues) => {
-        const resolvedUserId = isTeacher && user?.id
+        const resolvedLecturerId = isTeacher && user?.id
             ? user.id
-            : (data.user_id && data.user_id !== '' ? parseInt(data.user_id, 10) : null);
+            : (data.lecturer_id && data.lecturer_id !== '' ? parseInt(data.lecturer_id, 10) : null);
 
         const payload: QuizCreateRequest = {
             title: data.title,
             question_number: parseInt(data.question_number, 10),
             duration: parseInt(data.duration, 10),
             pin: data.pin,
-            user_id: resolvedUserId,
+            lecturer_id: resolvedLecturerId,
             group_id: data.group_id && data.group_id !== '' ? parseInt(data.group_id, 10) : null,
             subject_id: data.subject_id && data.subject_id !== '' ? parseInt(data.subject_id, 10) : null,
             is_active: data.is_active,
@@ -142,18 +170,24 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
         if (quiz) {
             updateMutation.mutate({ id: quiz.id, data: payload }, {
-                onSuccess: () => onSuccess(),
+                onSuccess: () => {
+                    toast.success('Test yangilandi');
+                    onSuccess();
+                },
                 onError: (error: unknown) => {
                     logger.error('Failed to update quiz', error);
-                    alert('Testni yangilashda xatolik yuz berdi');
+                    showError(error, 'Testni yangilashda xatolik yuz berdi');
                 },
             });
         } else {
             createMutation.mutate(payload, {
-                onSuccess: () => onSuccess(),
+                onSuccess: () => {
+                    toast.success('Test yaratildi');
+                    onSuccess();
+                },
                 onError: (error: unknown) => {
                     logger.error('Failed to create quiz', error);
-                    alert('Testni yaratishda xatolik yuz berdi');
+                    showError(error, 'Testni yaratishda xatolik yuz berdi');
                 },
             });
         }
@@ -212,22 +246,22 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         </button>
                     </div>
                     {errors.proctoring_mode && (
-                        <p className="text-sm text-red-500">{errors.proctoring_mode.message}</p>
+                        <p className="text-sm text-destructive">{errors.proctoring_mode.message}</p>
                     )}
                 </div>
 
                 {isTeacher ? (
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">O'qituvchi</label>
+                        <label className="text-sm font-medium">Ma'ruzachi</label>
                         <p className="text-sm bg-muted rounded px-3 py-2">
                             {teachers.find(t => t.employee?.user_id === user?.id)?.employee?.full_name || user?.username || '-'}
                         </p>
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">O'qituvchi</label>
+                        <label className="text-sm font-medium">Ma'ruzachi</label>
                         <Controller
-                            name="user_id"
+                            name="lecturer_id"
                             control={control}
                             render={({ field }) => (
                                 <Combobox
@@ -238,13 +272,19 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                                         setValue('subject_id', '');
                                         setValue('group_id', '');
                                     }}
-                                    placeholder="O'qituvchini tanlang"
+                                    placeholder="Ma'ruzachini tanlang"
                                     searchPlaceholder="Qidirish..."
                                     onSearchChange={setTeacherSearch}
+                                    disabled={!!quiz}
                                 />
                             )}
                         />
-                        {errors.user_id && <p className="text-sm text-red-500">{errors.user_id.message}</p>}
+                        <p className="text-xs text-muted-foreground">
+                            {quiz
+                                ? "Test yaratilgandan keyin ma'ruzachini o'zgartirish mumkin emas: savollar uning bankidan yig'ilgan."
+                                : "Savollar tanlangan ma'ruzachining bankidan yig'iladi."}
+                        </p>
+                        {errors.lecturer_id && <p className="text-sm text-destructive">{errors.lecturer_id.message}</p>}
                     </div>
                 )}
 
@@ -263,7 +303,13 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                             />
                         )}
                     />
-                    {errors.subject_id && <p className="text-sm text-red-500">{errors.subject_id.message}</p>}
+                    {errors.subject_id && <p className="text-sm text-destructive">{errors.subject_id.message}</p>}
+                    {available !== undefined && (
+                        <p className={`text-xs ${notEnough ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            Bankda mavjud savollar: {available}
+                            {notEnough && ` — so'ralgan ${requested} tadan kam, faol test yaratilmaydi`}
+                        </p>
+                    )}
                 </div>
 
                 <div className="space-y-2">
@@ -281,7 +327,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                             />
                         )}
                     />
-                    {errors.group_id && <p className="text-sm text-red-500">{errors.group_id.message}</p>}
+                    {errors.group_id && <p className="text-sm text-destructive">{errors.group_id.message}</p>}
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">

@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useUserAnswers } from '@/hooks/useUserAnswers';
 import { Button } from '@/components/ui/Button';
-import { Loader2, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { Pagination } from '@/components/ui/Pagination';
-import { cn } from '@/utils/utils';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { cn } from '@/lib/utils';
 
 const OPTION_LABELS = { a: 'A', b: 'B', c: 'C', d: 'D' } as const;
 
@@ -25,7 +28,7 @@ const UserAnswersPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 50;
 
-    const { data, isLoading } = useUserAnswers({
+    const { data, isLoading, isError, refetch } = useUserAnswers({
         page: currentPage,
         limit: pageSize,
         user_id: userId,
@@ -48,15 +51,15 @@ const UserAnswersPage = () => {
                 </Button>
                 <div className="flex-1">
                     <h1 className="page-title">Javoblar tafsiloti</h1>
-                    <div className="flex items-center gap-3 mt-1">
+                    <div className="flex flex-wrap items-center gap-3 mt-1">
                         <span className="text-sm text-muted-foreground font-mono">{total} ta savol</span>
                         {!isLoading && answers.length > 0 && (
                             <>
                                 <span className="text-border select-none">·</span>
-                                <span className="text-xs font-semibold text-[hsl(155,43%,30%)] bg-[hsl(155,43%,30%)]/10 px-2 py-0.5 rounded-full">
+                                <span className="badge badge-success font-semibold">
                                     {correctCount} to'g'ri
                                 </span>
-                                <span className="text-xs font-semibold text-[hsl(0,65%,42%)] bg-[hsl(0,65%,42%)]/10 px-2 py-0.5 rounded-full">
+                                <span className="badge badge-destructive font-semibold">
                                     {answers.length - correctCount} noto'g'ri
                                 </span>
                             </>
@@ -67,12 +70,19 @@ const UserAnswersPage = () => {
 
             {/* Content */}
             {isLoading ? (
-                <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="space-y-3">
+                    {Array.from({ length: 5 }, (_, i) => (
+                        <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+                    ))}
                 </div>
+            ) : isError ? (
+                <ErrorState onRetry={() => refetch()} />
             ) : answers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-16 text-muted-foreground">
-                    <p className="text-sm">Javoblar topilmadi.</p>
+                <div className="rounded-2xl border border-border bg-card">
+                    <EmptyState
+                        title="Javoblar topilmadi"
+                        description="Ushbu natija uchun javoblar mavjud emas."
+                    />
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -86,16 +96,16 @@ const UserAnswersPage = () => {
                                 className={cn(
                                     'rounded-2xl border bg-card overflow-hidden',
                                     answer.is_correct
-                                        ? 'border-[hsl(155,43%,30%)]/25'
-                                        : 'border-[hsl(0,65%,42%)]/25'
+                                        ? 'border-success/25'
+                                        : 'border-destructive/25'
                                 )}
                             >
                                 {/* Question header */}
                                 <div className={cn(
                                     'flex items-start gap-3 px-5 py-4 border-b',
                                     answer.is_correct
-                                        ? 'bg-[hsl(155,43%,30%)]/5 border-[hsl(155,43%,30%)]/15'
-                                        : 'bg-[hsl(0,65%,42%)]/5 border-[hsl(0,65%,42%)]/15'
+                                        ? 'bg-success/5 border-success/15'
+                                        : 'bg-destructive/5 border-destructive/15'
                                 )}>
                                     {/* Number badge */}
                                     <span className="font-mono text-xs font-bold text-muted-foreground bg-muted rounded-md px-2 py-1 shrink-0 mt-0.5">
@@ -105,9 +115,9 @@ const UserAnswersPage = () => {
                                         {question ? stripHtml(question.text) : `Savol #${answer.question_id}`}
                                     </p>
                                     {answer.is_correct ? (
-                                        <CheckCircle2 className="h-4.5 w-4.5 text-[hsl(155,43%,30%)] shrink-0 mt-0.5" />
+                                        <CheckCircle2 className="h-4.5 w-4.5 text-success shrink-0 mt-0.5" />
                                     ) : (
-                                        <XCircle className="h-4.5 w-4.5 text-[hsl(0,65%,42%)] shrink-0 mt-0.5" />
+                                        <XCircle className="h-4.5 w-4.5 text-destructive shrink-0 mt-0.5" />
                                     )}
                                 </div>
 
@@ -124,9 +134,9 @@ const UserAnswersPage = () => {
 
                                                 let style = 'border-border bg-muted/40 text-muted-foreground';
                                                 if (isCorrectOption) {
-                                                    style = 'border-[hsl(155,43%,30%)]/40 bg-[hsl(155,43%,30%)]/8 text-[hsl(155,43%,30%)] font-semibold';
+                                                    style = 'border-success/40 bg-success/10 text-success font-semibold';
                                                 } else if (isSelected && !answer.is_correct) {
-                                                    style = 'border-[hsl(0,65%,42%)]/40 bg-[hsl(0,65%,42%)]/8 text-[hsl(0,65%,42%)] font-medium';
+                                                    style = 'border-destructive/40 bg-destructive/10 text-destructive font-medium';
                                                 }
 
                                                 return (
@@ -156,9 +166,9 @@ const UserAnswersPage = () => {
                                             </span>
                                             <span className="text-border">·</span>
                                             {answer.is_correct ? (
-                                                <span className="font-semibold text-[hsl(155,43%,30%)]">To'g'ri</span>
+                                                <span className="font-semibold text-success">To'g'ri</span>
                                             ) : (
-                                                <span className="font-semibold text-[hsl(0,65%,42%)]">Noto'g'ri</span>
+                                                <span className="font-semibold text-destructive">Noto'g'ri</span>
                                             )}
                                         </div>
                                     </div>

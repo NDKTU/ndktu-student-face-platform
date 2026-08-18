@@ -3,16 +3,14 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/Table';
-import { ArrowLeft, ChevronRight, FolderEdit, Loader2, Search } from 'lucide-react';
+import { ArrowLeft, ChevronRight, FolderEdit, Search } from 'lucide-react';
 import { useStudents } from '@/hooks/useStudents';
 import { ChangeGroupModal } from '@/components/ChangeGroupModal';
 import type { Faculty } from '@/services/facultyService';
 import type { Group } from '@/services/groupService';
 import type { Student } from '@/services/studentService';
 import { Crumbs } from './Crumbs';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 
 interface GroupStudentsViewProps {
     faculty: Faculty;
@@ -43,9 +41,35 @@ export const GroupStudentsView = ({
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: studentsData, isLoading } = useStudents(currentPage, pageSize, debouncedSearch, undefined, group.id);
+    const { data: studentsData, isLoading, isError, refetch } = useStudents(currentPage, pageSize, debouncedSearch, undefined, group.id);
     const students = studentsData?.students || [];
     const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
+
+    const columns: DataTableColumn<Student>[] = [
+        { key: 'id', header: 'ID', headClassName: 'w-[80px]', cell: (student) => student.id },
+        { key: 'full_name', header: 'F.I.SH', className: 'font-medium', cell: (student) => student.full_name || '-' },
+        { key: 'student_id_number', header: 'Talaba raqami', hideBelow: 'lg', cell: (student) => student.student_id_number || '-' },
+        { key: 'phone', header: 'Telefon', hideBelow: 'lg', cell: (student) => student.phone || '-' },
+        {
+            key: 'actions',
+            header: '',
+            headClassName: 'w-[40px]',
+            className: 'text-right',
+            cell: (student) => (
+                <div className="flex items-center justify-end gap-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Guruhni o'zgartirish"
+                        onClick={(e) => { e.stopPropagation(); setStudentToMove(student); }}
+                    >
+                        <FolderEdit className="h-4 w-4" />
+                    </Button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+            ),
+        },
+    ];
 
     return (
         <div className="space-y-6">
@@ -61,7 +85,7 @@ export const GroupStudentsView = ({
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Orqaga
                         </Button>
-                        <h1 className="text-xl font-semibold tracking-tight">{group.name} — talabalar</h1>
+                        <h1 className="page-title">{group.name} — talabalar</h1>
                     </div>
                 </div>
                 <div className="relative">
@@ -77,55 +101,40 @@ export const GroupStudentsView = ({
 
             <Card>
                 <CardContent className="pt-6">
-                    {isLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[80px]">ID</TableHead>
-                                    <TableHead>F.I.SH</TableHead>
-                                    <TableHead>Talaba raqami</TableHead>
-                                    <TableHead>Telefon</TableHead>
-                                    <TableHead className="w-[40px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {students.map((student) => (
-                                    <TableRow
-                                        key={student.id}
-                                        className="cursor-pointer"
-                                        onClick={() => onOpenStudent(student)}
-                                    >
-                                        <TableCell>{student.id}</TableCell>
-                                        <TableCell className="font-medium">{student.full_name || '-'}</TableCell>
-                                        <TableCell>{student.student_id_number || '-'}</TableCell>
-                                        <TableCell>{student.phone || '-'}</TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    title="Guruhni o'zgartirish"
-                                                    onClick={(e) => { e.stopPropagation(); setStudentToMove(student); }}
-                                                >
-                                                    <FolderEdit className="h-4 w-4" />
-                                                </Button>
-                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {students.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Talabalar topilmadi.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
+                    <DataTable
+                        columns={columns}
+                        data={students}
+                        rowKey={(student) => student.id}
+                        isLoading={isLoading}
+                        isError={isError}
+                        onRetry={() => refetch()}
+                        emptyTitle="Talabalar topilmadi"
+                        emptyDescription="Ushbu guruhda talaba yo'q yoki qidiruvga mos talaba topilmadi."
+                        onRowClick={onOpenStudent}
+                        renderCard={(student) => (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="font-medium text-foreground">{student.full_name || '-'}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {student.student_id_number || '-'} · {student.phone || '-'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Guruhni o'zgartirish"
+                                            onClick={(e) => { e.stopPropagation(); setStudentToMove(student); }}
+                                        >
+                                            <FolderEdit className="h-4 w-4" />
+                                        </Button>
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    />
                 </CardContent>
             </Card>
 

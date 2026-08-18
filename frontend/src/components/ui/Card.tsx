@@ -8,7 +8,7 @@
  * - CardContent has no top-padding by default (aligns with CardHeader's bottom).
  */
 import React from 'react';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
     children: React.ReactNode;
@@ -16,7 +16,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card: React.FC<CardProps> = ({ className, children, ...props }) => (
     <div
-        className={cn('rounded-xl border border-border/50 bg-card text-card-foreground shadow-sm/50 transition-all duration-300', className)}
+        className={cn('rounded-xl border border-border/50 bg-card text-card-foreground shadow-sm transition-all duration-300', className)}
         {...props}
     >
         {children}

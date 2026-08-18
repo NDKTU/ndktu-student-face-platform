@@ -98,6 +98,22 @@ export interface WorkloadSyncResult {
     deactivated: number;
 }
 
+/**
+ * Итог полного прогона (`POST /run`). Он применяет только однозначные предложения;
+ * конфликты не применяются, их количество приходит в `requires_decision`.
+ * Сами конфликты в ответе не передаются: чтобы их разобрать, страница запрашивает
+ * свежий предпросмотр — повторно применять тот же `run_id` нельзя, предложения
+ * в нём заморожены и создали бы дубли уже созданных строк.
+ */
+export interface RunResponse {
+    triggered_by: string;
+    run_id: string;
+    requires_decision: number;
+    directories: ApplyResult[];
+    workloads: WorkloadSyncResult | null;
+    workloads_error: string | null;
+}
+
 /** Ключ предложения — он же идентификатор решения администратора. */
 export const proposalKey = (p: Proposal) => `${p.entity}:${p.external_id}`;
 
@@ -110,20 +126,17 @@ export const eduplanService = {
         const response = await api.post<PreviewResponse>('/integration/eduplan/preview');
         return response.data;
     },
+    /** Полный прогон: справочники + нагрузка, одним запросом. */
+    run: async () => {
+        const response = await api.post<RunResponse>('/integration/eduplan/run');
+        return response.data;
+    },
     apply: async (payload: {
         run_id: string;
         decisions: Decision[];
         apply_deactivations: boolean;
     }) => {
         const response = await api.post<ApplyResponse>('/integration/eduplan/apply', payload);
-        return response.data;
-    },
-    syncWorkloads: async (academicYearId?: number) => {
-        const response = await api.post<WorkloadSyncResult>(
-            '/integration/eduplan/workloads',
-            null,
-            { params: academicYearId ? { academic_year_id: academicYearId } : undefined },
-        );
         return response.data;
     },
 };

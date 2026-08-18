@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface TabItem {
     label: string;

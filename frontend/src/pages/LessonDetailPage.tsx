@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import { ArrowLeft, Clock, Loader2, Save, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -102,13 +105,26 @@ export default function LessonDetailPage() {
 
     if (isLessonLoading) {
         return (
-            <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="space-y-6">
+                <Skeleton className="h-10 w-2/3" />
+                <Skeleton className="h-48 w-full rounded-xl" />
+                <Skeleton className="h-64 w-full rounded-xl" />
             </div>
         );
     }
     if (!lesson) {
-        return <p className="text-sm text-destructive">Dars topilmadi.</p>;
+        return (
+            <EmptyState
+                title="Dars topilmadi"
+                description="Bu dars o'chirilgan yoki mavjud emas."
+                action={
+                    <Button variant="outline" onClick={() => navigate('/lessons')}>
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Darslarga qaytish
+                    </Button>
+                }
+            />
+        );
     }
 
     const studentResults = resultsData?.results ?? [];
@@ -116,18 +132,18 @@ export default function LessonDetailPage() {
     return (
         <div className="space-y-6">
             <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/lessons')}>
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Orqaga
-                    </Button>
-                    <h1 className="text-xl font-semibold tracking-tight">{lesson.topic}</h1>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {lesson.date}
-                    {lesson.subject_teacher?.subject?.name ? ` · ${lesson.subject_teacher.subject.name}` : ''}
-                    {lesson.group?.name ? ` · ${lesson.group.name}` : ''}
-                </p>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/lessons')} className="-ml-2">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Orqaga
+                </Button>
+                <PageHeader
+                    title={lesson.topic}
+                    description={[
+                        lesson.date,
+                        lesson.subject_teacher?.subject?.name,
+                        lesson.group?.name,
+                    ].filter(Boolean).join(' · ')}
+                />
                 {lesson.description && (
                     <p className="text-sm text-foreground/80">{lesson.description}</p>
                 )}

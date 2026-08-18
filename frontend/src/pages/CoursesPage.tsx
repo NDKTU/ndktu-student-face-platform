@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Pagination } from '@/components/ui/Pagination';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Plus } from 'lucide-react';
 import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
@@ -30,7 +32,7 @@ const CoursesPage = () => {
     const [filterTeacherId, setFilterTeacherId] = useState<number | undefined>(undefined);
     const [filterSemesterNumber, setFilterSemesterNumber] = useState<number | undefined>(undefined);
 
-    const { data: coursesData, isLoading: isCoursesLoading } = useCourses(
+    const { data: coursesData, isLoading: isCoursesLoading, isError: isCoursesError, refetch } = useCourses(
         currentPage,
         pageSize,
         filterTeacherId,
@@ -70,12 +72,13 @@ const CoursesPage = () => {
         if (!courseToDelete) return;
         deleteCourseMutation.mutate(courseToDelete.id, {
             onSuccess: () => {
+                toast.success("Kurs o'chirildi");
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
             },
             onError: (error: unknown) => {
                 logger.error('Failed to delete course', error);
-                alert("O'chirishda xatolik yuz berdi");
+                toast.error("O'chirishda xatolik yuz berdi");
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
             },
@@ -101,18 +104,18 @@ const CoursesPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Kurslar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Kurslarni boshqarish</p>
-                </div>
-                <PermissionGate permission="create:course">
-                    <Button onClick={handleCreateCourse}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Qo'shish
-                    </Button>
-                </PermissionGate>
-            </div>
+            <PageHeader
+                title="Kurslar"
+                description="Kurslarni boshqarish"
+                actions={
+                    <PermissionGate permission="create:course">
+                        <Button onClick={handleCreateCourse}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Qo'shish
+                        </Button>
+                    </PermissionGate>
+                }
+            />
 
             <CourseFilters
                 subjects={allSubjects}
@@ -133,6 +136,8 @@ const CoursesPage = () => {
             <CourseTable
                 courses={courses}
                 isLoading={isCoursesLoading}
+                isError={isCoursesError}
+                onRetry={() => refetch()}
                 onEdit={handleEditCourse}
                 onDelete={handleDeleteClick}
             />

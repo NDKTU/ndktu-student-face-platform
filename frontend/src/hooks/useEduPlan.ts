@@ -18,6 +18,17 @@ export const useEduPlanPreview = () => {
     });
 };
 
+/** Справочники, которые переписывает синхронизация: их кэш надо сбросить. */
+const MIRRORED_QUERY_KEYS = [
+    'faculties',
+    'kafedras',
+    'specialities',
+    'groups',
+    'subjects',
+    'employees',
+    'teachers',
+];
+
 export const useEduPlanApply = () => {
     const queryClient = useQueryClient();
     return useMutation({
@@ -25,20 +36,23 @@ export const useEduPlanApply = () => {
         onSuccess: () => {
             // Применение переписывает справочники целиком — сбрасываем всё,
             // что их показывает.
-            ['faculties', 'kafedras', 'specialities', 'groups', 'subjects', 'employees', 'teachers'].forEach(
-                (key) => queryClient.invalidateQueries({ queryKey: [key] }),
-            );
+            MIRRORED_QUERY_KEYS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
         },
     });
 };
 
-export const useEduPlanWorkloadSync = () => {
+/** Полный прогон одной кнопкой: справочники и нагрузка сразу. */
+export const useEduPlanRun = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (academicYearId?: number) => eduplanService.syncWorkloads(academicYearId),
+        mutationFn: () => eduplanService.run(),
         onSuccess: () => {
+            MIRRORED_QUERY_KEYS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
             queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
         },
     });
 };
+
+// Отдельного импорта нагрузки в интерфейсе больше нет: она переносится тем же
+// прогоном, что и справочники (см. useEduPlanRun). Эндпоинт `/workloads` на
+// бэкенде остался — им пользуются API и CLI.

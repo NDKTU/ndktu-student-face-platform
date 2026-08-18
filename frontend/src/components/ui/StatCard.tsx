@@ -1,18 +1,21 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 
 export type StatCardColor = 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'cyan' | 'red' | 'yellow';
 
+/* Пастельные плитки в духе референс-дизайна: разные оттенки для плиток-иконок,
+   осознанное исключение из правила «только семантические токены».
+   dark:-варианты обязательны — плитки должны читаться в тёмной теме. */
 const colorMap: Record<StatCardColor, string> = {
-    blue:   'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
-    purple: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
-    green:  'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20',
-    orange: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
-    pink:   'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20',
-    cyan:   'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
-    red:    'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
-    yellow: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20',
+    blue:   'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
+    purple: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/20',
+    cyan:   'bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/20',
+    green:  'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+    orange: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+    yellow: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20',
+    red:    'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+    pink:   'bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/20',
 };
 
 export interface StatCardProps {
@@ -45,7 +48,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                 )}
                 {description && (
                     <p className="flex items-center gap-1 text-xs text-muted-foreground pt-0.5">
-                        <TrendingUp className="h-3 w-3 text-green-500" />
+                        <TrendingUp className="h-3 w-3 text-success" />
                         {description}
                     </p>
                 )}

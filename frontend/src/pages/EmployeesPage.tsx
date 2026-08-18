@@ -1,16 +1,9 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Loader2, Search, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Briefcase } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
@@ -18,6 +11,8 @@ import type { Employee } from '@/services/employeeService';
 import { EmployeeModal } from '@/components/employees/EmployeeModal';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { PageTabs } from '@/components/ui/PageTabs';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 
 const USER_TABS = [
     { label: 'Tizim foydalanuvchilari', href: '/users' },
@@ -46,7 +41,12 @@ const EmployeesPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const { data: employeesData, isLoading } = useEmployees(currentPage, pageSize, debouncedSearch);
+    const {
+        data: employeesData,
+        isLoading,
+        isError,
+        refetch,
+    } = useEmployees(currentPage, pageSize, debouncedSearch);
     const deleteMutation = useDeleteEmployee();
 
     const employees = employeesData?.employees || [];
@@ -71,6 +71,7 @@ const EmployeesPage = () => {
             { id: employeeToDelete.id, force: cascadeWarnings.length > 0 },
             {
                 onSuccess: () => {
+                    toast.success("Xodim o'chirildi");
                     setIsDeleteModalOpen(false);
                     setEmployeeToDelete(null);
                     setCascadeWarnings([]);
@@ -79,7 +80,7 @@ const EmployeesPage = () => {
                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                         setCascadeWarnings(error.response.data.detail.warnings || []);
                     } else {
-                        alert("O'chirishda xatolik yuz berdi");
+                        toast.error("O'chirishda xatolik yuz berdi");
                         setIsDeleteModalOpen(false);
                         setEmployeeToDelete(null);
                         setCascadeWarnings([]);
@@ -94,92 +95,104 @@ const EmployeesPage = () => {
         setSelectedEmployee(null);
     };
 
+    const renderTeacherBadge = (employee: Employee) =>
+        employee.teacher ? (
+            <span className="badge badge-primary">Mavjud</span>
+        ) : (
+            <span className="text-xs text-muted-foreground">Yo'q</span>
+        );
+
+    const renderRowActions = (employee: Employee) => (
+        <div className="flex justify-end gap-2">
+            <PermissionGate permission="update:employee">
+                <Button variant="ghost" size="sm" onClick={(e) => handleEditClick(employee, e)}>
+                    <Pencil className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+            <PermissionGate permission="delete:employee">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={(e) => handleDeleteClick(employee, e)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+        </div>
+    );
+
+    const columns: DataTableColumn<Employee>[] = [
+        { key: 'full_name', header: 'F.I.SH', cell: (employee) => employee.full_name, className: 'font-medium capitalize' },
+        { key: 'username', header: 'Foydalanuvchi', cell: (employee) => employee.user?.username || '-' },
+        { key: 'phone', header: 'Telefon', cell: (employee) => employee.phone_number || '-', hideBelow: 'lg' },
+        { key: 'teacher', header: "O'qituvchi profili", cell: renderTeacherBadge },
+        {
+            key: 'actions',
+            header: <span className="block text-right">Amallar</span>,
+            cell: renderRowActions,
+            className: 'text-right',
+        },
+    ];
+
     return (
         <div className="space-y-6">
             <PageTabs tabs={USER_TABS} />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Xodimlar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Xodimlar ro'yxati va shaxsiy ma'lumotlarini boshqarish</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Qidirish..."
-                            className="pl-8 w-[220px]"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <PermissionGate permission="create:employee">
-                        <Button onClick={() => { setSelectedEmployee(null); setIsModalOpen(true); }}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Qo'shish
-                        </Button>
-                    </PermissionGate>
-                </div>
-            </div>
+            <PageHeader
+                title="Xodimlar"
+                description="Xodimlar ro'yxati va shaxsiy ma'lumotlarini boshqarish"
+                actions={
+                    <>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Qidirish..."
+                                className="pl-8 w-[220px]"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <PermissionGate permission="create:employee">
+                            <Button onClick={() => { setSelectedEmployee(null); setIsModalOpen(true); }}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Qo'shish
+                            </Button>
+                        </PermissionGate>
+                    </>
+                }
+            />
 
             <Card>
                 <CardContent className="pt-6">
-                    {isLoading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>F.I.SH</TableHead>
-                                    <TableHead>Foydalanuvchi</TableHead>
-                                    <TableHead>Telefon</TableHead>
-                                    <TableHead>O'qituvchi profili</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {employees.map((employee) => (
-                                    <TableRow key={employee.id}>
-                                        <TableCell className="font-medium capitalize">{employee.full_name}</TableCell>
-                                        <TableCell>{employee.user?.username || '-'}</TableCell>
-                                        <TableCell>{employee.phone_number || '-'}</TableCell>
-                                        <TableCell>
-                                            {employee.teacher ? (
-                                                <span className="text-xs rounded-full bg-primary/10 text-primary px-2 py-0.5">Mavjud</span>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">Yo'q</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <PermissionGate permission="update:employee">
-                                                    <Button variant="ghost" size="sm" onClick={(e) => handleEditClick(employee, e)}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                                <PermissionGate permission="delete:employee">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={(e) => handleDeleteClick(employee, e)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </PermissionGate>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {employees.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Xodimlar topilmadi.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
+                    <DataTable
+                        columns={columns}
+                        data={employees}
+                        rowKey={(employee) => employee.id}
+                        isLoading={isLoading}
+                        isError={isError}
+                        onRetry={() => refetch()}
+                        emptyTitle="Xodimlar topilmadi"
+                        emptyDescription="Qidiruv mezonlariga mos xodim yo'q."
+                        emptyIcon={<Briefcase className="h-6 w-6" />}
+                        renderCard={(employee) => (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium capitalize text-foreground">{employee.full_name}</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {employee.user?.username || '-'}
+                                            {employee.phone_number ? ` · ${employee.phone_number}` : ''}
+                                        </p>
+                                    </div>
+                                    {renderRowActions(employee)}
+                                </div>
+                                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>O'qituvchi profili:</span>
+                                    {renderTeacherBadge(employee)}
+                                </div>
+                            </div>
+                        )}
+                    />
                 </CardContent>
             </Card>
 
@@ -205,11 +218,11 @@ const EmployeesPage = () => {
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-red-600 font-medium">Diqqat! Ushbu xodimni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
-                            <ul className="list-disc pl-5 text-sm text-red-500">
+                            <p className="text-destructive font-medium">Diqqat! Ushbu xodimni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <ul className="list-disc pl-5 text-sm text-destructive/80">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-red-700 mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
                     ) : `Siz haqiqatan ham "${employeeToDelete?.full_name}" xodimini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }

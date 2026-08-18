@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useMyResults, useMethods, useDeleteResult } from '@/hooks/usePsychology';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
@@ -9,7 +10,11 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
-import { Loader2, Brain, ClipboardList, Eye, Calendar, User as UserIcon, FilterX, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Brain, Eye, Calendar, User as UserIcon, FilterX, Trash2 } from 'lucide-react';
 import type { TestResultResponse } from '@/services/psychologyService';
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
@@ -101,7 +106,7 @@ export default function PsychologyResultsPage() {
 
     const hasActiveFilter = !!(methodFilter || facultyFilter || groupFilter);
 
-    const { data, isLoading, isError } = useMyResults({
+    const { data, isLoading, isError, refetch } = useMyResults({
         method_id: methodFilter,
         faculty_id: facultyFilter ? Number(facultyFilter) : undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
@@ -109,29 +114,21 @@ export default function PsychologyResultsPage() {
     });
 
     return (
-        <div className="p-6">
-            {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-                        <ClipboardList className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-semibold text-foreground">Psixologik test natijalari</h1>
-                        <p className="text-xs text-muted-foreground">Barcha foydalanuvchilarning topshirgan testlari</p>
-                    </div>
-                </div>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                title="Psixologik test natijalari"
+                description="Barcha foydalanuvchilarning topshirgan testlari"
+            />
 
             {/* Filter */}
-            <Card className="mb-4">
-                <CardContent className="flex flex-wrap items-center gap-3 py-3">
+            <Card>
+                <CardContent className="flex flex-col gap-3 py-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="flex items-center gap-2">
-                        <label className="text-xs font-medium text-muted-foreground">Metod:</label>
+                        <label className="shrink-0 text-xs font-medium text-muted-foreground">Metod:</label>
                         <select
                             value={methodFilter ?? ''}
                             onChange={e => { setMethodFilter(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
-                            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-auto"
                         >
                             <option value="">Barchasi</option>
                             {methodsData?.methods.map(m => (
@@ -141,7 +138,7 @@ export default function PsychologyResultsPage() {
                     </div>
 
                     <PermissionGate permission="read:faculty">
-                        <div className="w-[200px]">
+                        <div className="w-full sm:w-[200px]">
                             <Combobox
                                 options={facultyOptions}
                                 value={facultyFilter}
@@ -156,7 +153,7 @@ export default function PsychologyResultsPage() {
                     </PermissionGate>
 
                     <PermissionGate permission="read:group">
-                        <div className="w-[200px]">
+                        <div className="w-full sm:w-[200px]">
                             <Combobox
                                 options={groupOptions}
                                 value={groupFilter}
@@ -176,6 +173,7 @@ export default function PsychologyResultsPage() {
                                 setGroupFilter('');
                                 setPage(1);
                             }}
+                            aria-label="Filtrlarni tozalash"
                         >
                             <FilterX className="h-4 w-4" />
                         </Button>
@@ -192,16 +190,19 @@ export default function PsychologyResultsPage() {
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <div className="mt-4 flex flex-col gap-2">
+                            {Array.from({ length: 6 }, (_, i) => (
+                                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                            ))}
                         </div>
                     ) : isError ? (
-                        <p className="py-8 text-center text-sm text-destructive">Xatolik yuz berdi</p>
+                        <ErrorState onRetry={() => refetch()} />
                     ) : !data?.results.length ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center">
-                            <Brain className="h-10 w-10 text-muted-foreground/30" />
-                            <p className="text-sm text-muted-foreground">Hozircha natijalar yo'q</p>
-                        </div>
+                        <EmptyState
+                            icon={<Brain className="h-6 w-6" />}
+                            title="Hozircha natijalar yo'q"
+                            description="Tanlangan filtrlar bo'yicha natija topilmadi."
+                        />
                     ) : (
                         <>
                             <div className="mt-4 flex flex-col gap-2">
@@ -209,14 +210,14 @@ export default function PsychologyResultsPage() {
                                     <div
                                         key={r.id}
                                         onClick={() => { if (deletingId !== null && deletingId !== r.id) setDeletingId(null); }}
-                                        className="flex items-center gap-4 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:border-primary/30 hover:bg-accent/30"
+                                        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:border-primary/30 hover:bg-accent/30"
                                     >
                                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                                             <Brain className="h-4 w-4 text-primary" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 basis-40">
                                             <p className="font-medium text-foreground truncate">{r.method?.name ?? 'Metod o\'chirilgan'}</p>
-                                            <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                                                 <span className="flex items-center gap-1">
                                                     <UserIcon className="h-3 w-3" />
                                                     {r.user?.username ?? '—'}
@@ -239,7 +240,11 @@ export default function PsychologyResultsPage() {
                                                 onClick={() => {
                                                     if (deletingId === r.id) {
                                                         deleteResult.mutate(r.id, {
-                                                            onSuccess: () => setDeletingId(null),
+                                                            onSuccess: () => {
+                                                                setDeletingId(null);
+                                                                toast.success("Natija o'chirildi");
+                                                            },
+                                                            onError: () => toast.error("Natijani o'chirishda xatolik yuz berdi"),
                                                         });
                                                     } else {
                                                         setDeletingId(r.id);
@@ -247,7 +252,7 @@ export default function PsychologyResultsPage() {
                                                 }}
                                                 className={`flex items-center justify-center rounded-lg p-1.5 transition-colors ${
                                                     deletingId === r.id
-                                                        ? 'bg-destructive text-white'
+                                                        ? 'bg-destructive text-destructive-foreground'
                                                         : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
                                                 }`}
                                                 title={deletingId === r.id ? "Tasdiqlash uchun bosing" : "O'chirish"}

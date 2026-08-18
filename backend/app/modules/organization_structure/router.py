@@ -24,6 +24,7 @@ from .faculty.schemas import (
     FacultyCreateResponse,
     FacultyListRequest,
     FacultyListResponse,
+    FacultyStatsResponse,
 )
 from .group.repository import get_group_repository
 from .group.schemas import (
@@ -73,6 +74,15 @@ async def create_faculty(
 ):
     result = await get_faculty_repository.create_faculty(session=session, data=data)
     return result
+
+
+# Объявлен до "/{faculty_id}", иначе "stats" распарсился бы как faculty_id
+@faculty_router.get("/stats", response_model=FacultyStatsResponse)
+async def get_faculty_stats(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:faculty")),
+):
+    return await get_faculty_repository.get_faculty_stats(session=session)
 
 
 @faculty_router.get("/{faculty_id}", response_model=FacultyCreateResponse)

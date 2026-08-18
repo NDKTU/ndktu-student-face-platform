@@ -25,11 +25,13 @@ export const QUESTION_TYPE_ICONS: Record<QuestionType, React.ElementType> = {
     multi_choice: CheckSquare,
 };
 
+// Шесть типов — семантических токенов не хватает, поэтому оттенки палитры
+// через прозрачность: одинаково читаются в светлой и тёмной теме.
 export const QUESTION_TYPE_COLORS: Record<QuestionType, string> = {
-    text: 'bg-blue-100 text-blue-700',
-    true_false: 'bg-green-100 text-green-700',
-    scale: 'bg-purple-100 text-purple-700',
-    image_stimulus: 'bg-orange-100 text-orange-700',
-    image_choice: 'bg-pink-100 text-pink-700',
-    multi_choice: 'bg-teal-100 text-teal-700',
+    text: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+    true_false: 'bg-success/15 text-success',
+    scale: 'bg-purple-500/15 text-purple-700 dark:text-purple-300',
+    image_stimulus: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
+    image_choice: 'bg-pink-500/15 text-pink-700 dark:text-pink-300',
+    multi_choice: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
 };

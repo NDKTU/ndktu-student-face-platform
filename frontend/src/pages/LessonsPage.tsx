@@ -5,14 +5,17 @@ import { useLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
 import { Combobox } from '@/components/ui/Combobox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
+import { tileFor, initialsOf } from '@/lib/avatarTiles';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Plus, Pencil, Trash2, Loader2, BookOpen, ChevronRight } from 'lucide-react';
 import type { Lesson, LessonCreateRequest, LessonUpdateRequest } from '@/services/lessonService';
 
@@ -27,7 +30,7 @@ export default function LessonsPage() {
     const pageSize = 10;
 
     const filterGroupNum = filterGroupId ? parseInt(filterGroupId, 10) : undefined;
-    const { data, isLoading, isError } = useLessons({ page, limit: pageSize, group_id: filterGroupNum });
+    const { data, isLoading, isError, refetch } = useLessons({ page, limit: pageSize, group_id: filterGroupNum });
 
     const createMutation = useCreateLesson();
     const updateMutation = useUpdateLesson();
@@ -153,20 +156,18 @@ export default function LessonsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Darslar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                        {isAdmin ? 'Barcha darslar' : isTeacher ? 'Mening darslarim' : 'Mening guruhim darslari'}
-                    </p>
-                </div>
-                {isAdmin && (
-                    <Button onClick={openCreate}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Yangi dars
-                    </Button>
-                )}
-            </div>
+            <PageHeader
+                title="Darslar"
+                description={isAdmin ? 'Barcha darslar' : isTeacher ? 'Mening darslarim' : 'Mening guruhim darslari'}
+                actions={
+                    isAdmin ? (
+                        <Button onClick={openCreate}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Yangi dars
+                        </Button>
+                    ) : undefined
+                }
+            />
 
             {(isAdmin || isTeacher) && groupOptions.length > 0 && (
                 <div className="flex items-center gap-2 max-w-sm">
@@ -183,83 +184,74 @@ export default function LessonsPage() {
             )}
 
             {isLoading ? (
-                <div className="flex h-48 items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 6 }, (_, i) => (
+                        <Skeleton key={i} className="h-40 w-full rounded-2xl" />
+                    ))}
                 </div>
             ) : isError ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16 text-center text-destructive">
-                        <BookOpen className="mb-4 h-14 w-14 opacity-20" />
-                        <h3 className="text-lg font-semibold">Yuklab bo'lmadi</h3>
-                    </CardContent>
-                </Card>
+                <ErrorState onRetry={() => refetch()} />
             ) : !data || data.lessons.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                        <BookOpen className="mb-4 h-14 w-14 opacity-20" />
-                        <h3 className="text-lg font-semibold">Darslar yo'q</h3>
-                        <p className="text-sm mt-1">Hozircha hech qanday dars qo'shilmagan.</p>
-                    </CardContent>
-                </Card>
+                <EmptyState
+                    icon={<BookOpen className="h-6 w-6" />}
+                    title="Darslar yo'q"
+                    description="Hozircha hech qanday dars qo'shilmagan."
+                />
             ) : (
-                <Card>
-                    <CardContent className="pt-6">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[110px]">Sana</TableHead>
-                                    <TableHead>Mavzu</TableHead>
-                                    <TableHead>Fan</TableHead>
-                                    <TableHead>Guruh</TableHead>
-                                    {isAdmin && <TableHead className="text-right">Amallar</TableHead>}
-                                    <TableHead className="w-[40px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {data.lessons.map(lesson => (
-                                    <TableRow
-                                        key={lesson.id}
-                                        className="cursor-pointer"
-                                        onClick={() => navigate(`/lessons/${lesson.id}`)}
-                                    >
-                                        <TableCell>{lesson.date}</TableCell>
-                                        <TableCell className="font-medium">{lesson.topic}</TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {lesson.subject_teacher?.subject?.name ?? `#${lesson.subject_teacher_id}`}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {lesson.group?.name ?? `#${lesson.group_id}`}
-                                        </TableCell>
-                                        {isAdmin && (
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={(e) => { e.stopPropagation(); openEdit(lesson); }}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(lesson); }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        )}
-                                        <TableCell className="text-right">
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                /* Карточная сетка в стиле референса «Vazifalar» */
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {data.lessons.map(lesson => (
+                        <div
+                            key={lesson.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => navigate(`/lessons/${lesson.id}`)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/lessons/${lesson.id}`); } }}
+                            className="group flex cursor-pointer flex-col rounded-2xl border border-border/60 bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tileFor(lesson.id)}`}>
+                                    {initialsOf(lesson.topic)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-display font-semibold leading-snug text-foreground line-clamp-2">{lesson.topic}</p>
+                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                        {lesson.subject_teacher?.subject?.name ?? `#${lesson.subject_teacher_id}`}
+                                    </p>
+                                </div>
+                                {isAdmin ? (
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <Button variant="ghost" size="sm" onClick={() => openEdit(lesson)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-destructive hover:text-destructive"
+                                            onClick={() => setDeleteTarget(lesson)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                                )}
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/60 pt-4">
+                                <div>
+                                    <p className="font-display text-sm font-bold text-foreground">{lesson.date}</p>
+                                    <p className="text-xs text-muted-foreground">Sana</p>
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="truncate font-display text-sm font-bold text-primary">
+                                        {lesson.group?.name ?? `#${lesson.group_id}`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Guruh</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
 
             <Pagination

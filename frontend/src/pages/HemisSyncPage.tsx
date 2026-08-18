@@ -1,22 +1,53 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-    Loader2, ArrowLeft, RefreshCw, UserCheck, AlertCircle, 
-    CheckCircle2, XCircle, Users, GraduationCap, 
-    ChevronRight, Info, ShieldCheck, Database, Zap
+import {
+    Loader2, ArrowLeft, RefreshCw, UserCheck, AlertCircle,
+    CheckCircle2, XCircle, Users, GraduationCap,
+    ChevronRight, Check, Info, ShieldCheck, Database, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { hemisService } from '@/services/hemisService';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
+
+/* Шаги мастера: проверка данных → синхронизация → готово. */
+const STEPS = ['Tekshirish', 'Sinxronlash', 'Yakun'];
+
+const StepIndicator = ({ current }: { current: number }) => (
+    <div className="flex flex-wrap items-center gap-2">
+        {STEPS.map((label, i) => (
+            <div key={label} className="flex items-center gap-2">
+                {i > 0 && <div className={`h-px w-6 sm:w-10 ${i <= current ? 'bg-primary' : 'bg-border'}`} />}
+                <div className="flex items-center gap-1.5">
+                    <span
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                            i < current
+                                ? 'bg-success/15 text-success'
+                                : i === current
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-muted-foreground'
+                        }`}
+                    >
+                        {i < current ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    </span>
+                    <span className={`text-xs font-medium ${i === current ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        {label}
+                    </span>
+                </div>
+            </div>
+        ))}
+    </div>
+);
 
 const HemisSyncPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    
+
     const login = searchParams.get('login');
     const password = searchParams.get('password');
 
@@ -30,7 +61,7 @@ const HemisSyncPage = () => {
     const extractName = (data: any) => {
         if (!data) return '—';
         if (typeof data === 'string') return data;
-        if (typeof data === 'object') return data.name || data.title || 'N/A';
+        if (typeof data === 'object') return data.name || data.title || '—';
         return String(data);
     };
 
@@ -59,8 +90,8 @@ const HemisSyncPage = () => {
     const syncMutation = useMutation({
         mutationFn: () => {
             setIsSyncing(true);
-            return hemisService.syncAdminData({ 
-                login: login!, 
+            return hemisService.syncAdminData({
+                login: login!,
                 password: password!,
                 faculty_id: selectedFacultyId,
                 group_id: selectedGroupId,
@@ -74,7 +105,7 @@ const HemisSyncPage = () => {
         },
         onError: (err: any) => {
             setIsSyncing(false);
-            alert(err?.response?.data?.detail || err?.message || 'Sinxronlashda xatolik');
+            toast.error(err?.response?.data?.detail || err?.message || 'Sinxronlashda xatolik');
         }
     });
 
@@ -84,10 +115,10 @@ const HemisSyncPage = () => {
                 <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
                     <XCircle className="w-10 h-10 text-destructive" />
                 </div>
-                <h1 className="text-2xl font-bold mb-2">Noto'g'ri So'rov</h1>
+                <h1 className="text-2xl font-bold mb-2">Noto'g'ri so'rov</h1>
                 <p className="text-muted-foreground max-w-sm mb-8">Login yoki parol taqdim etilmagan. Iltimos, talabalar sahifasidan qaytadan urinib ko'ring.</p>
                 <Button onClick={() => navigate('/students')} size="lg">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Orqaga Qaytish
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Orqaga qaytish
                 </Button>
             </div>
         );
@@ -96,11 +127,13 @@ const HemisSyncPage = () => {
     if (isPreviewLoading || isPending || isSyncing || isComplete) {
         const title = isComplete ? "Muvaffaqiyatli!" : isSyncing ? "Sinxronlanmoqda..." : "Ma'lumotlar yuklanmoqda...";
         const desc = isComplete ? "Ma'lumotlar saqlandi, yo'naltirilmoqda..." : "Hemis tizimi bilan xavfsiz aloqa o'rnatilmoqda...";
+        const step = isComplete ? 2 : isSyncing ? 1 : 0;
         return (
-            <div className="min-h-[70vh] flex flex-col items-center justify-center -mt-12">
+            <div className="min-h-[70vh] flex flex-col items-center justify-center gap-10 -mt-12">
+                <StepIndicator current={step} />
                 <div className="relative">
                     {isComplete ? (
-                        <div className="w-24 h-24 bg-success/20 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+                        <div className="w-24 h-24 bg-success/15 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
                              <CheckCircle2 className="w-12 h-12 text-success" />
                         </div>
                     ) : (
@@ -110,8 +143,10 @@ const HemisSyncPage = () => {
                         </>
                     )}
                 </div>
-                <h2 className="text-2xl font-bold mt-8 mb-2 tracking-tight">{title}</h2>
-                <p className="text-muted-foreground font-medium">{desc}</p>
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold mb-2 tracking-tight">{title}</h2>
+                    <p className="text-muted-foreground font-medium">{desc}</p>
+                </div>
             </div>
         );
     }
@@ -119,7 +154,7 @@ const HemisSyncPage = () => {
     if (isError || previewError) {
         return (
             <div className="max-w-2xl mx-auto mt-12 animate-in fade-in slide-in-from-bottom-4">
-                <Card className="border-destructive/20 shadow-2xl overflow-hidden">
+                <Card className="border-destructive/20 overflow-hidden">
                     <div className="h-1.5 bg-destructive"></div>
                     <CardContent className="p-10 flex flex-col items-center text-center">
                         <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
@@ -134,7 +169,7 @@ const HemisSyncPage = () => {
                                 <ArrowLeft className="w-4 h-4 mr-2" /> Orqaga
                             </Button>
                             <Button onClick={() => window.location.reload()} size="lg">
-                                <RefreshCw className="w-4 h-4 mr-2" /> Qaytadan Urinish
+                                <RefreshCw className="w-4 h-4 mr-2" /> Qaytadan urinish
                             </Button>
                         </div>
                     </CardContent>
@@ -147,61 +182,58 @@ const HemisSyncPage = () => {
     const facultyExists = previewData?.faculty_exists;
     const groupExists = previewData?.group_exists;
     const existingResults = previewData?.existing_results || [];
-    const suggestedGroup = previewData?.suggested_group || 'N/A';
+    const suggestedGroup = previewData?.suggested_group || '—';
     const hData = previewData?.hemis_data || {};
 
     return (
-        <div className="pb-20 space-y-8 animate-in fade-in duration-500">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b pb-8 bg-background/50 sticky top-0 z-20 backdrop-blur-sm -mx-6 px-6 pt-2">
-                <div className="flex items-start gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/students')} className="mt-1 hover:bg-muted">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                             <h1 className="text-3xl font-extrabold tracking-tight">Hemis Sinxronizatsiyasi</h1>
-                             <div className="badge badge-primary bg-primary/20 text-primary border border-primary/20">Admin Mode</div>
-                        </div>
-                        <p className="text-muted-foreground flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-success" /> 
-                            Xavfsiz ulanish o'rnatildi. Ma'lumotlarni tasdiqlang.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Button 
-                        onClick={() => syncMutation.mutate()} 
-                        disabled={syncMutation.isPending} 
-                        size="lg" 
-                        className="h-14 px-8 font-bold text-lg shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                        <Zap className="w-5 h-5 mr-2 fill-current" />
-                        Sinxronlash va Saqlash
-                    </Button>
-                </div>
+        <div className="pb-20 space-y-6 animate-in fade-in duration-500">
+            {/* Header */}
+            <PageHeader
+                title="Hemis sinxronizatsiyasi"
+                description="Xavfsiz ulanish o'rnatildi. Ma'lumotlarni tasdiqlab, sinxronlashni boshlang."
+                actions={
+                    <>
+                        <Button variant="outline" onClick={() => navigate('/students')}>
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Orqaga
+                        </Button>
+                        <Button
+                            onClick={() => syncMutation.mutate()}
+                            disabled={syncMutation.isPending}
+                        >
+                            <Zap className="w-4 h-4 mr-2" />
+                            Sinxronlash va saqlash
+                        </Button>
+                    </>
+                }
+            />
+
+            <div className="flex flex-wrap items-center gap-4">
+                <StepIndicator current={0} />
+                <span className="badge badge-primary border border-primary/20">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Admin rejimi
+                </span>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                 {/* Left Panel: Settings */}
                 <div className="xl:col-span-3 space-y-6">
-                    <Card className="border-primary/20 shadow-xl overflow-hidden sticky top-28">
-                        <CardHeader className="bg-primary/5 py-5 border-b">
-                            <CardTitle className="text-lg flex items-center gap-2 font-bold tracking-tight">
-                                <Zap className="w-5 h-5 text-primary" /> Sinxronlash Sozlamalari
+                    <Card className="overflow-hidden xl:sticky xl:top-24">
+                        <CardHeader className="bg-primary/5 py-5 border-b border-border/50">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-primary" /> Sinxronlash sozlamalari
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
                             <div className="space-y-3">
-                                <label className="text-sm font-bold flex items-center gap-2 text-foreground/80">
-                                    <GraduationCap className="w-4 h-4" /> Fakultet Tanlash
+                                <label className="text-sm font-medium flex items-center gap-2 text-foreground/80">
+                                    <GraduationCap className="w-4 h-4" /> Fakultetni tanlash
                                 </label>
-                                <select 
-                                    className="w-full h-11 px-3 rounded-xl border border-border/60 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
+                                <select
+                                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
                                     value={selectedFacultyId || ''}
                                     onChange={(e) => {
                                         setSelectedFacultyId(Number(e.target.value) || undefined);
-                                        setSelectedGroupId(undefined); 
+                                        setSelectedGroupId(undefined);
                                     }}
                                 >
                                     <option value="">Hemis bo'yicha (avtomatik)</option>
@@ -210,7 +242,7 @@ const HemisSyncPage = () => {
                                     ))}
                                 </select>
                                 {!facultyExists && !selectedFacultyId && (
-                                    <div className="flex gap-2 p-3 rounded-lg bg-amber-50/50 border border-amber-200/50 text-[11px] text-amber-700 leading-tight">
+                                    <div className="flex gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning leading-tight">
                                         <Info className="w-4 h-4 shrink-0" />
                                         <span>Diqqat: Hemisdagi fakultet bazamizda topilmadi. Avtomatik tanlansa, yangi fakultet yaratiladi.</span>
                                     </div>
@@ -218,11 +250,11 @@ const HemisSyncPage = () => {
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-sm font-bold flex items-center gap-2 text-foreground/80">
-                                    <Users className="w-4 h-4" /> Guruh Tanlash
+                                <label className="text-sm font-medium flex items-center gap-2 text-foreground/80">
+                                    <Users className="w-4 h-4" /> Guruhni tanlash
                                 </label>
-                                <select 
-                                    className="w-full h-11 px-3 rounded-xl border border-border/60 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
+                                <select
+                                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
                                     value={selectedGroupId || ''}
                                     onChange={(e) => setSelectedGroupId(Number(e.target.value) || undefined)}
                                 >
@@ -239,11 +271,11 @@ const HemisSyncPage = () => {
                                 )}
                             </div>
 
-                            <div className="pt-4 border-t">
-                               <div className="p-4 rounded-2xl bg-muted/50 border border-dashed flex items-start gap-3">
+                            <div className="pt-4 border-t border-border/50">
+                               <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border flex items-start gap-3">
                                   <Database className="w-5 h-5 text-muted-foreground mt-0.5" />
                                   <div className="text-[11px] text-muted-foreground leading-relaxed">
-                                     Override funksiyasi yordamida talabani xohlagan fakultet va guruhga biriktirishingiz mumkin. Nomlar mos kelmasa foydali.
+                                     Tanlov yordamida talabani xohlagan fakultet va guruhga biriktirishingiz mumkin. Nomlar mos kelmasa foydali.
                                   </div>
                                </div>
                             </div>
@@ -252,36 +284,36 @@ const HemisSyncPage = () => {
                 </div>
 
                 {/* Main Content: Comparison */}
-                <div className="xl:col-span-9 space-y-8">
+                <div className="xl:col-span-9 space-y-6">
                     {/* Status Overview Card */}
-                    <Card className="bg-primary/5 border-primary/10 shadow-sm overflow-hidden">
+                    <Card className="bg-primary/5 border-primary/10 overflow-hidden">
                         <div className="flex flex-col md:flex-row items-center justify-between p-6 gap-6">
                             <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${userExists ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                                    {userExists ? <UserCheck className="w-7 h-7" /> : < Zap className="w-7 h-7" />}
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${userExists ? 'bg-primary/10 text-primary' : 'bg-warning/15 text-warning'}`}>
+                                    {userExists ? <UserCheck className="w-7 h-7" /> : <Zap className="w-7 h-7" />}
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold">Talaba Holati</h3>
-                                    <p className="text-sm text-muted-foreground">Local bazadagi mavjudlik holati</p>
+                                    <h3 className="text-lg font-bold">Talaba holati</h3>
+                                    <p className="text-sm text-muted-foreground">Lokal bazadagi mavjudlik holati</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-sm font-semibold opacity-70">Xulosa:</span>
                                 {userExists ? (
-                                    <div className="badge border border-blue-200 bg-blue-50 text-blue-700 px-4 py-1.5 text-sm font-bold shadow-sm">
-                                        <CheckCircle2 className="w-4 h-4 mr-2" /> MA'LUMOTLAR YANGILANADI
-                                    </div>
+                                    <span className="badge badge-primary border border-primary/20 px-4 py-1.5 text-sm font-bold">
+                                        <CheckCircle2 className="w-4 h-4" /> Ma'lumotlar yangilanadi
+                                    </span>
                                 ) : (
-                                    <div className="badge border border-amber-200 bg-amber-50 text-amber-700 px-4 py-1.5 text-sm font-bold shadow-sm">
-                                        <Zap className="w-4 h-4 mr-2" /> YANGI AKKAUNT YARATILADI
-                                    </div>
+                                    <span className="badge badge-warning border border-warning/20 px-4 py-1.5 text-sm font-bold">
+                                        <Zap className="w-4 h-4" /> Yangi akkaunt yaratiladi
+                                    </span>
                                 )}
                             </div>
                         </div>
                     </Card>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative items-stretch">
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:flex bg-background border rounded-full p-2 z-10 shadow-lg">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative items-stretch">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:flex bg-background border border-border rounded-full p-2 z-10 shadow-lg">
                             <ChevronRight className="w-6 h-6 text-primary" />
                         </div>
 
@@ -289,30 +321,30 @@ const HemisSyncPage = () => {
                         <div className="space-y-4">
                              <div className="flex items-center gap-2 pl-2">
                                 <div className="h-4 w-1 bg-primary rounded-full"></div>
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Hemis Ma'lumotlari</h3>
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Hemis ma'lumotlari</h3>
                              </div>
-                             <Card className="border-primary/10 shadow-xl hover:shadow-2xl transition-all h-full bg-card/40 backdrop-blur-sm overflow-hidden">
-                                <CardHeader className="bg-primary/5 py-4 border-b">
-                                    <CardTitle className="text-md flex items-center justify-between">
-                                        <span className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Kelayotgan Profil</span>
-                                        <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">SOURCE</span>
+                             <Card className="h-full overflow-hidden">
+                                <CardHeader className="bg-primary/5 py-4 border-b border-border/50">
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <span className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Kelayotgan profil</span>
+                                        <span className="badge badge-primary text-[10px] font-bold uppercase">Manba</span>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-8 space-y-6">
-                                    <InfoRow label="To'liq Ism" value={extractName(hData?.full_name)} highlight />
+                                    <InfoRow label="To'liq ism" value={extractName(hData?.full_name)} highlight />
                                     <InfoRow label="Talaba ID" value={extractName(hData?.student_id_number)} />
                                     <InfoRow label="Guruh (Hemis)" value={extractName(hData?.group)} />
                                     <InfoRow label="Fakultet (Hemis)" value={extractName(hData?.faculty)} />
-                                    <InfoRow label="Bog'lanish" value={extractName(hData?.phone)} />
-                                    
-                                    <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t">
+                                    <InfoRow label="Telefon" value={extractName(hData?.phone)} />
+
+                                    <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-border/50">
                                         <div className="space-y-1">
-                                            <span className="text-[10px] text-muted-foreground uppercase font-bold">Ta'lim Shakli</span>
+                                            <span className="text-[10px] text-muted-foreground uppercase font-bold">Ta'lim shakli</span>
                                             <p className="text-sm font-medium">{extractName(hData?.educationForm)}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <span className="text-[10px] text-muted-foreground uppercase font-bold">Semestr</span>
-                                            <p className="text-sm font-medium">{extractName(hData?.semester)}-sem</p>
+                                            <p className="text-sm font-medium">{extractName(hData?.semester)}-semestr</p>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -323,43 +355,43 @@ const HemisSyncPage = () => {
                         <div className="space-y-4">
                              <div className="flex items-center gap-2 pl-2">
                                 <div className="h-4 w-1 bg-success rounded-full"></div>
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Platforma Bazasi</h3>
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Platforma bazasi</h3>
                              </div>
-                             <Card className={`h-full shadow-xl overflow-hidden transition-all duration-500 ${userExists ? 'border-success/20 bg-card/40' : 'border-dashed bg-muted/10 opacity-70'}`}>
-                                <CardHeader className={`py-4 border-b ${userExists ? 'bg-success/5' : 'bg-muted/5'}`}>
-                                    <CardTitle className="text-md flex items-center justify-between">
+                             <Card className={`h-full overflow-hidden transition-all duration-500 ${userExists ? 'border-success/20' : 'border-dashed bg-muted/10 opacity-70'}`}>
+                                <CardHeader className={`py-4 border-b border-border/50 ${userExists ? 'bg-success/5' : 'bg-muted/5'}`}>
+                                    <CardTitle className="text-base flex items-center justify-between">
                                         <span className="flex items-center gap-2">
                                             {userExists ? <ShieldCheck className="w-4 h-4 text-success" /> : <AlertCircle className="w-4 h-4" />}
-                                            {userExists ? "Mavjud Tarix" : "Yaralajak Profile"}
+                                            {userExists ? "Mavjud tarix" : "Yaratiladigan profil"}
                                         </span>
-                                        {userExists && <span className="text-[10px] bg-success/20 text-success px-2 py-0.5 rounded-full font-bold">LOCAL DB</span>}
+                                        {userExists && <span className="badge badge-success text-[10px] font-bold uppercase">Lokal baza</span>}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-8">
                                     {userExists ? (
                                         <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-                                            <div className="bg-success/5 border border-success/10 p-5 rounded-2xl">
+                                            <div className="bg-success/5 border border-success/10 p-5 rounded-xl">
                                                 <p className="text-sm font-semibold text-success flex items-center gap-2">
-                                                   <CheckCircle2 className="w-4 h-4" /> Sinxronlash muvaffaqiyatli!
+                                                   <CheckCircle2 className="w-4 h-4" /> Talaba bazada topildi
                                                 </p>
                                                 <p className="text-xs mt-1 opacity-80 leading-relaxed">
-                                                   Ushbu talaba bizning bazamizda topildi. Sinxronlash profilni yangilaydi (parol va guruh o'zgarishi mumkin).
+                                                   Ushbu talaba bizning bazamizda mavjud. Sinxronlash profilni yangilaydi (parol va guruh o'zgarishi mumkin).
                                                 </p>
                                             </div>
 
                                             <div className="space-y-4">
                                                 <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
-                                                    Mavjud Natijalar
-                                                    <span className="bg-muted px-2 py-0.5 rounded text-[10px]">{existingResults.length} ta record</span>
+                                                    Mavjud natijalar
+                                                    <span className="badge badge-muted text-[10px]">{existingResults.length} ta yozuv</span>
                                                 </h4>
-                                                
+
                                                 {existingResults.length > 0 ? (
                                                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                                         {existingResults.map((r: any, idx: number) => (
-                                                            <div key={r?.id || idx} className="group p-4 bg-muted/20 border border-border/40 rounded-2xl hover:bg-muted/50 hover:border-primary/20 transition-all cursor-default">
+                                                            <div key={r?.id || idx} className="group p-4 bg-muted/20 border border-border/40 rounded-xl hover:bg-muted/50 hover:border-primary/20 transition-all cursor-default">
                                                                 <div className="flex justify-between items-start mb-2">
                                                                     <div className="max-w-[70%]">
-                                                                        <p className="text-xs font-bold leading-tight line-clamp-1">{r?.quiz?.title || 'Unknown'}</p>
+                                                                        <p className="text-xs font-bold leading-tight line-clamp-1">{r?.quiz?.title || 'Noma\'lum'}</p>
                                                                         <p className="text-[10px] text-muted-foreground mt-1">{r?.subject?.name}</p>
                                                                     </div>
                                                                     <div className="text-right">
@@ -375,7 +407,7 @@ const HemisSyncPage = () => {
                                                         ))}
                                                     </div>
                                                 ) : (
-                                                    <div className="h-24 flex flex-col items-center justify-center border border-dashed rounded-2xl text-muted-foreground">
+                                                    <div className="h-24 flex flex-col items-center justify-center border border-dashed border-border rounded-xl text-muted-foreground">
                                                         <Database className="w-6 h-6 mb-2 opacity-20" />
                                                         <p className="text-xs italic">Hech qanday test natijasi topilmadi</p>
                                                     </div>
@@ -384,17 +416,17 @@ const HemisSyncPage = () => {
                                         </div>
                                     ) : (
                                         <div className="h-full min-h-[350px] flex flex-col items-center justify-center text-center p-8 space-y-6">
-                                            <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center border border-border/50 animate-pulse">
+                                            <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center border border-border/50">
                                                 <UserCheck className="w-10 h-10 text-muted-foreground" />
                                             </div>
                                             <div className="space-y-2">
-                                                <h3 className="text-xl font-bold">Yangi Profil</h3>
+                                                <h3 className="text-xl font-bold">Yangi profil</h3>
                                                 <p className="text-sm text-muted-foreground leading-relaxed max-w-[280px] mx-auto">
                                                     Ushbu talaba uchun bazamizda hech qanday tarix topilmadi. Tizim avtomatik ravishda yangi akkaunt va profil yaratadi.
                                                 </p>
                                             </div>
-                                            <div className="badge bg-primary/5 text-primary border border-primary/20 animate-bounce">
-                                                Avtomatik Yaratish Faol
+                                            <div className="badge badge-primary border border-primary/20">
+                                                Avtomatik yaratish faol
                                             </div>
                                         </div>
                                     )}

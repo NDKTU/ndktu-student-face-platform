@@ -12,6 +12,8 @@ from .schemas import (
     FacultyCreateRequest,
     FacultyListRequest,
     FacultyListResponse,
+    FacultyStatsItem,
+    FacultyStatsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -175,6 +177,52 @@ class FacultyRepository:
 
         await session.delete(faculty)
         await session.commit()
+
+    async def get_faculty_stats(self, session: AsyncSession) -> FacultyStatsResponse:
+        """Счётчики по каждому факультету для карточек справочника.
+
+        Студенты считаются через группу: у групп есть прямой faculty_id,
+        а у студентов — group_id (студенты без группы не попадают в счёт).
+        """
+        from app.modules.auth.model import Student
+        from app.modules.organization_structure.model import Group, Kafedra, Speciality
+
+        kafedra_rows = (
+            await session.execute(
+                select(Kafedra.faculty_id, func.count(Kafedra.id)).group_by(Kafedra.faculty_id)
+            )
+        ).all()
+        speciality_rows = (
+            await session.execute(
+                select(Kafedra.faculty_id, func.count(Speciality.id))
+                .join(Kafedra, Speciality.kafedra_id == Kafedra.id)
+                .group_by(Kafedra.faculty_id)
+            )
+        ).all()
+        student_rows = (
+            await session.execute(
+                select(Group.faculty_id, func.count(Student.id))
+                .join(Group, Student.group_id == Group.id)
+                .group_by(Group.faculty_id)
+            )
+        ).all()
+
+        kafedras = dict(kafedra_rows)
+        specialities = dict(speciality_rows)
+        students = dict(student_rows)
+
+        faculty_ids = (await session.execute(select(Faculty.id))).scalars().all()
+        return FacultyStatsResponse(
+            stats=[
+                FacultyStatsItem(
+                    faculty_id=fid,
+                    kafedra_count=kafedras.get(fid, 0),
+                    speciality_count=specialities.get(fid, 0),
+                    student_count=students.get(fid, 0),
+                )
+                for fid in faculty_ids
+            ]
+        )
 
     async def get_or_create(self, session: AsyncSession, name: str) -> Faculty:
         stmt = select(Faculty).where(Faculty.name == name)

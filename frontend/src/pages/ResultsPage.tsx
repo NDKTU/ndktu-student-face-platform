@@ -1,17 +1,15 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
 import { useResults, useDeleteResult } from '@/hooks/useResults';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/Table';
 import { Card, CardContent } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import {
     Loader2, FileText, X, FileSpreadsheet, Trash2,
     AlertTriangle, BookOpen, Calendar,
@@ -20,7 +18,7 @@ import {
 import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 import { useGroups } from '@/hooks/useGroups';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useQuizzes } from '@/hooks/useQuizzes';
@@ -28,13 +26,14 @@ import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
+// --grade-* хранят полные значения цвета — используем напрямую, без hsl().
 
 const gradeConfig = {
-    5: { label: "A'lo",        bg: 'bg-[hsl(213,65%,38%)]',   text: 'text-white',     ring: 'ring-[hsl(213,65%,38%)]',   softBg: 'bg-[hsl(213,65%,38%)]/10', softText: 'text-[hsl(213,65%,38%)]' },
-    4: { label: 'Yaxshi',      bg: 'bg-[hsl(155,43%,30%)]',   text: 'text-white',     ring: 'ring-[hsl(155,43%,30%)]',   softBg: 'bg-[hsl(155,43%,30%)]/10', softText: 'text-[hsl(155,43%,30%)]' },
-    3: { label: 'Qoniqarli',   bg: 'bg-[hsl(42,84%,38%)]',    text: 'text-white',     ring: 'ring-[hsl(42,84%,38%)]',    softBg: 'bg-[hsl(42,84%,38%)]/10',  softText: 'text-[hsl(42,84%,38%)]'  },
-    2: { label: 'Qoniqarsiz',  bg: 'bg-[hsl(0,65%,42%)]',     text: 'text-white',     ring: 'ring-[hsl(0,65%,42%)]',     softBg: 'bg-[hsl(0,65%,42%)]/10',   softText: 'text-[hsl(0,65%,42%)]'   },
-    1: { label: 'Qoniqarsiz',  bg: 'bg-[hsl(0,65%,42%)]',     text: 'text-white',     ring: 'ring-[hsl(0,65%,42%)]',     softBg: 'bg-[hsl(0,65%,42%)]/10',   softText: 'text-[hsl(0,65%,42%)]'   },
+    5: { label: "A'lo",       color: 'var(--grade-5)',   bg: 'bg-[var(--grade-5)]',   text: 'text-white', softBg: 'bg-[var(--grade-5)]/10',   softText: 'text-[var(--grade-5)]'   },
+    4: { label: 'Yaxshi',     color: 'var(--grade-4)',   bg: 'bg-[var(--grade-4)]',   text: 'text-white', softBg: 'bg-[var(--grade-4)]/10',   softText: 'text-[var(--grade-4)]'   },
+    3: { label: 'Qoniqarli',  color: 'var(--grade-3)',   bg: 'bg-[var(--grade-3)]',   text: 'text-white', softBg: 'bg-[var(--grade-3)]/10',   softText: 'text-[var(--grade-3)]'   },
+    2: { label: 'Qoniqarsiz', color: 'var(--grade-low)', bg: 'bg-[var(--grade-low)]', text: 'text-white', softBg: 'bg-[var(--grade-low)]/10', softText: 'text-[var(--grade-low)]' },
+    1: { label: 'Qoniqarsiz', color: 'var(--grade-low)', bg: 'bg-[var(--grade-low)]', text: 'text-white', softBg: 'bg-[var(--grade-low)]/10', softText: 'text-[var(--grade-low)]' },
 } as const;
 
 const getGradeConf = (grade: number) =>
@@ -80,7 +79,7 @@ const SlideOver = ({ result, onClose, onViewAnswers, onDelete, isAdmin }: SlideO
                 <div className="flex-1 px-6 py-5 space-y-5">
                     {/* Grade hero */}
                     <div className={cn('rounded-2xl p-6 text-center', conf.softBg)}>
-                        <p className="font-display text-8xl font-semibold tracking-tight leading-none" style={{ color: `hsl(var(--grade-${Math.min(result.grade, 5) as 1|2|3|4|5}))` }}>
+                        <p className="font-display text-8xl font-semibold tracking-tight leading-none" style={{ color: conf.color }}>
                             {result.grade}
                         </p>
                         <p className={cn('mt-2 text-sm font-semibold', conf.softText)}>{conf.label}</p>
@@ -130,16 +129,16 @@ const SlideOver = ({ result, onClose, onViewAnswers, onDelete, isAdmin }: SlideO
 
                     {/* Cheating evidence */}
                     {result.cheating_detected && (
-                        <div className="rounded-2xl border border-[hsl(0,65%,42%)]/25 bg-[hsl(0,65%,42%)]/6 p-4 space-y-3">
+                        <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4 space-y-3">
                             <div className="flex items-center gap-2">
-                                <ShieldAlert className="h-4 w-4 text-[hsl(0,65%,42%)] shrink-0" />
-                                <p className="text-sm font-semibold text-[hsl(0,65%,42%)]">Firibgarlik aniqlandi</p>
+                                <ShieldAlert className="h-4 w-4 text-destructive shrink-0" />
+                                <p className="text-sm font-semibold text-destructive">Firibgarlik aniqlandi</p>
                             </div>
                             {result.reason_for_stop && (
                                 <p className="text-xs text-foreground/70 leading-relaxed">{result.reason_for_stop}</p>
                             )}
                             {result.cheating_image_url && (
-                                <div className="mt-2 overflow-hidden rounded-xl border border-[hsl(0,65%,42%)]/20">
+                                <div className="mt-2 overflow-hidden rounded-xl border border-destructive/20">
                                     <img
                                         src={result.cheating_image_url}
                                         alt="Firibgarlik dalili"
@@ -167,7 +166,7 @@ const SlideOver = ({ result, onClose, onViewAnswers, onDelete, isAdmin }: SlideO
                     {isAdmin && onDelete && (
                         <Button
                             variant="outline"
-                            className="border-destructive/30 text-destructive hover:bg-destructive/8"
+                            className="border-destructive/30 text-destructive hover:bg-destructive/10"
                             onClick={() => onDelete(result.id)}
                         >
                             <Trash2 className="h-4 w-4" />
@@ -198,9 +197,9 @@ const ResultCard = ({ result, onClick }: ResultCardProps) => {
         >
             {/* Cheating banner */}
             {result.cheating_detected && (
-                <div className="flex items-center gap-1.5 mb-3 rounded-lg bg-[hsl(0,65%,42%)]/8 border border-[hsl(0,65%,42%)]/20 px-3 py-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-[hsl(0,65%,42%)] shrink-0" />
-                    <span className="text-xs font-medium text-[hsl(0,65%,42%)]">Firibgarlik aniqlandi</span>
+                <div className="flex items-center gap-1.5 mb-3 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                    <span className="text-xs font-medium text-destructive">Firibgarlik aniqlandi</span>
                 </div>
             )}
 
@@ -303,6 +302,7 @@ const ResultsPage = () => {
         if (resultToDelete) {
             deleteResult(resultToDelete, {
                 onSuccess: () => {
+                    toast.success("Natija o'chirildi");
                     setResultToDelete(null);
                     if (selectedResult?.id === resultToDelete) setSelectedResult(null);
                 }
@@ -336,7 +336,7 @@ const ResultsPage = () => {
 
     useEffect(() => { setCurrentPage(1); }, [selectedGroup, selectedSubject, selectedQuiz, selectedGrade, usernameSearch, sortDir]);
 
-    const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError } = useResults(
+    const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError, refetch: refetchResults } = useResults(
         currentPage, pageSize, undefined, parsedGrade, parsedGroup, parsedSubject, parsedQuiz,
         usernameSearch || undefined, sortDir,
         !isAuthLoading
@@ -372,7 +372,7 @@ const ResultsPage = () => {
                 1, 10000, parsedGrade, parsedGroup, parsedSubject, parsedQuiz, usernameSearch || undefined, sortDir
             );
             const items = response.results || [];
-            if (items.length === 0) { alert('Eksport qilish uchun natijalar topilmadi.'); return; }
+            if (items.length === 0) { toast.info('Eksport qilish uchun natijalar topilmadi.'); return; }
 
             const { utils, writeFile } = await import('xlsx');
             const date = new Date().toLocaleDateString('uz-UZ').replace(/\//g, '.');
@@ -404,32 +404,129 @@ const ResultsPage = () => {
             utils.book_append_sheet(wb, ws, 'Natijalar');
             writeFile(wb, `Natijalar_${date.replace(/\./g, '-')}.xlsx`);
         } catch {
-            alert('Eksport qilishda xatolik yuz berdi.');
+            toast.error('Eksport qilishda xatolik yuz berdi.');
         } finally {
             setIsExporting(false);
         }
     };
 
+    // Колонки админской таблицы — вынесены, чтобы использовать DataTable
+    // с мобильным карточным режимом (renderCard).
+    const columns: DataTableColumn<Result>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            hideBelow: 'lg',
+            className: 'font-mono text-xs text-muted-foreground',
+            cell: (result) => result.id,
+        },
+        {
+            key: 'student',
+            header: 'Talaba',
+            cell: (result) => (
+                <div>
+                    <div className="font-medium text-sm">{result.student_name || result.user?.username || '—'}</div>
+                    {result.student_id && (
+                        <div className="text-xs font-mono text-muted-foreground">{result.student_id}</div>
+                    )}
+                </div>
+            ),
+        },
+        { key: 'group', header: 'Guruh', hideBelow: 'md', className: 'text-sm', cell: (result) => result.group?.name || '—' },
+        { key: 'subject', header: 'Fan', hideBelow: 'lg', className: 'text-sm', cell: (result) => result.subject?.name || '—' },
+        {
+            key: 'quiz',
+            header: 'Test',
+            hideBelow: 'lg',
+            className: 'text-sm max-w-[180px] truncate',
+            cell: (result) => result.quiz?.title || `Test ${result.quiz_id}`,
+        },
+        {
+            key: 'grade',
+            header: 'Ball',
+            headClassName: 'w-[70px]',
+            cell: (result) => {
+                const conf = getGradeConf(result.grade);
+                return (
+                    <span className={cn('grade-badge h-7 w-7 text-xs', conf.bg, conf.text)}>
+                        {result.grade}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'score',
+            header: 'Natija',
+            cell: (result) => (
+                <div className="flex items-center gap-2">
+                    {result.cheating_detected && (
+                        <ShieldAlert className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="Firibgarlik aniqlandi" />
+                    )}
+                    <span className="font-mono text-xs text-foreground">
+                        {result.correct_answers}/{result.correct_answers + result.wrong_answers}
+                    </span>
+                </div>
+            ),
+        },
+        {
+            key: 'date',
+            header: 'Sana',
+            hideBelow: 'md',
+            className: 'text-xs text-muted-foreground whitespace-nowrap',
+            cell: (result) => new Date(result.created_at).toLocaleString('uz-UZ', { hour12: false }),
+        },
+    ];
+
+    if (isAdmin) {
+        columns.push({
+            key: 'actions',
+            header: 'Amallar',
+            headClassName: 'w-[100px]',
+            cell: (result) => (
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={e => { e.stopPropagation(); setSelectedResult(result); }}
+                    >
+                        <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={e => handleDeleteClick(e, result.id)}
+                        disabled={isDeleting}
+                    >
+                        {isDeleting && resultToDelete === result.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Trash2 className="h-3.5 w-3.5" />
+                        }
+                    </Button>
+                </div>
+            ),
+        });
+    }
+
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Natijalar</h1>
-                    <p className="page-description mt-0.5">
-                        {isStudent ? 'Sizning test natijalaringiz' : 'Talabalar test natijalari va baholari'}
-                    </p>
-                </div>
-                <Button
-                    variant="outline"
-                    onClick={handleExportExcel}
-                    disabled={isExporting}
-                    className="shrink-0"
-                >
-                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-                    Excel
-                </Button>
-            </div>
+            <PageHeader
+                title="Natijalar"
+                description={isStudent ? 'Sizning test natijalaringiz' : 'Talabalar test natijalari va baholari'}
+                actions={
+                    <Button
+                        variant="outline"
+                        onClick={handleExportExcel}
+                        disabled={isExporting}
+                        className="shrink-0"
+                    >
+                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                        Excel
+                    </Button>
+                }
+            />
 
             {/* Student stats hero */}
             {isStudent && resultsData && (
@@ -441,7 +538,7 @@ const ResultsPage = () => {
                 <CardContent className="p-4">
                     <div className="flex flex-wrap gap-3 items-end">
                         {isAdminOrTeacher && (
-                            <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Talaba</label>
                                 <Input
                                     placeholder="Ism yoki login..."
@@ -452,7 +549,7 @@ const ResultsPage = () => {
                         )}
 
                         {isAdminOrTeacher && (
-                            <div className="flex flex-col gap-1.5 min-w-[160px] flex-1">
+                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guruh</label>
                                 <Combobox
                                     options={groups.map(g => ({ value: String(g.id), label: g.name }))}
@@ -464,7 +561,7 @@ const ResultsPage = () => {
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-1.5 min-w-[160px] flex-1">
+                        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fan</label>
                             <Combobox
                                 options={subjectOptions}
@@ -475,7 +572,7 @@ const ResultsPage = () => {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1.5 min-w-[160px] flex-1">
+                        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Test</label>
                             <Combobox
                                 options={quizOptions}
@@ -486,7 +583,7 @@ const ResultsPage = () => {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1.5 w-[140px]">
+                        <div className="flex w-full flex-col gap-1.5 sm:w-[140px]">
                             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ball</label>
                             <Combobox
                                 options={[
@@ -502,7 +599,7 @@ const ResultsPage = () => {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1.5 w-[160px]">
+                        <div className="flex w-full flex-col gap-1.5 sm:w-[160px]">
                             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saralash</label>
                             <Combobox
                                 options={[
@@ -526,117 +623,86 @@ const ResultsPage = () => {
             </Card>
 
             {/* Content */}
-            {isResultsLoading ? (
-                <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : isResultsError ? (
-                <p className="py-16 text-center text-sm text-destructive">Xatolik yuz berdi</p>
-            ) : results.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <FileText className="h-10 w-10 mb-3 opacity-20" />
-                    <p className="text-sm">Natijalar topilmadi.</p>
-                </div>
-            ) : isStudent ? (
+            {isStudent ? (
                 /* ── Student: card grid ── */
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {results.map(result => (
-                        <ResultCard
-                            key={result.id}
-                            result={result}
-                            onClick={() => setSelectedResult(result)}
-                        />
-                    ))}
-                </div>
+                isResultsLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Array.from({ length: 6 }, (_, i) => (
+                            <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+                        ))}
+                    </div>
+                ) : isResultsError ? (
+                    <ErrorState onRetry={() => refetchResults()} />
+                ) : results.length === 0 ? (
+                    <EmptyState
+                        icon={<FileText className="h-6 w-6" />}
+                        title="Natijalar topilmadi"
+                        description="Siz hali birorta ham test topshirmagansiz yoki filtrga mos natija yo'q."
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {results.map(result => (
+                            <ResultCard
+                                key={result.id}
+                                result={result}
+                                onClick={() => setSelectedResult(result)}
+                            />
+                        ))}
+                    </div>
+                )
             ) : (
-                /* ── Admin/Teacher: table ── */
+                /* ── Admin/Teacher: table with mobile cards ── */
                 <Card>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[60px]">ID</TableHead>
-                                    <TableHead>Talaba</TableHead>
-                                    <TableHead>Guruh</TableHead>
-                                    <TableHead>Fan</TableHead>
-                                    <TableHead>Test</TableHead>
-                                    <TableHead className="w-[70px]">Ball</TableHead>
-                                    <TableHead>Natija</TableHead>
-                                    <TableHead>Sana</TableHead>
-                                    {isAdmin && <TableHead className="w-[100px]">Amallar</TableHead>}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {results.map(result => {
-                                    const conf = getGradeConf(result.grade);
-                                    return (
-                                        <TableRow
-                                            key={result.id}
-                                            className="cursor-pointer hover:bg-muted/40"
-                                            onClick={() => setSelectedResult(result)}
-                                        >
-                                            <TableCell className="font-mono text-xs text-muted-foreground">{result.id}</TableCell>
-                                            <TableCell>
-                                                <div className="font-medium text-sm">{result.student_name || result.user?.username || `—`}</div>
-                                                {result.student_id && (
-                                                    <div className="text-xs font-mono text-muted-foreground">{result.student_id}</div>
+                    <CardContent className="pt-6">
+                        <DataTable
+                            columns={columns}
+                            data={results}
+                            rowKey={(result) => result.id}
+                            isLoading={isResultsLoading}
+                            isError={isResultsError}
+                            onRetry={() => refetchResults()}
+                            onRowClick={(result) => setSelectedResult(result)}
+                            emptyIcon={<FileText className="h-6 w-6" />}
+                            emptyTitle="Natijalar topilmadi"
+                            emptyDescription={hasActiveFilters ? "Filtrlarni o'zgartirib ko'ring." : "Hozircha test natijalari yo'q."}
+                            renderCard={(result) => {
+                                const conf = getGradeConf(result.grade);
+                                const total = result.correct_answers + result.wrong_answers;
+                                return (
+                                    <div className="rounded-xl border border-border bg-card p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-sm text-foreground truncate">
+                                                    {result.student_name || result.user?.username || '—'}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                                                    {result.group?.name || '—'} · {result.subject?.name || '—'}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                                                    {result.quiz?.title || `Test ${result.quiz_id}`}
+                                                </p>
+                                            </div>
+                                            <span className={cn('grade-badge h-9 w-9 shrink-0 text-sm', conf.bg, conf.text)}>
+                                                {result.grade}
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                                            <div className="flex items-center gap-2">
+                                                {result.cheating_detected && (
+                                                    <ShieldAlert className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="Firibgarlik aniqlandi" />
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-sm">{result.group?.name || '—'}</TableCell>
-                                            <TableCell className="text-sm">{result.subject?.name || '—'}</TableCell>
-                                            <TableCell className="text-sm max-w-[180px] truncate">{result.quiz?.title || `Test ${result.quiz_id}`}</TableCell>
-                                            <TableCell>
-                                                <span className={cn(
-                                                    'grade-badge h-7 w-7 text-xs',
-                                                    conf.bg, conf.text
-                                                )}>
-                                                    {result.grade}
+                                                <span className="font-mono text-xs text-foreground">
+                                                    {result.correct_answers}/{total} to'g'ri
                                                 </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {result.cheating_detected && (
-                                                        <ShieldAlert className="h-3.5 w-3.5 text-[hsl(0,65%,42%)] shrink-0" aria-label="Firibgarlik aniqlandi" />
-                                                    )}
-                                                    <span className="font-mono text-xs text-foreground">
-                                                        {result.correct_answers}/{result.correct_answers + result.wrong_answers}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                                                {new Date(result.created_at).toLocaleString('uz-UZ', { hour12: false })}
-                                            </TableCell>
-                                            {isAdmin && (
-                                                <TableCell>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                                            onClick={e => { e.stopPropagation(); setSelectedResult(result); }}
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7 text-destructive/60 hover:bg-destructive/8 hover:text-destructive"
-                                                            onClick={e => handleDeleteClick(e, result.id)}
-                                                            disabled={isDeleting}
-                                                        >
-                                                            {isDeleting && resultToDelete === result.id
-                                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                                : <Trash2 className="h-3.5 w-3.5" />
-                                                            }
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            )}
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+                                            </div>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                {new Date(result.created_at).toLocaleDateString('uz-UZ')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            }}
+                        />
                     </CardContent>
                 </Card>
             )}

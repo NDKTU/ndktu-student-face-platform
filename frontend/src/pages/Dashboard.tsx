@@ -2,13 +2,14 @@
  * Dashboard.tsx — Redesigned
  *
  * Design decisions:
- * - Clean welcome header: name + greeting, no gradient text, no logout button here
- *   (logout is in Navbar profile dropdown).
- * - StatCard: flat border card, no hover lift, compact icon pill.
- * - System status widget: simple two rows, green dot indicates live status.
- * - Bottom "academic" widget: centered, subtle gradient tint.
+ * - PageHeader with greeting; logout lives in the Navbar profile dropdown.
+ * - StatCard: flat border card, compact icon pill (shared component, as-is).
+ * - Вместо фейкового «статуса системы» и маркетингового виджета — честная
+ *   сетка быстрых ссылок на основные разделы админки. Графиков нет: хуки
+ *   дашборда отдают только total-счётчики, разбивок на клиенте нет.
  */
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
     Users,
@@ -18,9 +19,12 @@ import {
     FileQuestion,
     Book,
     UserCheck,
-    Activity,
+    Building2,
+    RefreshCw,
+    ArrowUpRight,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { userService } from '@/services/userService';
 import { teacherService } from '@/services/teacherService';
 import { studentService } from '@/services/studentService';
@@ -29,6 +33,20 @@ import { quizService } from '@/services/quizService';
 import { questionService } from '@/services/questionService';
 import { resultService } from '@/services/resultService';
 import { StatCard } from '@/components/ui/StatCard';
+import { PageHeader } from '@/components/ui/PageHeader';
+
+/** Быстрые ссылки на основные разделы админки. */
+const QUICK_LINKS: { to: string; label: string; description: string; icon: React.ElementType }[] = [
+    { to: '/users',              label: 'Foydalanuvchilar',        description: "Akkauntlar va rollarni boshqarish",     icon: Users },
+    { to: '/students',           label: 'Talabalar',               description: "Talabalar ro'yxati va guruhlari",       icon: UserCheck },
+    { to: '/teachers',           label: "O'qituvchilar",           description: "O'qituvchilar va biriktirishlar",       icon: GraduationCap },
+    { to: '/faculties',          label: 'Fakultetlar',             description: "Tashkiliy tuzilma bo'limlari",          icon: Building2 },
+    { to: '/subjects',           label: 'Fanlar',                  description: "Fanlar va kurslar katalogi",            icon: Book },
+    { to: '/questions',          label: 'Savollar banki',          description: "Test savollarini boshqarish",           icon: FileQuestion },
+    { to: '/quizzes',            label: 'Testlar',                 description: "Testlarni yaratish va nazorat qilish",  icon: BookOpen },
+    { to: '/results',            label: 'Natijalar',               description: "Topshirilgan testlar tahlili",          icon: CheckCircle },
+    { to: '/admin/eduplan-sync', label: 'EduPlan sinxronizatsiya', description: "Tashkiliy tuzilmani import qilish",     icon: RefreshCw },
+];
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
@@ -51,14 +69,10 @@ const Dashboard: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Welcome header */}
-            <div>
-                <h1 className="text-xl font-semibold">
-                    {getGreeting()}, <span className="text-primary">{user?.username}</span> 👋
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Universitet tizimidagi bugungi yangiliklar va ko'rsatkichlar.
-                </p>
-            </div>
+            <PageHeader
+                title={`${getGreeting()}, ${user?.username ?? ''}`}
+                description="Universitet tizimidagi asosiy ko'rsatkichlar va bo'limlar."
+            />
 
             {/* Primary stats */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -75,39 +89,76 @@ const Dashboard: React.FC = () => {
                 <StatCard label="Yakunlangan testlar" value={results?.total ?? 0} icon={CheckCircle}  isLoading={isResultsLoading}   color="blue"   description="Jami topshirilganlar" />
             </div>
 
-            {/* System status + info */}
-            <div className="grid gap-4 md:grid-cols-2">
-                {/* Status */}
-                <div className="rounded-lg border bg-card p-5 shadow-sm">
-                    <div className="mb-4 flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-primary" />
-                        <h2 className="text-sm font-semibold">Tizim holati</h2>
-                    </div>
-                    <div className="space-y-2">
-                        {[
-                            { label: "Ma'lumotlar bazasi", status: 'Barqaror' },
-                            { label: 'API tarmoq shlyuzi', status: 'Ishlamoqda' },
-                        ].map(({ label, status }) => (
-                            <div key={label} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="h-2 w-2 shrink-0 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-sm">{label}</span>
-                                </div>
-                                <span className="text-xs font-medium text-green-600 dark:text-green-400">{status}</span>
-                            </div>
-                        ))}
-                    </div>
+            {/* Масштаб платформы одним взглядом */}
+            <div className="rounded-xl border border-border/50 bg-card p-5 shadow-sm">
+                <h2 className="mb-4 font-display text-sm font-semibold text-foreground">Platforma ko'lami</h2>
+                <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            data={[
+                                { name: 'Talabalar', value: students?.total ?? 0 },
+                                { name: "O'qituvchilar", value: teachers?.total ?? 0 },
+                                { name: 'Foydalanuvchilar', value: users?.total ?? 0 },
+                                { name: 'Fanlar', value: subjects?.total ?? 0 },
+                                { name: 'Savollar', value: questions?.total ?? 0 },
+                                { name: 'Testlar', value: quizzes?.total ?? 0 },
+                                { name: 'Natijalar', value: results?.total ?? 0 },
+                            ]}
+                            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis
+                                dataKey="name"
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                                axisLine={{ stroke: 'var(--border)' }}
+                                tickLine={false}
+                                interval={0}
+                            />
+                            <YAxis
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={52}
+                                allowDecimals={false}
+                                tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                            />
+                            <Tooltip
+                                cursor={{ fill: 'color-mix(in srgb, var(--primary) 6%, transparent)' }}
+                                contentStyle={{
+                                    background: 'var(--popover)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '0.5rem',
+                                    color: 'var(--popover-foreground)',
+                                    fontSize: 13,
+                                }}
+                                formatter={(value) => [value ?? 0, 'Soni']}
+                            />
+                            <Bar dataKey="value" fill="var(--primary)" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
+            </div>
 
-                {/* Info widget */}
-                <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-6 text-center shadow-sm">
-                    <div className="mb-3 rounded-full bg-primary/10 p-3">
-                        <GraduationCap className="h-6 w-6 text-primary" />
-                    </div>
-                    <h2 className="text-sm font-semibold">Akademik mukammallik</h2>
-                    <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
-                        Kengaytirilgan boshqaruv paneli orqali muassasangizning akademik resurslarini samarali boshqaring.
-                    </p>
+            {/* Quick links */}
+            <div>
+                <h2 className="mb-3 text-sm font-semibold text-foreground">Tezkor o'tish</h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => (
+                        <Link
+                            key={to}
+                            to={to}
+                            className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
+                        >
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Icon className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-medium text-foreground">{label}</span>
+                                <span className="block truncate text-xs text-muted-foreground">{description}</span>
+                            </span>
+                            <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                        </Link>
+                    ))}
                 </div>
             </div>
         </div>

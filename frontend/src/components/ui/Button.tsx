@@ -9,7 +9,7 @@
  * - `active:scale-95` gives tactile feedback without being heavy.
  */
 import React from 'react';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'link';

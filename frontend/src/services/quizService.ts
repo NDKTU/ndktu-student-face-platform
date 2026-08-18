@@ -8,6 +8,11 @@ export interface Quiz {
     question_number: number;
     duration: number; // in minutes
     pin: string;
+    /** Ma'ruzachi: savollar uning bankidan yig'iladi. */
+    lecturer_id?: number | null;
+    /** Testni yaratgan tashkilotchi. */
+    created_by_user_id?: number | null;
+    /** @deprecated `lecturer_id` bilan bir xil qiymat, eski klientlar uchun qoldirilgan. */
     user_id?: number;
     group_id?: number;
     subject_id?: number;
@@ -23,12 +28,19 @@ export interface QuizCreateRequest {
     question_number: number;
     duration: number;
     pin: string;
-    user_id?: number | null;
+    /** Ma'ruzachi. Tashkilotchi tanlaydi; savollar shu o'qituvchining bankidan olinadi. */
+    lecturer_id?: number | null;
     group_id?: number | null;
     subject_id?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
     attempt?: number | null;
+}
+
+export interface AvailableQuestionsResponse {
+    lecturer_id: number;
+    subject_id: number;
+    available: number;
 }
 
 export interface QuizListResponse {
@@ -55,6 +67,17 @@ export const quizService = {
 
     getQuizById: async (id: number): Promise<Quiz> => {
         const response = await api.get<Quiz>(`/quiz/${id}`);
+        return response.data;
+    },
+
+    /**
+     * Ma'ruzachining shu fan bo'yicha bankida nechta savol borligini qaytaradi.
+     * Faqat son qaytadi: tashkilotchi savollarning matnini ko'rmaydi.
+     */
+    getAvailableQuestions: async (lecturer_id: number, subject_id: number) => {
+        const response = await api.get<AvailableQuestionsResponse>('/quiz/available-questions', {
+            params: { lecturer_id, subject_id },
+        });
         return response.data;
     },
 

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -35,6 +36,18 @@ export function QuestionsPanel({ method, onClose }: QuestionsPanelProps) {
     // picks the question type once per batch.
     const [lastQuestionType, setLastQuestionType] = useState<QuestionType>('text');
 
+    // Esc закрывает панель, но только когда вложенные модалки закрыты —
+    // иначе Esc из Radix-модалки закрыл бы и её, и панель разом.
+    const innerModalOpen = qModal.open || importTarget !== null;
+    useEffect(() => {
+        if (innerModalOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [innerModalOpen, onClose]);
+
     const openCreate = (category: string = '') => {
         setQForm({ ...emptyQuestionForm(), question_type: lastQuestionType, category });
         setQModal({ open: true, editing: null });
@@ -66,20 +79,32 @@ export function QuestionsPanel({ method, onClose }: QuestionsPanelProps) {
         const { content, options, order, category } = buildQuestionPayload(qForm);
         if (qModal.editing) {
             updateQ.mutate({ id: qModal.editing.id, data: { question_type: qForm.question_type, content, options, order, category } }, {
-                onSuccess: () => setQModal({ open: false, editing: null }),
+                onSuccess: () => {
+                    setQModal({ open: false, editing: null });
+                    toast.success('Savol saqlandi');
+                },
+                onError: () => toast.error('Savolni saqlashda xatolik yuz berdi'),
             });
         } else {
             createQ.mutate({ method_id: method.id, question_type: qForm.question_type, content, options, order, category }, {
                 onSuccess: () => {
                     setLastQuestionType(qForm.question_type);
                     setQModal({ open: false, editing: null });
+                    toast.success("Savol qo'shildi");
                 },
+                onError: () => toast.error("Savolni qo'shishda xatolik yuz berdi"),
             });
         }
     };
 
     const handleDelete = (id: number) => {
-        deleteQ.mutate(id, { onSuccess: () => setDeleteId(null) });
+        deleteQ.mutate(id, {
+            onSuccess: () => {
+                setDeleteId(null);
+                toast.success("Savol o'chirildi");
+            },
+            onError: () => toast.error("Savolni o'chirishda xatolik yuz berdi"),
+        });
     };
 
     return (
@@ -87,12 +112,12 @@ export function QuestionsPanel({ method, onClose }: QuestionsPanelProps) {
             <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
             <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col bg-card shadow-2xl">
-                <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                    <div>
-                        <h2 className="font-semibold text-foreground">{method.name}</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
+                    <div className="min-w-0">
+                        <h2 className="truncate font-semibold text-foreground">{method.name}</h2>
                         <p className="text-xs text-muted-foreground">{method.questions.length} ta savol</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button
                             size="sm"
                             variant="outline"

@@ -85,7 +85,7 @@ function RangeRow({
 
     return (
         <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-            <div className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:grid-cols-[1fr_1fr_2fr_auto]">
                 <Input
                     label="Min"
                     type="number"
@@ -98,12 +98,15 @@ function RangeRow({
                     value={Number.isFinite(value.max) ? value.max : 0}
                     onChange={e => set('max', Number(e.target.value))}
                 />
-                <Input
-                    label="Yorliq"
-                    value={value.label}
-                    onChange={e => set('label', e.target.value)}
-                    placeholder="Masalan: Past"
-                />
+                {/* На мобильных ярлык переносится на отдельную строку во всю ширину */}
+                <div className="order-last col-span-full sm:order-none sm:col-span-1">
+                    <Input
+                        label="Yorliq"
+                        value={value.label}
+                        onChange={e => set('label', e.target.value)}
+                        placeholder="Masalan: Past"
+                    />
+                </div>
                 <div className="flex items-end">
                     <button
                         type="button"

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 import { Trophy, Loader2, Medal, Crown, Building2, Layers, Search, X, FilterX, FileSpreadsheet } from 'lucide-react';
@@ -194,7 +195,7 @@ const TeachersPanel = () => {
 
             const items = response.teachers || [];
             if (items.length === 0) {
-                alert("Eksport qilish uchun ma'lumot topilmadi.");
+                toast.info("Eksport qilish uchun ma'lumot topilmadi.");
                 return;
             }
 
@@ -247,7 +248,7 @@ const TeachersPanel = () => {
 
         } catch (error) {
             logger.error("Excel eksportda xatolik:", error);
-            alert("Eksport qilishda xatolik yuz berdi.");
+            toast.error("Eksport qilishda xatolik yuz berdi.");
         } finally {
             setIsExporting(false);
         }

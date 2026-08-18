@@ -35,11 +35,28 @@ async def eduplan_status(
     """
     cfg = settings.eduplan
     if not cfg.is_configured:
+        # Причин ровно три, и они требуют разных действий. Прежнее сообщение
+        # сваливало их в одну строку («не заданы креды или выключена»), из-за чего
+        # админ шёл искать логин с паролем, хотя они были на месте, а мешал флаг.
+        if not cfg.enabled:
+            detail = "Интеграция выключена флагом APP_CONFIG__EDUPLAN__ENABLED=false"
+        elif not cfg.base_url:
+            detail = "Не задан APP_CONFIG__EDUPLAN__BASE_URL"
+        else:
+            missing = [
+                name
+                for name, value in (
+                    ("APP_CONFIG__EDUPLAN__USERNAME", cfg.username),
+                    ("APP_CONFIG__EDUPLAN__PASSWORD", cfg.password),
+                )
+                if not value
+            ]
+            detail = f"Не заданы креды сервисного аккаунта: {', '.join(missing)}"
         return {
             "configured": False,
             "reachable": False,
             "base_url": cfg.base_url,
-            "detail": "Не заданы APP_CONFIG__EDUPLAN__USERNAME/PASSWORD или интеграция выключена",
+            "detail": detail,
         }
 
     try:

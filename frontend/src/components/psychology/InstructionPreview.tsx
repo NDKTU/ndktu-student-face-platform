@@ -14,12 +14,12 @@ export function InstructionPreview({ instruction }: { instruction: Record<string
     );
 
     return (
-        <div className={`rounded-lg border p-3 text-xs ${ok ? 'border-green-500/40 bg-green-50 dark:bg-green-950/20' : 'border-yellow-500/40 bg-yellow-50 dark:bg-yellow-950/20'}`}>
+        <div className={`rounded-lg border p-3 text-xs ${ok ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`}>
             <div className="flex items-center gap-2">
                 {ok
-                    ? <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    : <AlertCircle className="h-4 w-4 text-yellow-600" />}
-                <span className={`font-semibold ${ok ? 'text-green-900 dark:text-green-200' : 'text-yellow-900 dark:text-yellow-200'}`}>
+                    ? <CheckCircle2 className="h-4 w-4 text-success" />
+                    : <AlertCircle className="h-4 w-4 text-warning" />}
+                <span className="font-semibold text-foreground">
                     {ok ? 'Diagnostika sozlandi' : "Diagnostika to'liq sozlanmagan"}
                 </span>
             </div>

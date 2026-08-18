@@ -3,7 +3,11 @@ import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Loader2, BookOpen, ArrowRight } from 'lucide-react';
+import { BookOpen, ArrowRight } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const TeacherSubjectsPage = () => {
     const { user } = useAuth();
@@ -11,44 +15,51 @@ const TeacherSubjectsPage = () => {
 
     const userId = user?.id;
 
-    const { data, isLoading } = useTeacherAssignedSubjects(userId);
+    const { data, isLoading, isError, refetch } = useTeacherAssignedSubjects(userId);
 
     const subjects = data?.subject_teachers.map((st) => st.subject) || [];
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Mening Fanlarim</h1>
-                <p className="text-muted-foreground mt-2">
-                    Sizga biriktirilgan fanlar ro'yxati. Fan tanlab, natijalarni ko'rishingiz mumkin.
-                </p>
-            </div>
+            <PageHeader
+                title="Mening fanlarim"
+                description="Sizga biriktirilgan fanlar ro'yxati. Fan tanlab, testlarni ko'rishingiz mumkin."
+            />
 
             {isLoading ? (
-                <div className="flex justify-center p-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 6 }, (_, i) => (
+                        <Skeleton key={i} className="h-40 w-full rounded-xl" />
+                    ))}
                 </div>
+            ) : isError ? (
+                <Card>
+                    <CardContent className="pt-6">
+                        <ErrorState onRetry={() => refetch()} />
+                    </CardContent>
+                </Card>
             ) : subjects.length === 0 ? (
                 <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                        <div className="rounded-full bg-muted p-4 mb-4">
-                            <BookOpen className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-semibold">Fanlar biriktirilmagan</h3>
-                        <p className="text-muted-foreground mt-1 max-w-sm">
-                            Hozircha sizga hech qanday fan biriktirilmagan.
-                            Admin bilan bog'laning.
-                        </p>
+                    <CardContent className="pt-6">
+                        <EmptyState
+                            icon={<BookOpen className="h-6 w-6" />}
+                            title="Fanlar biriktirilmagan"
+                            description="Hozircha sizga hech qanday fan biriktirilmagan. Admin bilan bog'laning."
+                        />
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {subjects.map((subject) => (
-                        <Card key={subject.id} className="hover:shadow-md transition-shadow cursor-pointer group" onClick={() => navigate(`/quizzes?subject_id=${subject.id}`)}>
+                        <Card
+                            key={subject.id}
+                            className="group cursor-pointer transition-all hover:border-primary/40 hover:shadow-md"
+                            onClick={() => navigate(`/quizzes?subject_id=${subject.id}`)}
+                        >
                             <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center justify-between">
-                                    <span>{subject.name}</span>
-                                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <CardTitle className="flex items-center justify-between text-base">
+                                    <span className="truncate">{subject.name}</span>
+                                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                                 </CardTitle>
                                 <CardDescription>Fan ID: {subject.id}</CardDescription>
                             </CardHeader>
@@ -56,7 +67,7 @@ const TeacherSubjectsPage = () => {
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-1">
                                         <BookOpen className="h-4 w-4" />
-                                        <span>Testlar va Natijalar</span>
+                                        <span>Testlar va natijalar</span>
                                     </div>
                                 </div>
                                 <Button

@@ -18,6 +18,7 @@ import {
     User,
     Library,
     Database,
+    Home,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export const SIDEBAR_SECTION_ORDER = [
     'Testlar',
     'Psixologiya',
     'Ruxsatlar tizimi',
+    'Sozlamalar',
 ] as const;
 
 export const RESOURCES: Record<string, ResourceMeta> = {
@@ -48,7 +50,8 @@ export const RESOURCES: Record<string, ResourceMeta> = {
 
     // Пункт появляется у роли с правом read:eduplan (оно объявлено ручкой
     // статуса интеграции) и ведёт на экран синхронизации оргструктуры.
-    eduplan:       { label: 'EduPlan sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Boshqaruv' },
+    // Живёт в «Sozlamalar» — как системная настройка, а не ежедневный раздел.
+    eduplan:       { label: 'EduPlan sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Sozlamalar' },
 
     faculty:       { label: 'Fakultetlarni boshqarish', href: '/faculties', icon: Building2, section: 'Boshqaruv' },
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
@@ -112,6 +115,7 @@ const ALWAYS_VISIBLE: SidebarSection = {
 const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
     label: 'Umumiy',
     items: [
+        { name: 'Bosh sahifa', href: '/', icon: Home },
         { name: 'Profil', href: '/profile', icon: User },
     ],
 };

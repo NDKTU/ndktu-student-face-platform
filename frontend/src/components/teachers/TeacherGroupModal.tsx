@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -54,8 +55,11 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
     const handleSave = () => {
         if (!teacher || !teacher.employee?.user) return;
         assignGroupsMutation.mutate({ user_id: teacher.employee.user.id, group_ids: selectedGroupIds }, {
-            onSuccess: () => onClose(),
-            onError: () => alert("Guruhlarni biriktirishda xatolik yuz berdi"),
+            onSuccess: () => {
+                toast.success('Guruhlar biriktirildi');
+                onClose();
+            },
+            onError: () => toast.error("Guruhlarni biriktirishda xatolik yuz berdi"),
         });
     };
 
@@ -79,7 +83,7 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
                                 id={`group-${group.id}`}
                                 checked={selectedGroupIds.includes(group.id)}
                                 onChange={() => handleToggleGroup(group.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                             />
                             <label htmlFor={`group-${group.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
                                 {group.name}

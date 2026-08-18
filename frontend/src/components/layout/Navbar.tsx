@@ -1,45 +1,79 @@
 import { useState } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { setLanguage } from '@/i18n';
 import { User, LogOut, Sun, Moon, Menu, ChevronDown } from 'lucide-react';
-import { cn } from '@/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface NavbarProps {
     onMenuClick: () => void;
 }
 
-const ROUTE_LABELS: Record<string, string> = {
-    '':                  'Dashboard',
-    'users':             'Foydalanuvchilar',
-    'teachers':          "O'qituvchilar",
-    'employees':         'Xodimlar',
-    'students':          'Talabalar',
-    'faculties':         'Fakultetlar',
-    'kafedras':          'Kafedralar',
-    'groups':            'Guruhlar',
-    'subjects':          'Fanlar',
-    'questions':         'Savollar',
-    'quizzes':           'Testlar',
-    'quiz-test':         'Test ishlash',
-    'results':           'Natijalar',
-    'profile':           'Profil',
-    'teacher-ranking':   'Reyting',
+/* Полное покрытие всех маршрутов приложения — точные пути */
+const PATH_LABELS: Record<string, string> = {
+    '/':                    'Bosh sahifa',
+    '/dashboard':           'Boshqaruv paneli',
+    '/profile':             'Profil',
+    '/users':               'Foydalanuvchilar',
+    '/roles':               'Rollar',
+    '/permissions':         'Ruxsatlar',
+    '/teachers':            "O'qituvchilar",
+    '/employees':           'Xodimlar',
+    '/teacher-ranking':     'Reyting',
+    '/faculties':           'Fakultetlar',
+    '/kafedras':            'Kafedralar',
+    '/groups':              'Guruhlar',
+    '/students':            'Talabalar',
+    '/admin/hemis-sync':    'HEMIS sinxronizatsiyasi',
+    '/admin/eduplan-sync':  'EduPlan sinxronizatsiyasi',
+    '/lessons':             'Darslar',
+    '/psychology':          'Psixologiya',
+    '/psychology/results':  'Psixologiya natijalari',
+    '/psychology/student':  'Psixologik testlar',
+    '/subjects':            'Fanlar',
+    '/courses':             'Kurslar',
+    '/teacher-groups':      'Mening guruhlarim',
+    '/teacher-subjects':    'Mening fanlarim',
+    '/questions':           'Savollar',
+    '/questions/create':    'Yangi savol',
+    '/quizzes':             'Testlar',
+    '/active-quizzes':      'Faol testlar',
+    '/quiz-test':           'Test ishlash',
+    '/results':             'Natijalar',
+    '/results/answers':     'Javoblar tahlili',
 };
 
+/* Маршруты с динамическими сегментами */
+const DYNAMIC_LABELS: Array<[RegExp, string]> = [
+    [/^\/roles\/[^/]+\/permissions$/, 'Rol ruxsatlari'],
+    [/^\/questions\/[^/]+\/edit$/, 'Savolni tahrirlash'],
+    [/^\/lessons\/[^/]+$/, 'Dars tafsilotlari'],
+    [/^\/psychology\/test\/[^/]+$/, 'Psixologik test'],
+];
+
 const getPageLabel = (pathname: string) => {
-    const segment = pathname.split('/')[1] || '';
-    return ROUTE_LABELS[segment] ?? segment;
+    const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+    const exact = PATH_LABELS[normalized];
+    if (exact) return exact;
+    const dynamic = DYNAMIC_LABELS.find(([pattern]) => pattern.test(normalized));
+    if (dynamic) return dynamic[1];
+    return PATH_LABELS[`/${normalized.split('/')[1] ?? ''}`] ?? (normalized.split('/')[1] || 'Bosh sahifa');
 };
 
 const Navbar = ({ onMenuClick }: NavbarProps) => {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
+    const { t, i18n } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-    const pageLabel = getPageLabel(location.pathname);
+    const currentLang = i18n.language === 'ru' ? 'ru' : 'uz';
+    const toggleLang = () => setLanguage(currentLang === 'uz' ? 'ru' : 'uz');
+
+    const pageLabel = t(getPageLabel(location.pathname));
     const isHome = location.pathname === '/';
 
     const handleLogout = () => {
@@ -56,7 +90,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
         : user?.username ?? 'User';
 
     return (
-        <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-sm shadow-[0_1px_0_0_hsl(var(--border))]">
+        <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-sm shadow-[0_1px_0_0_var(--border)]">
             {/* Left */}
             <div className="flex items-center gap-3">
                 <button
@@ -71,13 +105,13 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                     {!isHome ? (
                         <>
                             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                                Bosh sahifa
+                                {t('Bosh sahifa')}
                             </Link>
                             <span className="text-border select-none">/</span>
                             <span className="font-medium text-foreground">{pageLabel}</span>
                         </>
                     ) : (
-                        <span className="font-semibold text-foreground font-display">Dashboard</span>
+                        <span className="font-semibold text-foreground font-display">{t('Bosh sahifa')}</span>
                     )}
                 </nav>
             </div>
@@ -85,9 +119,16 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
             {/* Right */}
             <div className="flex items-center gap-1.5">
                 <button
+                    onClick={toggleLang}
+                    className="flex h-8 items-center justify-center rounded-lg px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    aria-label={currentLang === 'uz' ? 'Переключить на русский' : "O'zbek tiliga o'tish"}
+                >
+                    {currentLang === 'uz' ? 'UZ' : 'RU'}
+                </button>
+                <button
                     onClick={toggleTheme}
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                    aria-label={theme === 'dark' ? 'Yorug\' rejim' : 'Qorong\'i rejim'}
+                    aria-label={theme === 'dark' ? t('Yorug\' rejim') : t('Qorong\'i rejim')}
                 >
                     {theme === 'dark'
                         ? <Sun className="h-4 w-4" />
@@ -129,7 +170,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                                 <div className="px-2.5 py-2 mb-1">
                                     <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                        {user?.roles?.map(r => r.name).join(', ') || 'Foydalanuvchi'}
+                                        {user?.roles?.map(r => r.name).join(', ') || t('Foydalanuvchi')}
                                     </p>
                                 </div>
                                 <div className="h-px bg-border mb-1" />
@@ -140,7 +181,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                                     onClick={() => setIsProfileOpen(false)}
                                 >
                                     <User className="h-3.5 w-3.5" />
-                                    Profil
+                                    {t('Profil')}
                                 </Link>
                                 <div className="h-px bg-border my-1" />
                                 <button
@@ -149,7 +190,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-destructive hover:bg-destructive/8 transition-colors"
                                 >
                                     <LogOut className="h-3.5 w-3.5" />
-                                    Chiqish
+                                    {t('Chiqish')}
                                 </button>
                             </div>
                         </>

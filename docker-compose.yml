@@ -84,7 +84,10 @@ services:
     container_name: nusmt_frontend
     restart: always
     ports:
-      - "3000:3000"
+      # Хостовый порт вынесен в переменную: на машине разработчика 3000 часто занят
+      # сторонним dev-сервером, и без этого `docker compose up` падает на биндинге.
+      # По умолчанию 3000 — поведение прода не меняется.
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - frontend_logs:/var/log/app_frontend
     networks:

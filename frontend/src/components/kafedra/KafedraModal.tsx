@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -53,13 +54,19 @@ export const KafedraModal = ({
     const onSubmit = (data: KafedraFormValues) => {
         if (kafedra) {
             updateMutation.mutate({ id: kafedra.id, data }, {
-                onSuccess: (data) => onSuccess(data),
-                onError: () => alert('Kafedrani yangilashda xatolik'),
+                onSuccess: (data) => {
+                    toast.success('Kafedra yangilandi');
+                    onSuccess(data);
+                },
+                onError: () => toast.error('Kafedrani yangilashda xatolik'),
             });
         } else {
             createMutation.mutate(data, {
-                onSuccess: (data) => onSuccess(data),
-                onError: () => alert('Kafedra yaratishda xatolik'),
+                onSuccess: (data) => {
+                    toast.success('Kafedra yaratildi');
+                    onSuccess(data);
+                },
+                onError: () => toast.error('Kafedra yaratishda xatolik'),
             });
         }
     };

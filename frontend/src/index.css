@@ -1,5 +1,11 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tw-animate-css";
+/* Шрифты self-host'ятся через @fontsource — импортируются в main.tsx,
+   потому что Tailwind v4 инлайнит CSS-@import и ломает пути к woff2. */
+
+/* Tailwind v4: dark: variant follows the .dark class (toggled by ThemeContext),
+   not the OS preference. Without this line dark: utilities ignore the toggle. */
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   --color-background: var(--background);
@@ -24,13 +30,19 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
 
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-foreground: var(--sidebar-fg);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-accent: var(--sidebar-accent);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit Variable', 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'Fira Code', monospace;
 }
 
 @layer base {
@@ -45,8 +57,8 @@
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(224 71% 4%);
 
-    /* Premium academic indigo primary */
-    --primary: hsl(244 80% 60%);
+    /* NDKTU brand blue #242CBB */
+    --primary: hsl(237 68% 44%);
     --primary-foreground: hsl(0 0% 100%);
 
     --secondary: hsl(220 14% 96%);
@@ -55,8 +67,8 @@
     --muted: hsl(220 14% 94%);
     --muted-foreground: hsl(220 9% 46%);
 
-    --accent: hsl(244 80% 96%);
-    --accent-foreground: hsl(244 80% 36%);
+    --accent: hsl(237 70% 96%);
+    --accent-foreground: hsl(237 68% 36%);
 
     --destructive: hsl(346 80% 50%);
     --destructive-foreground: hsl(0 0% 100%);
@@ -69,7 +81,7 @@
 
     --border: hsl(220 13% 90%);
     --input: hsl(220 13% 90%);
-    --ring: hsl(244 80% 60%);
+    --ring: hsl(237 68% 44%);
 
     /* 12px radius for cards, 8px for inputs/buttons */
     --radius: 0.75rem;
@@ -78,8 +90,16 @@
     --sidebar-width-collapsed: 3.5rem;
     --navbar-height: 3.5rem;
 
+    /* «Университетский премиум»: сайдбар в глубоком бренд-синем.
+       Одинаков в светлой и тёмной темах — это фирменная поверхность. */
+    --sidebar-bg: hsl(237 52% 15%);
+    --sidebar-fg: hsl(228 40% 96%);
+    --sidebar-muted: hsl(231 22% 68%);
+    --sidebar-active: hsl(237 55% 26%);
+    --sidebar-accent: hsl(237 95% 76%);
+
     /* Grade colors */
-    --grade-5: hsl(244 80% 45%);
+    --grade-5: hsl(237 68% 44%);
     --grade-4: hsl(224 85% 45%);
     --grade-3: hsl(42 84% 38%);
     --grade-low: hsl(346 80% 45%);
@@ -96,7 +116,7 @@
     --popover: hsl(224 71% 7%);
     --popover-foreground: hsl(220 20% 98%);
 
-    --primary: hsl(244 80% 68%);
+    --primary: hsl(237 78% 70%);
     --primary-foreground: hsl(224 71% 4%);
 
     --secondary: hsl(224 30% 12%);
@@ -105,8 +125,8 @@
     --muted: hsl(224 30% 10%);
     --muted-foreground: hsl(220 10% 60%);
 
-    --accent: hsl(244 80% 18%);
-    --accent-foreground: hsl(244 80% 80%);
+    --accent: hsl(237 70% 18%);
+    --accent-foreground: hsl(237 75% 82%);
 
     --destructive: hsl(346 80% 55%);
     --destructive-foreground: hsl(0 0% 100%);
@@ -119,12 +139,19 @@
 
     --border: hsl(224 30% 15%);
     --input: hsl(224 30% 15%);
-    --ring: hsl(244 80% 68%);
+    --ring: hsl(237 78% 70%);
 
-    --grade-5: hsl(244 80% 68%);
+    --grade-5: hsl(237 78% 70%);
     --grade-4: hsl(224 85% 55%);
     --grade-3: hsl(42 80% 50%);
     --grade-low: hsl(346 80% 55%);
+
+    /* В тёмной теме сайдбар чуть глубже фона контента */
+    --sidebar-bg: hsl(237 45% 10%);
+    --sidebar-fg: hsl(228 40% 96%);
+    --sidebar-muted: hsl(231 20% 62%);
+    --sidebar-active: hsl(237 50% 20%);
+    --sidebar-accent: hsl(237 95% 76%);
   }
 }
 
@@ -135,7 +162,7 @@
   }
 
   html {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -148,7 +175,8 @@
   }
 
   :focus-visible {
-    outline: 2px solid hsl(var(--ring));
+    /* --ring already holds a complete hsl() value — no extra hsl() wrap */
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
@@ -160,11 +188,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
+    background: var(--border);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.4);
+    background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
   }
 }
 
@@ -179,7 +207,7 @@
 
   .page-title {
     font-family: var(--font-display);
-    @apply text-2xl font-semibold tracking-tight text-foreground;
+    @apply text-2xl font-bold tracking-tight text-foreground;
   }
 
   .page-description {
@@ -191,7 +219,21 @@
   }
 
   .font-mono {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: 'JetBrains Mono Variable', 'Fira Code', monospace;
+  }
+
+  /* Thin overlay-style scrollbar for the sidebar and tab strips */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
   }
 
   /* Badge helpers */
@@ -225,7 +267,7 @@
 
   /* Grade badge utility */
   .grade-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono Variable', monospace;
     @apply inline-flex items-center justify-center rounded-full font-semibold;
   }
 }

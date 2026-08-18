@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,10 +31,11 @@ export const FacultyModal = ({ isOpen, onClose, faculty, onSuccess }: FacultyMod
             const result = faculty
                 ? await facultyService.updateFaculty(faculty.id, data)
                 : await facultyService.createFaculty(data);
+            toast.success(faculty ? 'Fakultet yangilandi' : 'Fakultet yaratildi');
             onSuccess(result);
         } catch (error) {
             logger.error('Fakultetni saqlashda xatolik', error);
-            alert('Fakultetni saqlashda xatolik');
+            toast.error('Fakultetni saqlashda xatolik');
         }
     };
 

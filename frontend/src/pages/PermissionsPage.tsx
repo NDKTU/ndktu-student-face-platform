@@ -1,21 +1,26 @@
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { permissionService, type Permission } from '@/services/permissionService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, KeyRound } from 'lucide-react';
 
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { labelFor, parsePermission } from '@/constants/resources';
 import { PageTabs } from '@/components/ui/PageTabs';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 const permissionSchema = z.object({
-    name: z.string().min(1, 'Permission name is required'),
+    name: z.string().min(1, 'Ruxsat nomi kiritilishi shart'),
 });
 
 type PermissionFormValues = z.infer<typeof permissionSchema>;
@@ -28,6 +33,7 @@ const ACCESS_TABS = [
 const PermissionsPage = () => {
     const [permissions, setPermissions] = useState<Permission[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isError, setIsError] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -38,10 +44,12 @@ const PermissionsPage = () => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
+            setIsError(false);
             const data = await permissionService.getPermissions(1, 1000, debouncedSearch);
             setPermissions(data.permissions);
         } catch (error) {
             logger.error('Failed to fetch permissions', error);
+            setIsError(true);
         } finally {
             setIsLoading(false);
         }
@@ -66,10 +74,12 @@ const PermissionsPage = () => {
         try {
             await permissionService.deletePermission(permissionToDelete.id);
             setPermissions((prev) => prev.filter((item) => item.id !== permissionToDelete.id));
+            toast.success("Ruxsat o'chirildi");
             setIsDeleteModalOpen(false);
             setPermissionToDelete(null);
         } catch (error) {
             logger.error('Failed to delete permission', error);
+            toast.error("Ruxsatni o'chirishda xatolik yuz berdi");
         }
     };
 
@@ -99,40 +109,57 @@ const PermissionsPage = () => {
     return (
         <div className="space-y-6">
             <PageTabs tabs={ACCESS_TABS} />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Ruxsatlar</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Tizim ruxsatlarini boshqarish</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Qidirish..."
-                            className="pl-8 w-[220px]"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <Button onClick={() => { setSelectedPermission(null); setIsModalOpen(true); }}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Qo'shish
-                    </Button>
-                </div>
-            </div>
+            <PageHeader
+                title="Ruxsatlar"
+                description="Tizim ruxsatlarini boshqarish"
+                actions={
+                    <>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Qidirish..."
+                                className="pl-8 w-[220px]"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <Button onClick={() => { setSelectedPermission(null); setIsModalOpen(true); }}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Qo'shish
+                        </Button>
+                    </>
+                }
+            />
 
-            {isLoading ? (
+            {isError ? (
                 <Card>
                     <CardContent className="pt-6">
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
+                        <ErrorState onRetry={fetchData} />
                     </CardContent>
                 </Card>
+            ) : isLoading ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <Card key={i}>
+                            <CardHeader className="pb-3">
+                                <Skeleton className="h-5 w-40" />
+                            </CardHeader>
+                            <CardContent className="pt-0 space-y-3">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
             ) : permissions.length === 0 ? (
                 <Card>
                     <CardContent className="pt-6">
-                        <div className="text-center text-muted-foreground py-8">Ruxsatlar topilmadi.</div>
+                        <EmptyState
+                            title="Ruxsatlar topilmadi"
+                            description="Qidiruv mezonlariga mos ruxsat yo'q."
+                            icon={<KeyRound className="h-6 w-6" />}
+                        />
                     </CardContent>
                 </Card>
             ) : (
@@ -142,7 +169,7 @@ const PermissionsPage = () => {
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center justify-between text-base">
                                     <span>{labelFor(resource)}</span>
-                                    <span className="inline-flex items-center rounded-full bg-secondary/60 px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+                                    <span className="badge badge-muted">
                                         {perms.length} ta
                                     </span>
                                 </CardTitle>
@@ -154,7 +181,7 @@ const PermissionsPage = () => {
                                         .sort((a, b) => a.name.localeCompare(b.name))
                                         .map((perm) => (
                                             <div key={perm.id} className="flex items-center justify-between py-2">
-                                                <span className="font-mono text-sm">{perm.name}</span>
+                                                <span className="font-mono text-sm break-all">{perm.name}</span>
                                                 <div className="flex gap-1">
                                                     <Button variant="ghost" size="sm" onClick={() => { setSelectedPermission(perm); setIsModalOpen(true); }}>
                                                         <Pencil className="h-4 w-4" />
@@ -207,20 +234,21 @@ const PermissionModal = ({ isOpen, onClose, permission, onSuccess }: {
             } else {
                 result = await permissionService.createPermission(data);
             }
+            toast.success(permission ? 'Ruxsat yangilandi' : 'Ruxsat yaratildi');
             onSuccess(result);
         } catch (error) {
             logger.error('Failed to save permission', error);
-            alert('Failed to save permission');
+            toast.error('Ruxsatni saqlashda xatolik');
         }
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={permission ? 'Edit Permission' : 'Create Permission'}>
+        <Modal isOpen={isOpen} onClose={onClose} title={permission ? 'Ruxsatni tahrirlash' : 'Ruxsat yaratish'}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <Input label="Permission Name" {...register('name')} error={errors.name?.message} placeholder="e.g. read:user, create:quiz" />
+                <Input label="Ruxsat nomi" {...register('name')} error={errors.name?.message} placeholder="masalan: read:user, create:quiz" />
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button type="submit" isLoading={isSubmitting}>{permission ? 'Update' : 'Create'}</Button>
+                    <Button type="button" variant="outline" onClick={onClose}>Bekor qilish</Button>
+                    <Button type="submit" isLoading={isSubmitting}>{permission ? 'Yangilash' : 'Yaratish'}</Button>
                 </div>
             </form>
         </Modal>
