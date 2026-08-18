@@ -125,9 +125,23 @@ class Question(Base, IdIntPk, TimestampMixin):
 class Quiz(Base, IdIntPk, TimestampMixin):
     __tablename__ = "quizzes"
 
-    user_id: Mapped[int | None] = mapped_column(
+    # Лектор, чей банк вопросов собирается в тест. Физически колонка называется
+    # user_id: исторически тест создавал сам преподаватель, поэтому «владелец» и
+    # «автор вопросов» были одним человеком. Теперь тест создаёт организатор, и эти
+    # роли разошлись — атрибут переименован на уровне ORM, чтобы «чей банк» и «кто
+    # создал» больше нельзя было спутать. Физическое переименование колонки
+    # отложено: на неё смотрят фронт и статистика преподавателя.
+    lecturer_id: Mapped[int | None] = mapped_column(
+        "user_id",
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    # Организатор тестирования, фактически создавший тест. Заполняется из токена,
+    # а не из тела запроса, поэтому подделать авторство нельзя.
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     group_id: Mapped[int | None] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL"),
@@ -146,7 +160,16 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     proctoring_mode: Mapped[str] = mapped_column(nullable=False, server_default="standard")
     attempt: Mapped[int | None] = mapped_column(nullable=True, default=1)
 
-    user: Mapped["User"] = relationship("User", back_populates="quizzes")
+    lecturer: Mapped["User"] = relationship(
+        "User",
+        back_populates="quizzes",
+        foreign_keys=[lecturer_id],
+    )
+
+    created_by: Mapped["User | None"] = relationship(
+        "User",
+        foreign_keys=[created_by_user_id],
+    )
 
     group: Mapped["Group"] = relationship("Group", back_populates="quizzes")
 

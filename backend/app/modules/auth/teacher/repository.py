@@ -160,7 +160,7 @@ class TeacherRepository:
                 )
             ).scalar() or 0
             quiz_count = (
-                await session.execute(select(func.count(Quiz.id)).where(Quiz.user_id == employee_user_id))
+                await session.execute(select(func.count(Quiz.id)).where(Quiz.lecturer_id == employee_user_id))
             ).scalar() or 0
             question_count = (
                 await session.execute(select(func.count(Question.id)).where(Question.user_id == employee_user_id))
@@ -189,7 +189,7 @@ class TeacherRepository:
 
         # Aggressive delete
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
-        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.user_id == employee_user_id))).scalars().all()
+        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.lecturer_id == employee_user_id))).scalars().all()
         if quiz_ids:
             from app.modules.quiz.model import QuizQuestion, Result
 

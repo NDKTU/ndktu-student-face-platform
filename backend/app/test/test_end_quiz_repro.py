@@ -1,32 +1,14 @@
 import pytest
 import pytest_asyncio
 
-from app.modules.quiz.model import QuizQuestion
-
 
 @pytest_asyncio.fixture
-async def setup_quiz_execution(auth_client, async_db, test_subject, test_user):
+async def setup_quiz_execution(auth_client, test_subject, test_user):
     user_id = test_user["id"]
 
-    # 1. Create Quiz
-    quiz_payload = {
-        "title": "Reproduction Quiz",
-        "question_number": 5,
-        "duration": 60,
-        "pin": "1234",
-        "user_id": user_id,
-        "subject_id": test_subject.id,
-        "is_active": True,
-    }
-    resp = await auth_client.post("/quiz/", json=quiz_payload)
-    quiz_id = resp.json()["id"]
-
-    # 2. Add Questions (Auto-link should happen, but let's ensure we have questions)
-    # If auto-link worked in previous test, great. If not, let's create questions now
-    # that match the quiz subject/user if that's required, OR just manually link if needed?
-    # The auto-link logic is: matching user_id & subject_id.
-
-    # Create matching question 1
+    # 1. Наполняем банк лектора. Порядок важен: тест собирает вопросы из банка
+    #    в момент создания, поэтому вопрос должен существовать раньше теста —
+    #    иначе тест останется пустым и активация вернёт 409.
     q1_payload = {
         "subject_id": test_subject.id,
         "user_id": user_id,
@@ -40,13 +22,21 @@ async def setup_quiz_execution(auth_client, async_db, test_subject, test_user):
     q1_resp = await auth_client.post("/question/", json=q1_payload)
     q1_id = q1_resp.json()["id"]
 
-    # We need to manually link it if it wasn't auto-linked (created AFTER quiz)
-    # Auto-link only happens on quiz creation.
-    # So we must link manually or create questions BEFORE quiz.
-    # Actually, let's create a new question and manually link it to be sure.
-    qq = QuizQuestion(quiz_id=quiz_id, question_id=q1_id)
-    async_db.add(qq)
-    await async_db.commit()
+    # 2. Create Quiz — вопрос подцепляется автоматически, руками связывать не нужно.
+    #    question_number совпадает с размером банка: активный тест не может требовать
+    #    больше вопросов, чем есть.
+    quiz_payload = {
+        "title": "Reproduction Quiz",
+        "question_number": 1,
+        "duration": 60,
+        "pin": "1234",
+        "user_id": user_id,
+        "subject_id": test_subject.id,
+        "is_active": True,
+    }
+    resp = await auth_client.post("/quiz/", json=quiz_payload)
+    assert resp.status_code == 201
+    quiz_id = resp.json()["id"]
 
     return {"quiz_id": quiz_id, "q1_id": q1_id, "user_id": user_id}
 

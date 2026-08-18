@@ -21,7 +21,54 @@ logger = logging.getLogger(__name__)
 
 
 class QuizRepository:
-    async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest) -> Quiz:
+    def _lecturer_questions_stmt(self, lecturer_id: int, subject_id: int):
+        """Банк вопросов лектора по предмету — активные, последней версии.
+
+        Банк персональный: тест собирается из вопросов того лектора, который
+        читает лекции группе, а не из всех вопросов предмета.
+        """
+        return select(Question).where(
+            Question.user_id == lecturer_id,
+            Question.subject_id == subject_id,
+            Question.is_active.is_(True),
+            Question.is_latest.is_(True),
+        )
+
+    async def count_available_questions(self, session: AsyncSession, lecturer_id: int, subject_id: int) -> int:
+        stmt = select(func.count()).select_from(self._lecturer_questions_stmt(lecturer_id, subject_id).subquery())
+        return (await session.execute(stmt)).scalar() or 0
+
+    def _not_enough_questions(self, available: int, requested: int) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "not_enough_questions",
+                "available": available,
+                "requested": requested,
+                "message": (
+                    f"Testni faollashtirish uchun savollar yetarli emas: "
+                    f"{available} ta savol mavjud, {requested} ta talab qilingan."
+                ),
+            },
+        )
+
+    async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int) -> Quiz:
+        # Проверяем банк только при активации. Неактивный тест организатор вправе
+        # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
+        # становится в момент включения — там же и проверяем.
+        #
+        # Почему проверка вообще нужна: start_quiz молча выдаёт столько вопросов,
+        # сколько нашлось, поэтому тест на 30 вопросов из банка в 12 превратился бы
+        # в экзамен на 12 — с оценкой, несравнимой с другими группами.
+        if data.is_active and data.lecturer_id and data.subject_id:
+            available = await self.count_available_questions(
+                session=session,
+                lecturer_id=data.lecturer_id,
+                subject_id=data.subject_id,
+            )
+            if available < data.question_number:
+                raise self._not_enough_questions(available, data.question_number)
+
         new_quiz = Quiz(
             title=data.title,
             question_number=data.question_number,
@@ -29,42 +76,22 @@ class QuizRepository:
             pin=data.pin,
             is_active=data.is_active,
             proctoring_mode=data.proctoring_mode,
-            user_id=data.user_id,
+            lecturer_id=data.lecturer_id,
+            created_by_user_id=created_by_user_id,
             group_id=data.group_id,
             subject_id=data.subject_id,
         )
         session.add(new_quiz)
 
-        # Auto-link questions if user_id and subject_id are provided
-        if data.user_id and data.subject_id:
-            # Find all active, latest-version questions with matching user_id and subject_id
-            stmt_questions = select(Question).where(
-                Question.user_id == data.user_id,
-                Question.subject_id == data.subject_id,
-                Question.is_active.is_(True),
-                Question.is_latest.is_(True),
-            )
-            result_questions = await session.execute(stmt_questions)
-            questions = result_questions.scalars().all()
+        if data.lecturer_id and data.subject_id:
+            result_questions = await session.execute(self._lecturer_questions_stmt(data.lecturer_id, data.subject_id))
+            for question in result_questions.scalars().all():
+                session.add(QuizQuestion(quiz=new_quiz, question=question))
 
-            for question in questions:
-                # Create relation
-                quiz_question = QuizQuestion(quiz=new_quiz, question=question)
-                session.add(quiz_question)
-
-        # Auto-create GroupTeacher relation if user_id and group_id are provided
-        if data.user_id and data.group_id:
-            # Check if relation already exists
-            stmt_check = select(GroupTeacher).where(
-                GroupTeacher.teacher_id == data.user_id,
-                GroupTeacher.group_id == data.group_id,
-            )
-            result_check = await session.execute(stmt_check)
-            existing_relation = result_check.scalar_one_or_none()
-
-            if not existing_relation:
-                new_group_teacher = GroupTeacher(teacher_id=data.user_id, group_id=data.group_id)
-                session.add(new_group_teacher)
+        # Связка GroupTeacher здесь раньше создавалась автоматически. Убрано: под
+        # разделением ролей это значило бы, что организатор, создав тест группе,
+        # молча становится её преподавателем. Права не должны появляться как
+        # побочный эффект действия.
 
         try:
             await session.commit()
@@ -123,24 +150,28 @@ class QuizRepository:
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
 
-            conditions = []
+            # Тесты, собранные из банка этого преподавателя, видны ему всегда —
+            # даже если предмет или группа за ним формально не закреплены. Раньше
+            # видимость держалась на GroupTeacher, который создавался побочным
+            # эффектом создания теста; теперь тест создаёт организатор, и такая
+            # связка не появляется.
+            conditions = [Quiz.lecturer_id == current_user.id]
             if allowed_group_ids:
                 conditions.append(Quiz.group_id.in_(allowed_group_ids))
             if allowed_subject_ids:
                 conditions.append(Quiz.subject_id.in_(allowed_subject_ids))
 
-            if conditions:
-                teacher_filter = or_(*conditions)
-            else:
-                teacher_filter = Quiz.id == -1
-
+            teacher_filter = or_(*conditions)
             stmt = stmt.where(teacher_filter)
 
         if request.title:
             stmt = stmt.where(Quiz.title.ilike(f"%{request.title}%"))
 
         if request.user_id:
-            stmt = stmt.where(Quiz.user_id == request.user_id)
+            stmt = stmt.where(Quiz.lecturer_id == request.user_id)
+
+        if request.created_by_user_id:
+            stmt = stmt.where(Quiz.created_by_user_id == request.created_by_user_id)
 
         if request.group_id:
             stmt = stmt.where(Quiz.group_id == request.group_id)
@@ -175,7 +206,9 @@ class QuizRepository:
         if request.title:
             count_stmt = count_stmt.where(Quiz.title.ilike(f"%{request.title}%"))
         if request.user_id:
-            count_stmt = count_stmt.where(Quiz.user_id == request.user_id)
+            count_stmt = count_stmt.where(Quiz.lecturer_id == request.user_id)
+        if request.created_by_user_id:
+            count_stmt = count_stmt.where(Quiz.created_by_user_id == request.created_by_user_id)
         if request.group_id:
             count_stmt = count_stmt.where(Quiz.group_id == request.group_id)
         if request.subject_id:
@@ -196,13 +229,51 @@ class QuizRepository:
         if not quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
+        # Смена лектора после создания запрещена: вопросы подобраны в quiz_questions
+        # один раз, при создании, и молча разошлись бы с новым лектором — тест
+        # остался бы собран из банка прежнего. Пересборка набора вопросов затёрла бы
+        # уже выданные попытки, поэтому правильный путь — создать тест заново.
+        if data.lecturer_id is not None and quiz.lecturer_id is not None and data.lecturer_id != quiz.lecturer_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "lecturer_change_forbidden",
+                    "message": (
+                        "Testni yaratgandan keyin o'qituvchini o'zgartirish mumkin emas: "
+                        "savollar uning bankidan yig'ilgan. Yangi test yarating."
+                    ),
+                },
+            )
+
+        # Заполнить пустого лектора у старого теста можно — это не меняет уже
+        # подобранный набор вопросов, а только фиксирует, кому он принадлежит.
+        if quiz.lecturer_id is None and data.lecturer_id is not None:
+            quiz.lecturer_id = data.lecturer_id
+
+        # Активный тест обязан иметь достаточно вопросов. Считаем именно связанные
+        # с тестом активные вопросы, а не банк лектора: набор фиксируется при
+        # создании, и вопрос могли удалить уже после этого.
+        if data.is_active:
+            linked = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(QuizQuestion)
+                    .join(Question, Question.id == QuizQuestion.question_id)
+                    .where(
+                        QuizQuestion.quiz_id == quiz_id,
+                        Question.is_active.is_(True),
+                    )
+                )
+            ).scalar() or 0
+            if linked < data.question_number:
+                raise self._not_enough_questions(linked, data.question_number)
+
         quiz.title = data.title
         quiz.question_number = data.question_number
         quiz.duration = data.duration
         quiz.pin = data.pin
         quiz.is_active = data.is_active
         quiz.proctoring_mode = data.proctoring_mode
-        quiz.user_id = data.user_id
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
 
@@ -242,7 +313,7 @@ class QuizRepository:
         await session.delete(quiz)
         await session.commit()
 
-    async def repeat_quiz(self, session: AsyncSession, quiz_id: int) -> Quiz:
+    async def repeat_quiz(self, session: AsyncSession, quiz_id: int, created_by_user_id: int) -> Quiz:
         import random
 
         stmt = (
@@ -263,7 +334,10 @@ class QuizRepository:
             pin=str(random.randint(1000, 9999)),  # Generate a new 4-digit PIN
             is_active=quiz.is_active,
             proctoring_mode=quiz.proctoring_mode,
-            user_id=quiz.user_id,
+            # Банк вопросов остаётся лекторским, а пересдачу выдаёт организатор —
+            # поэтому лектор наследуется, а создатель берётся текущий.
+            lecturer_id=quiz.lecturer_id,
+            created_by_user_id=created_by_user_id,
             group_id=quiz.group_id,
             subject_id=quiz.subject_id,
             attempt=2,
@@ -276,16 +350,7 @@ class QuizRepository:
                 new_qq = QuizQuestion(quiz_id=new_quiz.id, question_id=qq.question_id)
                 session.add(new_qq)
 
-        # Handle GroupTeacher relation if needed, though usually it's already there from original quiz creation
-        if new_quiz.user_id and new_quiz.group_id:
-            stmt_check = select(GroupTeacher).where(
-                GroupTeacher.teacher_id == new_quiz.user_id,
-                GroupTeacher.group_id == new_quiz.group_id,
-            )
-            result_check = await session.execute(stmt_check)
-            if not result_check.scalar_one_or_none():
-                new_group_teacher = GroupTeacher(teacher_id=new_quiz.user_id, group_id=new_quiz.group_id)
-                session.add(new_group_teacher)
+        # Связка GroupTeacher здесь тоже не создаётся — см. комментарий в create_quiz.
 
         try:
             await session.commit()

@@ -13,7 +13,7 @@ async def setup_quizzes_for_filter(async_db, test_user, test_subject, test_group
         duration=60,
         pin="1111",
         is_active=True,
-        user_id=test_user["id"],
+        lecturer_id=test_user["id"],
         subject_id=test_subject.id,
         group_id=test_group["id"],
     )
@@ -26,7 +26,7 @@ async def setup_quizzes_for_filter(async_db, test_user, test_subject, test_group
         duration=60,
         pin="2222",
         is_active=False,
-        user_id=test_user["id"],
+        lecturer_id=test_user["id"],
         subject_id=test_subject.id,
         group_id=test_group["id"],
     )

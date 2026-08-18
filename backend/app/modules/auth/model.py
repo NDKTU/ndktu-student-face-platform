@@ -48,7 +48,13 @@ class User(Base, IdIntPk, TimestampMixin):
 
     questions: Mapped[list["Question"]] = relationship("Question", back_populates="user")
 
-    quizzes: Mapped[list["Quiz"]] = relationship("Quiz", back_populates="user")
+    # Тесты, собранные из банка вопросов этого преподавателя. Не «созданные им»:
+    # создаёт тест организатор, см. Quiz.created_by_user_id.
+    quizzes: Mapped[list["Quiz"]] = relationship(
+        "Quiz",
+        back_populates="lecturer",
+        foreign_keys="Quiz.lecturer_id",
+    )
 
     results: Mapped[list["Result"]] = relationship("Result", back_populates="user")
 

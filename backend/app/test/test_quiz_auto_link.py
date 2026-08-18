@@ -81,7 +81,9 @@ async def test_auto_link_questions_on_quiz_create(setup_questions_and_quiz, auth
     # Create Quiz with matching User and Subject
     quiz_payload = {
         "title": "Auto Link Quiz",
-        "question_number": 5,
+        # В банке лектора по этому предмету ровно два подходящих вопроса (Q1 и Q2),
+        # а активный тест не может требовать больше, чем есть.
+        "question_number": 2,
         "duration": 60,
         "pin": "9999",
         "user_id": data["user_id"],

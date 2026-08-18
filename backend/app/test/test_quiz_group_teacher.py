@@ -5,23 +5,31 @@ from app.modules.organization_structure.model import GroupTeacher
 
 
 @pytest.mark.asyncio
-async def test_create_quiz_creates_group_teacher(auth_client, async_db, test_user, test_subject, test_group):
-    # Ensure no GroupTeacher exists initially
+async def test_create_quiz_does_not_create_group_teacher(
+    auth_client, async_db, test_user, test_subject, test_group, make_questions
+):
+    """Создание теста не выдаёт создателю прав на группу.
+
+    Раньше `create_quiz` заводил связку GroupTeacher, если её не было. Под разделением
+    ролей это дыра: тест создаёт организатор, и он молча становился бы преподавателем
+    группы — то есть получал бы доступ к её тестам и результатам. Права не должны
+    появляться как побочный эффект действия.
+    """
     user_id = test_user["id"]
     group_id = test_group["id"]
 
     stmt = select(GroupTeacher).where(GroupTeacher.teacher_id == user_id, GroupTeacher.group_id == group_id)
-    res = await async_db.execute(stmt)
-    assert res.scalar_one_or_none() is None
+    assert (await async_db.execute(stmt)).scalar_one_or_none() is None
 
-    # Create Quiz
+    await make_questions(subject_id=test_subject.id, user_id=user_id, count=2)
+
     payload = {
         "title": "Group Teacher Test Quiz",
-        "question_number": 5,
+        "question_number": 2,
         "duration": 30,
         "pin": "1234",
         "is_active": True,
-        "user_id": user_id,
+        "lecturer_id": user_id,
         "group_id": group_id,
         "subject_id": test_subject.id,
     }
@@ -29,21 +37,39 @@ async def test_create_quiz_creates_group_teacher(auth_client, async_db, test_use
     resp = await auth_client.post("/quiz/", json=payload)
     assert resp.status_code == 201
 
-    # Verify GroupTeacher created
+    async_db.expire_all()
+    assert (await async_db.execute(stmt)).scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_repeat_quiz_does_not_create_group_teacher(
+    auth_client, async_db, test_user, test_subject, test_group, make_questions
+):
+    """Пересдача тоже не заводит связку с группой — та же причина."""
+    user_id = test_user["id"]
+    group_id = test_group["id"]
+
+    await make_questions(subject_id=test_subject.id, user_id=user_id, count=1)
+
+    create_resp = await auth_client.post(
+        "/quiz/",
+        json={
+            "title": "Repeat No GroupTeacher",
+            "question_number": 1,
+            "duration": 30,
+            "pin": "4321",
+            "is_active": True,
+            "lecturer_id": user_id,
+            "group_id": group_id,
+            "subject_id": test_subject.id,
+        },
+    )
+    assert create_resp.status_code == 201
+    quiz_id = create_resp.json()["id"]
+
+    repeat_resp = await auth_client.post(f"/quiz/{quiz_id}/repeat")
+    assert repeat_resp.status_code == 201
+
     async_db.expire_all()
     stmt = select(GroupTeacher).where(GroupTeacher.teacher_id == user_id, GroupTeacher.group_id == group_id)
-    res = await async_db.execute(stmt)
-    group_teacher = res.scalar_one_or_none()
-    assert group_teacher is not None
-    assert group_teacher.teacher_id == user_id
-    assert group_teacher.group_id == group_id
-
-    # Verify idempotent (creating another quiz shouldn't fail)
-    payload["title"] = "Another Quiz"
-    resp = await auth_client.post("/quiz/", json=payload)
-    assert resp.status_code == 201
-
-    # Still only one record (or at least no error)
-    res = await async_db.execute(stmt)
-    relations = res.scalars().all()
-    assert len(relations) == 1
+    assert (await async_db.execute(stmt)).scalar_one_or_none() is None

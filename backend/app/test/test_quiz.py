@@ -15,7 +15,10 @@ async def test_create_quiz(auth_client, test_subject, test_group):
         "user_id": user_id,
         "group_id": test_group["id"],
         "subject_id": test_subject.id,
-        "is_active": True,
+        # Неактивный тест организатор вправе подготовить заранее, пока лектор ещё
+        # грузит вопросы. Проверка достаточности банка привязана к активации —
+        # она отдельно покрыта в test_quiz_lecturer_ownership.py.
+        "is_active": False,
     }
     response = await auth_client.post("/quiz/", json=payload)
     assert response.status_code == 201

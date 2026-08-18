@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import Result, SubjectTeacher
+from app.modules.quiz.model import Quiz, Result, SubjectTeacher
 
 from .schemas import (
     ResultListRequest,
@@ -87,15 +87,22 @@ class ResultRepository:
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
 
+            # Результаты по тестам, собранным из банка этого преподавателя, видны
+            # ему всегда. Раньше это обеспечивала связка GroupTeacher, которая
+            # создавалась побочным эффектом создания теста; теперь тест создаёт
+            # организатор, и такой связки не появляется.
+            own_quizzes = Result.quiz_id.in_(select(Quiz.id).where(Quiz.lecturer_id == current_user.id))
+
             if allowed_group_ids and allowed_subject_ids:
-                teacher_filter = Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
+                assignment_filter = Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
             elif allowed_group_ids:
-                teacher_filter = Result.group_id.in_(allowed_group_ids)
+                assignment_filter = Result.group_id.in_(allowed_group_ids)
             elif allowed_subject_ids:
-                teacher_filter = Result.subject_id.in_(allowed_subject_ids)
+                assignment_filter = Result.subject_id.in_(allowed_subject_ids)
             else:
-                # If a teacher has no assigned groups/subjects, they see nothing
-                teacher_filter = Result.id == -1
+                assignment_filter = None
+
+            teacher_filter = or_(own_quizzes, assignment_filter) if assignment_filter is not None else own_quizzes
 
             if teacher_filter is not None:
                 stmt = stmt.where(teacher_filter)

@@ -151,7 +151,7 @@ class UserRepository:
                 await session.execute(select(func.count(Result.id)).where(Result.user_id == user_id))
             ).scalar() or 0
             quiz_count = (
-                await session.execute(select(func.count(QuizModel.id)).where(QuizModel.user_id == user_id))
+                await session.execute(select(func.count(QuizModel.id)).where(QuizModel.lecturer_id == user_id))
             ).scalar() or 0
             student_count = (
                 await session.execute(select(func.count(StudentModel.id)).where(StudentModel.user_id == user_id))
@@ -194,7 +194,7 @@ class UserRepository:
         # 2. Quizzes & their Results & Questions?
         # If the user is a teacher, we already have logic in delete_teacher.
         # But here we delete the User directly.
-        quiz_ids = (await session.execute(select(QuizModel.id).where(QuizModel.user_id == user_id))).scalars().all()
+        quiz_ids = (await session.execute(select(QuizModel.id).where(QuizModel.lecturer_id == user_id))).scalars().all()
         if quiz_ids:
             from app.modules.quiz.model import QuizQuestion
 

@@ -9,6 +9,20 @@ async def test_end_quiz_check_correct_answer(auth_client, test_subject, test_gro
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
+    # Вопрос создаётся до теста: активный тест собирается из банка лектора, и
+    # набор вопросов фиксируется в момент создания.
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Correct Answer Check",
+        "option_a": "CorrectChoice",
+        "option_b": "WrongChoice1",
+        "option_c": "WrongChoice2",
+        "option_d": "WrongChoice3",
+        "correct_option": "a",
+    }
+    await auth_client.post("/question/", json=q_payload)
+
     quiz_payload = {
         "title": "Check Correct Answer Quiz",
         "question_number": 1,
@@ -21,18 +35,6 @@ async def test_end_quiz_check_correct_answer(auth_client, test_subject, test_gro
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
-
-    q_payload = {
-        "subject_id": test_subject.id,
-        "user_id": user_id,
-        "text": "Correct Answer Check",
-        "option_a": "CorrectChoice",
-        "option_b": "WrongChoice1",
-        "option_c": "WrongChoice2",
-        "option_d": "WrongChoice3",
-        "correct_option": "a",
-    }
-    await auth_client.post("/question/", json=q_payload)
 
     start_resp = await auth_client.post("/quiz_process/start_quiz", json={"quiz_id": quiz_id, "pin": "1111"})
     assert start_resp.status_code == 200

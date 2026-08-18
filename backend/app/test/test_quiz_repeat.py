@@ -2,10 +2,14 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_repeat_quiz(auth_client, test_subject, test_group):
+async def test_repeat_quiz(auth_client, test_subject, test_group, make_questions):
     # Setup
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
+
+    # Банк лектора наполняется до создания теста: активный тест не может требовать
+    # больше вопросов, чем есть в банке.
+    await make_questions(subject_id=test_subject.id, user_id=user_id, count=2)
 
     quiz_payload = {
         "title": "Repeat Quiz",

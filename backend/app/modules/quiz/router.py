@@ -22,6 +22,7 @@ from .question.schemas import (
 )
 from .quiz.repository import get_quiz_repository
 from .quiz.schemas import (
+    AvailableQuestionsResponse,
     QuizCreateRequest,
     QuizCreateResponse,
     QuizListRequest,
@@ -294,10 +295,36 @@ quiz_router = APIRouter(
 async def create_quiz(
     data: QuizCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:quiz")),
+    current_user: User = Depends(PermissionRequired("create:quiz")),
 ):
-    result = await get_quiz_repository.create_quiz(session=session, data=data)
+    # Создателя берём из токена, а не из тела запроса: иначе организатор мог бы
+    # записать создание теста на чужое имя.
+    result = await get_quiz_repository.create_quiz(
+        session=session,
+        data=data,
+        created_by_user_id=current_user.id,
+    )
     return result
+
+
+@quiz_router.get("/available-questions", response_model=AvailableQuestionsResponse)
+async def get_available_questions(
+    lecturer_id: int,
+    subject_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(PermissionRequired("create:quiz")),
+):
+    """Сколько вопросов лектора доступно для сборки теста.
+
+    Отдаёт только количество — ни текстов, ни вариантов: организатор собирает тест,
+    но содержимое банка вопросов ему не принадлежит и видеть его он не должен.
+    """
+    available = await get_quiz_repository.count_available_questions(
+        session=session,
+        lecturer_id=lecturer_id,
+        subject_id=subject_id,
+    )
+    return AvailableQuestionsResponse(lecturer_id=lecturer_id, subject_id=subject_id, available=available)
 
 
 @quiz_router.get("/active", response_model=QuizListResponse)
@@ -379,9 +406,13 @@ async def get_quiz_delete_info(
 async def repeat_quiz(
     quiz_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:quiz")),
+    current_user: User = Depends(PermissionRequired("create:quiz")),
 ):
-    result = await get_quiz_repository.repeat_quiz(session=session, quiz_id=quiz_id)
+    result = await get_quiz_repository.repeat_quiz(
+        session=session,
+        quiz_id=quiz_id,
+        created_by_user_id=current_user.id,
+    )
     return result
 
 

@@ -2,12 +2,29 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_start_quiz(auth_client, test_subject, test_group, async_db):
+async def test_start_quiz(auth_client, test_subject, test_group):
     # Setup: Create a quiz and some questions
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
-    # 1. Create Quiz
+    # 1. Create Questions for the subject — банк лектора наполняется первым:
+    #    создание теста собирает в него вопросы из банка, поэтому обратный порядок
+    #    дал бы пустой тест (и 409 при активации).
+    for i in range(2):
+        q_payload = {
+            "subject_id": test_subject.id,
+            "user_id": user_id,
+            "text": f"Question {i}",
+            "option_a": "A",
+            "option_b": "B",
+            "option_c": "C",
+            "option_d": "D",
+            "correct_option": "a",
+        }
+        q_resp = await auth_client.post("/question/", json=q_payload)
+        assert q_resp.status_code == 201
+
+    # 2. Create Quiz — вопросы подцепляются автоматически, руками связывать не нужно
     quiz_payload = {
         "title": "Process Quiz",
         "question_number": 2,
@@ -21,31 +38,7 @@ async def test_start_quiz(auth_client, test_subject, test_group, async_db):
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
 
-    # 2. Create Questions for the subject
-    questions = []
-    for i in range(2):
-        q_payload = {
-            "subject_id": test_subject.id,
-            "user_id": user_id,
-            "text": f"Question {i}",
-            "option_a": "A",
-            "option_b": "B",
-            "option_c": "C",
-            "option_d": "D",
-            "correct_option": "a",
-        }
-        q_resp = await auth_client.post("/question/", json=q_payload)
-        questions.append(q_resp.json()["id"])
-
-    # 3. Manually link questions to quiz (since no API for it)
-    from app.modules.quiz.model import QuizQuestion
-
-    for q_id in questions:
-        qq = QuizQuestion(quiz_id=quiz_id, question_id=q_id)
-        async_db.add(qq)
-    await async_db.commit()
-
-    # 4. Start Quiz
+    # 3. Start Quiz
     start_payload = {"quiz_id": quiz_id, "pin": "1234"}
     response = await auth_client.post("/quiz_process/start_quiz", json=start_payload)
 
@@ -62,6 +55,20 @@ async def test_end_quiz(auth_client, test_subject, test_group):
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
+    # Create a question — correct_option explicitly marks which of the 4 options is right.
+    # Вопрос идёт до теста: набор фиксируется при создании теста из банка лектора.
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "What is A?",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+        "correct_option": "a",
+    }
+    await auth_client.post("/question/", json=q_payload)
+
     quiz_payload = {
         "title": "End Process Quiz",
         "question_number": 1,
@@ -74,19 +81,6 @@ async def test_end_quiz(auth_client, test_subject, test_group):
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
-
-    # Create a question — correct_option explicitly marks which of the 4 options is right.
-    q_payload = {
-        "subject_id": test_subject.id,
-        "user_id": user_id,
-        "text": "What is A?",
-        "option_a": "A",
-        "option_b": "B",
-        "option_c": "C",
-        "option_d": "D",
-        "correct_option": "a",
-    }
-    await auth_client.post("/question/", json=q_payload)
 
     # Start the attempt — this is what reserves the served questions and creates
     # the Result(status="in_progress") row, replacing the old stateless start_quiz.

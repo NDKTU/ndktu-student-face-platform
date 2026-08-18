@@ -7,7 +7,21 @@ async def test_list_results(auth_client, test_subject, test_group):
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
-    # 1. Create Quiz
+    # 1. Create Question — банк лектора наполняется до создания теста: активный
+    #    тест не может требовать больше вопросов, чем есть в банке.
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Result Q1",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+    }
+    q_resp = await auth_client.post("/question/", json=q_payload)
+    q_id = q_resp.json()["id"]
+
+    # 2. Create Quiz
     quiz_payload = {
         "title": "Result Test Quiz",
         "question_number": 1,
@@ -20,19 +34,6 @@ async def test_list_results(auth_client, test_subject, test_group):
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
-
-    # 2. Create Question
-    q_payload = {
-        "subject_id": test_subject.id,
-        "user_id": user_id,
-        "text": "Result Q1",
-        "option_a": "A",
-        "option_b": "B",
-        "option_c": "C",
-        "option_d": "D",
-    }
-    q_resp = await auth_client.post("/question/", json=q_payload)
-    q_id = q_resp.json()["id"]
 
     # 3. End Quiz (creates result)
     end_payload = {
@@ -70,6 +71,19 @@ async def test_get_result(auth_client, test_subject, test_group):
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
+    # Вопрос — до теста: набор фиксируется при создании теста из банка лектора.
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Result Q2",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+    }
+    q_resp = await auth_client.post("/question/", json=q_payload)
+    q_id = q_resp.json()["id"]
+
     quiz_payload = {
         "title": "Get Result Quiz",
         "question_number": 1,
@@ -82,18 +96,6 @@ async def test_get_result(auth_client, test_subject, test_group):
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
-
-    q_payload = {
-        "subject_id": test_subject.id,
-        "user_id": user_id,
-        "text": "Result Q2",
-        "option_a": "A",
-        "option_b": "B",
-        "option_c": "C",
-        "option_d": "D",
-    }
-    q_resp = await auth_client.post("/question/", json=q_payload)
-    q_id = q_resp.json()["id"]
 
     end_payload = {
         "quiz_id": quiz_id,
@@ -122,6 +124,19 @@ async def test_delete_result(auth_client, test_subject, test_group):
     users_resp = await auth_client.get("/user/")
     user_id = users_resp.json()["users"][0]["id"]
 
+    # Вопрос — до теста: набор фиксируется при создании теста из банка лектора.
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Result Q3",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+    }
+    q_resp = await auth_client.post("/question/", json=q_payload)
+    q_id = q_resp.json()["id"]
+
     quiz_payload = {
         "title": "Delete Result Quiz",
         "question_number": 1,
@@ -134,18 +149,6 @@ async def test_delete_result(auth_client, test_subject, test_group):
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
     quiz_id = quiz_resp.json()["id"]
-
-    q_payload = {
-        "subject_id": test_subject.id,
-        "user_id": user_id,
-        "text": "Result Q3",
-        "option_a": "A",
-        "option_b": "B",
-        "option_c": "C",
-        "option_d": "D",
-    }
-    q_resp = await auth_client.post("/question/", json=q_payload)
-    q_id = q_resp.json()["id"]
 
     end_payload = {
         "quiz_id": quiz_id,
