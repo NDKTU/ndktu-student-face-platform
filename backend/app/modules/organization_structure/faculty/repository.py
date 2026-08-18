@@ -188,9 +188,7 @@ class FacultyRepository:
         from app.modules.organization_structure.model import Group, Kafedra, Speciality
 
         kafedra_rows = (
-            await session.execute(
-                select(Kafedra.faculty_id, func.count(Kafedra.id)).group_by(Kafedra.faculty_id)
-            )
+            await session.execute(select(Kafedra.faculty_id, func.count(Kafedra.id)).group_by(Kafedra.faculty_id))
         ).all()
         speciality_rows = (
             await session.execute(

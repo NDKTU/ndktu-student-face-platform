@@ -33,8 +33,11 @@ def upgrade() -> None:
     op.drop_table("yakuniy")
     op.drop_table("student_movements")
 
-    op.drop_constraint("quizzes_semester_id_fkey", "quizzes", type_="foreignkey")
-    op.drop_column("quizzes", "semester_id")
+    # quizzes.semester_id существовал только на проде (не создавался ни одной
+    # миграцией цепочки) — на свежей базе CI этих объектов нет, поэтому
+    # удаление условное. На проде поведение не меняется.
+    op.execute("ALTER TABLE quizzes DROP CONSTRAINT IF EXISTS quizzes_semester_id_fkey")
+    op.execute("ALTER TABLE quizzes DROP COLUMN IF EXISTS semester_id")
 
     op.drop_table("semesters")
     op.drop_table("academic_years")

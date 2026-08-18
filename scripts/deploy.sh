@@ -116,6 +116,26 @@ for i in $(seq 1 30); do
     if docker exec database pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then break; fi
     sleep 2
 done
+
+# Бэкап базы ПЕРЕД миграциями: без свежего дампа изменение схемы не запускаем.
+# Дампы копятся в ./backups, храним последние 10, чтобы не забить диск.
+BACKUP_DIR="./backups"
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz"
+echo "  💾 Backing up database to $BACKUP_FILE ..."
+if docker exec database sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$BACKUP_FILE"; then
+    BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+    if [ ! -s "$BACKUP_FILE" ]; then
+        echo "  ❌ Backup file is empty — aborting before migrations."
+        exit 1
+    fi
+    echo "  ✅ Backup done ($BACKUP_SIZE)"
+    ls -1t "$BACKUP_DIR"/pre_deploy_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+else
+    echo "  ❌ pg_dump failed — aborting before migrations."
+    exit 1
+fi
+
 $COMPOSE run --rm --no-deps backend sh -c "cd /face/app && uv run alembic upgrade head"
 
 echo ""

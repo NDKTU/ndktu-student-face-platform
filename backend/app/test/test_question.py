@@ -119,5 +119,13 @@ async def test_delete_question(auth_client, test_subject):
     response = await auth_client.delete(f"/question/{question_id}")
     assert response.status_code == 204
 
+    # Удаление мягкое (is_active=False): строка остаётся читаемой напрямую,
+    # т.к. на неё могут ссылаться quiz_questions/user_answers, но из
+    # списков и будущего отбора в тесты вопрос исключается.
     response = await auth_client.get(f"/question/{question_id}")
-    assert response.status_code == 404
+    assert response.status_code == 200
+
+    list_resp = await auth_client.get(f"/question/?subject_id={test_subject.id}")
+    assert list_resp.status_code == 200
+    listed_ids = [q["id"] for q in list_resp.json()["questions"]]
+    assert question_id not in listed_ids

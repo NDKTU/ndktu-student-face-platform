@@ -15,8 +15,9 @@ async def test_quiz_upload_image(auth_client: AsyncClient, monkeypatch):
 
         monkeypatch.setattr(settings.file_url, "upload_dir", tmp_dir)
 
-        # Create a dummy image file
-        file_content = b"fake image content"
+        # Файл должен начинаться с настоящих JPEG magic-байтов: загрузка
+        # изображений теперь валидируется по сигнатуре (см. image_upload.py).
+        file_content = b"\xff\xd8\xff\xe0" + b"fake image content"
         files = {"file": ("test_image.jpg", file_content, "image/jpeg")}
 
         response = await auth_client.post("/quiz/upload", files=files)
@@ -25,7 +26,8 @@ async def test_quiz_upload_image(auth_client: AsyncClient, monkeypatch):
         data = response.json()
         assert "url" in data
 
-        # Verify that a file was written inside the temp dir
+        # Verify that a file was written inside the temp dir.
+        # save_image пишет в подпапку question/ (settings.question_upload_dir).
         filename = data["url"].split("/")[-1]
-        file_path = os.path.join(tmp_dir, filename)
+        file_path = os.path.join(tmp_dir, "question", filename)
         assert os.path.exists(file_path)

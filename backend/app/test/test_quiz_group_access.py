@@ -95,7 +95,7 @@ async def student_user_and_group(async_client, async_db, test_faculty, test_role
     await async_db.refresh(student)
 
     client = async_client
-    client.headers.update({"Authorization": token})
+    client.headers.update({"Authorization": f"Bearer {token}"})
 
     return {
         "client": client,
@@ -118,7 +118,7 @@ async def non_student_user(async_client, async_db, test_role):
     token = login_resp.json()["access_token"]
 
     client = async_client
-    client.headers.update({"Authorization": token})
+    client.headers.update({"Authorization": f"Bearer {token}"})
     return client
 
 
@@ -159,18 +159,52 @@ async def test_student_cannot_access_other_group_quiz(student_user_and_group, te
     data = student_user_and_group
     client = data["client"]
 
+    # Все фикстуры делят один httpx-клиент, и student_user_and_group оставила
+    # в заголовках токен студента. Возвращаем токен админа (test_user из
+    # conftest) для setup-фазы.
+    admin_login = await client.post("/user/login", json={"username": "test_user", "password": "password123"})
+    assert admin_login.status_code == 200, admin_login.json()
+    client.headers.update({"Authorization": f"Bearer {admin_login.json()['access_token']}"})
+
+    # Банк лектора наполняется до создания теста: активный тест без вопросов
+    # отклоняется репозиторием (Bug#7 fix).
+    users_resp = await auth_client.get("/user/")
+    assert users_resp.status_code == 200, (users_resp.status_code, users_resp.json())
+    admin_id = users_resp.json()["users"][0]["id"]
+    q_payload = {
+        "subject_id": test_subject.id,
+        "user_id": admin_id,
+        "text": "Other group Q",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+        "correct_option": "a",
+    }
+    q_resp = await auth_client.post("/question/", json=q_payload)
+    assert q_resp.status_code == 201
+
     # Create invalid quiz (Other Group)
     quiz_payload = {
         "title": "Other Group Quiz",
         "question_number": 1,
         "duration": 60,
         "pin": "2222",
+        "user_id": admin_id,
         "group_id": data["other_group_id"],  # Mismatch
         "subject_id": test_subject.id,
         "is_active": True,
     }
     quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
+    assert quiz_resp.status_code == 201, quiz_resp.json()
     quiz_id = quiz_resp.json()["id"]
+
+    # Все фикстуры делят один httpx-клиент, и auth_client (последняя в списке)
+    # оставила в заголовках токен АДМИНА. Перелогиниваемся студентом явно,
+    # иначе start_quiz выполнится от имени админа и 403 не случится.
+    login_resp = await client.post("/user/login", json={"username": "student_user", "password": "password123"})
+    assert login_resp.status_code == 200
+    client.headers.update({"Authorization": f"Bearer {login_resp.json()['access_token']}"})
 
     # Start Quiz
     start_payload = {"quiz_id": quiz_id, "pin": "2222"}
