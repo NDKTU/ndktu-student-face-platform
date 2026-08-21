@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import {
     AlertCircle,
     AlertTriangle,
@@ -10,6 +11,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import {
@@ -21,11 +23,15 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import {
+    useClearEduPlanSettings,
     useEduPlanApply,
     useEduPlanPreview,
     useEduPlanRun,
+    useEduPlanSettings,
     useEduPlanStatus,
+    useUpdateEduPlanSettings,
 } from '@/hooks/useEduPlan';
+import { KeyRound, Save, Trash2 } from 'lucide-react';
 import {
     proposalKey,
     type ApplyResponse,
@@ -49,6 +55,13 @@ const ENTITY_LABEL: Record<EduPlanEntity, string> = {
 
 /** Выбор администратора по конфликту: id локальной строки либо «создать новую». */
 type ConflictChoice = number | 'create' | undefined;
+
+/** Текст ошибки API для уведомлений: detail из ответа либо message исключения. */
+const errorText = (e: unknown) => {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    return (e as Error)?.message ?? "Noma'lum xatolik";
+};
 
 const EduPlanSyncPage = () => {
     const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useEduPlanStatus();
@@ -112,12 +125,6 @@ const EduPlanSyncPage = () => {
         setPreview(null);
     };
 
-    const errorText = (e: unknown) => {
-        const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-        if (typeof detail === 'string') return detail;
-        return (e as Error)?.message ?? "Noma'lum xatolik";
-    };
-
     const syncing = runMutation.isPending || previewMutation.isPending;
 
     return (
@@ -126,6 +133,8 @@ const EduPlanSyncPage = () => {
                 title="EduPlan bilan sinxronizatsiya"
                 description="Tashkiliy tuzilmani bir tomonlama import qilish. EduPlan tizimiga hech narsa yozilmaydi."
             />
+
+            <ConnectionSettingsCard />
 
             {/* ── 1-qadam: состояние подключения и запуск ───────────── */}
             <Card>
@@ -474,5 +483,132 @@ const Stat = ({ label, value, muted }: { label: string; value: number; muted?: b
         <div className="text-lg font-semibold">{value}</div>
     </div>
 );
+
+/** Форма учётных данных сервисного аккаунта: пароль EduPlan меняется часто,
+ *  и админ вводит его здесь, а не в .env на сервере. */
+const ConnectionSettingsCard = () => {
+    const { data: saved, isLoading } = useEduPlanSettings();
+    const updateMutation = useUpdateEduPlanSettings();
+    const clearMutation = useClearEduPlanSettings();
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [activeRole, setActiveRole] = useState('');
+    const [baseUrl, setBaseUrl] = useState('');
+
+    useEffect(() => {
+        if (!saved) return;
+        setUsername(saved.username ?? '');
+        setActiveRole(saved.active_role ?? '');
+        setBaseUrl(saved.base_url ?? '');
+        setPassword('');
+    }, [saved]);
+
+    const needsPassword = !saved?.has_password || saved.source === 'env';
+
+    const handleSave = () => {
+        if (!username.trim()) {
+            toast.error('Login kiritilishi shart');
+            return;
+        }
+        if (needsPassword && !password) {
+            toast.error('Parol kiritilishi shart');
+            return;
+        }
+        updateMutation.mutate(
+            {
+                username: username.trim(),
+                password: password || null,
+                active_role: activeRole.trim(),
+                base_url: baseUrl.trim() || null,
+            },
+            {
+                onSuccess: () => {
+                    toast.success("Ulanish ma'lumotlari saqlandi — ulanish qayta tekshirilmoqda");
+                    setPassword('');
+                },
+                onError: (e) => toast.error(errorText(e)),
+            }
+        );
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <KeyRound className="h-4 w-4 text-primary" />
+                    Ulanish sozlamalari
+                    {saved && (
+                        <span className={`badge ${saved.source === 'db' ? 'badge-primary' : 'badge-muted'}`}>
+                            {saved.source === 'db' ? "Interfeysdan kiritilgan" : 'Server sozlamalaridan (.env)'}
+                        </span>
+                    )}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    EduPlan servis akkauntining login va paroli. Parol o'zgarsa — shu yerda yangilang,
+                    serverga kirish shart emas. Parol shifrlangan holda saqlanadi va qayta ko'rsatilmaydi.
+                </p>
+                {isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+                    </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input
+                            label="Login"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="EduPlan foydalanuvchi nomi"
+                            autoComplete="off"
+                        />
+                        <Input
+                            label={saved?.has_password && saved.source === 'db' ? "Yangi parol (o'zgartirmaslik uchun bo'sh qoldiring)" : 'Parol'}
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder={saved?.has_password && saved.source === 'db' ? '••••••••' : 'EduPlan paroli'}
+                            autoComplete="new-password"
+                        />
+                        <Input
+                            label="Faol rol (X-Active-Role)"
+                            value={activeRole}
+                            onChange={(e) => setActiveRole(e.target.value)}
+                            placeholder="masalan, admin"
+                        />
+                        <Input
+                            label="EduPlan manzili"
+                            value={baseUrl}
+                            onChange={(e) => setBaseUrl(e.target.value)}
+                            placeholder="https://edu.plan.nsumt.uz/rest"
+                        />
+                    </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleSave} isLoading={updateMutation.isPending} disabled={isLoading}>
+                        <Save className="mr-2 h-4 w-4" />
+                        Saqlash va ulanishni tekshirish
+                    </Button>
+                    {saved?.source === 'db' && (
+                        <Button
+                            variant="outline"
+                            className="text-destructive border-destructive hover:bg-destructive/10"
+                            onClick={() =>
+                                clearMutation.mutate(undefined, {
+                                    onSuccess: () => toast.success("Saqlangan ma'lumotlar o'chirildi — server sozlamalari ishlatiladi"),
+                                    onError: (e) => toast.error(errorText(e)),
+                                })
+                            }
+                            isLoading={clearMutation.isPending}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Saqlanganni o'chirish
+                        </Button>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
 export default EduPlanSyncPage;

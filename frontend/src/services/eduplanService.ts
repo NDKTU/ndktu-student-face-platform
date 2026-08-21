@@ -80,8 +80,29 @@ export interface EduPlanStatus {
     configured: boolean;
     reachable: boolean;
     base_url: string;
+    /** 'db' — учётные данные введены в интерфейсе, 'env' — из переменных окружения */
+    source?: 'db' | 'env';
     detail?: string;
     active_academic_year?: { id: number; name: string } | null;
+}
+
+/** Настройки подключения, как их показывает API: пароль наружу не отдаётся. */
+export interface EduPlanSettings {
+    source: 'db' | 'env';
+    base_url: string;
+    username: string;
+    active_role: string;
+    has_password: boolean;
+    enabled: boolean;
+    updated_at?: string | null;
+}
+
+export interface EduPlanSettingsPayload {
+    base_url?: string | null;
+    username: string;
+    /** Пустое значение = оставить прежний пароль */
+    password?: string | null;
+    active_role: string;
 }
 
 export interface WorkloadSyncResult {
@@ -130,6 +151,17 @@ export const eduplanService = {
     run: async () => {
         const response = await api.post<RunResponse>('/integration/eduplan/run');
         return response.data;
+    },
+    getSettings: async () => {
+        const response = await api.get<EduPlanSettings>('/integration/eduplan/settings');
+        return response.data;
+    },
+    updateSettings: async (payload: EduPlanSettingsPayload) => {
+        const response = await api.put<EduPlanSettings>('/integration/eduplan/settings', payload);
+        return response.data;
+    },
+    clearSettings: async () => {
+        await api.delete('/integration/eduplan/settings');
     },
     apply: async (payload: {
         run_id: string;

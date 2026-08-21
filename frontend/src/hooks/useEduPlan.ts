@@ -12,6 +12,36 @@ export const useEduPlanStatus = () => {
     });
 };
 
+export const useEduPlanSettings = () =>
+    useQuery({
+        queryKey: ['eduplan', 'settings'],
+        queryFn: () => eduplanService.getSettings(),
+        refetchOnWindowFocus: false,
+    });
+
+/** Сохранение учётных данных: после него статус подключения нужно перепроверить. */
+export const useUpdateEduPlanSettings = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: eduplanService.updateSettings,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['eduplan', 'settings'] });
+            queryClient.invalidateQueries({ queryKey: ['eduplan', 'status'] });
+        },
+    });
+};
+
+export const useClearEduPlanSettings = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => eduplanService.clearSettings(),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['eduplan', 'settings'] });
+            queryClient.invalidateQueries({ queryKey: ['eduplan', 'status'] });
+        },
+    });
+};
+
 export const useEduPlanPreview = () => {
     return useMutation({
         mutationFn: () => eduplanService.preview(),

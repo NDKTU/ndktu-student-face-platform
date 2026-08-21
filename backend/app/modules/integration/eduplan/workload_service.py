@@ -30,6 +30,7 @@ from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
 
 from .client import EduPlanClient
+from .credentials import effective_config
 from .schemas import EduPlanStream, EduPlanWorkload
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class EduPlanWorkloadService:
     async def sync(self, session: AsyncSession, academic_year_id: int | None = None) -> dict:
-        async with EduPlanClient() as client:
+        async with EduPlanClient(await effective_config(session)) as client:
             if academic_year_id is None:
                 years = await client.academic_years()
                 active = next((y for y in years if y.get("is_active")), None)

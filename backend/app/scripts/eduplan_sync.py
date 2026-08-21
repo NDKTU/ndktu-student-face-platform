@@ -32,11 +32,11 @@ sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
 # Блок обязан идти после правки sys.path — сортировка импортов его сломает.
 # isort: off
 import app.core.database.models_registry  # noqa: E402,F401 — регистрирует модели до резолва связей
-from core.config import settings  # noqa: E402
 from core.database.db_helper import db_helper  # noqa: E402
 from core.redis_client import redis_client  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
+from app.modules.integration.eduplan.credentials import effective_config  # noqa: E402
 from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner  # noqa: E402
 from app.modules.integration.eduplan.workload_service import (  # noqa: E402
     eduplan_workload_service,
@@ -60,15 +60,18 @@ def _configure_logging(verbose: bool) -> None:
 
 
 async def _run(args: argparse.Namespace) -> int:
-    if not settings.eduplan.is_configured:
-        logger.error(
-            "Интеграция с EduPlan не настроена. Заполните APP_CONFIG__EDUPLAN__USERNAME/PASSWORD "
-            "и выставьте APP_CONFIG__EDUPLAN__ENABLED=true."
-        )
-        return EXIT_FAILED
-
     try:
         async with db_helper.session_factory() as session:
+            # Креды могли быть введены администратором в интерфейсе — тогда
+            # переменные окружения не обязательны.
+            cfg = await effective_config(session)
+            if not cfg.is_configured:
+                logger.error(
+                    "Интеграция с EduPlan не настроена: введите логин и пароль на экране "
+                    "синхронизации либо заполните APP_CONFIG__EDUPLAN__USERNAME/PASSWORD "
+                    "и выставьте APP_CONFIG__EDUPLAN__ENABLED=true."
+                )
+                return EXIT_FAILED
             if args.workloads_only:
                 result = await eduplan_workload_service.sync(session, args.academic_year_id)
             else:

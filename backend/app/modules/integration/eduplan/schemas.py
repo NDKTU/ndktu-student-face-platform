@@ -232,3 +232,27 @@ class ApplyResponse(BaseModel):
     run_id: str
     results: list[ApplyResult]
     finished_at: str
+
+
+# ---------------------------------------------------------------------- #
+#  Учётные данные сервисного аккаунта (вводятся в интерфейсе)
+# ---------------------------------------------------------------------- #
+class EduPlanSettingsIn(BaseModel):
+    """Форма «Ulanish sozlamalari». Пустой ``password`` = оставить прежний."""
+
+    base_url: Optional[str] = Field(default=None, max_length=255)
+    username: str = Field(min_length=1, max_length=150)
+    password: Optional[str] = Field(default=None, max_length=255)
+    active_role: str = Field(default="", max_length=50)
+
+
+class EduPlanSettingsOut(BaseModel):
+    """Всё, что можно показать: пароль наружу не отдаётся никогда."""
+
+    source: str  # "db" — введено в интерфейсе, "env" — из переменных окружения
+    base_url: str
+    username: str
+    active_role: str
+    has_password: bool
+    enabled: bool
+    updated_at: Optional[Any] = None

@@ -35,6 +35,7 @@ __all__ = [
     "TeacherAssignment",
     "Department",
     "Resource",
+    "EduPlanCredential",
 ]
 
 from app.modules.auth.model import (
@@ -57,6 +58,9 @@ from app.modules.course.model import (
     Lesson,
     LessonResult,
     Resource,
+)
+from app.modules.integration.eduplan.model import (
+    EduPlanCredential,
 )
 from app.modules.organization_structure.model import (
     Department,

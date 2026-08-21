@@ -32,6 +32,7 @@ from app.modules.organization_structure.model import (
 from app.modules.quiz.model import Subject
 
 from .client import EduPlanClient
+from .credentials import effective_config
 from .repository import eduplan_repository, normalize_name
 from .schemas import (
     SYNC_ORDER,
@@ -81,7 +82,7 @@ class EduPlanSyncService:
     #  Фаза 1: предпросмотр
     # ------------------------------------------------------------------ #
     async def build_preview(self, session: AsyncSession) -> PreviewResponse:
-        async with EduPlanClient() as client:
+        async with EduPlanClient(await effective_config(session)) as client:
             snapshot = {
                 "faculties": await client.faculties(),
                 "departments": await client.departments(),

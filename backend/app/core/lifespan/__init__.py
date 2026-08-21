@@ -84,7 +84,9 @@ async def _shutdown(redis_client) -> None:
 def _start_eduplan_schedule() -> "asyncio.Task | None":
     """Ночная синхронизация с EduPlan, если она включена и настроена."""
     cfg = settings.eduplan
-    if not (cfg.schedule_enabled and cfg.is_configured):
+    # Креды могут лежать в базе (введены в интерфейсе), поэтому здесь проверяем
+    # только сам флаг расписания; сам прогон возьмёт актуальную конфигурацию.
+    if not cfg.schedule_enabled:
         return None
 
     from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner

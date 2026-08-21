@@ -14,7 +14,7 @@ from types import TracebackType
 from typing import Any
 
 import httpx
-from core.config import settings
+from core.config import EduPlanConfig, settings
 from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,15 @@ class EduPlanClient:
     состояние, которое нужно инвалидировать.
     """
 
-    def __init__(self) -> None:
-        cfg = settings.eduplan
+    def __init__(self, cfg: EduPlanConfig | None = None) -> None:
+        # cfg приходит из credentials.effective_config(): строка, введённая
+        # администратором, либо переменные окружения. Без аргумента — окружение,
+        # чтобы старые вызовы и скрипты продолжали работать.
+        cfg = cfg or settings.eduplan
         if not cfg.is_configured:
             raise EduPlanError(
-                "Интеграция с EduPlan не настроена: заполните APP_CONFIG__EDUPLAN__*",
+                "EduPlan integratsiyasi sozlanmagan: sinxronizatsiya sahifasida "
+                "login va parolni kiriting yoki APP_CONFIG__EDUPLAN__* ni to‘ldiring",
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         self._cfg = cfg
@@ -75,19 +79,19 @@ class EduPlanClient:
             )
         except httpx.RequestError as e:
             raise EduPlanError(
-                f"EduPlan недоступен: {e}",
+                f"EduPlan bilan bog‘lanib bo‘lmadi: {e}",
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if resp.status_code != 200:
             raise EduPlanError(
-                f"EduPlan отклонил вход сервисного аккаунта (HTTP {resp.status_code})",
+                f"EduPlan servis akkaunti login yoki parolini qabul qilmadi (HTTP {resp.status_code})",
                 status_code=status.HTTP_502_BAD_GATEWAY,
             )
 
         token = resp.json().get("access_token")
         if not token:
-            raise EduPlanError("EduPlan вернул ответ на логин без access_token")
+            raise EduPlanError("EduPlan login javobida access_token yo‘q")
 
         logger.info("EduPlan: сервисный аккаунт %s аутентифицирован", self._cfg.username)
         return token
@@ -110,7 +114,7 @@ class EduPlanClient:
                 resp = await self._client.get(url, params=clean_params, headers=self._headers())
             except httpx.RequestError as e:
                 raise EduPlanError(
-                    f"EduPlan недоступен при запросе {path}: {e}",
+                    f"EduPlan {path} so‘rovida javob bermadi: {e}",
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
 
@@ -128,11 +132,11 @@ class EduPlanClient:
                 )
 
             if resp.status_code != 200:
-                raise EduPlanError(f"EduPlan вернул HTTP {resp.status_code} на {path}")
+                raise EduPlanError(f"EduPlan {path} uchun HTTP {resp.status_code} qaytardi")
 
             return resp.json()
 
-        raise EduPlanError(f"EduPlan не авторизовал запрос {path} после повторного входа")
+        raise EduPlanError(f"EduPlan {path} so‘rovini qayta kirishdan keyin ham ruxsat bermadi")
 
     # ------------------------------------------------------------------ #
     #  Обход пагинации
