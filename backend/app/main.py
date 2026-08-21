@@ -12,7 +12,16 @@ from app.core.lifespan import lifespan
 from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.modules.router import router
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="NDKTU Platform API",
+    version="1.0.0",
+    description=(
+        "Talabalar va o'qituvchilar uchun yagona ta'lim platformasi: testlar, "
+        "natijalar, psixologik metodikalar, tashkiliy tuzilma va EduPlan integratsiyasi. "
+        "Barcha endpointlar `/api` prefiksi ostida; avtorizatsiya — Bearer JWT."
+    ),
+    lifespan=lifespan,
+)
 
 # Ensure upload directory (and its purpose-based subfolders) exist
 os.makedirs(settings.absolute_upload_dir, exist_ok=True)
