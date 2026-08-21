@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Plus, Search } from 'lucide-react';
-import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz } from '@/hooks/useQuizzes';
+import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz, useQuizCatalog } from '@/hooks/useQuizzes';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers } from '@/hooks/useTeachers';
-import type { Quiz, QuizCreateRequest } from '@/services/quizService';
+import type { Quiz, QuizCatalogFaculty, QuizCatalogSubject, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
@@ -19,6 +19,11 @@ import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
+import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
+import { HierarchyHeader } from '@/components/catalog/HierarchyHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const QuizzesPage = () => {
     const { user, hasPermission } = useAuth();
@@ -44,6 +49,9 @@ const QuizzesPage = () => {
     const [filterUserId, setFilterUserId] = useState<number | undefined>(undefined);
     const [filterIsActive, setFilterIsActive] = useState<boolean | undefined>(undefined);
     const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+    const [selectedFaculty, setSelectedFaculty] = useState<QuizCatalogFaculty | null>(null);
+    const [selectedCatalogSubject, setSelectedCatalogSubject] = useState<QuizCatalogSubject | null>(null);
+    const quizCatalog = useQuizCatalog();
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -179,7 +187,7 @@ const QuizzesPage = () => {
     const getGroupName = (id?: number) => allGroups.find((g: Group) => g.id === id)?.name || '-';
 
     const clearFilters = () => {
-        setFilterSubjectId(undefined);
+        setFilterSubjectId(selectedCatalogSubject?.subject_id);
         setFilterGroupId(undefined);
         setFilterUserId(undefined);
         setFilterIsActive(undefined);
@@ -195,11 +203,83 @@ const QuizzesPage = () => {
         searchTerm !== '' ||
         sortDir !== 'desc';
 
+    if (!selectedFaculty) {
+        return (
+            <div className="space-y-6">
+                <PageHeader
+                    title="Testlar"
+                    description="Fakultetni tanlang va testlarni ko'ring"
+                    actions={!isTeacher ? <Button onClick={handleCreateQuiz}><Plus className="mr-2 h-4 w-4" />Test yaratish</Button> : undefined}
+                />
+                {quizCatalog.isError ? <ErrorState onRetry={() => quizCatalog.refetch()} /> : quizCatalog.isLoading ? (
+                    <CatalogGrid>{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}</CatalogGrid>
+                ) : (quizCatalog.data?.length ?? 0) === 0 ? (
+                    <EmptyState title="Testlar topilmadi" description="Hozircha fakultetga biriktirilgan test mavjud emas." />
+                ) : (
+                    <CatalogGrid>
+                        {quizCatalog.data?.map((faculty) => (
+                            <CatalogCard
+                                key={faculty.faculty_id}
+                                id={faculty.faculty_id}
+                                title={faculty.faculty_name}
+                                subtitle="Fakultet testlari"
+                                metrics={[
+                                    { label: 'Test', value: faculty.quiz_count },
+                                    { label: 'Faol', value: faculty.active_count, accent: true },
+                                ]}
+                                onClick={() => setSelectedFaculty(faculty)}
+                            />
+                        ))}
+                    </CatalogGrid>
+                )}
+                <QuizModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} quiz={selectedQuiz} teachers={allTeachers} onSuccess={handleSuccess} />
+            </div>
+        );
+    }
+
+    if (!selectedCatalogSubject) {
+        return (
+            <div className="space-y-6">
+                <HierarchyHeader
+                    title={selectedFaculty.faculty_name}
+                    description="Fanni tanlang va testlarni ko'ring"
+                    onBack={() => setSelectedFaculty(null)}
+                    actions={!isTeacher ? <Button onClick={handleCreateQuiz}><Plus className="mr-2 h-4 w-4" />Test yaratish</Button> : undefined}
+                />
+                {selectedFaculty.subjects.length === 0 ? (
+                    <EmptyState title="Fanlar topilmadi" description="Ushbu fakultetda test mavjud emas." />
+                ) : (
+                    <CatalogGrid>
+                        {selectedFaculty.subjects.map((subject) => (
+                            <CatalogCard
+                                key={subject.subject_id}
+                                id={subject.subject_id}
+                                title={subject.subject_name}
+                                subtitle="Fan testlari"
+                                metrics={[
+                                    { label: 'Test', value: subject.quiz_count },
+                                    { label: 'Faol', value: subject.active_count, accent: true },
+                                ]}
+                                onClick={() => {
+                                    setSelectedCatalogSubject(subject);
+                                    setFilterSubjectId(subject.subject_id);
+                                    setCurrentPage(1);
+                                }}
+                            />
+                        ))}
+                    </CatalogGrid>
+                )}
+                <QuizModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} quiz={selectedQuiz} teachers={allTeachers} onSuccess={handleSuccess} />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
-            <PageHeader
-                title="Testlar"
-                description="Testlarni va topshiriqlarni boshqarish"
+            <HierarchyHeader
+                title={selectedCatalogSubject.subject_name}
+                description={`${selectedFaculty.faculty_name} · Testlar`}
+                onBack={() => { setSelectedCatalogSubject(null); setFilterSubjectId(undefined); setCurrentPage(1); }}
                 actions={
                     <>
                         <div className="relative">

@@ -4,6 +4,10 @@ export interface Group {
     id: number;
     name: string;
     faculty_id: number;
+    speciality_id?: number | null;
+    course?: number | null;
+    education_shape?: string | null;
+    student_count?: number | null;
     created_at: string;
     updated_at: string;
     // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
@@ -37,11 +41,12 @@ export interface GroupStudentListResponse {
 }
 
 export const groupService = {
-    getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number) => {
+    getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number, speciality_id?: number) => {
         const params: any = { page, limit };
         if (search) params.name = search;
         if (teacher_id) params.teacher_id = teacher_id;
         if (faculty_id) params.faculty_id = faculty_id;
+        if (speciality_id) params.speciality_id = speciality_id;
 
         const response = await api.get<GroupListResponse>('/group/', { params });
         return response.data;

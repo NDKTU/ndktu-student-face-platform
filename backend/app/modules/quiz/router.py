@@ -14,6 +14,7 @@ from .model import Result
 from .question.repository import get_question_repository
 from .question.schemas import (
     QuestionBulkDeleteRequest,
+    QuestionCatalogResponse,
     QuestionCreateRequest,
     QuestionCreateResponse,
     QuestionExcelUploadResponse,
@@ -23,6 +24,8 @@ from .question.schemas import (
 from .quiz.repository import get_quiz_repository
 from .quiz.schemas import (
     AvailableQuestionsResponse,
+    QuizAnalyticsResponse,
+    QuizCatalogResponse,
     QuizCreateRequest,
     QuizCreateResponse,
     QuizListRequest,
@@ -183,6 +186,17 @@ async def create_question(
     return result
 
 
+@question_router.get("/catalog", response_model=QuestionCatalogResponse)
+async def get_question_catalog(
+    search: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:question")),
+):
+    return await get_question_repository.get_catalog(
+        session=session, current_user=current_user, search=search
+    )
+
+
 @question_router.get("/{question_id}", response_model=QuestionCreateResponse)
 async def get_question(
     question_id: int,
@@ -337,6 +351,14 @@ async def list_active_quizzes(
     return await get_quiz_repository.list_quizzes(session=session, request=data, current_user=current_user)
 
 
+@quiz_router.get("/catalog", response_model=QuizCatalogResponse)
+async def get_quiz_catalog(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:quiz")),
+):
+    return await get_quiz_repository.get_catalog(session=session, current_user=current_user)
+
+
 @quiz_router.get("/{quiz_id}", response_model=QuizCreateResponse)
 async def get_quiz(
     quiz_id: int,
@@ -344,6 +366,15 @@ async def get_quiz(
     _: PermissionRequired = Depends(PermissionRequired("read:quiz")),
 ):
     return await get_quiz_repository.get_quiz(session=session, quiz_id=quiz_id)
+
+
+@quiz_router.get("/{quiz_id}/analytics", response_model=QuizAnalyticsResponse)
+async def get_quiz_analytics(
+    quiz_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:result")),
+):
+    return await get_quiz_repository.get_analytics(session=session, quiz_id=quiz_id)
 
 
 @quiz_router.get("/", response_model=QuizListResponse)

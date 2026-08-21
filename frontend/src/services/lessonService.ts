@@ -17,15 +17,32 @@ export interface LessonGroupInfo {
     name: string;
 }
 
+export interface LessonTopicInfo {
+    id: number;
+    title: string;
+    order_index: number;
+}
+
+export interface LessonResourceInfo {
+    id: number;
+    resource_type: string;
+    title: string;
+    file_url?: string | null;
+    link_url?: string | null;
+    order_index: number;
+}
+
 export type LessonType = 'lecture' | 'seminar' | 'independent' | 'lab';
 
 export interface Lesson {
     id: number;
     subject_teacher_id: number;
     group_id: number;
+    course_id: number;
     sinf_id?: number | null;
     topic_id?: number | null;
     lesson_type?: LessonType | null;
+    duration_minutes?: number | null;
     topic: string;
     date: string;
     description?: string | null;
@@ -33,6 +50,8 @@ export interface Lesson {
     updated_at: string;
     subject_teacher?: LessonSubjectTeacherInfo | null;
     group?: LessonGroupInfo | null;
+    course_topic?: LessonTopicInfo | null;
+    resources: LessonResourceInfo[];
 }
 
 export interface LessonListResponse {
@@ -45,9 +64,11 @@ export interface LessonListResponse {
 export interface LessonCreateRequest {
     subject_teacher_id?: number;
     group_id: number;
+    course_id?: number;
     sinf_id?: number | null;
     topic_id?: number | null;
     lesson_type?: LessonType | null;
+    duration_minutes?: number | null;
     topic: string;
     date: string;
     description?: string | null;
@@ -56,9 +77,11 @@ export interface LessonCreateRequest {
 export interface LessonUpdateRequest {
     subject_teacher_id?: number;
     group_id?: number;
+    course_id?: number;
     sinf_id?: number | null;
     topic_id?: number | null;
     lesson_type?: LessonType | null;
+    duration_minutes?: number | null;
     topic?: string;
     date?: string;
     description?: string | null;
@@ -67,6 +90,7 @@ export interface LessonUpdateRequest {
 export interface LessonListParams {
     subject_teacher_id?: number;
     group_id?: number;
+    course_id?: number;
     sinf_id?: number;
     topic_id?: number;
     date_from?: string;

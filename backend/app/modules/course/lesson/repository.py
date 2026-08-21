@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.course.course.repository import get_course_repository
-from app.modules.course.model import Course, CourseGroup, Lesson, LessonResult
+from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson, LessonResult
 from app.modules.organization_structure.model import GroupTeacher
 from app.modules.quiz.model import SubjectTeacher
 
@@ -98,6 +98,17 @@ class LessonRepository:
         subject_teacher = await get_course_repository.get_or_create_subject_teacher_for_course(session, course)
         return course, subject_teacher, group_id
 
+    async def _validate_topic(self, session: AsyncSession, course_id: int, topic_id: int | None) -> None:
+        if topic_id is None:
+            return
+        topic = (
+            await session.execute(
+                select(CourseTopic.id).where(CourseTopic.id == topic_id, CourseTopic.course_id == course_id)
+            )
+        ).scalar_one_or_none()
+        if topic is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic does not belong to this Course")
+
     # ── Lessons ──────────────────────────────────────────────────────────────
 
     async def create_lesson(
@@ -111,12 +122,15 @@ class LessonRepository:
         _, subject_teacher, _ = await self._resolve_course_context(
             session, data.course_id, current_user, data.group_id, is_admin
         )
+        await self._validate_topic(session, data.course_id, data.topic_id)
 
         new_lesson = Lesson(
             subject_teacher_id=subject_teacher.id,
             group_id=data.group_id,
             course_id=data.course_id,
+            topic_id=data.topic_id,
             lesson_type=data.lesson_type,
+            duration_minutes=data.duration_minutes,
             topic=data.topic,
             date=data.date,
             description=data.description,
@@ -142,6 +156,8 @@ class LessonRepository:
             .options(
                 selectinload(Lesson.subject_teacher).selectinload(SubjectTeacher.subject),
                 selectinload(Lesson.group),
+                selectinload(Lesson.course_topic),
+                selectinload(Lesson.resources),
             )
             .where(Lesson.id == lesson_id)
         )
@@ -162,6 +178,8 @@ class LessonRepository:
         stmt = select(Lesson).options(
             selectinload(Lesson.subject_teacher).selectinload(SubjectTeacher.subject),
             selectinload(Lesson.group),
+            selectinload(Lesson.course_topic),
+            selectinload(Lesson.resources),
         )
 
         is_admin = await self._is_role(current_user, "admin")
@@ -211,7 +229,12 @@ class LessonRepository:
         if request.date_to:
             stmt = stmt.where(Lesson.date <= request.date_to)
 
-        stmt = stmt.order_by(desc(Lesson.date), desc(Lesson.id))
+        if request.course_id is not None:
+            stmt = stmt.outerjoin(CourseTopic, CourseTopic.id == Lesson.topic_id).order_by(
+                CourseTopic.order_index.asc().nullslast(), Lesson.id.asc()
+            )
+        else:
+            stmt = stmt.order_by(desc(Lesson.date), desc(Lesson.id))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
@@ -258,8 +281,13 @@ class LessonRepository:
             lesson.subject_teacher_id = data.subject_teacher_id
         if data.group_id is not None:
             lesson.group_id = data.group_id
+        if data.topic_id is not None:
+            await self._validate_topic(session, data.course_id or lesson.course_id, data.topic_id)
+            lesson.topic_id = data.topic_id
         if data.lesson_type is not None:
             lesson.lesson_type = data.lesson_type
+        if data.duration_minutes is not None:
+            lesson.duration_minutes = data.duration_minutes
         if data.topic is not None:
             lesson.topic = data.topic
         if data.date is not None:

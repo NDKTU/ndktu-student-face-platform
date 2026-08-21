@@ -50,7 +50,52 @@ export interface QuizListResponse {
     quizzes: Quiz[];
 }
 
+export interface QuizCatalogSubject {
+    subject_id: number;
+    subject_name: string;
+    quiz_count: number;
+    active_count: number;
+}
+
+export interface QuizCatalogFaculty {
+    faculty_id: number;
+    faculty_name: string;
+    quiz_count: number;
+    active_count: number;
+    subjects: QuizCatalogSubject[];
+}
+
+export interface QuizQuestionAnalytics {
+    question_id: number;
+    question_text: string;
+    answer_count: number;
+    correct_count: number;
+    wrong_count: number;
+    correct_percent: number;
+}
+
+export interface QuizAnalytics {
+    quiz_id: number;
+    total_students: number;
+    submitted_count: number;
+    average_grade?: number | null;
+    minimum_grade?: number | null;
+    maximum_grade?: number | null;
+    average_duration_seconds?: number | null;
+    questions: QuizQuestionAnalytics[];
+}
+
 export const quizService = {
+    getCatalog: async () => {
+        const response = await api.get<{ faculties: QuizCatalogFaculty[] }>('/quiz/catalog');
+        return response.data.faculties;
+    },
+
+    getAnalytics: async (id: number): Promise<QuizAnalytics> => {
+        const response = await api.get<QuizAnalytics>(`/quiz/${id}/analytics`);
+        return response.data;
+    },
+
     getQuizzes: async (page = 1, limit = 10, title?: string, is_active?: boolean, user_id?: number, group_id?: number, subject_id?: number, sort_dir?: string) => {
         const response = await api.get<QuizListResponse>('/quiz/', {
             params: { page, limit, title, is_active, user_id, group_id, subject_id, sort_dir },

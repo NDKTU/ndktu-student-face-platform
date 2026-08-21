@@ -76,6 +76,12 @@ class Course(Base, IdIntPk, TimestampMixin):
         "Lesson",
         back_populates="course",
     )
+    topics: Mapped[list["CourseTopic"]] = relationship(
+        "CourseTopic",
+        back_populates="course",
+        cascade="all, delete-orphan",
+        order_by="CourseTopic.order_index",
+    )
 
     resources: Mapped[list["Resource"]] = relationship(
         "Resource",
@@ -111,6 +117,25 @@ class CourseGroup(Base, IdIntPk, TimestampMixin):
         return f"CourseGroup course={self.course_id} group={self.group_id}"
 
 
+class CourseTopic(Base, IdIntPk, TimestampMixin):
+    __tablename__ = "course_topics"
+
+    course_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    course: Mapped["Course"] = relationship("Course", back_populates="topics")
+    lessons: Mapped[list["Lesson"]] = relationship("Lesson", back_populates="course_topic")
+
+    def __str__(self):
+        return f"CourseTopic {self.id} ({self.title})"
+
+
 class Lesson(Base, IdIntPk, TimestampMixin):
     __tablename__ = "lessons"
 
@@ -134,8 +159,15 @@ class Lesson(Base, IdIntPk, TimestampMixin):
         nullable=False,
         index=True,
     )
+    topic_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("course_topics.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     lesson_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     date: Mapped[date_type] = mapped_column(Date, nullable=False)
@@ -144,6 +176,7 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     subject_teacher: Mapped["SubjectTeacher"] = relationship("SubjectTeacher")
     group: Mapped["Group"] = relationship("Group")
     course: Mapped["Course"] = relationship("Course", back_populates="lessons")
+    course_topic: Mapped["CourseTopic | None"] = relationship("CourseTopic", back_populates="lessons")
     results: Mapped[list["LessonResult"]] = relationship(
         "LessonResult", back_populates="lesson", cascade="all, delete-orphan"
     )

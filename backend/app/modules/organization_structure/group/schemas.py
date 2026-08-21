@@ -21,6 +21,10 @@ class GroupCreateResponse(ExternalRefFields):
     id: int
     name: str
     faculty_id: int
+    speciality_id: Optional[int] = None
+    course: Optional[int] = None
+    education_shape: Optional[str] = None
+    student_count: Optional[int] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
@@ -32,6 +36,7 @@ class GroupCreateResponse(ExternalRefFields):
 class GroupListRequest(BaseModel):
     name: Optional[str] = None
     faculty_id: Optional[int] = None
+    speciality_id: Optional[int] = None
     teacher_id: Optional[int] = None
 
     page: int = 1

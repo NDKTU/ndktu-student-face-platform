@@ -27,6 +27,7 @@ from .course.schemas import (
     CourseListRequest,
     CourseListResponse,
     CourseResponse,
+    CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
 from .lesson.repository import get_lesson_repository
@@ -46,6 +47,13 @@ from .resource.schemas import (
     ResourceListResponse,
     ResourceResponse,
     ResourceUpdateRequest,
+)
+from .topic.repository import get_course_topic_repository
+from .topic.schemas import (
+    CourseTopicCreateRequest,
+    CourseTopicListResponse,
+    CourseTopicResponse,
+    CourseTopicUpdateRequest,
 )
 
 if TYPE_CHECKING:
@@ -96,13 +104,35 @@ async def list_courses(
     )
 
 
+@course_router.get("/teachers/summary", response_model=CourseTeacherSummaryResponse)
+async def list_course_teacher_summaries(
+    search: str | None = None,
+    faculty_id: int | None = None,
+    kafedra_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
+):
+    return await get_course_repository.list_teacher_summaries(
+        session=session,
+        current_user=current_user,
+        restrict_to_teacher=not _is_admin(current_user),
+        search=search,
+        faculty_id=faculty_id,
+        kafedra_id=kafedra_id,
+    )
+
+
 @course_router.get("/{course_id}", response_model=CourseResponse)
 async def get_course(
     course_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:course")),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
 ):
-    return await get_course_repository.get_course(session=session, course_id=course_id)
+    return await get_course_repository.get_course(
+        session=session,
+        course_id=course_id,
+        current_user=current_user,
+    )
 
 
 @course_router.put(
@@ -130,6 +160,54 @@ async def delete_course(
     _: "User" = Depends(PermissionRequired("delete:course")),
 ):
     await get_course_repository.delete_course(session=session, course_id=course_id)
+
+
+# ============================================================================
+#  COURSE TOPIC
+# ============================================================================
+topic_router = APIRouter(tags=["Course Topic"], prefix="/course-topic")
+
+
+@topic_router.post(
+    "/",
+    response_model=CourseTopicResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+)
+async def create_course_topic(
+    data: CourseTopicCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("create:lesson")),
+):
+    return await get_course_topic_repository.create_topic(session, data, current_user)
+
+
+@topic_router.get("/", response_model=CourseTopicListResponse)
+async def list_course_topics(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:lesson")),
+):
+    return await get_course_topic_repository.list_topics(session, course_id, current_user)
+
+
+@topic_router.put("/{topic_id}", response_model=CourseTopicResponse)
+async def update_course_topic(
+    topic_id: int,
+    data: CourseTopicUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:lesson")),
+):
+    return await get_course_topic_repository.update_topic(session, topic_id, data, current_user)
+
+
+@topic_router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_course_topic(
+    topic_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("delete:lesson")),
+):
+    await get_course_topic_repository.delete_topic(session, topic_id, current_user)
 
 
 # ============================================================================
@@ -455,6 +533,7 @@ async def delete_resource(
 # ============================================================================
 router = APIRouter()
 router.include_router(course_router)
+router.include_router(topic_router)
 router.include_router(lesson_router)
 router.include_router(assignment_router)
 router.include_router(resource_router)

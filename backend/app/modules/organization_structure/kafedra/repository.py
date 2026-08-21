@@ -12,12 +12,55 @@ from .schemas import (
     KafedraCreateRequest,
     KafedraListRequest,
     KafedraListResponse,
+    KafedraStatsItem,
+    KafedraStatsResponse,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class KafedraRepository:
+    async def get_kafedra_stats(
+        self, session: AsyncSession, faculty_id: int | None = None
+    ) -> KafedraStatsResponse:
+        """Return catalogue counters without downloading all related rows."""
+        from app.modules.auth.model import Teacher
+        from app.modules.organization_structure.model import Speciality
+
+        kafedra_stmt = select(Kafedra.id)
+        if faculty_id is not None:
+            kafedra_stmt = kafedra_stmt.where(Kafedra.faculty_id == faculty_id)
+        kafedra_ids = list((await session.execute(kafedra_stmt)).scalars().all())
+        if not kafedra_ids:
+            return KafedraStatsResponse(stats=[])
+
+        speciality_rows = (
+            await session.execute(
+                select(Speciality.kafedra_id, func.count(Speciality.id))
+                .where(Speciality.kafedra_id.in_(kafedra_ids))
+                .group_by(Speciality.kafedra_id)
+            )
+        ).all()
+        teacher_rows = (
+            await session.execute(
+                select(Teacher.kafedra_id, func.count(Teacher.id))
+                .where(Teacher.kafedra_id.in_(kafedra_ids))
+                .group_by(Teacher.kafedra_id)
+            )
+        ).all()
+        specialities = dict(speciality_rows)
+        teachers = dict(teacher_rows)
+        return KafedraStatsResponse(
+            stats=[
+                KafedraStatsItem(
+                    kafedra_id=kafedra_id,
+                    speciality_count=specialities.get(kafedra_id, 0),
+                    teacher_count=teachers.get(kafedra_id, 0),
+                )
+                for kafedra_id in kafedra_ids
+            ]
+        )
+
     async def create_kafedra(self, session: AsyncSession, data: KafedraCreateRequest) -> Kafedra:
         stmt_check = select(Kafedra).where(Kafedra.name == data.name)
         result_check = await session.execute(stmt_check)

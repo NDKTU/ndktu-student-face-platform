@@ -21,6 +21,17 @@ export const useCourses = (
     });
 };
 
+export const useCourseTeacherSummaries = (
+    search?: string,
+    facultyId?: number,
+    kafedraId?: number,
+    enabled = true,
+) => useQuery({
+    queryKey: ['course-teacher-summaries', search, facultyId, kafedraId],
+    queryFn: () => courseService.getTeacherSummaries(search, facultyId, kafedraId),
+    enabled,
+});
+
 export const useCourse = (id?: number) => {
     return useQuery({
         queryKey: ['course', id],
@@ -35,6 +46,7 @@ export const useCreateCourse = () => {
         mutationFn: (data: CourseCreateRequest) => courseService.createCourse(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['courses'] });
+            queryClient.invalidateQueries({ queryKey: ['course-teacher-summaries'] });
         },
     });
 };
@@ -45,6 +57,7 @@ export const useUpdateCourse = () => {
         mutationFn: ({ id, data }: { id: number; data: CourseUpdateRequest }) => courseService.updateCourse(id, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['courses'] });
+            queryClient.invalidateQueries({ queryKey: ['course-teacher-summaries'] });
             queryClient.invalidateQueries({ queryKey: ['course', data.id] });
         },
     });
@@ -56,6 +69,7 @@ export const useDeleteCourse = () => {
         mutationFn: (id: number) => courseService.deleteCourse(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['courses'] });
+            queryClient.invalidateQueries({ queryKey: ['course-teacher-summaries'] });
         },
     });
 };

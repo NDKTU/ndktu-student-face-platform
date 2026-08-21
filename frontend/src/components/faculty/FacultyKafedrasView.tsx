@@ -2,7 +2,6 @@ import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { ArrowLeft, Search, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useKafedras, useDeleteKafedra } from '@/hooks/useReferenceData';
@@ -11,8 +10,12 @@ import type { Kafedra } from '@/services/kafedraService';
 import { Crumbs } from './Crumbs';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { KafedraModal } from '@/components/kafedra/KafedraModal'; // We need to import or move the modal
+import { KafedraModal } from '@/components/kafedra/KafedraModal';
+import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { kafedraService, type KafedraStats } from '@/services/kafedraService';
 
 interface FacultyKafedrasViewProps {
     faculty: Faculty;
@@ -32,6 +35,7 @@ export const FacultyKafedrasView = ({ faculty, onBack, onOpenKafedra, hideHeader
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [kafedraToDelete, setKafedraToDelete] = useState<Kafedra | null>(null);
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    const [stats, setStats] = useState<Map<number, KafedraStats>>(new Map());
 
     const deleteKafedraMutation = useDeleteKafedra();
 
@@ -46,6 +50,12 @@ export const FacultyKafedrasView = ({ faculty, onBack, onOpenKafedra, hideHeader
     const { data: kafedrasData, isLoading, isError, refetch } = useKafedras(currentPage, pageSize, debouncedSearch, faculty.id);
     const kafedras = kafedrasData?.kafedras || [];
     const totalPages = kafedrasData ? Math.ceil(kafedrasData.total / pageSize) : 1;
+
+    useEffect(() => {
+        kafedraService.getKafedraStats(faculty.id)
+            .then((items) => setStats(new Map(items.map((item) => [item.kafedra_id, item]))))
+            .catch(() => setStats(new Map()));
+    }, [faculty.id]);
 
     const handleDeleteClick = (kafedra: Kafedra, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -92,23 +102,6 @@ export const FacultyKafedrasView = ({ faculty, onBack, onOpenKafedra, hideHeader
         </div>
     );
 
-    const columns: DataTableColumn<Kafedra>[] = [
-        { key: 'id', header: 'ID', headClassName: 'w-[80px]', cell: (kafedra) => kafedra.id },
-        { key: 'name', header: 'Nomi', className: 'font-medium capitalize', cell: (kafedra) => kafedra.name },
-        {
-            key: 'created_at',
-            header: 'Yaratilgan sana',
-            hideBelow: 'lg',
-            cell: (kafedra) => new Date(kafedra.created_at).toLocaleDateString(),
-        },
-        {
-            key: 'actions',
-            header: 'Amallar',
-            headClassName: 'text-right',
-            cell: (kafedra) => renderActions(kafedra),
-        },
-    ];
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -147,34 +140,33 @@ export const FacultyKafedrasView = ({ faculty, onBack, onOpenKafedra, hideHeader
                 </div>
             </div>
 
-            <Card>
-                <CardContent className="pt-6">
-                    <DataTable
-                        columns={columns}
-                        data={kafedras}
-                        rowKey={(kafedra) => kafedra.id}
-                        isLoading={isLoading}
-                        isError={isError}
-                        onRetry={() => refetch()}
-                        emptyTitle="Kafedralar topilmadi"
-                        emptyDescription="Ushbu fakultetda kafedra yo'q yoki qidiruvga mos kafedra topilmadi."
-                        onRowClick={onOpenKafedra}
-                        renderCard={(kafedra) => (
-                            <div className="rounded-xl border border-border bg-card p-4">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <p className="font-medium capitalize text-foreground">{kafedra.name}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            ID: {kafedra.id} · {new Date(kafedra.created_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    {renderActions(kafedra)}
-                                </div>
-                            </div>
-                        )}
-                    />
-                </CardContent>
-            </Card>
+            {isError ? (
+                <ErrorState onRetry={() => refetch()} />
+            ) : isLoading ? (
+                <CatalogGrid>{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}</CatalogGrid>
+            ) : kafedras.length === 0 ? (
+                <EmptyState title="Kafedralar topilmadi" description="Ushbu fakultetda kafedra yo'q yoki qidiruvga mos natija topilmadi." />
+            ) : (
+                <CatalogGrid>
+                    {kafedras.map((kafedra) => {
+                        const item = stats.get(kafedra.id);
+                        return (
+                            <CatalogCard
+                                key={kafedra.id}
+                                id={kafedra.id}
+                                title={kafedra.name}
+                                subtitle="Kafedra"
+                                metrics={[
+                                    { label: 'Mutaxassislik', value: item?.speciality_count ?? '—' },
+                                    { label: "O'qituvchi", value: item?.teacher_count ?? '—', accent: true },
+                                ]}
+                                actions={renderActions(kafedra)}
+                                onClick={() => onOpenKafedra(kafedra)}
+                            />
+                        );
+                    })}
+                </CatalogGrid>
+            )}
 
             <Pagination
                 currentPage={currentPage}

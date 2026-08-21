@@ -29,11 +29,30 @@ class LessonGroupInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LessonTopicInfo(BaseModel):
+    id: int
+    title: str
+    order_index: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LessonResourceInfo(BaseModel):
+    id: int
+    resource_type: str
+    title: str
+    file_url: Optional[str] = None
+    link_url: Optional[str] = None
+    order_index: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LessonCreateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: int
     course_id: int
+    topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
+    duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     topic: str = Field(min_length=1, max_length=255)
     date: date_type
     description: Optional[str] = None
@@ -43,7 +62,9 @@ class LessonUpdateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
     group_id: Optional[int] = None
     course_id: Optional[int] = None
+    topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
+    duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     topic: Optional[str] = Field(default=None, min_length=1, max_length=255)
     date: Optional[date_type] = None
     description: Optional[str] = None
@@ -54,7 +75,9 @@ class LessonResponse(BaseModel):
     subject_teacher_id: int
     group_id: int
     course_id: int
+    topic_id: Optional[int] = None
     lesson_type: Optional[str] = None
+    duration_minutes: Optional[int] = None
     topic: str
     date: date_type
     description: Optional[str] = None
@@ -62,6 +85,8 @@ class LessonResponse(BaseModel):
     updated_at: TashkentDatetime
     subject_teacher: Optional[LessonSubjectTeacherInfo] = None
     group: Optional[LessonGroupInfo] = None
+    course_topic: Optional[LessonTopicInfo] = None
+    resources: list[LessonResourceInfo] = []
 
     model_config = ConfigDict(from_attributes=True)
 

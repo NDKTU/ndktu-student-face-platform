@@ -2,25 +2,179 @@ import logging
 
 from core.config import settings
 from fastapi import HTTPException, status
-from sqlalchemy import asc, desc, func, or_, select
+from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, SubjectTeacher
+from app.modules.organization_structure.model import Faculty, Group, GroupTeacher
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, SubjectTeacher, UserAnswers
 
 from .schemas import (
+    QuizAnalyticsResponse,
+    QuizCatalogFaculty,
+    QuizCatalogResponse,
+    QuizCatalogSubject,
     QuizCreateRequest,
     QuizListRequest,
     QuizListResponse,
+    QuizQuestionAnalytics,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class QuizRepository:
+    async def _apply_visibility(self, stmt, session: AsyncSession, current_user: User):
+        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_student = any(role.name.lower() == "student" for role in current_user.roles)
+        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
+        if is_admin:
+            return stmt
+        if is_student:
+            group_id = (
+                await session.execute(select(Student.group_id).where(Student.user_id == current_user.id))
+            ).scalar_one_or_none()
+            return stmt.where(Quiz.group_id == group_id) if group_id else stmt.where(Quiz.id == -1)
+        if is_teacher:
+            group_ids = list(
+                (await session.execute(
+                    select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+                )).scalars().all()
+            )
+            subject_ids = list(
+                (await session.execute(
+                    select(SubjectTeacher.subject_id)
+                    .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+                    .join(Employee, Teacher.employee_id == Employee.id)
+                    .where(Employee.user_id == current_user.id)
+                )).scalars().all()
+            )
+            conditions = [Quiz.lecturer_id == current_user.id]
+            if group_ids:
+                conditions.append(Quiz.group_id.in_(group_ids))
+            if subject_ids:
+                conditions.append(Quiz.subject_id.in_(subject_ids))
+            return stmt.where(or_(*conditions))
+        return stmt.where(Quiz.id == -1)
+
+    async def get_catalog(self, session: AsyncSession, current_user: User) -> QuizCatalogResponse:
+        """Return the faculty -> subject catalogue with active/total counters."""
+        stmt = (
+            select(
+                Faculty.id.label("faculty_id"),
+                Faculty.name.label("faculty_name"),
+                Subject.id.label("subject_id"),
+                Subject.name.label("subject_name"),
+                func.count(Quiz.id).label("quiz_count"),
+                func.sum(case((Quiz.is_active.is_(True), 1), else_=0)).label("active_count"),
+            )
+            .join(Group, Group.id == Quiz.group_id)
+            .join(Faculty, Faculty.id == Group.faculty_id)
+            .join(Subject, Subject.id == Quiz.subject_id)
+        )
+        stmt = await self._apply_visibility(stmt, session, current_user)
+        stmt = stmt.group_by(Faculty.id, Faculty.name, Subject.id, Subject.name).order_by(
+            Faculty.name.asc(), Subject.name.asc()
+        )
+
+        faculties: dict[int, QuizCatalogFaculty] = {}
+        for row in (await session.execute(stmt)).all():
+            faculty = faculties.get(row.faculty_id)
+            if faculty is None:
+                faculty = QuizCatalogFaculty(
+                    faculty_id=row.faculty_id,
+                    faculty_name=row.faculty_name,
+                    quiz_count=0,
+                    active_count=0,
+                    subjects=[],
+                )
+                faculties[row.faculty_id] = faculty
+            faculty.quiz_count += row.quiz_count
+            faculty.active_count += row.active_count or 0
+            faculty.subjects.append(
+                QuizCatalogSubject(
+                    subject_id=row.subject_id,
+                    subject_name=row.subject_name,
+                    quiz_count=row.quiz_count,
+                    active_count=row.active_count or 0,
+                )
+            )
+        return QuizCatalogResponse(faculties=list(faculties.values()))
+
+    async def get_analytics(self, session: AsyncSession, quiz_id: int) -> QuizAnalyticsResponse:
+        quiz = await self.get_quiz(session, quiz_id)
+        total_students = 0
+        if quiz.group_id is not None:
+            total_students = (
+                await session.execute(select(func.count(Student.id)).where(Student.group_id == quiz.group_id))
+            ).scalar() or 0
+
+        latest_result_ids = list(
+            (await session.execute(
+                select(func.max(Result.id))
+                .where(Result.quiz_id == quiz_id)
+                .group_by(Result.user_id)
+            )).scalars().all()
+        )
+        completed_results = []
+        if latest_result_ids:
+            completed_results = list(
+                (await session.execute(
+                    select(Result).where(
+                        Result.id.in_(latest_result_ids),
+                        Result.status == "completed",
+                    )
+                )).scalars().all()
+            )
+
+        grades = [result.grade for result in completed_results if result.grade is not None]
+        durations = [
+            (result.finished_at - result.created_at).total_seconds()
+            for result in completed_results
+            if result.finished_at is not None and result.created_at is not None
+        ]
+        completed_ids = [result.id for result in completed_results]
+        question_items: list[QuizQuestionAnalytics] = []
+        if completed_ids:
+            question_stmt = (
+                select(
+                    Question.id.label("question_id"),
+                    Question.text.label("question_text"),
+                    func.count(UserAnswers.id).label("answer_count"),
+                    func.sum(case((UserAnswers.is_correct.is_(True), 1), else_=0)).label("correct_count"),
+                )
+                .join(UserAnswers, UserAnswers.question_id == Question.id)
+                .where(UserAnswers.quiz_id == quiz_id, UserAnswers.result_id.in_(completed_ids))
+                .group_by(Question.id, Question.text)
+                .order_by(Question.id.asc())
+            )
+            for row in (await session.execute(question_stmt)).all():
+                correct = row.correct_count or 0
+                wrong = row.answer_count - correct
+                question_items.append(
+                    QuizQuestionAnalytics(
+                        question_id=row.question_id,
+                        question_text=row.question_text,
+                        answer_count=row.answer_count,
+                        correct_count=correct,
+                        wrong_count=wrong,
+                        correct_percent=round((correct / row.answer_count) * 100, 1) if row.answer_count else 0,
+                    )
+                )
+
+        return QuizAnalyticsResponse(
+            quiz_id=quiz_id,
+            total_students=total_students,
+            submitted_count=len(completed_results),
+            average_grade=round(sum(grades) / len(grades), 2) if grades else None,
+            minimum_grade=min(grades) if grades else None,
+            maximum_grade=max(grades) if grades else None,
+            average_duration_seconds=round(sum(durations) / len(durations), 1) if durations else None,
+            questions=question_items,
+        )
+
     def _lecturer_questions_stmt(self, lecturer_id: int, subject_id: int):
         """Банк вопросов лектора по предмету — активные, последней версии.
 
@@ -179,6 +333,9 @@ class QuizRepository:
         if request.subject_id:
             stmt = stmt.where(Quiz.subject_id == request.subject_id)
 
+        if request.faculty_id:
+            stmt = stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
+
         if request.is_active is not None:
             stmt = stmt.where(Quiz.is_active == request.is_active)
 
@@ -213,6 +370,10 @@ class QuizRepository:
             count_stmt = count_stmt.where(Quiz.group_id == request.group_id)
         if request.subject_id:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
+        if request.faculty_id:
+            count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(
+                Group.faculty_id == request.faculty_id
+            )
         if request.is_active is not None:
             count_stmt = count_stmt.where(Quiz.is_active == request.is_active)
 

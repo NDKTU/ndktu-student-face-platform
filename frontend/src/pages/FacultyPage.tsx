@@ -16,19 +16,22 @@ import type { Group } from '@/services/groupService';
 import type { Student } from '@/services/studentService';
 import { FacultyModal } from '@/components/faculty/FacultyModal';
 import { FacultyDetailsView } from '@/components/faculty/FacultyDetailsView';
-import { KafedraTeachersView } from '@/components/faculty/KafedraTeachersView';
 import { GroupStudentsView } from '@/components/faculty/GroupStudentsView';
 import { StudentDetailView } from '@/components/faculty/StudentDetailView';
+import { KafedraSpecialitiesView } from '@/components/faculty/KafedraSpecialitiesView';
+import { SpecialityGroupsView } from '@/components/faculty/SpecialityGroupsView';
 import type { Kafedra } from '@/services/kafedraService';
+import type { Speciality } from '@/services/specialityService';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { logger } from '@/utils/logger';
 
 type View =
     | { level: 'faculties' }
     | { level: 'faculty-details'; faculty: Faculty }
-    | { level: 'kafedra-teachers'; faculty: Faculty; kafedra: Kafedra }
-    | { level: 'group-students'; faculty: Faculty; group: Group }
-    | { level: 'student-detail'; faculty: Faculty; group: Group; student: Student };
+    | { level: 'kafedra-specialities'; faculty: Faculty; kafedra: Kafedra }
+    | { level: 'speciality-groups'; faculty: Faculty; kafedra: Kafedra; speciality: Speciality }
+    | { level: 'group-students'; faculty: Faculty; kafedra: Kafedra; speciality: Speciality; group: Group }
+    | { level: 'student-detail'; faculty: Faculty; kafedra: Kafedra; speciality: Speciality; group: Group; student: Student };
 
 
 const FacultyPage = () => {
@@ -123,18 +126,28 @@ const FacultyPage = () => {
             <FacultyDetailsView
                 faculty={view.faculty}
                 onBack={() => setView({ level: 'faculties' })}
-                onOpenKafedra={(kafedra) => setView({ level: 'kafedra-teachers', faculty: view.faculty, kafedra })}
-                onOpenGroup={(group) => setView({ level: 'group-students', faculty: view.faculty, group })}
+                onOpenKafedra={(kafedra) => setView({ level: 'kafedra-specialities', faculty: view.faculty, kafedra })}
             />
         );
     }
-    if (view.level === 'kafedra-teachers') {
+    if (view.level === 'kafedra-specialities') {
         return (
-            <KafedraTeachersView
+            <KafedraSpecialitiesView
                 faculty={view.faculty}
                 kafedra={view.kafedra}
-                onBackToFaculty={() => setView({ level: 'faculty-details', faculty: view.faculty })}
-                onBackToFaculties={() => setView({ level: 'faculties' })}
+                onBack={() => setView({ level: 'faculty-details', faculty: view.faculty })}
+                onOpenSpeciality={(speciality) => setView({ level: 'speciality-groups', faculty: view.faculty, kafedra: view.kafedra, speciality })}
+            />
+        );
+    }
+    if (view.level === 'speciality-groups') {
+        return (
+            <SpecialityGroupsView
+                faculty={view.faculty}
+                kafedra={view.kafedra}
+                speciality={view.speciality}
+                onBack={() => setView({ level: 'kafedra-specialities', faculty: view.faculty, kafedra: view.kafedra })}
+                onOpenGroup={(group) => setView({ level: 'group-students', faculty: view.faculty, kafedra: view.kafedra, speciality: view.speciality, group })}
             />
         );
     }
@@ -144,8 +157,8 @@ const FacultyPage = () => {
                 faculty={view.faculty}
                 group={view.group}
                 onBackToFaculties={() => setView({ level: 'faculties' })}
-                onBackToGroups={() => setView({ level: 'faculty-details', faculty: view.faculty })}
-                onOpenStudent={(student) => setView({ level: 'student-detail', faculty: view.faculty, group: view.group, student })}
+                onBackToGroups={() => setView({ level: 'speciality-groups', faculty: view.faculty, kafedra: view.kafedra, speciality: view.speciality })}
+                onOpenStudent={(student) => setView({ level: 'student-detail', faculty: view.faculty, kafedra: view.kafedra, speciality: view.speciality, group: view.group, student })}
             />
         );
     }
@@ -156,8 +169,8 @@ const FacultyPage = () => {
                 group={view.group}
                 student={view.student}
                 onBackToFaculties={() => setView({ level: 'faculties' })}
-                onBackToGroups={() => setView({ level: 'faculty-details', faculty: view.faculty })}
-                onBackToStudents={() => setView({ level: 'group-students', faculty: view.faculty, group: view.group })}
+                onBackToGroups={() => setView({ level: 'speciality-groups', faculty: view.faculty, kafedra: view.kafedra, speciality: view.speciality })}
+                onBackToStudents={() => setView({ level: 'group-students', faculty: view.faculty, kafedra: view.kafedra, speciality: view.speciality, group: view.group })}
             />
         );
     }

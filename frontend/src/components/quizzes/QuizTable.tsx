@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { BookOpen, Camera, Pencil, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
 import type { ProctoringMode, Quiz } from '@/services/quizService';
+import { useNavigate } from 'react-router-dom';
 
 interface QuizTableProps {
     quizzes: Quiz[];
@@ -50,6 +51,7 @@ export const QuizTable = ({
     onStart,
     readOnly,
 }: QuizTableProps) => {
+    const navigate = useNavigate();
     const hideActions = Boolean(isTeacher) || Boolean(readOnly);
     const showStart = Boolean(onStart);
 
@@ -152,7 +154,16 @@ export const QuizTable = ({
                 return (
                     <div
                         key={quiz.id}
-                        className="flex flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                        role={!readOnly ? 'button' : undefined}
+                        tabIndex={!readOnly ? 0 : undefined}
+                        onClick={() => { if (!readOnly) navigate(`/quizzes/${quiz.id}`); }}
+                        onKeyDown={(event) => {
+                            if (!readOnly && (event.key === 'Enter' || event.key === ' ')) {
+                                event.preventDefault();
+                                navigate(`/quizzes/${quiz.id}`);
+                            }
+                        }}
+                        className={`flex flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md ${!readOnly ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
                     >
                         <div className="flex items-start gap-3">
                             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tileFor(quiz.id)}`}>
@@ -185,7 +196,7 @@ export const QuizTable = ({
                         </div>
 
                         {(showStart || !hideActions) && (
-                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3" onClick={(event) => event.stopPropagation()}>
                                 {!hideActions && (
                                     <div className="flex items-center gap-2">
                                         <Switch

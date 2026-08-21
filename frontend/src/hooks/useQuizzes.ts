@@ -10,6 +10,18 @@ export const useQuizzes = (page = 1, limit = 10, title?: string, is_active?: boo
     });
 };
 
+export const useQuizCatalog = (enabled = true) => useQuery({
+    queryKey: ['quiz-catalog'],
+    queryFn: quizService.getCatalog,
+    enabled,
+});
+
+export const useQuizAnalytics = (id?: number) => useQuery({
+    queryKey: ['quiz-analytics', id],
+    queryFn: () => quizService.getAnalytics(id!),
+    enabled: Boolean(id),
+});
+
 export const useActiveQuizzes = (page = 1, limit = 10, title?: string, user_id?: number, group_id?: number, subject_id?: number, sort_dir?: string) => {
     return useQuery({
         queryKey: ['active-quizzes', page, limit, title, user_id, group_id, subject_id, sort_dir],
@@ -45,6 +57,7 @@ export const useCreateQuiz = () => {
         mutationFn: (data: QuizCreateRequest) => quizService.createQuiz(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+            queryClient.invalidateQueries({ queryKey: ['quiz-catalog'] });
         },
     });
 };
@@ -55,6 +68,7 @@ export const useUpdateQuiz = () => {
         mutationFn: ({ id, data }: { id: number; data: QuizCreateRequest }) => quizService.updateQuiz(id, data),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+            queryClient.invalidateQueries({ queryKey: ['quiz-catalog'] });
             queryClient.invalidateQueries({ queryKey: ['quiz', variables.id] });
         },
     });
@@ -66,6 +80,7 @@ export const useDeleteQuiz = () => {
         mutationFn: ({ id, force }: { id: number; force?: boolean }) => quizService.deleteQuiz(id, force),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+            queryClient.invalidateQueries({ queryKey: ['quiz-catalog'] });
         },
     });
 };
@@ -76,7 +91,7 @@ export const useRepeatQuiz = () => {
         mutationFn: (id: number) => quizService.repeatQuiz(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+            queryClient.invalidateQueries({ queryKey: ['quiz-catalog'] });
         },
     });
 };
-

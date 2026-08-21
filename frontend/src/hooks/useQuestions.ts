@@ -9,6 +9,11 @@ export const useQuestions = (page = 1, limit = 10, text?: string, subject_id?: n
     });
 };
 
+export const useQuestionCatalog = (search?: string) => useQuery({
+    queryKey: ['question-catalog', search],
+    queryFn: () => questionService.getCatalog(search),
+});
+
 export const useQuestion = (id: number) => {
     return useQuery({
         queryKey: ['question', id],
@@ -23,6 +28,7 @@ export const useCreateQuestion = () => {
         mutationFn: (data: QuestionCreateRequest) => questionService.createQuestion(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
+            queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
         },
     });
 };
@@ -33,6 +39,7 @@ export const useUpdateQuestion = () => {
         mutationFn: ({ id, data }: { id: number; data: QuestionCreateRequest }) => questionService.updateQuestion(id, data),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
+            queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
             queryClient.invalidateQueries({ queryKey: ['question', variables.id] });
         },
     });
@@ -44,6 +51,7 @@ export const useDeleteQuestion = () => {
         mutationFn: (id: number) => questionService.deleteQuestion(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
+            queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
         },
     });
 };
@@ -54,6 +62,7 @@ export const useUploadQuestions = () => {
         mutationFn: ({ file, subject_id }: { file: File; subject_id: number }) => questionService.uploadQuestions(file, subject_id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
+            queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
         },
     });
 };
@@ -70,6 +79,7 @@ export const useBulkDeleteQuestions = () => {
         mutationFn: (data: { subject_id: number; user_id: number }) => questionService.bulkDeleteQuestions(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
+            queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
         },
     });
 };

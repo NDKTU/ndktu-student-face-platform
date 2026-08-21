@@ -9,18 +9,16 @@ import type { Assignment } from '@/services/assignmentService';
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    sinfId: number;
+    courseId: number;
     lessonId?: number | null;
-    topicId?: number | null;
     editing?: Assignment | null;
 }
 
 export const AssignmentFormModal = ({
     isOpen,
     onClose,
-    sinfId,
+    courseId,
     lessonId,
-    topicId,
     editing,
 }: Props) => {
     const createMut = useCreateAssignment();
@@ -72,12 +70,12 @@ export const AssignmentFormModal = ({
         };
         if (editing) {
             updateMut.mutate(
-                { id: editing.id, data: { ...base, lesson_id: lessonId, topic_id: topicId } },
+                { id: editing.id, data: { ...base, lesson_id: lessonId } },
                 { onSuccess: onClose, onError: () => setError('Xatolik') },
             );
         } else {
             createMut.mutate(
-                { ...base, sinf_id: sinfId, lesson_id: lessonId, topic_id: topicId },
+                { ...base, course_id: courseId, lesson_id: lessonId },
                 { onSuccess: onClose, onError: () => setError('Xatolik') },
             );
         }

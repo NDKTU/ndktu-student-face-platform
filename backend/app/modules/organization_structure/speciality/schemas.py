@@ -60,3 +60,13 @@ class SpecialityListResponse(BaseModel):
     page: int
     limit: int
     specialities: list[SpecialityResponse]
+
+
+class SpecialityStatsItem(BaseModel):
+    speciality_id: int
+    group_count: int
+    student_count: int
+
+
+class SpecialityStatsResponse(BaseModel):
+    stats: list[SpecialityStatsItem]

@@ -49,3 +49,13 @@ class KafedraListResponse(BaseModel):
     page: int
     limit: int
     kafedras: list[KafedraCreateResponse]
+
+
+class KafedraStatsItem(BaseModel):
+    kafedra_id: int
+    speciality_count: int
+    teacher_count: int
+
+
+class KafedraStatsResponse(BaseModel):
+    stats: list[KafedraStatsItem]

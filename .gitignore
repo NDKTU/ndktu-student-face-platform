@@ -104,3 +104,4 @@ scripts/_assets/
 .stitch/
 # Дизайн-референсы, экспортированные одним HTML — не для репозитория
 /NDKTU LMS*.html
+.codex

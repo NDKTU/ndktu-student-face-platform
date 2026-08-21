@@ -12,6 +12,8 @@ from .schemas import (
     SpecialityCreateRequest,
     SpecialityListRequest,
     SpecialityListResponse,
+    SpecialityStatsItem,
+    SpecialityStatsResponse,
     SpecialityUpdateRequest,
 )
 
@@ -19,6 +21,48 @@ logger = logging.getLogger(__name__)
 
 
 class SpecialityRepository:
+    async def get_speciality_stats(
+        self, session: AsyncSession, kafedra_id: int | None = None
+    ) -> SpecialityStatsResponse:
+        """Return group and student totals for speciality cards."""
+        from app.modules.auth.model import Student
+        from app.modules.organization_structure.model import Group
+
+        speciality_stmt = select(Speciality.id)
+        if kafedra_id is not None:
+            speciality_stmt = speciality_stmt.where(Speciality.kafedra_id == kafedra_id)
+        speciality_ids = list((await session.execute(speciality_stmt)).scalars().all())
+        if not speciality_ids:
+            return SpecialityStatsResponse(stats=[])
+
+        group_rows = (
+            await session.execute(
+                select(Group.speciality_id, func.count(Group.id))
+                .where(Group.speciality_id.in_(speciality_ids))
+                .group_by(Group.speciality_id)
+            )
+        ).all()
+        student_rows = (
+            await session.execute(
+                select(Group.speciality_id, func.count(Student.id))
+                .join(Student, Student.group_id == Group.id)
+                .where(Group.speciality_id.in_(speciality_ids))
+                .group_by(Group.speciality_id)
+            )
+        ).all()
+        groups = dict(group_rows)
+        students = dict(student_rows)
+        return SpecialityStatsResponse(
+            stats=[
+                SpecialityStatsItem(
+                    speciality_id=speciality_id,
+                    group_count=groups.get(speciality_id, 0),
+                    student_count=students.get(speciality_id, 0),
+                )
+                for speciality_id in speciality_ids
+            ]
+        )
+
     async def create_speciality(self, session: AsyncSession, data: SpecialityCreateRequest) -> Speciality:
         stmt_check = select(Speciality).where(Speciality.name == data.name)
         if (await session.execute(stmt_check)).scalar_one_or_none():

@@ -87,6 +87,26 @@ class QuestionListResponse(BaseModel):
     questions: list[QuestionCreateResponse]
 
 
+class QuestionSubjectSummary(BaseModel):
+    subject_id: int
+    subject_name: str
+    question_count: int
+
+
+class QuestionTeacherSummary(BaseModel):
+    teacher_user_id: int
+    username: str
+    full_name: Optional[str] = None
+    kafedra_id: Optional[int] = None
+    kafedra_name: Optional[str] = None
+    question_count: int
+    subjects: list[QuestionSubjectSummary]
+
+
+class QuestionCatalogResponse(BaseModel):
+    teachers: list[QuestionTeacherSummary]
+
+
 class QuestionExcelUploadResponse(BaseModel):
     questions: list[QuestionCreateResponse]
     warnings: list[str] = []

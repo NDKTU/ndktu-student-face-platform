@@ -2,19 +2,11 @@ import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { useNavigate } from 'react-router-dom';
-import type { Question } from '@/services/questionService';
+import type { Question, QuestionTeacherSummary } from '@/services/questionService';
 import type { Subject } from '@/services/subjectService';
 import { Button } from '@/components/ui/Button';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/Table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search, BookOpen, ArrowRight, ArrowLeft, Download } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search, ArrowLeft, Download } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -22,72 +14,15 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { sanitizeHtml } from '@/utils/sanitize';
-import { useQuestions, useDeleteQuestion, useUploadQuestions, useBulkDeleteQuestions, useDownloadQuestionsExcel } from '@/hooks/useQuestions';
-import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
+import { useQuestions, useDeleteQuestion, useUploadQuestions, useBulkDeleteQuestions, useDownloadQuestionsExcel, useQuestionCatalog } from '@/hooks/useQuestions';
+import { useSubjects } from '@/hooks/useSubjects';
 import { useUsers } from '@/hooks/useUsers';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/context/AuthContext';
 import { Combobox } from '@/components/ui/Combobox';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-
-// ─── Teacher Subject Picker ──────────────────────────────────────────────────
-
-const TeacherSubjectPicker = ({ onSelect }: { onSelect: (subject: Subject) => void }) => {
-    const { user } = useAuth();
-    const userId = user?.id;
-    const { data, isLoading } = useTeacherAssignedSubjects(userId);
-    const subjects = data?.subject_teachers.map((st) => st.subject) || [];
-
-    if (isLoading) {
-        return (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }, (_, i) => (
-                    <Skeleton key={i} className="h-36 w-full rounded-xl" />
-                ))}
-            </div>
-        );
-    }
-
-    if (subjects.length === 0) {
-        return (
-            <Card className="border-dashed">
-                <CardContent className="pt-6">
-                    <EmptyState
-                        icon={<BookOpen className="h-6 w-6" />}
-                        title="Fanlar biriktirilmagan"
-                        description="Hozircha sizga hech qanday fan biriktirilmagan. Admin bilan bog'laning."
-                    />
-                </CardContent>
-            </Card>
-        );
-    }
-
-    return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {subjects.map((subject) => (
-                <Card
-                    key={subject.id}
-                    className="group cursor-pointer transition-all hover:border-primary/40 hover:shadow-md"
-                    onClick={() => onSelect(subject)}
-                >
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between text-base">
-                            <span className="truncate">{subject.name}</span>
-                            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                        </CardTitle>
-                        <CardDescription>Savollarni ko'rish uchun bosing</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <BookOpen className="h-4 w-4" />
-                            <span>Savollar bankini ko'rish</span>
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
-    );
-};
+import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
+import { HierarchyHeader } from '@/components/catalog/HierarchyHeader';
 
 // ─── Questions Table (shared by admin and teacher) ───────────────────────────
 
@@ -96,9 +31,10 @@ interface QuestionsTableProps {
     subjects: Subject[];
     onBack?: () => void;
     selectedSubjectName?: string;
+    ownerUserId?: number;
 }
 
-const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: QuestionsTableProps) => {
+const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName, ownerUserId }: QuestionsTableProps) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
@@ -134,7 +70,7 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
         pageSize,
         debouncedSearch,
         subjectId,
-        isTeacher ? user?.id : undefined,  // Pass user_id only for teachers
+        ownerUserId ?? (isTeacher ? user?.id : undefined),
     );
     const deleteQuestionMutation = useDeleteQuestion();
 
@@ -255,59 +191,47 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName }: Qu
                             description="Qo'lda qo'shing yoki Excel dan import qiling."
                         />
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[50%]">Savol</TableHead>
-                                    <TableHead>Fan</TableHead>
-                                    <TableHead>Foydalanuvchi</TableHead>
-                                    <TableHead className="text-right">Amallar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {questions.map((question) => {
-                                    const plainText = stripHtml(question.text);
-                                    return (
-                                        <TableRow
-                                            key={question.id}
-                                            className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => handleViewQuestion(question)}
-                                        >
-                                            <TableCell className="font-medium">
-                                                <div className="break-words max-w-md" title={plainText}>
-                                                    {plainText.length > 100 ? `${plainText.substring(0, 100)}...` : plainText}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{question.subject_name || '-'}</TableCell>
-                                            <TableCell>{question.username || '-'}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <PermissionGate permission="update:question">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={(e) => handleEditQuestion(question, e)}
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                    </PermissionGate>
-                                                    <PermissionGate permission="delete:question">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-destructive hover:text-destructive"
-                                                            onClick={(e) => handleDeleteClick(question, e)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </PermissionGate>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+                        <div className="divide-y divide-border/60">
+                            {questions.map((question, index) => {
+                                const plainText = stripHtml(question.text);
+                                return (
+                                    <article
+                                        key={question.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        className="group flex cursor-pointer items-start gap-4 px-1 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        onClick={() => handleViewQuestion(question)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                handleViewQuestion(question);
+                                            }
+                                        }}
+                                    >
+                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-mono text-xs font-bold text-primary">
+                                            {(currentPage - 1) * pageSize + index + 1}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-medium leading-relaxed text-foreground">{plainText}</p>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                <span>{question.subject_name || selectedSubjectName || '-'}</span>
+                                                <span aria-hidden="true">·</span>
+                                                <span>{question.username || '-'}</span>
+                                                <span className="badge badge-success">To'g'ri javob: {(question.correct_option || 'a').toUpperCase()}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex shrink-0 gap-1" onClick={(event) => event.stopPropagation()}>
+                                            <PermissionGate permission="update:question">
+                                                <Button variant="ghost" size="sm" aria-label="Savolni tahrirlash" onClick={(event) => handleEditQuestion(question, event)}><Pencil className="h-4 w-4" /></Button>
+                                            </PermissionGate>
+                                            <PermissionGate permission="delete:question">
+                                                <Button variant="ghost" size="sm" aria-label="Savolni o'chirish" className="text-destructive hover:text-destructive" onClick={(event) => handleDeleteClick(question, event)}><Trash2 className="h-4 w-4" /></Button>
+                                            </PermissionGate>
+                                        </div>
+                                    </article>
+                                );
+                            })}
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -361,39 +285,103 @@ const QuestionsPage = () => {
     const { user } = useAuth();
     const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
 
-    const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+    const [selectedTeacher, setSelectedTeacher] = useState<QuestionTeacherSummary | null>(null);
+    const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+    const [catalogSearch, setCatalogSearch] = useState('');
+    const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState('');
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebouncedCatalogSearch(catalogSearch), 350);
+        return () => window.clearTimeout(timer);
+    }, [catalogSearch]);
+
+    const catalog = useQuestionCatalog(debouncedCatalogSearch || undefined);
 
     // All subjects — needed for admin flat view and upload modal
     const { data: subjectsData } = useSubjects(1, 100);
     const subjects = subjectsData?.subjects || [];
+    const activeTeacher = isTeacher ? catalog.data?.[0] ?? null : selectedTeacher;
 
-    if (isTeacher) {
-        if (!selectedSubject) {
-            // Step 1: show subject picker
-            return (
-                <div className="space-y-6">
-                    <PageHeader
-                        title="Savollar"
-                        description="Fan tanlang — o'sha fanga tegishli savollarni ko'rasiz"
-                    />
-                    <TeacherSubjectPicker onSelect={setSelectedSubject} />
-                </div>
-            );
-        }
-
-        // Step 2: show questions filtered by selected subject
+    if (!isTeacher && !selectedTeacher) {
         return (
-            <QuestionsTable
-                subjectId={selectedSubject.id}
-                subjects={subjects}
-                selectedSubjectName={selectedSubject.name}
-                onBack={() => setSelectedSubject(null)}
-            />
+            <div className="space-y-6">
+                <PageHeader
+                    title="Savollar"
+                    description="O'qituvchini tanlang va savollar bankini ko'ring"
+                    actions={
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="O'qituvchini qidirish..." className="w-[240px] pl-8" />
+                        </div>
+                    }
+                />
+                {catalog.isError ? <ErrorState onRetry={() => catalog.refetch()} /> : catalog.isLoading ? (
+                    <CatalogGrid>{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}</CatalogGrid>
+                ) : (catalog.data?.length ?? 0) === 0 ? (
+                    <EmptyState icon={<FileQuestion className="h-6 w-6" />} title="Savollar topilmadi" description="Hozircha savol qo'shgan o'qituvchi yo'q." />
+                ) : (
+                    <CatalogGrid>
+                        {catalog.data?.map((teacher) => (
+                            <CatalogCard
+                                key={teacher.teacher_user_id}
+                                id={teacher.teacher_user_id}
+                                title={teacher.full_name || teacher.username}
+                                subtitle={teacher.kafedra_name || teacher.username}
+                                metrics={[
+                                    { label: 'Fan', value: teacher.subjects.length },
+                                    { label: 'Savol', value: teacher.question_count, accent: true },
+                                ]}
+                                onClick={() => setSelectedTeacher(teacher)}
+                            />
+                        ))}
+                    </CatalogGrid>
+                )}
+            </div>
         );
     }
 
-    // Admin: existing flat list
-    return <QuestionsTable subjects={subjects} />;
+    if (activeTeacher && selectedSubjectId === null) {
+        return (
+            <div className="space-y-6">
+                {isTeacher ? (
+                    <PageHeader title="Savollar" description="Fanni tanlang va savollarni ko'ring" />
+                ) : (
+                    <HierarchyHeader
+                        title={activeTeacher.full_name || activeTeacher.username}
+                        description={`${activeTeacher.kafedra_name || "O'qituvchi"} · Fanlar`}
+                        onBack={() => setSelectedTeacher(null)}
+                    />
+                )}
+                {activeTeacher.subjects.length === 0 ? (
+                    <EmptyState title="Fanlar topilmadi" description="Ushbu o'qituvchida savollar mavjud emas." />
+                ) : (
+                    <CatalogGrid>
+                        {activeTeacher.subjects.map((subject) => (
+                            <CatalogCard
+                                key={subject.subject_id}
+                                id={subject.subject_id}
+                                title={subject.subject_name}
+                                subtitle="Savollar banki"
+                                metrics={[{ label: 'Savol', value: subject.question_count, accent: true }]}
+                                onClick={() => setSelectedSubjectId(subject.subject_id)}
+                            />
+                        ))}
+                    </CatalogGrid>
+                )}
+            </div>
+        );
+    }
+
+    const selectedSubjectSummary = activeTeacher?.subjects.find((item) => item.subject_id === selectedSubjectId);
+    return (
+        <QuestionsTable
+            subjectId={selectedSubjectId ?? undefined}
+            subjects={subjects}
+            selectedSubjectName={selectedSubjectSummary?.subject_name}
+            ownerUserId={activeTeacher?.teacher_user_id}
+            onBack={() => setSelectedSubjectId(null)}
+        />
+    );
 };
 
 // ─── Modals ───────────────────────────────────────────────────────────────────

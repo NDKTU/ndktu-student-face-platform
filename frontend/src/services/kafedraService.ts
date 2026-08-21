@@ -19,6 +19,12 @@ export interface KafedraListResponse {
     kafedras: Kafedra[];
 }
 
+export interface KafedraStats {
+    kafedra_id: number;
+    speciality_count: number;
+    teacher_count: number;
+}
+
 export const kafedraService = {
     getKafedras: async (page = 1, limit = 100, name?: string, faculty_id?: number) => {
         const response = await api.get<KafedraListResponse>('/kafedra/', {
@@ -30,6 +36,13 @@ export const kafedraService = {
     getKafedraById: async (id: number): Promise<Kafedra> => {
         const response = await api.get<Kafedra>(`/kafedra/${id}`);
         return response.data;
+    },
+
+    getKafedraStats: async (facultyId?: number): Promise<KafedraStats[]> => {
+        const response = await api.get<{ stats: KafedraStats[] }>('/kafedra/stats', {
+            params: { faculty_id: facultyId },
+        });
+        return response.data.stats;
     },
 
     createKafedra: async (data: { name: string; faculty_id: number }) => {

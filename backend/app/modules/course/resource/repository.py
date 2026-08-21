@@ -15,10 +15,28 @@ from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListRes
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "pdf", "docx", "xlsx", "pptx"}
+_VIDEO_EXTS = {"mp4", "webm", "mov", "m4v"}
+_ALLOWED_EXTS = {
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "txt",
+    "zip",
+    *_VIDEO_EXTS,
+}
 _IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
 _IMAGE_MAX = 5 * 1024 * 1024
 _DOC_MAX = 20 * 1024 * 1024
+_VIDEO_MAX = 500 * 1024 * 1024
 
 
 class ResourceRepository:
@@ -51,17 +69,28 @@ class ResourceRepository:
         if ext not in _ALLOWED_EXTS:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
 
-        content = await file.read()
-        max_size = _IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX
-        if len(content) > max_size:
-            raise HTTPException(status_code=400, detail=f"File must not exceed {max_size // (1024 * 1024)}MB")
+        max_size = _VIDEO_MAX if ext in _VIDEO_EXTS else (_IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX)
+        if ext in _VIDEO_EXTS and file.content_type and not file.content_type.startswith("video/"):
+            raise HTTPException(status_code=400, detail="Uploaded video has an invalid content type")
 
         upload_dir = settings.course_resource_upload_dir
         os.makedirs(upload_dir, exist_ok=True)
         filename = f"{uuid.uuid4()}.{ext}"
         file_path = upload_dir / filename
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
+        size = 0
+        try:
+            with open(file_path, "wb") as buffer:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > max_size:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"File must not exceed {max_size // (1024 * 1024)}MB",
+                        )
+                    buffer.write(chunk)
+        except Exception:
+            file_path.unlink(missing_ok=True)
+            raise
 
         return f"{settings.file_url.http}/course_resources/{filename}"
 

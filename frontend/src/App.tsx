@@ -18,6 +18,7 @@ const StudentDashboardPage = lazy(() => import('@/pages/StudentDashboardPage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
 const UsersPage = lazy(() => import('@/pages/UsersPage'));
 const QuizzesPage = lazy(() => import('@/pages/QuizzesPage'));
+const QuizDetailPage = lazy(() => import('@/pages/QuizDetailPage'));
 const ActiveQuizzesPage = lazy(() => import('@/pages/ActiveQuizzesPage'));
 const ResultsPage = lazy(() => import('@/pages/ResultsPage'));
 const TeachersPage = lazy(() => import('@/pages/TeachersPage'));
@@ -29,6 +30,7 @@ const KafedraPage = lazy(() => import('@/pages/KafedraPage'));
 const GroupsPage = lazy(() => import('@/pages/GroupsPage'));
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'));
 const CoursesPage = lazy(() => import('@/pages/CoursesPage'));
+const CourseDetailPage = lazy(() => import('@/pages/CourseDetailPage'));
 const StudentsPage = lazy(() => import('@/pages/StudentsPage'));
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'));
 const QuestionFormPage = lazy(() => import('@/pages/QuestionFormPage'));
@@ -146,12 +148,14 @@ function App() {
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
                                         <Route path="/courses" element={<PermissionRoute permission="read:course"><CoursesPage /></PermissionRoute>} />
+                                        <Route path="/courses/:id" element={<PermissionRoute permission="read:course"><CourseDetailPage /></PermissionRoute>} />
                                         <Route path="/teacher-groups" element={<PermissionRoute permission="read:group"><TeacherGroupsPage /></PermissionRoute>} />
                                         <Route path="/teacher-subjects" element={<PermissionRoute permission="read:subject"><TeacherSubjectsPage /></PermissionRoute>} />
                                         <Route path="/questions" element={<PermissionRoute permission="read:question"><QuestionsPage /></PermissionRoute>} />
                                         <Route path="/questions/create" element={<PermissionRoute permission="create:question"><QuestionFormPage /></PermissionRoute>} />
                                         <Route path="/questions/:id/edit" element={<PermissionRoute permission="update:question"><QuestionFormPage /></PermissionRoute>} />
                                         <Route path="/quizzes" element={<PermissionRoute permission="read:quiz"><QuizzesPage /></PermissionRoute>} />
+                                        <Route path="/quizzes/:id" element={<PermissionRoute permission="read:result"><QuizDetailPage /></PermissionRoute>} />
                                         <Route path="/active-quizzes" element={<PermissionRoute permission="read:active_quiz"><ActiveQuizzesPage /></PermissionRoute>} />
 
                                         <Route path="/results" element={<PermissionRoute permission="read:result"><ResultsPage /></PermissionRoute>} />

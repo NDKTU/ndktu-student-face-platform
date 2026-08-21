@@ -1,26 +1,98 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import User
-from app.modules.quiz.model import Question
+from app.modules.auth.model import Employee, Teacher, User
+from app.modules.organization_structure.model import Kafedra
+from app.modules.quiz.model import Question, Subject
 
 from .schemas import (
     QuestionBulkDeleteRequest,
+    QuestionCatalogResponse,
     QuestionCreateRequest,
     QuestionListRequest,
     QuestionListResponse,
+    QuestionSubjectSummary,
+    QuestionTeacherSummary,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class QuestionRepository:
+    async def get_catalog(
+        self, session: AsyncSession, current_user: User, search: str | None = None
+    ) -> QuestionCatalogResponse:
+        """Return teacher -> subject counts for the question-bank catalogue."""
+        stmt = (
+            select(
+                Question.user_id.label("teacher_user_id"),
+                User.username,
+                Employee.full_name,
+                Kafedra.id.label("kafedra_id"),
+                Kafedra.name.label("kafedra_name"),
+                Subject.id.label("subject_id"),
+                Subject.name.label("subject_name"),
+                func.count(Question.id).label("question_count"),
+            )
+            .join(User, User.id == Question.user_id)
+            .outerjoin(Employee, Employee.user_id == User.id)
+            .outerjoin(Teacher, Teacher.employee_id == Employee.id)
+            .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
+            .join(Subject, Subject.id == Question.subject_id)
+            .where(Question.is_latest.is_(True), Question.is_active.is_(True))
+        )
+        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        if not is_admin:
+            stmt = stmt.where(Question.user_id == current_user.id)
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    Employee.full_name.ilike(pattern),
+                    User.username.ilike(pattern),
+                    Subject.name.ilike(pattern),
+                )
+            )
+        stmt = stmt.group_by(
+            Question.user_id,
+            User.username,
+            Employee.full_name,
+            Kafedra.id,
+            Kafedra.name,
+            Subject.id,
+            Subject.name,
+        ).order_by(Employee.full_name.asc().nullslast(), User.username.asc(), Subject.name.asc())
+
+        teachers: dict[int, QuestionTeacherSummary] = {}
+        for row in (await session.execute(stmt)).all():
+            teacher = teachers.get(row.teacher_user_id)
+            if teacher is None:
+                teacher = QuestionTeacherSummary(
+                    teacher_user_id=row.teacher_user_id,
+                    username=row.username,
+                    full_name=row.full_name,
+                    kafedra_id=row.kafedra_id,
+                    kafedra_name=row.kafedra_name,
+                    question_count=0,
+                    subjects=[],
+                )
+                teachers[row.teacher_user_id] = teacher
+            teacher.question_count += row.question_count
+            teacher.subjects.append(
+                QuestionSubjectSummary(
+                    subject_id=row.subject_id,
+                    subject_name=row.subject_name,
+                    question_count=row.question_count,
+                )
+            )
+        return QuestionCatalogResponse(teachers=list(teachers.values()))
+
     async def create_question(self, session: AsyncSession, data: QuestionCreateRequest) -> Question:
         # No unique check on text requested, but it's often good practice.
         # For now, just create it.

@@ -7,11 +7,12 @@ import {
     type LessonResultUpsertItem,
 } from '@/services/lessonService';
 
-export const useLessons = (params?: LessonListParams) => {
+export const useLessons = (params?: LessonListParams, enabled = true) => {
     return useQuery({
         queryKey: ['lessons', params],
         queryFn: () => lessonService.list(params),
         placeholderData: (previousData) => previousData,
+        enabled,
     });
 };
 
@@ -29,6 +30,8 @@ export const useCreateLesson = () => {
         mutationFn: (data: LessonCreateRequest) => lessonService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['lessons'] });
+            queryClient.invalidateQueries({ queryKey: ['course-topics'] });
+            queryClient.invalidateQueries({ queryKey: ['courses'] });
         },
     });
 };
@@ -41,6 +44,7 @@ export const useUpdateLesson = () => {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['lessons'] });
             queryClient.invalidateQueries({ queryKey: ['lesson', data.id] });
+            queryClient.invalidateQueries({ queryKey: ['course-topics'] });
         },
     });
 };
@@ -51,6 +55,8 @@ export const useDeleteLesson = () => {
         mutationFn: (id: number) => lessonService.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['lessons'] });
+            queryClient.invalidateQueries({ queryKey: ['course-topics'] });
+            queryClient.invalidateQueries({ queryKey: ['courses'] });
         },
     });
 };

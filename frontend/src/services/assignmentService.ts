@@ -18,8 +18,7 @@ export interface AssignmentStats {
 
 export interface Assignment {
     id: number;
-    sinf_id: number;
-    topic_id?: number | null;
+    course_id: number;
     lesson_id?: number | null;
     created_by_user_id?: number | null;
     title: string;
@@ -42,8 +41,7 @@ export interface AssignmentListResponse {
 }
 
 export interface AssignmentCreateRequest {
-    sinf_id: number;
-    topic_id?: number | null;
+    course_id: number;
     lesson_id?: number | null;
     title: string;
     description?: string | null;
@@ -55,7 +53,6 @@ export interface AssignmentCreateRequest {
 }
 
 export interface AssignmentUpdateRequest {
-    topic_id?: number | null;
     lesson_id?: number | null;
     title?: string;
     description?: string | null;
@@ -103,7 +100,7 @@ export interface SubmissionGradeRequest {
 }
 
 export const assignmentService = {
-    list: async (params?: { sinf_id?: number; topic_id?: number; lesson_id?: number; page?: number; limit?: number }) => {
+    list: async (params?: { course_id?: number; lesson_id?: number; page?: number; limit?: number }) => {
         const response = await api.get<AssignmentListResponse>('/assignment/', { params });
         return response.data;
     },

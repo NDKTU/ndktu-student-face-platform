@@ -1,24 +1,32 @@
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Library } from 'lucide-react';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
+import { useCourses, useCourseTeacherSummaries, useDeleteCourse } from '@/hooks/useCourses';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers } from '@/hooks/useTeachers';
-import type { Course } from '@/services/courseService';
+import type { Course, CourseTeacherSummary } from '@/services/courseService';
 import { logger } from '@/utils/logger';
 import { CourseFilters } from '@/components/courses/CourseFilters';
 import { CourseTable } from '@/components/courses/CourseTable';
 import { CourseModal } from '@/components/courses/CourseModal';
+import { Input } from '@/components/ui/Input';
+import { CatalogCard } from '@/components/catalog/CatalogCard';
+import { HierarchyHeader } from '@/components/catalog/HierarchyHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
 
 const CoursesPage = () => {
-    const { hasPermission } = useAuth();
+    const { user, hasPermission } = useAuth();
+    const isAdmin = user?.roles?.some((role) => role.name.toLowerCase() === 'admin') ?? false;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -26,11 +34,37 @@ const CoursesPage = () => {
     const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
+    const [selectedTeacher, setSelectedTeacher] = useState<CourseTeacherSummary | null>(null);
+    const [teacherSearch, setTeacherSearch] = useState('');
+    const [debouncedTeacherSearch, setDebouncedTeacherSearch] = useState('');
+    const [teacherFacultyId, setTeacherFacultyId] = useState<number | undefined>();
+    const [teacherKafedraId, setTeacherKafedraId] = useState<number | undefined>();
 
     const [filterSubjectId, setFilterSubjectId] = useState<number | undefined>(undefined);
     const [filterGroupId, setFilterGroupId] = useState<number | undefined>(undefined);
     const [filterTeacherId, setFilterTeacherId] = useState<number | undefined>(undefined);
     const [filterSemesterNumber, setFilterSemesterNumber] = useState<number | undefined>(undefined);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebouncedTeacherSearch(teacherSearch), 350);
+        return () => window.clearTimeout(timer);
+    }, [teacherSearch]);
+
+    const teacherSummaries = useCourseTeacherSummaries(
+        debouncedTeacherSearch || undefined,
+        teacherFacultyId,
+        teacherKafedraId,
+        isAdmin && selectedTeacher === null,
+    );
+
+    const facultiesQuery = useFaculties(1, 1000, undefined, isAdmin && hasPermission('read:faculty'));
+    const kafedrasQuery = useKafedras(
+        1,
+        1000,
+        undefined,
+        teacherFacultyId,
+        isAdmin && hasPermission('read:kafedra'),
+    );
 
     const { data: coursesData, isLoading: isCoursesLoading, isError: isCoursesError, refetch } = useCourses(
         currentPage,
@@ -89,22 +123,116 @@ const CoursesPage = () => {
         setIsModalOpen(false);
     };
 
+    if (isAdmin && selectedTeacher === null) {
+        return (
+            <div className="space-y-6">
+                <PageHeader
+                    title="Kurslar"
+                    description="O'qituvchilar bo'yicha kurslar"
+                    actions={
+                        <PermissionGate permission="create:course">
+                            <Button onClick={handleCreateCourse}><Plus className="mr-2 h-4 w-4" />Kurs yaratish</Button>
+                        </PermissionGate>
+                    }
+                />
+
+                <div className="grid gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(220px,265px)_minmax(220px,280px)]">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            value={teacherSearch}
+                            onChange={(event) => setTeacherSearch(event.target.value)}
+                            placeholder="O'qituvchini qidirish..."
+                            className="pl-9"
+                        />
+                    </div>
+                    <select
+                        value={teacherFacultyId ?? ''}
+                        onChange={(event) => {
+                            setTeacherFacultyId(event.target.value ? Number(event.target.value) : undefined);
+                            setTeacherKafedraId(undefined);
+                        }}
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Barcha fakultetlar</option>
+                        {facultiesQuery.data?.faculties.map((faculty) => (
+                            <option key={faculty.id} value={faculty.id}>{faculty.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={teacherKafedraId ?? ''}
+                        onChange={(event) => setTeacherKafedraId(event.target.value ? Number(event.target.value) : undefined)}
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Barcha kafedralar</option>
+                        {kafedrasQuery.data?.kafedras.map((kafedra) => (
+                            <option key={kafedra.id} value={kafedra.id}>{kafedra.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {teacherSummaries.isError ? (
+                    <ErrorState onRetry={() => teacherSummaries.refetch()} />
+                ) : teacherSummaries.isLoading ? (
+                    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
+                    </section>
+                ) : (teacherSummaries.data?.length ?? 0) === 0 ? (
+                    <EmptyState icon={<Library className="h-6 w-6" />} title="Kurslar topilmadi" description="Hozircha kurs biriktirilgan o'qituvchi yo'q." />
+                ) : (
+                    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {teacherSummaries.data?.map((teacher) => (
+                            <CatalogCard
+                                key={teacher.teacher_id}
+                                id={teacher.teacher_id}
+                                title={teacher.full_name || teacher.username}
+                                subtitle={teacher.kafedra_name || teacher.username}
+                                metrics={[
+                                    { label: 'Kurs', value: teacher.course_count },
+                                    { label: 'Dars', value: teacher.lesson_count, accent: true },
+                                ]}
+                                onClick={() => {
+                                    setSelectedTeacher(teacher);
+                                    setFilterTeacherId(teacher.teacher_id);
+                                    setCurrentPage(1);
+                                }}
+                            />
+                        ))}
+                    </section>
+                )}
+
+                <CourseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} course={selectedCourse} onSuccess={handleSuccess} />
+            </div>
+        );
+    }
+
     const clearFilters = () => {
         setFilterSubjectId(undefined);
         setFilterGroupId(undefined);
-        setFilterTeacherId(undefined);
+        setFilterTeacherId(selectedTeacher?.teacher_id);
         setFilterSemesterNumber(undefined);
     };
 
     const hasActiveFilters =
         filterSubjectId !== undefined ||
         filterGroupId !== undefined ||
-        filterTeacherId !== undefined ||
+        (!selectedTeacher && filterTeacherId !== undefined) ||
         filterSemesterNumber !== undefined;
 
     return (
         <div className="space-y-6">
-            <PageHeader
+            {selectedTeacher ? (
+                <HierarchyHeader
+                    title={selectedTeacher.full_name || selectedTeacher.username}
+                    description={`${selectedTeacher.kafedra_name || "O'qituvchi"} · ${selectedTeacher.course_count} kurs · ${selectedTeacher.lesson_count} dars`}
+                    onBack={() => { setSelectedTeacher(null); setFilterTeacherId(undefined); setCurrentPage(1); }}
+                    actions={
+                        <PermissionGate permission="create:course">
+                            <Button onClick={handleCreateCourse}><Plus className="mr-2 h-4 w-4" />Kurs yaratish</Button>
+                        </PermissionGate>
+                    }
+                />
+            ) : <PageHeader
                 title="Kurslar"
                 description="Kurslarni boshqarish"
                 actions={
@@ -115,7 +243,7 @@ const CoursesPage = () => {
                         </Button>
                     </PermissionGate>
                 }
-            />
+            />}
 
             <CourseFilters
                 subjects={allSubjects}
@@ -131,6 +259,7 @@ const CoursesPage = () => {
                 onSemesterChange={setFilterSemesterNumber}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearFilters}
+                showTeacherFilter={!selectedTeacher}
             />
 
             <CourseTable

@@ -19,7 +19,7 @@ education_shape / student_count у группы, education_type у специа�
 kafedra_id / credits у предмета, hemis_id / position / staff_type у сотрудника.
 
 Revision ID: b1e4a72f9c05
-Revises: c8a3f0d2e517
+Revises: 55ff8e93c6a6
 Create Date: 2026-08-08 13:10:00.000000
 
 """
@@ -31,7 +31,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b1e4a72f9c05"
-down_revision: Union[str, Sequence[str], None] = "c8a3f0d2e517"
+down_revision: Union[str, Sequence[str], None] = "55ff8e93c6a6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -50,6 +50,38 @@ MIRRORED_TABLES = (
 
 def upgrade() -> None:
     """Upgrade schema."""
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    # The legacy LMS branch replaced groups.faculty_id with speciality_id.
+    # Main uses both: restore faculty_id from the existing hierarchy before
+    # changing the uniqueness rule below.
+    group_columns = {column["name"] for column in inspector.get_columns("groups")}
+    legacy_group_schema = "faculty_id" not in group_columns
+    if legacy_group_schema:
+        op.add_column("groups", sa.Column("faculty_id", sa.Integer(), nullable=True))
+        op.execute(
+            """
+            UPDATE groups AS g
+            SET faculty_id = k.faculty_id
+            FROM specialities AS s
+            JOIN kafedras AS k ON k.id = s.kafedra_id
+            WHERE s.id = g.speciality_id
+            """
+        )
+        missing_faculty = bind.execute(sa.text("SELECT count(*) FROM groups WHERE faculty_id IS NULL")).scalar_one()
+        if missing_faculty:
+            raise RuntimeError(f"Cannot restore groups.faculty_id for {missing_faculty} legacy group(s)")
+        op.alter_column("groups", "faculty_id", existing_type=sa.Integer(), nullable=False)
+        op.create_index("ix_groups_faculty_id", "groups", ["faculty_id"])
+        op.create_foreign_key(
+            "fk_groups_faculty_id_faculties",
+            "groups",
+            "faculties",
+            ["faculty_id"],
+            ["id"],
+        )
+
     # ------------------------------------------------------------------ #
     #  1. Служебные поля зеркала
     # ------------------------------------------------------------------ #
@@ -96,7 +128,9 @@ def upgrade() -> None:
 
     # Полные тёзки среди сотрудников — обычное дело, уникальность снимаем,
     # но поиск по ФИО остаётся частым, поэтому оставляем обычный индекс.
-    op.drop_constraint("employees_full_name_key", "employees", type_="unique")
+    employee_unique_constraints = {constraint["name"] for constraint in inspector.get_unique_constraints("employees")}
+    if "employees_full_name_key" in employee_unique_constraints:
+        op.drop_constraint("employees_full_name_key", "employees", type_="unique")
     op.create_index("ix_employees_full_name", "employees", ["full_name"])
 
     # В EPOS преподаватель может не иметь кафедры.
@@ -108,20 +142,31 @@ def upgrade() -> None:
     op.add_column("groups", sa.Column("course", sa.Integer(), nullable=True))
     op.add_column("groups", sa.Column("education_shape", sa.String(length=32), nullable=True))
     op.add_column("groups", sa.Column("student_count", sa.Integer(), nullable=True))
+    if legacy_group_schema and "kurs" in group_columns:
+        op.execute("UPDATE groups SET course = kurs WHERE kurs IS NOT NULL")
 
     op.add_column("specialities", sa.Column("education_type", sa.String(length=32), nullable=True))
 
-    op.add_column("subjects", sa.Column("kafedra_id", sa.Integer(), nullable=True))
+    # The retired LMS feature branch had already introduced this column (with
+    # an equivalent FK under a different name).  Legacy databases stamped at
+    # 55ff8e93c6a6 must retain it while fresh databases still need it created.
+    subject_columns = {column["name"] for column in inspector.get_columns("subjects")}
+    if "kafedra_id" not in subject_columns:
+        op.add_column("subjects", sa.Column("kafedra_id", sa.Integer(), nullable=True))
     op.add_column("subjects", sa.Column("credits", sa.Integer(), nullable=True))
-    op.create_index("ix_subjects_kafedra_id", "subjects", ["kafedra_id"])
-    op.create_foreign_key(
-        "subjects_kafedra_id_fkey",
-        "subjects",
-        "kafedras",
-        ["kafedra_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    subject_indexes = {index["name"] for index in inspector.get_indexes("subjects")}
+    if "ix_subjects_kafedra_id" not in subject_indexes:
+        op.create_index("ix_subjects_kafedra_id", "subjects", ["kafedra_id"])
+    subject_foreign_keys = inspector.get_foreign_keys("subjects")
+    if not any(fk.get("constrained_columns") == ["kafedra_id"] for fk in subject_foreign_keys):
+        op.create_foreign_key(
+            "subjects_kafedra_id_fkey",
+            "subjects",
+            "kafedras",
+            ["kafedra_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
     # Предмет уникален в пределах кафедры. У 754 существующих строк kafedra_id
     # пуст, а NULL в Postgres не конфликтует сам с собой — то есть на уже
     # накопленные данные ограничение не срабатывает и миграция не падает.

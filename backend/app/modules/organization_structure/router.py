@@ -39,6 +39,7 @@ from .kafedra.schemas import (
     KafedraCreateResponse,
     KafedraListRequest,
     KafedraListResponse,
+    KafedraStatsResponse,
 )
 from .speciality.repository import get_speciality_repository
 from .speciality.schemas import (
@@ -46,6 +47,7 @@ from .speciality.schemas import (
     SpecialityListRequest,
     SpecialityListResponse,
     SpecialityResponse,
+    SpecialityStatsResponse,
     SpecialityUpdateRequest,
 )
 
@@ -154,6 +156,15 @@ async def create_kafedra(
 ):
     result = await get_kafedra_repository.create_kafedra(session=session, data=data)
     return result
+
+
+@kafedra_router.get("/stats", response_model=KafedraStatsResponse)
+async def get_kafedra_stats(
+    faculty_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:kafedra")),
+):
+    return await get_kafedra_repository.get_kafedra_stats(session=session, faculty_id=faculty_id)
 
 
 @kafedra_router.get("/{kafedra_id}", response_model=KafedraCreateResponse)
@@ -330,6 +341,15 @@ async def create_speciality(
     _: PermissionRequired = Depends(PermissionRequired("create:speciality")),
 ):
     return await get_speciality_repository.create_speciality(session=session, data=data)
+
+
+@speciality_router.get("/stats", response_model=SpecialityStatsResponse)
+async def get_speciality_stats(
+    kafedra_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:speciality")),
+):
+    return await get_speciality_repository.get_speciality_stats(session=session, kafedra_id=kafedra_id)
 
 
 @speciality_router.get("/", response_model=SpecialityListResponse)

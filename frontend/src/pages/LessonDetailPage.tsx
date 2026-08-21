@@ -1,354 +1,122 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, BookOpen, ExternalLink, FileText, Link as LinkIcon, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useLesson, useLessonResults, useUpsertLessonResults } from '@/hooks/useLessons';
-import { useGroupStudents } from '@/hooks/useGroups';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { useLesson } from '@/hooks/useLessons';
+import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
+import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useResources';
+import { resourceService, type ResourceType } from '@/services/resourceService';
+import type { Assignment } from '@/services/assignmentService';
+import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { AssignmentFormModal } from '@/components/AssignmentFormModal';
-import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
-import { ArrowLeft, Clock, Loader2, Save, Plus, Pencil, Trash2 } from 'lucide-react';
-import type { LessonAttendance, LessonResultUpsertItem } from '@/services/lessonService';
-import type { Assignment } from '@/services/assignmentService';
 
-type Row = {
-    user_id: number;
-    full_name: string;
-    attendance: LessonAttendance;
-    grade: string;
-    notes: string;
-};
-
-const ATTENDANCE_OPTIONS: { value: LessonAttendance; label: string }[] = [
-    { value: 'present', label: 'Keldi' },
-    { value: 'absent', label: 'Kelmadi' },
-    { value: 'late', label: 'Kechikdi' },
-];
+function youtubeEmbedUrl(url?: string | null) {
+    if (!url) return null;
+    try {
+        const parsed = new URL(url);
+        let videoId = parsed.hostname.includes('youtu.be') ? parsed.pathname.slice(1) : parsed.searchParams.get('v');
+        if (parsed.pathname.startsWith('/embed/')) videoId = parsed.pathname.split('/')[2];
+        return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
+    } catch { return null; }
+}
 
 export default function LessonDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
-    const lessonId = id ? parseInt(id, 10) : undefined;
+    const { hasPermission } = useAuth();
+    const lessonId = id ? Number.parseInt(id, 10) : undefined;
+    const lessonQuery = useLesson(lessonId);
+    const resourcesQuery = useResources(lessonId);
+    const assignmentsQuery = useAssignments(lessonId ? { lesson_id: lessonId, limit: 50 } : undefined);
+    const deleteResource = useDeleteResource(lessonId);
+    const deleteAssignment = useDeleteAssignment();
+    const [contentOpen, setContentOpen] = useState(false);
+    const [homeworkOpen, setHomeworkOpen] = useState(false);
+    const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
 
-    const isAdmin = user?.roles?.some(r => r.name.toLowerCase() === 'admin');
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
-    const canEdit = !!(isAdmin || isTeacher);
+    if (lessonQuery.isLoading) return <div className="space-y-6"><Skeleton className="h-10 w-2/3" /><Skeleton className="aspect-video w-full rounded-2xl" /></div>;
+    if (lessonQuery.isError) return <ErrorState onRetry={() => lessonQuery.refetch()} />;
+    const lesson = lessonQuery.data;
+    if (!lesson) return <EmptyState title="Dars topilmadi" description="Bu dars mavjud emas." />;
 
-    const { data: lesson, isLoading: isLessonLoading } = useLesson(lessonId);
-    const { data: studentsData } = useGroupStudents(lesson?.group_id);
-    const { data: resultsData } = useLessonResults(lessonId);
-
-    const upsertMutation = useUpsertLessonResults();
-
-    const { data: assignmentsData } = useAssignments(lessonId ? { lesson_id: lessonId, limit: 100 } : undefined);
-    const lessonAssignments = lessonId ? assignmentsData?.assignments ?? [] : [];
-    const deleteAssignmentMutation = useDeleteAssignment();
-
-    const [rows, setRows] = useState<Row[]>([]);
-    const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
-    const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
-    const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
-    const [nowSnapshot] = useState(() => Date.now());
-
-    const studentList = useMemo(() => studentsData?.students ?? [], [studentsData]);
-    const resultByUserId = useMemo(() => {
-        const m = new Map<number, { attendance: LessonAttendance; grade: number | null; notes: string | null }>();
-        (resultsData?.results ?? []).forEach(r => m.set(r.user_id, {
-            attendance: r.attendance,
-            grade: r.grade ?? null,
-            notes: r.notes ?? null,
-        }));
-        return m;
-    }, [resultsData]);
-
-    useEffect(() => {
-        if (!canEdit) return;
-        const next: Row[] = studentList
-            .filter(s => s.user_id != null)
-            .map(s => {
-                const existing = resultByUserId.get(s.user_id!);
-                return {
-                    user_id: s.user_id!,
-                    full_name: s.full_name || `Talaba #${s.id}`,
-                    attendance: existing?.attendance ?? 'present',
-                    grade: existing?.grade != null ? String(existing.grade) : '',
-                    notes: existing?.notes ?? '',
-                };
-            });
-        setRows(next);
-    }, [studentList, resultByUserId, canEdit]);
-
-    const updateRow = (idx: number, patch: Partial<Row>) => {
-        setRows(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
-    };
-
-    const handleSave = () => {
-        if (!lessonId) return;
-        const items: LessonResultUpsertItem[] = rows.map(r => {
-            const gradeNum = r.grade.trim() === '' ? null : parseInt(r.grade, 10);
-            return {
-                user_id: r.user_id,
-                attendance: r.attendance,
-                grade: gradeNum != null && !Number.isNaN(gradeNum) ? gradeNum : null,
-                notes: r.notes.trim() || null,
-            };
-        });
-        upsertMutation.mutate({ lessonId, items });
-    };
-
-    if (isLessonLoading) {
-        return (
-            <div className="space-y-6">
-                <Skeleton className="h-10 w-2/3" />
-                <Skeleton className="h-48 w-full rounded-xl" />
-                <Skeleton className="h-64 w-full rounded-xl" />
-            </div>
-        );
-    }
-    if (!lesson) {
-        return (
-            <EmptyState
-                title="Dars topilmadi"
-                description="Bu dars o'chirilgan yoki mavjud emas."
-                action={
-                    <Button variant="outline" onClick={() => navigate('/lessons')}>
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Darslarga qaytish
-                    </Button>
-                }
-            />
-        );
-    }
-
-    const studentResults = resultsData?.results ?? [];
+    const resources = resourcesQuery.data?.resources ?? [];
+    const video = resources.find((item) => item.resource_type === 'video');
+    const scripts = resources.filter((item) => item.resource_type === 'text');
+    const extras = resources.filter((item) => item.resource_type === 'file' || item.resource_type === 'link');
+    const assignments = assignmentsQuery.data?.assignments ?? [];
+    const embedUrl = youtubeEmbedUrl(video?.link_url);
+    const canManageContent = hasPermission('create:resource');
+    const canManageHomework = hasPermission('create:assignment');
 
     return (
         <div className="space-y-6">
             <div className="space-y-2">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/lessons')} className="-ml-2">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Orqaga
-                </Button>
-                <PageHeader
-                    title={lesson.topic}
-                    description={[
-                        lesson.date,
-                        lesson.subject_teacher?.subject?.name,
-                        lesson.group?.name,
-                    ].filter(Boolean).join(' · ')}
-                />
-                {lesson.description && (
-                    <p className="text-sm text-foreground/80">{lesson.description}</p>
-                )}
+                <Button variant="ghost" size="sm" onClick={() => navigate(`/courses/${lesson.course_id}`)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4" /> Kursga qaytish</Button>
+                <PageHeader title={lesson.topic} description={[lesson.date, lesson.subject_teacher?.subject?.name, lesson.group?.name].filter(Boolean).join(' · ')} actions={canManageContent ? <Button onClick={() => setContentOpen(true)}><Plus className="mr-2 h-4 w-4" /> Kontent qo'shish</Button> : undefined} />
+                {lesson.description && <p className="max-w-4xl text-sm leading-6 text-foreground/80">{lesson.description}</p>}
             </div>
 
-            {lesson.sinf_id && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Topshiriqlar</CardTitle>
-                        {canEdit && (
-                            <Button
-                                size="sm"
-                                onClick={() => { setEditingAssignment(null); setAssignmentModalOpen(true); }}
-                            >
-                                <Plus className="h-4 w-4 mr-2" /> Topshiriq qo'shish
-                            </Button>
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        {lessonAssignments.length === 0 ? (
-                            <p className="py-6 text-center text-sm text-muted-foreground">
-                                Bu darsga hali topshiriq yo'q.
-                            </p>
-                        ) : (
-                            <div className="space-y-2">
-                                {lessonAssignments.map((a) => {
-                                    const dlDate = new Date(a.deadline);
-                                    const overdue = dlDate.getTime() < nowSnapshot;
-                                    return (
-                                        <div
-                                            key={a.id}
-                                            className="rounded-xl border border-border/60 bg-card p-3 flex items-center justify-between gap-3 hover:shadow-sm hover:border-primary/20 transition-all duration-300"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-medium truncate">{a.title}</p>
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                                                    <Clock className="h-3 w-3" />
-                                                    <span className={overdue ? 'text-destructive' : ''}>
-                                                        {dlDate.toLocaleString()}
-                                                    </span>
-                                                    <span>· max {a.max_grade}</span>
-                                                    {a.stats && (
-                                                        <span>· {a.stats.submitted}/{a.stats.total_students} topshirgan</span>
-                                                    )}
-                                                </div>
-                                                {a.description && (
-                                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                                        {a.description}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            {canEdit && (
-                                                <div className="flex gap-1 shrink-0">
-                                                    <button
-                                                        onClick={() => { setEditingAssignment(a); setAssignmentModalOpen(true); }}
-                                                        className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                                        title="Tahrirlash"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setAssignmentToDelete(a)}
-                                                        className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                        title="O'chirish"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+            <Card><CardHeader><CardTitle>Dars videosi</CardTitle></CardHeader><CardContent>
+                {embedUrl ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe className="h-full w-full" src={embedUrl} title={video?.title ?? lesson.topic} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
+                    : video?.file_url ? <video className="aspect-video w-full rounded-xl bg-black" controls preload="metadata" src={video.file_url} />
+                    : <EmptyState icon={<BookOpen className="h-6 w-6" />} title="Video qo'shilmagan" description="Bu darsni video bo'lmasdan ham o'qish mumkin." />}
+            </CardContent></Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Natijalar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {canEdit ? (
-                        <>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>F.I.SH</TableHead>
-                                        <TableHead className="w-[160px]">Qatnashish</TableHead>
-                                        <TableHead className="w-[100px]">Baho (0-5)</TableHead>
-                                        <TableHead>Izoh</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {rows.map((r, idx) => (
-                                        <TableRow key={r.user_id}>
-                                            <TableCell className="font-medium">{r.full_name}</TableCell>
-                                            <TableCell>
-                                                <select
-                                                    value={r.attendance}
-                                                    onChange={(e) => updateRow(idx, { attendance: e.target.value as LessonAttendance })}
-                                                    className="w-full rounded-xl border border-border/60 bg-card px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200"
-                                                >
-                                                    {ATTENDANCE_OPTIONS.map(opt => (
-                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                    ))}
-                                                </select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={5}
-                                                    value={r.grade}
-                                                    onChange={(e) => updateRow(idx, { grade: e.target.value })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    value={r.notes}
-                                                    onChange={(e) => updateRow(idx, { notes: e.target.value })}
-                                                    placeholder="Izoh..."
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {rows.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                                                Bu guruhda talabalar topilmadi.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                            {rows.length > 0 && (
-                                <div className="mt-4 flex justify-end">
-                                    <Button onClick={handleSave} disabled={upsertMutation.isPending}>
-                                        {upsertMutation.isPending
-                                            ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            : <Save className="h-4 w-4 mr-2" />}
-                                        Saqlash
-                                    </Button>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Qatnashish</TableHead>
-                                    <TableHead>Baho</TableHead>
-                                    <TableHead>Izoh</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {studentResults.map(r => {
-                                    const label = ATTENDANCE_OPTIONS.find(o => o.value === r.attendance)?.label ?? r.attendance;
-                                    return (
-                                        <TableRow key={r.id}>
-                                            <TableCell>{label}</TableCell>
-                                            <TableCell>{r.grade ?? '-'}</TableCell>
-                                            <TableCell className="text-muted-foreground">{r.notes ?? '-'}</TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                                {studentResults.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                                            Hali natija qo'shilmagan.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+            {scripts.length > 0 && <Card><CardHeader><CardTitle>Dars skripti / konspekti</CardTitle></CardHeader><CardContent className="space-y-4">{scripts.map((item) => <div key={item.id} className="relative rounded-xl bg-muted/40 p-4"><p className="whitespace-pre-wrap text-sm leading-7">{item.text_content}</p>{canManageContent && <DeleteButton onClick={() => deleteResource.mutate(item.id)} />}</div>)}</CardContent></Card>}
 
-            {lesson.sinf_id && (
-                <AssignmentFormModal
-                    isOpen={assignmentModalOpen}
-                    onClose={() => { setAssignmentModalOpen(false); setEditingAssignment(null); }}
-                    sinfId={lesson.sinf_id}
-                    lessonId={lesson.id}
-                    topicId={lesson.topic_id ?? null}
-                    editing={editingAssignment}
-                />
-            )}
+            <Card><CardHeader><CardTitle>Qo'shimcha materiallar</CardTitle></CardHeader><CardContent>
+                {extras.length === 0 ? <p className="text-sm text-muted-foreground">Hozircha kitob, hujjat yoki qo'shimcha havola yo'q.</p> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border/60 p-4">{item.resource_type === 'file' ? <FileText className="h-5 w-5 text-primary" /> : <LinkIcon className="h-5 w-5 text-primary" />}<a href={item.file_url || item.link_url || '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-medium hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 text-muted-foreground" />{canManageContent && <button onClick={() => deleteResource.mutate(item.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
+            </CardContent></Card>
 
-            <ConfirmDialog
-                isOpen={!!assignmentToDelete}
-                onClose={() => setAssignmentToDelete(null)}
-                onConfirm={() => {
-                    if (!assignmentToDelete) return;
-                    deleteAssignmentMutation.mutate(assignmentToDelete.id, {
-                        onSuccess: () => setAssignmentToDelete(null),
-                    });
-                }}
-                title="Topshiriqni o'chirish"
-                description={`"${assignmentToDelete?.title}" topshirig'ini o'chirmoqchimisiz?`}
-                confirmText="O'chirish"
-                cancelText="Bekor qilish"
-            />
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Uy vazifasi</CardTitle>{canManageHomework && <Button size="sm" onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Uy vazifasi</Button>}</CardHeader><CardContent>
+                {assignments.length === 0 ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : <div className="space-y-3">{assignments.map((assignment) => <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {new Date(assignment.deadline).toLocaleString()} · Maksimal ball: {assignment.max_grade}</p></div>{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div></div>)}</div>}
+            </CardContent></Card>
+
+            <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />
+            <AssignmentFormModal isOpen={homeworkOpen} onClose={() => setHomeworkOpen(false)} courseId={lesson.course_id} lessonId={lesson.id} editing={editingHomework} />
         </div>
     );
+}
+
+function DeleteButton({ onClick }: { onClick: () => void }) { return <button onClick={onClick} className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>; }
+
+function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose: () => void; lessonId: number }) {
+    const createResource = useCreateResource(lessonId);
+    const [kind, setKind] = useState<ResourceType>('file');
+    const [title, setTitle] = useState('');
+    const [url, setUrl] = useState('');
+    const [text, setText] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'Video yoki YouTube' }];
+
+    const submit = async () => {
+        setSaving(true); setError('');
+        try {
+            let fileUrl: string | undefined;
+            if ((kind === 'file' || kind === 'video') && file) fileUrl = (await resourceService.upload(file)).url;
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
+            setTitle(''); setUrl(''); setText(''); setFile(null); onClose();
+        } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
+        finally { setSaving(false); }
+    };
+
+    return <Modal isOpen={isOpen} onClose={onClose} title="Dars kontenti"><div className="space-y-4">
+        <div className="flex flex-wrap gap-2">{options.map((option) => <Button key={option.value} size="sm" variant={kind === option.value ? 'primary' : 'outline'} onClick={() => { setKind(option.value); setError(''); }}>{option.label}</Button>)}</div>
+        <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>
+        {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
+        {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
+        {kind === 'video' && <><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="YouTube havolasi (yoki quyida fayl tanlang)" /><Input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></>}
+        {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></div>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button><Button onClick={submit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button></div>
+    </div></Modal>;
 }

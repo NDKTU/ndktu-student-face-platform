@@ -47,6 +47,8 @@ export interface Course {
     kafedra?: CourseKafedraInfo;
     speciality?: CourseSpecialityInfo;
     groups: CourseGroupInfo[];
+    topic_count: number;
+    lesson_count: number;
     created_at: string;
     updated_at: string;
 }
@@ -72,7 +74,23 @@ export interface CourseListResponse {
     courses: Course[];
 }
 
+export interface CourseTeacherSummary {
+    teacher_id: number;
+    username: string;
+    full_name?: string | null;
+    kafedra_id?: number | null;
+    kafedra_name?: string | null;
+    course_count: number;
+    lesson_count: number;
+}
+
 export const courseService = {
+    getTeacherSummaries: async (search?: string, facultyId?: number, kafedraId?: number) => {
+        const response = await api.get<{ teachers: CourseTeacherSummary[] }>('/course/teachers/summary', {
+            params: { search, faculty_id: facultyId, kafedra_id: kafedraId },
+        });
+        return response.data.teachers;
+    },
     getCourses: async (
         page = 1,
         limit = 10,

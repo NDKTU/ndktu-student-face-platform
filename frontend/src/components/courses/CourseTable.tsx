@@ -1,4 +1,5 @@
-import { Pencil, Trash2, Library } from 'lucide-react';
+import { Pencil, Trash2, Library, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
@@ -22,6 +23,8 @@ interface CourseTableProps {
  * название, преподаватель и кафедра, полоса счётчиков, группы.
  */
 export const CourseTable = ({ courses, isLoading, isError, onRetry, onEdit, onDelete }: CourseTableProps) => {
+    const navigate = useNavigate();
+
     if (isError) {
         return <ErrorState onRetry={onRetry} />;
     }
@@ -45,7 +48,7 @@ export const CourseTable = ({ courses, isLoading, isError, onRetry, onEdit, onDe
     }
 
     const renderActions = (course: Course) => (
-        <div className="flex gap-1">
+        <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
             <PermissionGate permission="update:course">
                 <Button variant="ghost" size="sm" onClick={() => onEdit(course)}>
                     <Pencil className="h-4 w-4" />
@@ -67,13 +70,22 @@ export const CourseTable = ({ courses, isLoading, isError, onRetry, onEdit, onDe
     return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {courses.map((course) => {
-                const subtitle = [course.teacher?.full_name, course.kafedra?.name]
+                const subtitle = [course.subject?.name, course.kafedra?.name]
                     .filter(Boolean)
                     .join(' · ');
                 return (
                     <div
                         key={course.id}
-                        className="flex flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/courses/${course.id}`)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                navigate(`/courses/${course.id}`);
+                            }
+                        }}
+                        className="group flex cursor-pointer flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <div className="flex items-start gap-3">
                             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tileFor(course.id)}`}>
@@ -84,22 +96,17 @@ export const CourseTable = ({ courses, isLoading, isError, onRetry, onEdit, onDe
                                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle || '—'}</p>
                             </div>
                             {renderActions(course)}
+                            <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                         </div>
 
-                        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-4">
+                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/60 pt-4">
                             <div className="min-w-0">
-                                <p className="truncate font-display text-sm font-bold text-foreground" title={course.subject?.name}>
-                                    {course.subject?.name || '—'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Fan</p>
+                                <p className="font-display text-lg font-bold text-foreground">{course.topic_count ?? 0}</p>
+                                <p className="text-xs text-muted-foreground">Mavzu</p>
                             </div>
                             <div>
-                                <p className="font-display text-lg font-bold text-foreground">{course.semester_number ?? '—'}</p>
-                                <p className="text-xs text-muted-foreground">Semestr</p>
-                            </div>
-                            <div>
-                                <p className="font-display text-lg font-bold text-primary">{course.groups.length}</p>
-                                <p className="text-xs text-muted-foreground">Guruh</p>
+                                <p className="font-display text-lg font-bold text-primary">{course.lesson_count ?? 0}</p>
+                                <p className="text-xs text-muted-foreground">Dars</p>
                             </div>
                         </div>
 

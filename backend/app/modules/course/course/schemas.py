@@ -82,6 +82,8 @@ class CourseResponse(BaseModel):
     kafedra: Optional[CourseKafedraInfo] = None
     speciality: Optional[CourseSpecialityInfo] = None
     groups: List[CourseGroupInfo] = []
+    topic_count: int = 0
+    lesson_count: int = 0
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
@@ -111,3 +113,17 @@ class CourseListResponse(BaseModel):
     page: int
     limit: int
     courses: List[CourseResponse]
+
+
+class CourseTeacherSummary(BaseModel):
+    teacher_id: int
+    username: str
+    full_name: Optional[str] = None
+    kafedra_id: Optional[int] = None
+    kafedra_name: Optional[str] = None
+    course_count: int
+    lesson_count: int
+
+
+class CourseTeacherSummaryResponse(BaseModel):
+    teachers: List[CourseTeacherSummary]

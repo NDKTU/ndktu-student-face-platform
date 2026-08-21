@@ -107,6 +107,9 @@ class GroupRepository:
         if request.faculty_id:
             stmt = stmt.where(Group.faculty_id == request.faculty_id)
 
+        if request.speciality_id:
+            stmt = stmt.where(Group.speciality_id == request.speciality_id)
+
         stmt = stmt.order_by(desc(Group.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
@@ -136,6 +139,8 @@ class GroupRepository:
             count_stmt = count_stmt.where(Group.name.ilike(f"%{request.name}%"))
         if request.faculty_id:
             count_stmt = count_stmt.where(Group.faculty_id == request.faculty_id)
+        if request.speciality_id:
+            count_stmt = count_stmt.where(Group.speciality_id == request.speciality_id)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0

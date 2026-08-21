@@ -34,7 +34,29 @@ export interface QuestionListResponse {
     questions: Question[];
 }
 
+export interface QuestionSubjectSummary {
+    subject_id: number;
+    subject_name: string;
+    question_count: number;
+}
+
+export interface QuestionTeacherSummary {
+    teacher_user_id: number;
+    username: string;
+    full_name?: string | null;
+    kafedra_id?: number | null;
+    kafedra_name?: string | null;
+    question_count: number;
+    subjects: QuestionSubjectSummary[];
+}
+
 export const questionService = {
+    getCatalog: async (search?: string) => {
+        const response = await api.get<{ teachers: QuestionTeacherSummary[] }>('/question/catalog', {
+            params: { search },
+        });
+        return response.data.teachers;
+    },
     getQuestions: async (page = 1, limit = 10, text?: string, subject_id?: number, user_id?: number) => {
         const response = await api.get<QuestionListResponse>('/question/', {
             params: { page, limit, text, subject_id, user_id },

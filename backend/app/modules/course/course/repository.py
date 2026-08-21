@@ -1,12 +1,13 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Teacher, User
-from app.modules.course.model import Course, CourseGroup
+from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
+from app.modules.organization_structure.model import Kafedra
 from app.modules.quiz.model import Subject, SubjectTeacher
 
 from .schemas import (
@@ -20,6 +21,8 @@ from .schemas import (
     CourseSpecialityInfo,
     CourseSubjectInfo,
     CourseTeacherInfo,
+    CourseTeacherSummary,
+    CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
 
@@ -27,6 +30,86 @@ logger = logging.getLogger(__name__)
 
 
 class CourseRepository:
+    @staticmethod
+    def _role_names(user: User) -> set[str]:
+        return {role.name.lower() for role in (user.roles or [])}
+
+    async def _ensure_view_access(self, session: AsyncSession, course: Course, current_user: User) -> None:
+        """Allow admins, the owning teacher, and students enrolled in a course group."""
+        roles = self._role_names(current_user)
+        if "admin" in roles or course.teacher_id == current_user.id:
+            return
+
+        if "student" in roles:
+            enrollment = await session.execute(
+                select(Student.id)
+                .join(CourseGroup, CourseGroup.group_id == Student.group_id)
+                .where(CourseGroup.course_id == course.id, Student.user_id == current_user.id)
+            )
+            if enrollment.scalar_one_or_none() is not None:
+                return
+
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this Course")
+
+    async def list_teacher_summaries(
+        self,
+        session: AsyncSession,
+        current_user: User,
+        restrict_to_teacher: bool,
+        search: str | None = None,
+        faculty_id: int | None = None,
+        kafedra_id: int | None = None,
+    ) -> CourseTeacherSummaryResponse:
+        """Aggregate course/lesson totals for the teacher-first catalogue."""
+        stmt = (
+            select(
+                Course.teacher_id,
+                User.username,
+                Employee.full_name,
+                Kafedra.id.label("kafedra_id"),
+                Kafedra.name.label("kafedra_name"),
+                func.count(func.distinct(Course.id)).label("course_count"),
+                func.count(func.distinct(Lesson.id)).label("lesson_count"),
+            )
+            .join(User, User.id == Course.teacher_id)
+            .outerjoin(Employee, Employee.user_id == User.id)
+            .outerjoin(Teacher, Teacher.employee_id == Employee.id)
+            .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
+            .outerjoin(Lesson, Lesson.course_id == Course.id)
+        )
+        if restrict_to_teacher:
+            stmt = stmt.where(Course.teacher_id == current_user.id)
+        if faculty_id is not None:
+            stmt = stmt.where(Course.faculty_id == faculty_id)
+        if kafedra_id is not None:
+            stmt = stmt.where(Course.kafedra_id == kafedra_id)
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(or_(Employee.full_name.ilike(pattern), User.username.ilike(pattern)))
+
+        stmt = stmt.group_by(
+            Course.teacher_id,
+            User.username,
+            Employee.full_name,
+            Kafedra.id,
+            Kafedra.name,
+        ).order_by(Employee.full_name.asc().nullslast(), User.username.asc())
+        rows = (await session.execute(stmt)).all()
+        return CourseTeacherSummaryResponse(
+            teachers=[
+                CourseTeacherSummary(
+                    teacher_id=row.teacher_id,
+                    username=row.username,
+                    full_name=row.full_name,
+                    kafedra_id=row.kafedra_id,
+                    kafedra_name=row.kafedra_name,
+                    course_count=row.course_count,
+                    lesson_count=row.lesson_count,
+                )
+                for row in rows
+            ]
+        )
+
     async def _ensure_user_exists(self, session: AsyncSession, user_id: int) -> None:
         if (await session.execute(select(User.id).where(User.id == user_id))).scalar_one_or_none() is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Teacher user {user_id} not found")
@@ -38,6 +121,12 @@ class CourseRepository:
     async def _serialize(self, session: AsyncSession, course: Course) -> CourseResponse:
         teacher_full_name_stmt = select(Employee.full_name).where(Employee.user_id == course.teacher_id)
         teacher_full_name = (await session.execute(teacher_full_name_stmt)).scalar_one_or_none()
+        lesson_count = (
+            await session.execute(select(func.count(Lesson.id)).where(Lesson.course_id == course.id))
+        ).scalar() or 0
+        topic_count = (
+            await session.execute(select(func.count(CourseTopic.id)).where(CourseTopic.course_id == course.id))
+        ).scalar() or 0
 
         return CourseResponse(
             id=course.id,
@@ -61,6 +150,8 @@ class CourseRepository:
             kafedra=CourseKafedraInfo.model_validate(course.kafedra) if course.kafedra else None,
             speciality=CourseSpecialityInfo.model_validate(course.speciality) if course.speciality else None,
             groups=[CourseGroupInfo.model_validate(g) for g in course.groups],
+            topic_count=topic_count,
+            lesson_count=lesson_count,
             created_at=course.created_at,
             updated_at=course.updated_at,
         )
@@ -116,8 +207,9 @@ class CourseRepository:
         loaded = await self._load_with_relations(session, course.id)
         return await self._serialize(session, loaded)
 
-    async def get_course(self, session: AsyncSession, course_id: int) -> CourseResponse:
+    async def get_course(self, session: AsyncSession, course_id: int, current_user: User) -> CourseResponse:
         course = await self._load_with_relations(session, course_id)
+        await self._ensure_view_access(session, course, current_user)
         return await self._serialize(session, course)
 
     async def list_courses(
@@ -139,7 +231,18 @@ class CourseRepository:
 
         filters = []
         if restrict_to_teacher:
-            filters.append(Course.teacher_id == current_user.id)
+            roles = self._role_names(current_user)
+            if "teacher" in roles:
+                filters.append(Course.teacher_id == current_user.id)
+            elif "student" in roles:
+                enrolled_course_ids = (
+                    select(CourseGroup.course_id)
+                    .join(Student, Student.group_id == CourseGroup.group_id)
+                    .where(Student.user_id == current_user.id)
+                )
+                filters.append(Course.id.in_(enrolled_course_ids))
+            else:
+                filters.append(Course.teacher_id == current_user.id)
         if request.teacher_id:
             filters.append(Course.teacher_id == request.teacher_id)
         if request.subject_id:

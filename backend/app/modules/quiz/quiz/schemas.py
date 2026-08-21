@@ -74,6 +74,7 @@ class QuizListRequest(BaseModel):
     created_by_user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    faculty_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None
 
@@ -106,3 +107,42 @@ class AvailableQuestionsResponse(BaseModel):
     lecturer_id: int
     subject_id: int
     available: int
+
+
+class QuizCatalogSubject(BaseModel):
+    subject_id: int
+    subject_name: str
+    quiz_count: int
+    active_count: int
+
+
+class QuizCatalogFaculty(BaseModel):
+    faculty_id: int
+    faculty_name: str
+    quiz_count: int
+    active_count: int
+    subjects: list[QuizCatalogSubject]
+
+
+class QuizCatalogResponse(BaseModel):
+    faculties: list[QuizCatalogFaculty]
+
+
+class QuizQuestionAnalytics(BaseModel):
+    question_id: int
+    question_text: str
+    answer_count: int
+    correct_count: int
+    wrong_count: int
+    correct_percent: float
+
+
+class QuizAnalyticsResponse(BaseModel):
+    quiz_id: int
+    total_students: int
+    submitted_count: int
+    average_grade: Optional[float] = None
+    minimum_grade: Optional[int] = None
+    maximum_grade: Optional[int] = None
+    average_duration_seconds: Optional[float] = None
+    questions: list[QuizQuestionAnalytics]

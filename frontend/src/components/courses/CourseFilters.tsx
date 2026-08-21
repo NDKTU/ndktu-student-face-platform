@@ -21,6 +21,7 @@ interface CourseFiltersProps {
     onSemesterChange: (val: number | undefined) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
+    showTeacherFilter?: boolean;
 }
 
 const selectClassName =
@@ -40,6 +41,7 @@ export const CourseFilters = ({
     onSemesterChange,
     hasActiveFilters,
     onClearFilters,
+    showTeacherFilter = true,
 }: CourseFiltersProps) => {
     return (
         <Card>
@@ -57,18 +59,20 @@ export const CourseFilters = ({
                             />
                         </div>
                     </PermissionGate>
-                    <PermissionGate permission="read:teacher">
-                        <div className="flex flex-col gap-2 min-w-[200px] flex-1">
-                            <label className="text-sm font-medium">O'qituvchi bo'yicha filtri</label>
-                            <Combobox
-                                options={teachers.map(t => ({ value: (t.employee?.user_id ?? '').toString(), label: t.employee?.full_name ?? '' }))}
-                                value={filterTeacherId?.toString()}
-                                onChange={(val) => onTeacherChange(val ? parseInt(val) : undefined)}
-                                placeholder="Barcha o'qituvchilar"
-                                searchPlaceholder="O'qituvchini qidirish..."
-                            />
-                        </div>
-                    </PermissionGate>
+                    {showTeacherFilter && (
+                        <PermissionGate permission="read:teacher">
+                            <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                                <label className="text-sm font-medium">O'qituvchi bo'yicha filtri</label>
+                                <Combobox
+                                    options={teachers.map(t => ({ value: (t.employee?.user_id ?? '').toString(), label: t.employee?.full_name ?? '' }))}
+                                    value={filterTeacherId?.toString()}
+                                    onChange={(val) => onTeacherChange(val ? parseInt(val) : undefined)}
+                                    placeholder="Barcha o'qituvchilar"
+                                    searchPlaceholder="O'qituvchini qidirish..."
+                                />
+                            </div>
+                        </PermissionGate>
+                    )}
                     <PermissionGate permission="read:group">
                         <div className="flex flex-col gap-2 min-w-[200px] flex-1">
                             <label className="text-sm font-medium">Guruh bo'yicha filtri</label>

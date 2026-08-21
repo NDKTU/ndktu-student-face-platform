@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.schemas import TashkentDatetime
 
-RESOURCE_TYPES = Literal["file", "link", "text"]
+RESOURCE_TYPES = Literal["file", "link", "text", "video"]
 
 
 class ResourceCreateRequest(BaseModel):
@@ -22,9 +22,13 @@ class ResourceCreateRequest(BaseModel):
         if (self.lesson_id is None) == (self.course_id is None):
             raise ValueError("Exactly one of lesson_id or course_id must be set")
 
-        field_by_type = {"file": self.file_url, "link": self.link_url, "text": self.text_content}
-        if not field_by_type[self.resource_type]:
-            raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
+        if self.resource_type == "video":
+            if not (self.file_url or self.link_url):
+                raise ValueError("video resource requires file_url or link_url")
+        else:
+            field_by_type = {"file": self.file_url, "link": self.link_url, "text": self.text_content}
+            if not field_by_type[self.resource_type]:
+                raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
         return self
 
 
