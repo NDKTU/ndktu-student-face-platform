@@ -4,6 +4,8 @@ export interface Speciality {
     id: number;
     name: string;
     kafedra_id: number;
+    /** EPOS: 'Bakalavr' | 'Magistr'; у ручных записей может отсутствовать */
+    education_type?: string | null;
     created_at: string;
     updated_at: string;
     external_id?: string | null;
