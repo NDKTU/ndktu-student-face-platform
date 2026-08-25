@@ -30,7 +30,15 @@ def downgrade() -> None:
         sa.Column("attendance", sa.String(16), nullable=False),
         sa.Column("grade", sa.Integer(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            server_default=sa.text("now()"),
+            onupdate=sa.text("now()"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("lesson_id", "user_id", name="uq_lesson_result_per_user"),
     )
+    op.create_index(op.f("ix_lesson_results_lesson_id"), "lesson_results", ["lesson_id"], unique=False)
+    op.create_index(op.f("ix_lesson_results_user_id"), "lesson_results", ["user_id"], unique=False)
