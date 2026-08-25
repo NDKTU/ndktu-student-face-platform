@@ -141,7 +141,6 @@ class LessonRepository:
             course_id=data.course_id,
             topic_id=data.topic_id,
             lesson_type=data.lesson_type,
-            duration_minutes=data.duration_minutes,
             topic=data.topic,
             # Форма дарса даты не спрашивает: занятие заводят в день проведения.
             date=data.date or datetime.now(TASHKENT_TZ).date(),
@@ -298,8 +297,6 @@ class LessonRepository:
             lesson.topic_id = data.topic_id
         if data.lesson_type is not None:
             lesson.lesson_type = data.lesson_type
-        if data.duration_minutes is not None:
-            lesson.duration_minutes = data.duration_minutes
         if data.topic is not None:
             lesson.topic = data.topic
         if data.date is not None:

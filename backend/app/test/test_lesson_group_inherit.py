@@ -51,7 +51,6 @@ async def test_lesson_without_date_and_duration(
     assert response.status_code == 201
     lesson = response.json()
     assert lesson["date"] == datetime.now(TASHKENT_TZ).date().isoformat()
-    assert lesson["duration_minutes"] is None
 
 
 @pytest.mark.asyncio

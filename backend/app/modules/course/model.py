@@ -167,7 +167,6 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     )
 
     lesson_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     date: Mapped[date_type] = mapped_column(Date, nullable=False)

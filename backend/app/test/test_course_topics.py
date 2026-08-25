@@ -40,13 +40,11 @@ async def test_course_topics_and_lesson_linkage(
             "topic_id": topic_id,
             "topic": "Introduction to limits",
             "date": "2026-08-21",
-            "duration_minutes": 25,
         },
     )
     assert lesson_response.status_code == 201
     lesson = lesson_response.json()
     assert lesson["topic_id"] == topic_id
-    assert lesson["duration_minutes"] == 25
     assert lesson["course_topic"]["title"] == "Limits"
     assert lesson["resources"] == []
 
@@ -106,7 +104,6 @@ async def test_lesson_rejects_topic_from_another_course(
             "topic_id": topic.json()["id"],
             "topic": "Wrong course topic",
             "date": "2026-08-21",
-            "duration_minutes": 15,
         },
     )
     assert response.status_code == 400
