@@ -555,6 +555,7 @@ class QuizRepository:
             pin=str(random.randint(1000, 9999)),  # Generate a new 4-digit PIN
             is_active=quiz.is_active,
             proctoring_mode=quiz.proctoring_mode,
+            quiz_type=quiz.quiz_type,
             # Банк вопросов остаётся лекторским, а пересдачу выдаёт организатор —
             # поэтому лектор наследуется, а создатель берётся текущий.
             lecturer_id=quiz.lecturer_id,

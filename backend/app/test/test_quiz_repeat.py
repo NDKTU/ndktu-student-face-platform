@@ -32,3 +32,35 @@ async def test_repeat_quiz(auth_client, test_subject, test_group, make_questions
     assert data["title"] == "Repeat Quiz"
     assert data["attempt"] == 2
     assert data["pin"] != "REPEAT"
+
+
+@pytest.mark.asyncio
+async def test_repeat_quiz_keeps_quiz_type(auth_client, test_subject, test_group, make_questions):
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    await make_questions(subject_id=test_subject.id, user_id=user_id, count=2)
+
+    quiz_payload = {
+        "title": "Repeat Quiz Type",
+        "question_number": 2,
+        "duration": 60,
+        "pin": "REPEATTYPE",
+        "user_id": user_id,
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+        "is_active": True,
+        "quiz_type": "SEMESTER_FINAL",
+    }
+    quiz_resp = await auth_client.post("/quiz/", json=quiz_payload)
+    quiz_id = quiz_resp.json()["id"]
+
+    response = await auth_client.post(f"/quiz/{quiz_id}/repeat")
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["attempt"] == 2
+    assert data["quiz_type"] == "SEMESTER_FINAL"
+
+    detail = await auth_client.get(f"/quiz/{data['id']}")
+    assert detail.json()["quiz_type"] == "SEMESTER_FINAL"
