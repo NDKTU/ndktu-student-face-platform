@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
-ATTENDANCE_VALUES = Literal["present", "absent", "late"]
 LESSON_TYPE_VALUES = Literal["lecture", "seminar", "independent", "lab"]
 
 
@@ -112,42 +111,3 @@ class LessonListResponse(BaseModel):
     page: int
     limit: int
     lessons: List[LessonResponse]
-
-
-# ── Lesson results ──────────────────────────────────────────────────────────
-
-
-class LessonResultUserInfo(BaseModel):
-    id: int
-    username: str
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LessonResultUpsertItem(BaseModel):
-    user_id: int
-    attendance: ATTENDANCE_VALUES
-    grade: Optional[int] = Field(default=None, ge=0, le=5)
-    notes: Optional[str] = None
-
-
-class LessonResultsBulkUpsertRequest(BaseModel):
-    items: List[LessonResultUpsertItem]
-
-
-class LessonResultResponse(BaseModel):
-    id: int
-    lesson_id: int
-    user_id: int
-    attendance: str
-    grade: Optional[int] = None
-    notes: Optional[str] = None
-    created_at: TashkentDatetime
-    updated_at: TashkentDatetime
-    user: Optional[LessonResultUserInfo] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LessonResultListResponse(BaseModel):
-    total: int
-    results: List[LessonResultResponse]

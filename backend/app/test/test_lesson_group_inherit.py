@@ -35,10 +35,10 @@ async def test_lesson_inherits_the_only_group_of_the_course(
 
 
 @pytest.mark.asyncio
-async def test_lesson_without_date_and_duration(
+async def test_lesson_without_date_defaults_to_today(
     auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
 ):
-    """Форма дарса не спрашивает ни дату, ни длительность."""
+    """Форма дарса не спрашивает дату — проставляется сегодняшняя (Ташкент)."""
     from datetime import datetime
 
     from app.core.schemas import TASHKENT_TZ

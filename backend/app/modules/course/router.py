@@ -36,8 +36,6 @@ from .lesson.schemas import (
     LessonListRequest,
     LessonListResponse,
     LessonResponse,
-    LessonResultListResponse,
-    LessonResultsBulkUpsertRequest,
     LessonUpdateRequest,
 )
 from .resource.repository import get_resource_repository
@@ -278,42 +276,6 @@ async def delete_lesson(
     current_user: "User" = Depends(PermissionRequired("delete:lesson")),
 ):
     await get_lesson_repository.delete_lesson(session=session, lesson_id=lesson_id, current_user=current_user)
-
-
-# ── Lesson results ──────────────────────────────────────────────────────────
-
-
-@lesson_router.get(
-    "/{lesson_id}/results",
-    response_model=LessonResultListResponse,
-)
-async def list_lesson_results(
-    lesson_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    return await get_lesson_repository.list_lesson_results(
-        session=session, lesson_id=lesson_id, current_user=current_user
-    )
-
-
-@lesson_router.put(
-    "/{lesson_id}/results",
-    response_model=LessonResultListResponse,
-    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
-)
-async def upsert_lesson_results(
-    lesson_id: int,
-    data: LessonResultsBulkUpsertRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("update:lesson_result")),
-):
-    return await get_lesson_repository.upsert_lesson_results(
-        session=session,
-        lesson_id=lesson_id,
-        data=data,
-        current_user=current_user,
-    )
 
 
 # ============================================================================

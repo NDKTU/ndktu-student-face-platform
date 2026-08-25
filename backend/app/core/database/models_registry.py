@@ -29,7 +29,6 @@ __all__ = [
     "GroupTeacher",
     "PsychologyMethod",
     "Lesson",
-    "LessonResult",
     "Assignment",
     "AssignmentSubmission",
     "TeacherAssignment",
@@ -56,7 +55,6 @@ from app.modules.course.model import (
     CourseGroup,
     CourseTopic,
     Lesson,
-    LessonResult,
     Resource,
 )
 from app.modules.integration.eduplan.model import (

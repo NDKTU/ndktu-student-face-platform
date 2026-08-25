@@ -176,44 +176,12 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     group: Mapped["Group"] = relationship("Group")
     course: Mapped["Course"] = relationship("Course", back_populates="lessons")
     course_topic: Mapped["CourseTopic | None"] = relationship("CourseTopic", back_populates="lessons")
-    results: Mapped[list["LessonResult"]] = relationship(
-        "LessonResult", back_populates="lesson", cascade="all, delete-orphan"
-    )
     resources: Mapped[list["Resource"]] = relationship(
         "Resource", back_populates="lesson", cascade="all, delete-orphan"
     )
 
     def __str__(self):
         return f"Lesson {self.id} ({self.topic} @ {self.date})"
-
-
-class LessonResult(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "lesson_results"
-    __table_args__ = (UniqueConstraint("lesson_id", "user_id", name="uq_lesson_result_per_user"),)
-
-    lesson_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("lessons.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    user_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    attendance: Mapped[str] = mapped_column(String(16), nullable=False)
-    grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    lesson: Mapped["Lesson"] = relationship("Lesson", back_populates="results")
-    user: Mapped["User"] = relationship("User")
-
-    def __str__(self):
-        return f"LessonResult lesson={self.lesson_id} user={self.user_id}"
 
 
 class Assignment(Base, IdIntPk, TimestampMixin):
