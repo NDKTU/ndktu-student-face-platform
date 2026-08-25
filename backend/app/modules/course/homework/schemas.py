@@ -15,7 +15,7 @@ class SubmissionFile(BaseModel):
     type: Optional[str] = None
 
 
-class AssignmentCreateRequest(BaseModel):
+class HomeworkCreateRequest(BaseModel):
     course_id: int
     lesson_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
@@ -27,7 +27,7 @@ class AssignmentCreateRequest(BaseModel):
     allowed_file_types: List[str] = []
 
 
-class AssignmentUpdateRequest(BaseModel):
+class HomeworkUpdateRequest(BaseModel):
     lesson_id: Optional[int] = None
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = None
@@ -38,14 +38,14 @@ class AssignmentUpdateRequest(BaseModel):
     allowed_file_types: Optional[List[str]] = None
 
 
-class AssignmentStats(BaseModel):
+class HomeworkStats(BaseModel):
     total_students: int
     submitted: int
     graded: int
     late: int
 
 
-class AssignmentResponse(BaseModel):
+class HomeworkResponse(BaseModel):
     id: int
     course_id: int
     lesson_id: Optional[int] = None
@@ -57,14 +57,14 @@ class AssignmentResponse(BaseModel):
     allow_file: bool
     allow_text: bool
     allowed_file_types: List[str] = []
-    stats: Optional[AssignmentStats] = None
+    stats: Optional[HomeworkStats] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class AssignmentListRequest(BaseModel):
+class HomeworkListRequest(BaseModel):
     course_id: Optional[int] = None
     lesson_id: Optional[int] = None
     page: int = 1
@@ -77,11 +77,11 @@ class AssignmentListRequest(BaseModel):
         return (self.page - 1) * self.limit
 
 
-class AssignmentListResponse(BaseModel):
+class HomeworkListResponse(BaseModel):
     total: int
     page: int
     limit: int
-    assignments: List[AssignmentResponse]
+    homeworks: List[HomeworkResponse]
 
 
 # ── Submissions ───────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ class SubmissionGradeRequest(BaseModel):
 
 class SubmissionResponse(BaseModel):
     id: int
-    assignment_id: int
+    homework_id: int
     user_id: int
     submitted_text: Optional[str] = None
     submitted_files: List[SubmissionFile] = []

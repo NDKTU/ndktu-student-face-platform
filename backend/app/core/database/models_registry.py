@@ -29,8 +29,8 @@ __all__ = [
     "GroupTeacher",
     "PsychologyMethod",
     "Lesson",
-    "Assignment",
-    "AssignmentSubmission",
+    "Homework",
+    "HomeworkSubmission",
     "TeacherAssignment",
     "Department",
     "Resource",
@@ -49,11 +49,11 @@ from app.modules.auth.model import (
     UserRole,
 )
 from app.modules.course.model import (
-    Assignment,
-    AssignmentSubmission,
     Course,
     CourseGroup,
     CourseTopic,
+    Homework,
+    HomeworkSubmission,
     Lesson,
     Resource,
 )

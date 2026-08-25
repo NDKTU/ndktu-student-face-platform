@@ -8,15 +8,15 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.modules.auth.model import Employee, Student, User
-from app.modules.course.model import Assignment, AssignmentSubmission, Course, CourseGroup
+from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission
 
 from .schemas import (
-    AssignmentCreateRequest,
-    AssignmentListRequest,
-    AssignmentListResponse,
-    AssignmentResponse,
-    AssignmentStats,
-    AssignmentUpdateRequest,
+    HomeworkCreateRequest,
+    HomeworkListRequest,
+    HomeworkListResponse,
+    HomeworkResponse,
+    HomeworkStats,
+    HomeworkUpdateRequest,
     SubmissionGradeRequest,
     SubmissionListResponse,
     SubmissionResponse,
@@ -27,7 +27,7 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 
-class AssignmentRepository:
+class HomeworkRepository:
     async def _is_admin(self, user: User) -> bool:
         return any(r.name.lower() == "admin" for r in (user.roles or []))
 
@@ -42,7 +42,7 @@ class AssignmentRepository:
         if not await self._is_admin(user) and course.teacher_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Course owner or admin can manage assignments",
+                detail="Only Course owner or admin can manage homeworks",
             )
         return course
 
@@ -54,7 +54,7 @@ class AssignmentRepository:
         )
         return (await session.execute(stmt)).scalar_one_or_none() is not None
 
-    async def _serialize_assignment(self, session: AsyncSession, a: Assignment) -> AssignmentResponse:
+    async def _serialize_homework(self, session: AsyncSession, a: Homework) -> HomeworkResponse:
         # Stats: count students in course, submitted, graded, late
         total_students_stmt = (
             select(func.count(Student.id))
@@ -64,13 +64,13 @@ class AssignmentRepository:
         total_students = (await session.execute(total_students_stmt)).scalar() or 0
 
         sub_counts_stmt = (
-            select(AssignmentSubmission.status, func.count(AssignmentSubmission.id))
-            .where(AssignmentSubmission.assignment_id == a.id)
-            .group_by(AssignmentSubmission.status)
+            select(HomeworkSubmission.status, func.count(HomeworkSubmission.id))
+            .where(HomeworkSubmission.homework_id == a.id)
+            .group_by(HomeworkSubmission.status)
         )
         counts = {row[0]: row[1] for row in (await session.execute(sub_counts_stmt)).all()}
 
-        return AssignmentResponse(
+        return HomeworkResponse(
             id=a.id,
             course_id=a.course_id,
             lesson_id=a.lesson_id,
@@ -82,7 +82,7 @@ class AssignmentRepository:
             allow_file=a.allow_file,
             allow_text=a.allow_text,
             allowed_file_types=list(a.allowed_file_types or []),
-            stats=AssignmentStats(
+            stats=HomeworkStats(
                 total_students=total_students,
                 submitted=counts.get("submitted", 0) + counts.get("late", 0) + counts.get("graded", 0),
                 graded=counts.get("graded", 0),
@@ -92,14 +92,14 @@ class AssignmentRepository:
             updated_at=a.updated_at,
         )
 
-    # ── Assignment CRUD ─────────────────────────────────────────────────────
+    # ── Homework CRUD ─────────────────────────────────────────────────────
 
-    async def create_assignment(
-        self, session: AsyncSession, data: AssignmentCreateRequest, current_user: User
-    ) -> AssignmentResponse:
+    async def create_homework(
+        self, session: AsyncSession, data: HomeworkCreateRequest, current_user: User
+    ) -> HomeworkResponse:
         await self._check_course_owner(session, data.course_id, current_user)
 
-        a = Assignment(
+        a = Homework(
             course_id=data.course_id,
             lesson_id=data.lesson_id,
             created_by_user_id=current_user.id,
@@ -114,14 +114,14 @@ class AssignmentRepository:
         session.add(a)
         await session.commit()
         await session.refresh(a)
-        return await self._serialize_assignment(session, a)
+        return await self._serialize_homework(session, a)
 
-    async def update_assignment(
-        self, session: AsyncSession, assignment_id: int, data: AssignmentUpdateRequest, current_user: User
-    ) -> AssignmentResponse:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+    async def update_homework(
+        self, session: AsyncSession, homework_id: int, data: HomeworkUpdateRequest, current_user: User
+    ) -> HomeworkResponse:
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
         for field in (
@@ -141,36 +141,36 @@ class AssignmentRepository:
                 setattr(a, field, val)
         await session.commit()
         await session.refresh(a)
-        return await self._serialize_assignment(session, a)
+        return await self._serialize_homework(session, a)
 
-    async def delete_assignment(self, session: AsyncSession, assignment_id: int, current_user: User) -> None:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+    async def delete_homework(self, session: AsyncSession, homework_id: int, current_user: User) -> None:
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
         await session.delete(a)
         await session.commit()
 
-    async def get_assignment(self, session: AsyncSession, assignment_id: int, current_user: User) -> AssignmentResponse:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+    async def get_homework(self, session: AsyncSession, homework_id: int, current_user: User) -> HomeworkResponse:
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
 
         if await self._is_student(current_user):
             in_course = await self._student_in_course(session, a.course_id, current_user.id)
             if not in_course:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Course")
 
-        return await self._serialize_assignment(session, a)
+        return await self._serialize_homework(session, a)
 
-    async def list_assignments(
-        self, session: AsyncSession, request: AssignmentListRequest, current_user: User
-    ) -> AssignmentListResponse:
-        stmt = select(Assignment)
-        count_stmt = select(func.count()).select_from(Assignment)
+    async def list_homeworks(
+        self, session: AsyncSession, request: HomeworkListRequest, current_user: User
+    ) -> HomeworkListResponse:
+        stmt = select(Homework)
+        count_stmt = select(func.count()).select_from(Homework)
 
         if await self._is_student(current_user):
-            # Student sees only assignments from courses they belong to
+            # Student sees only homeworks from courses they belong to
             student_courses_stmt = (
                 select(CourseGroup.course_id)
                 .join(Student, Student.group_id == CourseGroup.group_id)
@@ -178,30 +178,30 @@ class AssignmentRepository:
             )
             course_ids = (await session.execute(student_courses_stmt)).scalars().all()
             if not course_ids:
-                return AssignmentListResponse(total=0, page=request.page, limit=request.limit, assignments=[])
-            stmt = stmt.where(Assignment.course_id.in_(course_ids))
-            count_stmt = count_stmt.where(Assignment.course_id.in_(course_ids))
+                return HomeworkListResponse(total=0, page=request.page, limit=request.limit, homeworks=[])
+            stmt = stmt.where(Homework.course_id.in_(course_ids))
+            count_stmt = count_stmt.where(Homework.course_id.in_(course_ids))
 
         if request.course_id:
-            stmt = stmt.where(Assignment.course_id == request.course_id)
-            count_stmt = count_stmt.where(Assignment.course_id == request.course_id)
+            stmt = stmt.where(Homework.course_id == request.course_id)
+            count_stmt = count_stmt.where(Homework.course_id == request.course_id)
         if request.lesson_id:
-            stmt = stmt.where(Assignment.lesson_id == request.lesson_id)
-            count_stmt = count_stmt.where(Assignment.lesson_id == request.lesson_id)
+            stmt = stmt.where(Homework.lesson_id == request.lesson_id)
+            count_stmt = count_stmt.where(Homework.lesson_id == request.lesson_id)
 
-        stmt = stmt.order_by(desc(Assignment.deadline)).offset(request.offset).limit(request.limit)
+        stmt = stmt.order_by(desc(Homework.deadline)).offset(request.offset).limit(request.limit)
         items = (await session.execute(stmt)).scalars().all()
         total = (await session.execute(count_stmt)).scalar() or 0
-        return AssignmentListResponse(
+        return HomeworkListResponse(
             total=total,
             page=request.page,
             limit=request.limit,
-            assignments=[await self._serialize_assignment(session, a) for a in items],
+            homeworks=[await self._serialize_homework(session, a) for a in items],
         )
 
     # ── Submissions ─────────────────────────────────────────────────────────
 
-    async def _serialize_submission(self, sub: AssignmentSubmission) -> SubmissionResponse:
+    async def _serialize_submission(self, sub: HomeworkSubmission) -> SubmissionResponse:
         user_info: SubmissionUserInfo | None = None
         if sub.user is not None:
             teacher_full_name = None
@@ -213,7 +213,7 @@ class AssignmentRepository:
             )
         return SubmissionResponse(
             id=sub.id,
-            assignment_id=sub.assignment_id,
+            homework_id=sub.homework_id,
             user_id=sub.user_id,
             submitted_text=sub.submitted_text,
             submitted_files=list(sub.submitted_files or []),
@@ -228,20 +228,20 @@ class AssignmentRepository:
         )
 
     async def submit(
-        self, session: AsyncSession, assignment_id: int, data: SubmissionSubmitRequest, current_user: User
+        self, session: AsyncSession, homework_id: int, data: SubmissionSubmitRequest, current_user: User
     ) -> SubmissionResponse:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
 
         if await self._is_student(current_user):
             in_course = await self._student_in_course(session, a.course_id, current_user.id)
             if not in_course:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Course")
 
-        existing_stmt = select(AssignmentSubmission).where(
-            AssignmentSubmission.assignment_id == assignment_id,
-            AssignmentSubmission.user_id == current_user.id,
+        existing_stmt = select(HomeworkSubmission).where(
+            HomeworkSubmission.homework_id == homework_id,
+            HomeworkSubmission.user_id == current_user.id,
         )
         sub = (await session.execute(existing_stmt)).scalar_one_or_none()
 
@@ -251,8 +251,8 @@ class AssignmentRepository:
         new_status = "late" if is_late else "submitted"
 
         if sub is None:
-            sub = AssignmentSubmission(
-                assignment_id=assignment_id,
+            sub = HomeworkSubmission(
+                homework_id=homework_id,
                 user_id=current_user.id,
                 submitted_text=data.submitted_text,
                 submitted_files=[f.model_dump() for f in data.submitted_files],
@@ -275,22 +275,22 @@ class AssignmentRepository:
         await session.refresh(sub)
         loaded = (
             await session.execute(
-                select(AssignmentSubmission)
-                .options(selectinload(AssignmentSubmission.user))
-                .where(AssignmentSubmission.id == sub.id)
+                select(HomeworkSubmission)
+                .options(selectinload(HomeworkSubmission.user))
+                .where(HomeworkSubmission.id == sub.id)
             )
         ).scalar_one()
         return await self._serialize_submission(loaded)
 
     async def get_my_submission(
-        self, session: AsyncSession, assignment_id: int, current_user: User
+        self, session: AsyncSession, homework_id: int, current_user: User
     ) -> SubmissionResponse | None:
         stmt = (
-            select(AssignmentSubmission)
-            .options(selectinload(AssignmentSubmission.user))
+            select(HomeworkSubmission)
+            .options(selectinload(HomeworkSubmission.user))
             .where(
-                AssignmentSubmission.assignment_id == assignment_id,
-                AssignmentSubmission.user_id == current_user.id,
+                HomeworkSubmission.homework_id == homework_id,
+                HomeworkSubmission.user_id == current_user.id,
             )
         )
         sub = (await session.execute(stmt)).scalar_one_or_none()
@@ -299,18 +299,18 @@ class AssignmentRepository:
         return await self._serialize_submission(sub)
 
     async def list_submissions(
-        self, session: AsyncSession, assignment_id: int, current_user: User
+        self, session: AsyncSession, homework_id: int, current_user: User
     ) -> SubmissionListResponse:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
         stmt = (
-            select(AssignmentSubmission)
-            .options(selectinload(AssignmentSubmission.user))
-            .where(AssignmentSubmission.assignment_id == assignment_id)
-            .order_by(desc(AssignmentSubmission.submitted_at))
+            select(HomeworkSubmission)
+            .options(selectinload(HomeworkSubmission.user))
+            .where(HomeworkSubmission.homework_id == homework_id)
+            .order_by(desc(HomeworkSubmission.submitted_at))
         )
         items = (await session.execute(stmt)).scalars().all()
 
@@ -333,19 +333,19 @@ class AssignmentRepository:
     async def grade_submission(
         self,
         session: AsyncSession,
-        assignment_id: int,
+        homework_id: int,
         user_id: int,
         data: SubmissionGradeRequest,
         current_user: User,
     ) -> SubmissionResponse:
-        a = (await session.execute(select(Assignment).where(Assignment.id == assignment_id))).scalar_one_or_none()
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
-        stmt = select(AssignmentSubmission).where(
-            AssignmentSubmission.assignment_id == assignment_id,
-            AssignmentSubmission.user_id == user_id,
+        stmt = select(HomeworkSubmission).where(
+            HomeworkSubmission.homework_id == homework_id,
+            HomeworkSubmission.user_id == user_id,
         )
         sub = (await session.execute(stmt)).scalar_one_or_none()
         if not sub:
@@ -366,12 +366,12 @@ class AssignmentRepository:
 
         loaded = (
             await session.execute(
-                select(AssignmentSubmission)
-                .options(selectinload(AssignmentSubmission.user))
-                .where(AssignmentSubmission.id == sub.id)
+                select(HomeworkSubmission)
+                .options(selectinload(HomeworkSubmission.user))
+                .where(HomeworkSubmission.id == sub.id)
             )
         ).scalar_one()
         return await self._serialize_submission(loaded)
 
 
-get_assignment_repository = AssignmentRepository()
+get_homework_repository = HomeworkRepository()

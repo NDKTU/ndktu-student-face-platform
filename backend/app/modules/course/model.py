@@ -184,8 +184,8 @@ class Lesson(Base, IdIntPk, TimestampMixin):
         return f"Lesson {self.id} ({self.topic} @ {self.date})"
 
 
-class Assignment(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "assignments"
+class Homework(Base, IdIntPk, TimestampMixin):
+    __tablename__ = "homeworks"
 
     course_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
@@ -206,20 +206,20 @@ class Assignment(Base, IdIntPk, TimestampMixin):
     course: Mapped["Course"] = relationship("Course")
     lesson: Mapped["Lesson | None"] = relationship("Lesson")
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_user_id])
-    submissions: Mapped[list["AssignmentSubmission"]] = relationship(
-        "AssignmentSubmission", back_populates="assignment", cascade="all, delete-orphan"
+    submissions: Mapped[list["HomeworkSubmission"]] = relationship(
+        "HomeworkSubmission", back_populates="homework", cascade="all, delete-orphan"
     )
 
     def __str__(self):
-        return f"Assignment {self.id} ({self.title})"
+        return f"Homework {self.id} ({self.title})"
 
 
-class AssignmentSubmission(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "assignment_submissions"
-    __table_args__ = (UniqueConstraint("assignment_id", "user_id", name="uq_submission_per_user"),)
+class HomeworkSubmission(Base, IdIntPk, TimestampMixin):
+    __tablename__ = "homework_submissions"
+    __table_args__ = (UniqueConstraint("homework_id", "user_id", name="uq_submission_per_user"),)
 
-    assignment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True
+    homework_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("homeworks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
@@ -237,12 +237,12 @@ class AssignmentSubmission(Base, IdIntPk, TimestampMixin):
     )
     graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    assignment: Mapped["Assignment"] = relationship("Assignment", back_populates="submissions")
+    homework: Mapped["Homework"] = relationship("Homework", back_populates="submissions")
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     graded_by: Mapped["User | None"] = relationship("User", foreign_keys=[graded_by_user_id])
 
     def __str__(self):
-        return f"Submission {self.id} (assignment={self.assignment_id}, user={self.user_id})"
+        return f"Submission {self.id} (homework={self.homework_id}, user={self.user_id})"
 
 
 class Resource(Base, IdIntPk, TimestampMixin):
