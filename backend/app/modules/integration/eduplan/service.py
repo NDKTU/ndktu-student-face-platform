@@ -293,7 +293,6 @@ class EduPlanSyncService:
                     {
                         "name": s.name,
                         "kafedra_external_id": str(s.department_id),
-                        "credits": s.credits,
                     },
                     by_name,
                 )
@@ -511,7 +510,6 @@ class EduPlanSyncService:
                     proposal.external_id,
                     changes["name"],
                     kafedra_id,
-                    changes.get("credits"),
                     existing,
                 )
 

@@ -84,7 +84,6 @@ class EduPlanSubject(_Lenient):
     id: int
     name: str
     department_id: int
-    credits: Optional[int] = None
 
 
 class EduPlanTeacherProfile(_Lenient):

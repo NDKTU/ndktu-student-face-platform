@@ -33,7 +33,6 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         nullable=True,
         index=True,
     )
-    credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
         "SubjectTeacher",

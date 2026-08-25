@@ -162,13 +162,11 @@ class EduPlanRepository:
         external_id: str,
         name: str,
         kafedra_id: int | None,
-        credits: int | None,
         existing: Subject | None,
     ) -> Subject:
         row = existing or Subject(name=name)
         row.name = name
         row.kafedra_id = kafedra_id
-        row.credits = credits
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()
