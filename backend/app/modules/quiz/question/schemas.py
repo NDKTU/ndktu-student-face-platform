@@ -2,6 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from app.core.enums import QuestionType
 from app.core.schemas import TashkentDatetime
 
 CorrectOption = Literal["a", "b", "c", "d"]
@@ -16,6 +17,7 @@ class QuestionCreateRequest(BaseModel):
     option_c: str
     option_d: str
     correct_option: CorrectOption = "a"
+    question_type: QuestionType = QuestionType.QUIZ
 
     @field_validator("text", "option_a", "option_b", "option_c", "option_d", mode="before")
     @classmethod
@@ -42,6 +44,7 @@ class QuestionCreateResponse(BaseModel):
     option_c: str
     option_d: str
     correct_option: CorrectOption
+    question_type: QuestionType
     version: int
     is_latest: bool
     is_active: bool

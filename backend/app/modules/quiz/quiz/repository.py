@@ -386,6 +386,9 @@ class QuizRepository:
         if request.is_active is not None:
             stmt = stmt.where(Quiz.is_active == request.is_active)
 
+        if request.quiz_type:
+            stmt = stmt.where(Quiz.quiz_type == request.quiz_type.value)
+
         # Always prioritize active quizzes first, then sort by date
         sort_field = (
             asc(Quiz.created_at) if request.sort_dir and request.sort_dir.lower() == "asc" else desc(Quiz.created_at)
@@ -423,6 +426,8 @@ class QuizRepository:
             )
         if request.is_active is not None:
             count_stmt = count_stmt.where(Quiz.is_active == request.is_active)
+        if request.quiz_type:
+            count_stmt = count_stmt.where(Quiz.quiz_type == request.quiz_type.value)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0

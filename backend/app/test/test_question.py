@@ -129,3 +129,25 @@ async def test_delete_question(auth_client, test_subject):
     assert list_resp.status_code == 200
     listed_ids = [q["id"] for q in list_resp.json()["questions"]]
     assert question_id not in listed_ids
+
+
+@pytest.mark.asyncio
+async def test_question_type_defaults_to_quiz(auth_client, test_subject):
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Question type default check",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+    }
+    create_resp = await auth_client.post("/question/", json=payload)
+    question_id = create_resp.json()["id"]
+
+    response = await auth_client.get(f"/question/{question_id}")
+    assert response.status_code == 200
+    assert response.json()["question_type"] == "QUIZ"

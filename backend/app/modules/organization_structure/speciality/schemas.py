@@ -1,17 +1,15 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.core.enums import EducationType
 from app.core.schemas import ExternalRefFields, TashkentDatetime
-
-# EPOS EducationType. Ручные записи могут его не указывать.
-EDUCATION_TYPES = Literal["Bakalavr", "Magistr"]
 
 
 class SpecialityCreateRequest(BaseModel):
     name: str
     kafedra_id: int
-    education_type: Optional[EDUCATION_TYPES] = None
+    education_type: Optional[EducationType] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -30,7 +28,7 @@ class SpecialityCreateRequest(BaseModel):
 class SpecialityUpdateRequest(BaseModel):
     name: Optional[str] = None
     kafedra_id: Optional[int] = None
-    education_type: Optional[EDUCATION_TYPES] = None
+    education_type: Optional[EducationType] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -52,7 +50,7 @@ class SpecialityResponse(ExternalRefFields):
     name: str
     kafedra_id: int
     # EPOS EducationType: Bakalavr | Magistr (у ручных записей может быть пусто)
-    education_type: Optional[str] = None
+    education_type: Optional[EducationType] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
