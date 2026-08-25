@@ -17,7 +17,6 @@ class EduPlanEntity(str, Enum):
 
     faculty = "faculty"
     kafedra = "kafedra"
-    department = "department"
     speciality = "speciality"
     group = "group"
     subject = "subject"
@@ -29,7 +28,6 @@ class EduPlanEntity(str, Enum):
 SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.faculty,
     EduPlanEntity.kafedra,
-    EduPlanEntity.department,
     EduPlanEntity.speciality,
     EduPlanEntity.group,
     EduPlanEntity.subject,
@@ -55,13 +53,6 @@ class EduPlanDepartment(_Lenient):
     id: int
     name: str
     faculty_id: int
-
-
-class EduPlanSection(_Lenient):
-    """EduPlan section — наш административный отдел."""
-
-    id: int
-    name: str
 
 
 class EduPlanSpeciality(_Lenient):

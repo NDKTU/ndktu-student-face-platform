@@ -26,7 +26,6 @@ class EmployeeRepository:
         return (
             selectinload(Employee.user).selectinload(User.roles),
             selectinload(Employee.teacher),
-            selectinload(Employee.department),
         )
 
     def _generate_full_name(self, first_name: str, last_name: str, third_name: str) -> str:
@@ -63,7 +62,6 @@ class EmployeeRepository:
             full_name=full_name,
             phone_number=data.phone_number,
             image_url=data.image_url,
-            department_id=data.department_id,
         )
         session.add(new_employee)
 
@@ -149,7 +147,6 @@ class EmployeeRepository:
         employee.full_name = full_name
         employee.phone_number = data.phone_number
         employee.image_url = data.image_url
-        employee.department_id = data.department_id
 
         await session.commit()
         await session.refresh(employee)

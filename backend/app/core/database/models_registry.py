@@ -32,7 +32,6 @@ __all__ = [
     "Homework",
     "HomeworkSubmission",
     "TeacherAssignment",
-    "Department",
     "Resource",
     "EduPlanCredential",
 ]
@@ -61,7 +60,6 @@ from app.modules.integration.eduplan.model import (
     EduPlanCredential,
 )
 from app.modules.organization_structure.model import (
-    Department,
     Faculty,
     Group,
     GroupTeacher,

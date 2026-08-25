@@ -9,7 +9,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import Employee, Student, Teacher, User
+    from app.modules.auth.model import Student, Teacher, User
     from app.modules.quiz.model import Quiz, Result
 
 
@@ -121,20 +121,6 @@ class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="specialities")
     groups: Mapped[list["Group"]] = relationship("Group", back_populates="speciality")
-
-    def __str__(self):
-        return self.name
-
-
-class Department(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
-    """Административный отдел. В EPOS этой сущности соответствует ``section``."""
-
-    __tablename__ = "departments"
-    __table_args__ = (external_ref_index("departments"),)
-
-    name: Mapped[str] = mapped_column(String(255), unique=True)
-
-    employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="department")
 
     def __str__(self):
         return self.name

@@ -19,12 +19,6 @@ class EmployeeTeacherInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class EmployeeDepartmentInfo(BaseModel):
-    id: int
-    name: str
-    model_config = ConfigDict(from_attributes=True)
-
-
 class EmployeeCreateRequest(BaseModel):
     username: str
     password: str
@@ -33,7 +27,6 @@ class EmployeeCreateRequest(BaseModel):
     third_name: str
     phone_number: Optional[str] = None
     image_url: Optional[str] = None
-    department_id: Optional[int] = None
     roles: list[RoleRequest] = []
 
     @field_validator("first_name", "last_name", "third_name", mode="before")
@@ -64,7 +57,6 @@ class EmployeeUpdateRequest(BaseModel):
     third_name: str
     phone_number: Optional[str] = None
     image_url: Optional[str] = None
-    department_id: Optional[int] = None
 
     @field_validator("first_name", "last_name", "third_name", mode="before")
     @classmethod
@@ -88,7 +80,6 @@ class EmployeeResponse(ExternalRefFields):
 
     user: Optional[EmployeeUserInfo] = None
     teacher: Optional[EmployeeTeacherInfo] = None
-    department: Optional[EmployeeDepartmentInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 

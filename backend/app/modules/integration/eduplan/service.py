@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Employee
 from app.modules.organization_structure.model import (
-    Department,
     Faculty,
     Group,
     Kafedra,
@@ -45,7 +44,6 @@ from .schemas import (
     EduPlanEntity,
     EduPlanFaculty,
     EduPlanGroup,
-    EduPlanSection,
     EduPlanSpeciality,
     EduPlanStaff,
     EduPlanSubject,
@@ -65,7 +63,6 @@ SNAPSHOT_TTL_SECONDS = 3600
 ENTITY_MODEL = {
     EduPlanEntity.faculty: Faculty,
     EduPlanEntity.kafedra: Kafedra,
-    EduPlanEntity.department: Department,
     EduPlanEntity.speciality: Speciality,
     EduPlanEntity.group: Group,
     EduPlanEntity.subject: Subject,
@@ -86,7 +83,6 @@ class EduPlanSyncService:
             snapshot = {
                 "faculties": await client.faculties(),
                 "departments": await client.departments(),
-                "sections": await client.sections(),
                 "specialities": await client.specialities(),
                 "groups": await client.groups(),
                 "subjects": await client.subjects(),
@@ -249,11 +245,6 @@ class EduPlanSyncService:
                 d = EduPlanDepartment.model_validate(raw)
                 yield str(d.id), d.name, {"name": d.name, "faculty_external_id": str(d.faculty_id)}, by_name
 
-        elif entity == EduPlanEntity.department:
-            for raw in snapshot["sections"]:
-                s = EduPlanSection.model_validate(raw)
-                yield str(s.id), s.name, {"name": s.name}, by_name
-
         elif entity == EduPlanEntity.speciality:
             for raw in snapshot["specialities"]:
                 sp = EduPlanSpeciality.model_validate(raw)
@@ -326,7 +317,6 @@ class EduPlanSyncService:
         source_key = {
             EduPlanEntity.faculty: "faculties",
             EduPlanEntity.kafedra: "departments",
-            EduPlanEntity.department: "sections",
             EduPlanEntity.speciality: "specialities",
             EduPlanEntity.group: "groups",
             EduPlanEntity.subject: "subjects",
@@ -457,11 +447,6 @@ class EduPlanSyncService:
                     session, proposal.external_id, changes["name"], faculty_id, existing
                 )
                 kafedra_faculty[row.id] = faculty_id
-
-            elif entity == EduPlanEntity.department:
-                row = await eduplan_repository.upsert_department(
-                    session, proposal.external_id, changes["name"], existing
-                )
 
             elif entity == EduPlanEntity.speciality:
                 kafedra_id = id_map[EduPlanEntity.kafedra].get(changes["kafedra_external_id"])

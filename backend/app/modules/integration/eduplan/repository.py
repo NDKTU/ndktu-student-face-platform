@@ -23,7 +23,6 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Role, Teacher, User
 from app.modules.organization_structure.model import (
-    Department,
     Faculty,
     Group,
     Kafedra,
@@ -99,16 +98,6 @@ class EduPlanRepository:
         row = existing or Kafedra(name=name, faculty_id=faculty_id)
         row.name = name
         row.faculty_id = faculty_id
-        self._stamp(row, external_id)
-        session.add(row)
-        await session.flush()
-        return row
-
-    async def upsert_department(
-        self, session: AsyncSession, external_id: str, name: str, existing: Department | None
-    ) -> Department:
-        row = existing or Department(name=name)
-        row.name = name
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()

@@ -20,7 +20,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.organization_structure.model import Department, Group, GroupTeacher, Kafedra
+    from app.modules.organization_structure.model import Group, GroupTeacher, Kafedra
     from app.modules.quiz.model import Question, Quiz, Result, Subject, SubjectTeacher, UserAnswers
 
 
@@ -183,11 +183,6 @@ class Employee(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     )
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
-    department_id: Mapped[int | None] = mapped_column(
-        ForeignKey("departments.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
 
     last_name: Mapped[str] = mapped_column(String(255))
     first_name: Mapped[str] = mapped_column(String(255))
@@ -204,7 +199,6 @@ class Employee(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     user: Mapped["User"] = relationship("User", back_populates="employee")
     teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="employee", uselist=False)
-    department: Mapped["Department | None"] = relationship("Department", back_populates="employees")
 
     def __str__(self):
         return self.full_name
