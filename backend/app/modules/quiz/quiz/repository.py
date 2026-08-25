@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, User
 from app.modules.organization_structure.model import Faculty, Group, GroupTeacher
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, SubjectTeacher, UserAnswers
 
@@ -49,8 +49,7 @@ class QuizRepository:
                 (await session.execute(
                     select(SubjectTeacher.subject_id)
                     .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                    .join(Employee, Teacher.employee_id == Employee.id)
-                    .where(Employee.user_id == current_user.id)
+                    .where(Teacher.user_id == current_user.id)
                 )).scalars().all()
             )
             conditions = [Quiz.lecturer_id == current_user.id]
@@ -346,8 +345,7 @@ class QuizRepository:
             st_stmt = (
                 select(SubjectTeacher.subject_id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
+                .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()

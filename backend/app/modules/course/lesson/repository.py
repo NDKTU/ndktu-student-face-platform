@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
-from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
 from app.modules.organization_structure.model import GroupTeacher
@@ -165,8 +165,7 @@ class LessonRepository:
             st_stmt = (
                 select(SubjectTeacher.id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
+                .where(Teacher.user_id == current_user.id)
             )
             allowed_subject_teacher_ids = (await session.execute(st_stmt)).scalars().all()
 

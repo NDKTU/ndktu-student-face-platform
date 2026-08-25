@@ -20,7 +20,7 @@ class EduPlanEntity(str, Enum):
     speciality = "speciality"
     group = "group"
     subject = "subject"
-    employee = "employee"
+    teacher = "teacher"
 
 
 #: Порядок обхода. Ребёнок не может примениться раньше родителя: кафедра
@@ -31,7 +31,7 @@ SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.speciality,
     EduPlanEntity.group,
     EduPlanEntity.subject,
-    EduPlanEntity.employee,
+    EduPlanEntity.teacher,
 )
 
 

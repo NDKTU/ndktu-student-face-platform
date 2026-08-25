@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Role, Student, Teacher, User
+from app.modules.auth.model import Role, Student, Teacher, User
 
 from .active_check import ensure_user_active
 from .schemas import UserLoginRequest, UserLoginResponse
@@ -131,7 +131,7 @@ class UserService:
             .where(User.id == user_id)
             .options(
                 selectinload(User.roles).selectinload(Role.permissions),
-                selectinload(User.employee).selectinload(Employee.teacher).selectinload(Teacher.kafedra),
+                selectinload(User.teacher).selectinload(Teacher.kafedra),
                 selectinload(User.student).selectinload(Student.group),
             )
         )

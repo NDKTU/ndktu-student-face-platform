@@ -23,9 +23,8 @@ from core.mixins.time_stamp_mixin import utcnow_naive
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, TeacherAssignment
+from app.modules.auth.model import Teacher, TeacherAssignment
 from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
 
@@ -148,16 +147,11 @@ class EduPlanWorkloadService:
     @staticmethod
     async def _teacher_map(session: AsyncSession) -> dict[str, int]:
         """Идентификатор пользователя EduPlan -> id нашей строки преподавателя."""
-        stmt = (
-            select(Employee)
-            .where(
-                Employee.external_source == SOURCE_EDUPLAN,
-                Employee.external_id.is_not(None),
-            )
-            .options(selectinload(Employee.teacher))
+        stmt = select(Teacher.external_id, Teacher.id).where(
+            Teacher.external_source == SOURCE_EDUPLAN,
+            Teacher.external_id.is_not(None),
         )
-        rows = (await session.execute(stmt)).scalars().all()
-        return {e.external_id: e.teacher.id for e in rows if e.teacher is not None}
+        return {ext_id: local_id for ext_id, local_id in (await session.execute(stmt)).all()}
 
     # ------------------------------------------------------------------ #
     #  Запись

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
-from app.modules.auth.model import Employee, Student, User
+from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission
 
 from .schemas import (
@@ -319,7 +319,7 @@ class HomeworkRepository:
         for sub in items:
             resp = await self._serialize_submission(sub)
             if resp.user and sub.user:
-                t_stmt = select(Employee.full_name).where(Employee.user_id == sub.user.id)
+                t_stmt = select(Teacher.full_name).where(Teacher.user_id == sub.user.id)
                 full = (await session.execute(t_stmt)).scalar_one_or_none()
                 if full:
                     resp = resp.model_copy(

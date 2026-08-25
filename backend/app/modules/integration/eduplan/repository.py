@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Role, Teacher, User
+from app.modules.auth.model import Role, Teacher, User
 from app.modules.organization_structure.model import (
     Faculty,
     Group,
@@ -56,11 +56,8 @@ class EduPlanRepository:
         rows = (await session.execute(stmt)).scalars().all()
         return {row.external_id: row for row in rows}
 
-    async def load_employees(self, session: AsyncSession) -> list[Employee]:
-        stmt = select(Employee).options(
-            selectinload(Employee.teacher),
-            selectinload(Employee.user).selectinload(User.roles),
-        )
+    async def load_teachers(self, session: AsyncSession) -> list[Teacher]:
+        stmt = select(Teacher).options(selectinload(Teacher.user).selectinload(User.roles))
         return list((await session.execute(stmt)).scalars().all())
 
     async def username_exists(self, session: AsyncSession, username: str) -> bool:
@@ -190,7 +187,7 @@ class EduPlanRepository:
             return
         user.roles.append(role)
 
-    async def upsert_employee(
+    async def upsert_teacher(
         self,
         session: AsyncSession,
         external_id: str,
@@ -200,15 +197,12 @@ class EduPlanRepository:
         last_name: str,
         third_name: str,
         full_name: str,
-        position: str | None,
-        staff_type: str | None,
-        is_teacher: bool,
         kafedra_id: int | None,
-        existing: Employee | None,
-    ) -> Employee:
+        existing: Teacher | None,
+    ) -> Teacher:
         row = existing
         if row is None:
-            # Локальная учётная запись обязательна: employees.user_id NOT NULL.
+            # Локальная учётная запись обязательна: teachers.user_id NOT NULL.
             # Пароль — случайный и никому не известный: такой пользователь
             # входит только через внешнюю аутентификацию.
             login = await self._unique_username(session, username, hemis_id or "")
@@ -216,7 +210,7 @@ class EduPlanRepository:
             session.add(user)
             await session.flush()
             await session.refresh(user, attribute_names=["roles"])
-            row = Employee(
+            row = Teacher(
                 user_id=user.id,
                 first_name=first_name,
                 last_name=last_name,
@@ -231,26 +225,16 @@ class EduPlanRepository:
         row.third_name = third_name
         row.full_name = full_name
         row.hemis_id = hemis_id
-        row.position = position
-        row.staff_type = staff_type
+        row.kafedra_id = kafedra_id
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()
 
-        if is_teacher:
-            # Роли назначаем только базовую. admin/psixologik/tutor выдаёт
-            # администратор вручную: кадровая ошибка во внешней системе не
-            # должна превращаться в расширение прав у нас.
-            if user is not None:
-                await self._ensure_role(session, user, "teacher")
-
-            teacher = row.teacher
-            if teacher is None:
-                teacher = Teacher(employee_id=row.id, kafedra_id=kafedra_id)
-                session.add(teacher)
-            else:
-                teacher.kafedra_id = kafedra_id
-            await session.flush()
+        # Роль назначаем только базовую. admin/psixologik/tutor выдаёт
+        # администратор вручную: кадровая ошибка во внешней системе не
+        # должна превращаться в расширение прав у нас.
+        if user is not None:
+            await self._ensure_role(session, user, "teacher")
 
         return row
 

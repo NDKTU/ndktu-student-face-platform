@@ -1,12 +1,16 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Float, asc, case, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Teacher, User
+from app.core.config import settings
+from app.core.utils.image_upload import save_image
+from app.modules.auth.model import Teacher, User
+from app.modules.auth.user.repository import get_user_repository
+from app.modules.auth.user.schemas import UserCreateRequest
 from app.modules.organization_structure.model import Faculty, Group, GroupTeacher, Kafedra
 from app.modules.quiz.model import Result, Subject, SubjectTeacher
 
@@ -36,47 +40,59 @@ class TeacherRepository:
         # been imported by the app.
         return (
             selectinload(Teacher.kafedra),
-            selectinload(Teacher.employee)
-            .selectinload(Employee.user)
-            .selectinload(User.group_teachers)
-            .selectinload(GroupTeacher.group),
-            selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
+            selectinload(Teacher.user).selectinload(User.roles),
         )
 
-    async def create_teacher(self, session: AsyncSession, data: TeacherCreateRequest) -> Teacher:
-        employee = (await session.execute(select(Employee).where(Employee.id == data.employee_id))).scalar_one_or_none()
-        if not employee:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+    @staticmethod
+    def _generate_full_name(first_name: str, last_name: str, third_name: str) -> str:
+        return f"{last_name} {first_name} {third_name}"
 
-        existing = (
-            await session.execute(select(Teacher).where(Teacher.employee_id == data.employee_id))
-        ).scalar_one_or_none()
+    async def upload_image(self, file: UploadFile) -> str:
+        filename = await save_image(file, settings.profile_upload_dir)
+        return f"{settings.file_url.http}/profile/{filename}"
+
+    async def create_teacher(self, session: AsyncSession, data: TeacherCreateRequest) -> Teacher:
+        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
+
+        existing = (await session.execute(select(Teacher).where(Teacher.full_name == full_name))).scalar_one_or_none()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This employee already has a Teacher profile",
+                detail=f"Teacher '{full_name}' already exists",
             )
 
+        # commit=False: the User insert is part of this same transaction, so a
+        # failure creating the Teacher row rolls the User insert back too and
+        # no orphan account is left behind.
+        user = await get_user_repository.create_user(
+            session=session,
+            data=UserCreateRequest(username=data.username, password=data.password, roles=data.roles),
+            commit=False,
+        )
+
         new_teacher = Teacher(
+            user_id=user.id,
             kafedra_id=data.kafedra_id,
-            employee_id=data.employee_id,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            third_name=data.third_name,
+            full_name=full_name,
+            image_url=data.image_url,
         )
         session.add(new_teacher)
 
         try:
             await session.commit()
-            await session.refresh(new_teacher)
-            # Eager load relationships for response
-            stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == new_teacher.id)
-            result = await session.execute(stmt)
-            new_teacher = result.scalar_one()
         except Exception:
             await session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
-        return new_teacher
+
+        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == new_teacher.id)
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
     async def get_teacher(self, session: AsyncSession, teacher_id: int) -> Teacher:
         stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == teacher_id)
@@ -93,8 +109,8 @@ class TeacherRepository:
         count_stmt = select(func.count()).select_from(Teacher)
 
         if request.full_name:
-            stmt = stmt.join(Teacher.employee).where(Employee.full_name.ilike(f"%{request.full_name}%"))
-            count_stmt = count_stmt.join(Teacher.employee).where(Employee.full_name.ilike(f"%{request.full_name}%"))
+            stmt = stmt.where(Teacher.full_name.ilike(f"%{request.full_name}%"))
+            count_stmt = count_stmt.where(Teacher.full_name.ilike(f"%{request.full_name}%"))
 
         if request.kafedra_id:
             stmt = stmt.where(Teacher.kafedra_id == request.kafedra_id)
@@ -119,11 +135,25 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-        # У самой строки преподавателя источника нет — владение определяется
-        # карточкой сотрудника, из которой она выросла.
-        if teacher.employee is not None:
-            ensure_editable(teacher.employee, "преподавателя")
+        ensure_editable(teacher, "преподавателя")
 
+        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
+
+        if full_name != teacher.full_name:
+            existing = (
+                await session.execute(select(Teacher).where(Teacher.full_name == full_name, Teacher.id != teacher_id))
+            ).scalar_one_or_none()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Teacher name already taken",
+                )
+
+        teacher.first_name = data.first_name
+        teacher.last_name = data.last_name
+        teacher.third_name = data.third_name
+        teacher.full_name = full_name
+        teacher.image_url = data.image_url
         teacher.kafedra_id = data.kafedra_id
 
         await session.commit()
@@ -136,17 +166,16 @@ class TeacherRepository:
         from app.modules.organization_structure.model import GroupTeacher
         from app.modules.quiz.model import Question, Quiz, SubjectTeacher
 
-        stmt = select(Teacher).options(selectinload(Teacher.employee)).where(Teacher.id == teacher_id)
+        stmt = select(Teacher).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
         teacher = result.scalar_one_or_none()
 
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-        if teacher.employee is not None:
-            ensure_editable(teacher.employee, "преподавателя")
+        ensure_editable(teacher, "преподавателя")
 
-        employee_user_id = teacher.employee.user_id
+        teacher_user_id = teacher.user_id
 
         if not force:
             st_count = (
@@ -156,14 +185,14 @@ class TeacherRepository:
             ).scalar() or 0
             gt_count = (
                 await session.execute(
-                    select(func.count(GroupTeacher.id)).where(GroupTeacher.teacher_id == employee_user_id)
+                    select(func.count(GroupTeacher.id)).where(GroupTeacher.teacher_id == teacher_user_id)
                 )
             ).scalar() or 0
             quiz_count = (
-                await session.execute(select(func.count(Quiz.id)).where(Quiz.lecturer_id == employee_user_id))
+                await session.execute(select(func.count(Quiz.id)).where(Quiz.lecturer_id == teacher_user_id))
             ).scalar() or 0
             question_count = (
-                await session.execute(select(func.count(Question.id)).where(Question.user_id == employee_user_id))
+                await session.execute(select(func.count(Question.id)).where(Question.user_id == teacher_user_id))
             ).scalar() or 0
 
             total = st_count + gt_count + quiz_count + question_count
@@ -189,7 +218,7 @@ class TeacherRepository:
 
         # Aggressive delete
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
-        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.lecturer_id == employee_user_id))).scalars().all()
+        quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.lecturer_id == teacher_user_id))).scalars().all()
         if quiz_ids:
             from app.modules.quiz.model import QuizQuestion, Result
 
@@ -198,10 +227,10 @@ class TeacherRepository:
             await session.execute(delete(Quiz).where(Quiz.id.in_(quiz_ids)))
 
         # 2. Questions
-        await session.execute(delete(Question).where(Question.user_id == employee_user_id))
+        await session.execute(delete(Question).where(Question.user_id == teacher_user_id))
 
         # 3. Group Assignments
-        await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id == employee_user_id))
+        await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id == teacher_user_id))
 
         # 4. Subject Assignments (handled by SQLAlchemy cascade)
 
@@ -293,14 +322,8 @@ class TeacherRepository:
     async def get_assigned_subjects_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
             select(Teacher)
-            .join(Teacher.employee)
-            .options(
-                # employee грузим явно: схема ответа разворачивает ФИО из него,
-                # а ленивая подгрузка в async-сессии падает с MissingGreenlet.
-                selectinload(Teacher.employee),
-                selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
-            )
-            .where(Employee.user_id == user_id)
+            .options(selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject))
+            .where(Teacher.user_id == user_id)
         )
 
         result = await session.execute(stmt)
@@ -317,14 +340,13 @@ class TeacherRepository:
     async def get_assigned_groups_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
             select(Teacher)
-            .join(Teacher.employee)
             .options(
-                selectinload(Teacher.employee)
-                .selectinload(Employee.user)
-                .selectinload(User.group_teachers)
-                .selectinload(GroupTeacher.group)
+                # user'ni aniq yuklaymiz: javob sxemasi guruhlarni
+                # `teacher.user.group_teachers` dan oladi, lazy-load esa
+                # async sessiyada MissingGreenlet bilan yiqiladi.
+                selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group)
             )
-            .where(Employee.user_id == user_id)
+            .where(Teacher.user_id == user_id)
         )
 
         result = await session.execute(stmt)
@@ -407,7 +429,7 @@ class TeacherRepository:
 
         columns = [
             Teacher.id.label("teacher_id"),
-            Employee.full_name,
+            Teacher.full_name,
             Teacher.kafedra_id,
             Kafedra.name.label("kafedra_name"),
             Kafedra.faculty_id,
@@ -420,10 +442,9 @@ class TeacherRepository:
 
         stmt = (
             select(*columns)
-            .join(Employee, Teacher.employee_id == Employee.id)
             .outerjoin(Kafedra, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(Faculty, Kafedra.faculty_id == Faculty.id)
-            .outerjoin(GroupTeacher, Employee.user_id == GroupTeacher.teacher_id)
+            .outerjoin(GroupTeacher, Teacher.user_id == GroupTeacher.teacher_id)
             .outerjoin(Result, GroupTeacher.group_id == Result.group_id)
         )
 
@@ -436,7 +457,7 @@ class TeacherRepository:
 
         stmt = stmt.group_by(
             Teacher.id,
-            Employee.full_name,
+            Teacher.full_name,
             Teacher.kafedra_id,
             Kafedra.name,
             Kafedra.faculty_id,
@@ -525,8 +546,7 @@ class TeacherRepository:
             )
             .outerjoin(Kafedra, Kafedra.faculty_id == Faculty.id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(Employee, Teacher.employee_id == Employee.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Employee.user_id)
+            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
             .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
             .group_by(Faculty.id, Faculty.name)
             .order_by(desc("rank_score"))
@@ -588,8 +608,7 @@ class TeacherRepository:
             )
             .outerjoin(Faculty, Faculty.id == Kafedra.faculty_id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(Employee, Teacher.employee_id == Employee.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Employee.user_id)
+            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
             .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
             .group_by(Kafedra.id, Kafedra.name, Kafedra.faculty_id, Faculty.name)
             .order_by(desc("rank_score"))

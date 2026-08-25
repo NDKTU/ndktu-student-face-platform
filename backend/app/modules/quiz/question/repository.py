@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Employee, Teacher, User
+from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Kafedra
 from app.modules.quiz.model import Question, Subject
 
@@ -33,7 +33,7 @@ class QuestionRepository:
             select(
                 Question.user_id.label("teacher_user_id"),
                 User.username,
-                Employee.full_name,
+                Teacher.full_name,
                 Kafedra.id.label("kafedra_id"),
                 Kafedra.name.label("kafedra_name"),
                 Subject.id.label("subject_id"),
@@ -41,8 +41,7 @@ class QuestionRepository:
                 func.count(Question.id).label("question_count"),
             )
             .join(User, User.id == Question.user_id)
-            .outerjoin(Employee, Employee.user_id == User.id)
-            .outerjoin(Teacher, Teacher.employee_id == Employee.id)
+            .outerjoin(Teacher, Teacher.user_id == User.id)
             .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
             .join(Subject, Subject.id == Question.subject_id)
             .where(Question.is_latest.is_(True), Question.is_active.is_(True))
@@ -54,7 +53,7 @@ class QuestionRepository:
             pattern = f"%{search}%"
             stmt = stmt.where(
                 or_(
-                    Employee.full_name.ilike(pattern),
+                    Teacher.full_name.ilike(pattern),
                     User.username.ilike(pattern),
                     Subject.name.ilike(pattern),
                 )
@@ -62,12 +61,12 @@ class QuestionRepository:
         stmt = stmt.group_by(
             Question.user_id,
             User.username,
-            Employee.full_name,
+            Teacher.full_name,
             Kafedra.id,
             Kafedra.name,
             Subject.id,
             Subject.name,
-        ).order_by(Employee.full_name.asc().nullslast(), User.username.asc(), Subject.name.asc())
+        ).order_by(Teacher.full_name.asc().nullslast(), User.username.asc(), Subject.name.asc())
 
         teachers: dict[int, QuestionTeacherSummary] = {}
         for row in (await session.execute(stmt)).all():

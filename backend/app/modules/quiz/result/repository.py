@@ -5,7 +5,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, User
 from app.modules.organization_structure.model import Group, GroupTeacher
 from app.modules.quiz.model import Quiz, Result, SubjectTeacher
 
@@ -81,8 +81,7 @@ class ResultRepository:
             st_stmt = (
                 select(SubjectTeacher.subject_id)
                 .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
+                .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
@@ -124,8 +123,7 @@ class ResultRepository:
             org_filters.append(
                 Result.quiz_id.in_(
                     select(Quiz.id)
-                    .join(Employee, Employee.user_id == Quiz.lecturer_id)
-                    .join(Teacher, Teacher.employee_id == Employee.id)
+                    .join(Teacher, Teacher.user_id == Quiz.lecturer_id)
                     .where(Teacher.kafedra_id == request.kafedra_id)
                 )
             )

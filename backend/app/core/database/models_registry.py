@@ -10,7 +10,6 @@ __all__ = [
     "RolePermission",
     "Permission",
     "Student",
-    "Employee",
     "Faculty",
     "Kafedra",
     "Group",
@@ -37,7 +36,6 @@ __all__ = [
 ]
 
 from app.modules.auth.model import (
-    Employee,
     Permission,
     Role,
     RolePermission,

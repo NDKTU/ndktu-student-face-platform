@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Permission, Role, Student, Teacher, User
+from app.modules.auth.model import Permission, Role, Student, Teacher, User
 
 from .schemas import (
     UserCreateRequest,
@@ -50,7 +50,7 @@ class UserRepository:
         session.add(new_user)
 
         if not commit:
-            # Caller (e.g. EmployeeRepository) owns the transaction and will
+            # Caller (e.g. TeacherRepository) owns the transaction and will
             # commit once after adding its own dependent rows.
             await session.flush()
             return new_user
@@ -81,7 +81,7 @@ class UserRepository:
         # 1. Запрос на получение моделей
         stmt = select(User).options(
             selectinload(User.roles),
-            selectinload(User.employee).selectinload(Employee.teacher).selectinload(Teacher.kafedra),
+            selectinload(User.teacher).selectinload(Teacher.kafedra),
             selectinload(User.student).selectinload(Student.group),
         )
 
@@ -157,11 +157,7 @@ class UserRepository:
                 await session.execute(select(func.count(StudentModel.id)).where(StudentModel.user_id == user_id))
             ).scalar() or 0
             teacher_count = (
-                await session.execute(
-                    select(func.count(TeacherModel.id))
-                    .join(Employee, TeacherModel.employee_id == Employee.id)
-                    .where(Employee.user_id == user_id)
-                )
+                await session.execute(select(func.count(TeacherModel.id)).where(TeacherModel.user_id == user_id))
             ).scalar() or 0
 
             total = result_count + quiz_count + student_count + teacher_count
@@ -202,22 +198,9 @@ class UserRepository:
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizModel).where(QuizModel.id.in_(quiz_ids)))
 
-        # 3. Student, Teacher & Employee records (Teacher before Employee: FK order)
+        # 3. Student & Teacher records
         await session.execute(delete(StudentModel).where(StudentModel.user_id == user_id))
-        teacher_ids = (
-            (
-                await session.execute(
-                    select(TeacherModel.id)
-                    .join(Employee, TeacherModel.employee_id == Employee.id)
-                    .where(Employee.user_id == user_id)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if teacher_ids:
-            await session.execute(delete(TeacherModel).where(TeacherModel.id.in_(teacher_ids)))
-        await session.execute(delete(Employee).where(Employee.user_id == user_id))
+        await session.execute(delete(TeacherModel).where(TeacherModel.user_id == user_id))
 
         # 4. Role assignments (usually handled by SQLAlchemy relationship if set up, but safe to delete user)
 

@@ -10,7 +10,7 @@ async def test_course_topics_and_lesson_linkage(
     test_faculty,
     test_kafedra,
 ):
-    teacher_user_id = test_teacher["employee"]["user_id"]
+    teacher_user_id = test_teacher["user_id"]
     course_response = await auth_client.post(
         "/course/",
         json={
@@ -69,7 +69,7 @@ async def test_lesson_rejects_topic_from_another_course(
     test_subject,
     test_group,
 ):
-    teacher_user_id = test_teacher["employee"]["user_id"]
+    teacher_user_id = test_teacher["user_id"]
     first = await auth_client.post(
         "/course/",
         json={

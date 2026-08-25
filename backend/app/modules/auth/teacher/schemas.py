@@ -1,8 +1,9 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from app.core.schemas import TashkentDatetime
+from app.core.schemas import ExternalRefFields, TashkentDatetime
+from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 
 class TeacherKafedraInfo(BaseModel):
@@ -37,49 +38,81 @@ class TeacherSubjectTeacherInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherEmployeeUserInfo(BaseModel):
+class TeacherUserInfo(BaseModel):
     id: int
     username: str
-    group_teachers: list[TeacherUserGroupTeacherInfo] = []
-    model_config = ConfigDict(from_attributes=True)
-
-
-class TeacherEmployeeInfo(BaseModel):
-    id: int
-    user_id: int
-    first_name: str
-    last_name: str
-    third_name: str
-    full_name: str
-    phone_number: Optional[str] = None
-    image_url: Optional[str] = None
-    user: Optional[TeacherEmployeeUserInfo] = None
+    roles: list[RoleResponse] = []
     model_config = ConfigDict(from_attributes=True)
 
 
 class TeacherCreateRequest(BaseModel):
-    employee_id: int
-    kafedra_id: int
+    """O'qituvchi endi xodim kartochkasining o'zi: bu so'rov bir vaqtda
+    `User` va `Teacher` yozuvini yaratadi."""
+
+    username: str
+    password: str
+    first_name: str
+    last_name: str
+    third_name: str
+    image_url: Optional[str] = None
+    kafedra_id: Optional[int] = None
+    roles: list[RoleRequest] = []
+
+    @field_validator("first_name", "last_name", "third_name", mode="before")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Field cannot be empty")
+        return v.strip()
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Username cannot be empty")
+        return value.strip().lower()
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Password cannot be empty")
+        return value.strip()
 
 
 class TeacherUpdateRequest(BaseModel):
-    """Teacher's own identity (employee_id) is immutable after creation —
-    only the kafedra assignment can change. Personal info lives on Employee
-    and is edited via the employee endpoints."""
+    """Hisob ma'lumotlari (username/parol/rollar) `user` endpoint'larida
+    boshqariladi, bu yerda faqat shaxsiy ma'lumot va kafedra o'zgaradi."""
 
-    kafedra_id: int
+    first_name: str
+    last_name: str
+    third_name: str
+    image_url: Optional[str] = None
+    kafedra_id: Optional[int] = None
+
+    @field_validator("first_name", "last_name", "third_name", mode="before")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Field cannot be empty")
+        return v.strip()
 
 
-class TeacherCreateResponse(BaseModel):
+class TeacherCreateResponse(ExternalRefFields):
     id: int
-    employee_id: int
-    kafedra_id: int
+    user_id: int
+    kafedra_id: Optional[int] = None
+    first_name: str
+    last_name: str
+    third_name: str
+    full_name: str
+    image_url: Optional[str] = None
+    hemis_id: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
     kafedra: Optional[TeacherKafedraInfo] = None
-    employee: Optional[TeacherEmployeeInfo] = None
-    subject_teachers: list[TeacherSubjectTeacherInfo] = []
+    user: Optional[TeacherUserInfo] = None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -118,20 +151,6 @@ class TeacherSubjectAssignRequest(BaseModel):
     subject_ids: list[int]
 
 
-def _flatten_employee(data: Any) -> Any:
-    """Shared before-validator: copies personal/user fields from
-    `teacher.employee.*` onto the flat response shape these "my profile"
-    endpoints have always returned."""
-    if hasattr(data, "employee") and data.employee is not None:
-        employee = data.employee
-        data.__dict__["user_id"] = employee.user_id
-        data.__dict__["first_name"] = employee.first_name
-        data.__dict__["last_name"] = employee.last_name
-        data.__dict__["third_name"] = employee.third_name
-        data.__dict__["full_name"] = employee.full_name
-    return data
-
-
 class TeacherAssignedSubjectsResponse(BaseModel):
     id: int
     user_id: int
@@ -142,11 +161,6 @@ class TeacherAssignedSubjectsResponse(BaseModel):
     subject_teachers: list[TeacherSubjectTeacherInfo]
 
     model_config = ConfigDict(from_attributes=True)
-
-    @model_validator(mode="before")
-    @classmethod
-    def flatten_employee(cls, data: Any) -> Any:
-        return _flatten_employee(data)
 
 
 class TeacherAssignedGroupsResponse(BaseModel):
@@ -163,10 +177,10 @@ class TeacherAssignedGroupsResponse(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def extract_group_teachers(cls, data: Any) -> Any:
-        data = _flatten_employee(data)
-        # Groups live on teacher.employee.user.group_teachers
-        if hasattr(data, "employee") and data.employee is not None and data.employee.user is not None:
-            data.__dict__["group_teachers"] = data.employee.user.group_teachers
+        # Guruhlar hamon `GroupTeacher.teacher_id -> users.id` orqali biriktirilgan,
+        # shuning uchun ular `teacher.user.group_teachers` da yotadi.
+        if hasattr(data, "user") and data.user is not None:
+            data.__dict__["group_teachers"] = data.user.group_teachers
         return data
 
 

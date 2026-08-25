@@ -60,7 +60,7 @@ class User(Base, IdIntPk, TimestampMixin):
 
     user_answers: Mapped[list["UserAnswers"]] = relationship("UserAnswers", back_populates="user")
 
-    employee: Mapped["Employee"] = relationship("Employee", back_populates="user")
+    teacher: Mapped["Teacher | None"] = relationship("Teacher", back_populates="user", uselist=False)
 
     group_teachers: Mapped[list["GroupTeacher"]] = relationship(
         "GroupTeacher", back_populates="teacher", cascade="all, delete-orphan"
@@ -167,15 +167,14 @@ class Student(Base, TimestampMixin, IdIntPk):
     user: Mapped["User"] = relationship("User", back_populates="student")
 
 
-class Employee(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
-    __tablename__ = "employees"
+class Teacher(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+    __tablename__ = "teachers"
     __table_args__ = (
-        external_ref_index("employees"),
-        # hemis_id — идентичность человека в HEMIS, в отличие от external_id,
-        # который указывает на строку в EPOS. Именно по нему потом опознаётся
-        # вошедший преподаватель, поэтому уникальность обязательна.
+        external_ref_index("teachers"),
+        # hemis_id — odamning HEMIS'dagi shaxsiyligi; o'qituvchi login aynan
+        # shu bo'yicha topiladi, shuning uchun unikallik majburiy.
         Index(
-            "uq_employees_hemis_id",
+            "uq_teachers_hemis_id",
             "hemis_id",
             unique=True,
             postgresql_where=text("hemis_id IS NOT NULL"),
@@ -183,34 +182,19 @@ class Employee(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     )
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    # Nullable: в EPOS преподаватель без кафедры — штатная ситуация
+    # (у них для этого есть отдельный фильтр unassigned=true).
+    kafedra_id: Mapped[int | None] = mapped_column(ForeignKey("kafedras.id"), nullable=True)
 
     last_name: Mapped[str] = mapped_column(String(255))
     first_name: Mapped[str] = mapped_column(String(255))
     third_name: Mapped[str] = mapped_column(String(255))
-    # Уникальности нет: полные тёзки среди сотрудников — обычное дело.
+    # Уникальности нет: полные тёзки среди преподавателей — обычное дело.
     full_name: Mapped[str] = mapped_column(String(500), index=True)
-
-    hemis_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    position: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    staff_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
-
-    phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    hemis_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="employee")
-    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="employee", uselist=False)
-
-    def __str__(self):
-        return self.full_name
-
-
-class Teacher(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "teachers"
-    # Nullable: в EPOS преподаватель без кафедры — штатная ситуация
-    # (у них для этого есть отдельный фильтр unassigned=true).
-    kafedra_id: Mapped[int | None] = mapped_column(ForeignKey("kafedras.id"), nullable=True)
-    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), unique=True)
-
+    user: Mapped["User"] = relationship("User", back_populates="teacher")
     kafedra: Mapped["Kafedra | None"] = relationship("Kafedra", back_populates="teachers")
 
     subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
@@ -218,10 +202,8 @@ class Teacher(Base, IdIntPk, TimestampMixin):
         back_populates="teacher",
     )
 
-    employee: Mapped["Employee"] = relationship("Employee", back_populates="teacher")
-
     def __str__(self):
-        return self.employee.full_name if self.employee else f"Teacher {self.id}"
+        return self.full_name
 
 
 class TeacherAssignment(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
