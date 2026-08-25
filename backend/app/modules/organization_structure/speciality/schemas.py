@@ -50,7 +50,7 @@ class SpecialityResponse(ExternalRefFields):
     name: str
     kafedra_id: int
     # EPOS EducationType: Bakalavr | Magistr (у ручных записей может быть пусто)
-    education_type: Optional[EducationType] = None
+    education_type: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 

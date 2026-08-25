@@ -178,3 +178,37 @@ async def test_question_type_persists_on_create(auth_client, test_subject):
     assert response.status_code == 200
     assert response.json()["question_type"] == "TRUE_FALSE"
 
+
+@pytest.mark.asyncio
+async def test_question_type_persists_through_versioning_update(auth_client, test_subject):
+    """Editing a question creates a new version row rather than mutating in
+    place — question_type must be carried onto that new row too, not just
+    onto a freshly created one."""
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Original versioned question",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+        "question_type": "TRUE_FALSE",
+    }
+    create_resp = await auth_client.post("/question/", json=payload)
+    assert create_resp.json()["question_type"] == "TRUE_FALSE"
+
+    update_payload = payload.copy()
+    update_payload["text"] = "Updated versioned question"
+
+    update_resp = await auth_client.put(f"/question/{create_resp.json()['id']}", json=update_payload)
+    assert update_resp.status_code == 200
+    new_question_id = update_resp.json()["id"]
+    assert update_resp.json()["question_type"] == "TRUE_FALSE"
+
+    response = await auth_client.get(f"/question/{new_question_id}")
+    assert response.status_code == 200
+    assert response.json()["text"] == "Updated versioned question"
+    assert response.json()["question_type"] == "TRUE_FALSE"
