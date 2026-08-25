@@ -277,6 +277,7 @@ class QuizRepository:
             pin=data.pin,
             is_active=data.is_active,
             proctoring_mode=data.proctoring_mode,
+            quiz_type=data.quiz_type.value,
             lecturer_id=data.lecturer_id,
             created_by_user_id=created_by_user_id,
             group_id=data.group_id,
@@ -493,6 +494,7 @@ class QuizRepository:
         quiz.pin = data.pin
         quiz.is_active = data.is_active
         quiz.proctoring_mode = data.proctoring_mode
+        quiz.quiz_type = data.quiz_type.value
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
 

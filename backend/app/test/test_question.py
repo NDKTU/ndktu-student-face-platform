@@ -151,3 +151,30 @@ async def test_question_type_defaults_to_quiz(auth_client, test_subject):
     response = await auth_client.get(f"/question/{question_id}")
     assert response.status_code == 200
     assert response.json()["question_type"] == "QUIZ"
+
+@pytest.mark.asyncio
+async def test_question_type_persists_on_create(auth_client, test_subject):
+    """question_type присланный при создании должен реально попасть в БД, а
+    не молча замениться дефолтом "QUIZ"."""
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "subject_id": test_subject.id,
+        "user_id": user_id,
+        "text": "Non-default question type",
+        "option_a": "A",
+        "option_b": "B",
+        "option_c": "C",
+        "option_d": "D",
+        "question_type": "TRUE_FALSE",
+    }
+    create_resp = await auth_client.post("/question/", json=payload)
+    assert create_resp.status_code == 201
+    assert create_resp.json()["question_type"] == "TRUE_FALSE"
+    question_id = create_resp.json()["id"]
+
+    response = await auth_client.get(f"/question/{question_id}")
+    assert response.status_code == 200
+    assert response.json()["question_type"] == "TRUE_FALSE"
+
