@@ -30,20 +30,34 @@ export interface ResultListResponse {
     results: Result[];
 }
 
+/** Фильтры списка результатов. Объект, а не позиционные аргументы:
+ *  их стало девять, и добавление факультета/кафедры в хвост было бы нечитаемым. */
+export interface ResultListParams {
+    page?: number;
+    limit?: number;
+    user_id?: number;
+    grade?: number;
+    group_id?: number;
+    subject_id?: number;
+    quiz_id?: number;
+    /** Факультет студента (по группе результата). */
+    faculty_id?: number;
+    /** Кафедра автора теста. */
+    kafedra_id?: number;
+    username?: string;
+    sort_dir?: string;
+}
+
 export const resultService = {
-    getResults: async (page = 1, limit = 10, grade?: number, group_id?: number, subject_id?: number, quiz_id?: number, username?: string, sort_dir?: string) => {
+    getResults: async (params: ResultListParams = {}) => {
         const response = await api.get<ResultListResponse>('/result/', {
-            params: { page, limit, grade, group_id, subject_id, quiz_id, username, sort_dir },
+            params: { page: 1, limit: 10, ...params },
         });
         return response.data;
     },
 
-    getUserResults: async (userId: number, page = 1, limit = 10, grade?: number, group_id?: number, subject_id?: number, quiz_id?: number, username?: string, sort_dir?: string) => {
-        const response = await api.get<ResultListResponse>('/result/', {
-            params: { page, limit, user_id: userId, grade, group_id, subject_id, quiz_id, username, sort_dir },
-        });
-        return response.data;
-    },
+    getUserResults: async (userId: number, params: Omit<ResultListParams, 'user_id'> = {}) =>
+        resultService.getResults({ ...params, user_id: userId }),
     getResultById: async (id: number): Promise<Result> => {
         const response = await api.get<Result>(`/result/${id}`);
         return response.data;

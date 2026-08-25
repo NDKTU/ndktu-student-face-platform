@@ -1,5 +1,7 @@
 import api from './api';
 
+export type EducationType = 'Bakalavr' | 'Magistr';
+
 export interface Speciality {
     id: number;
     name: string;
@@ -9,6 +11,16 @@ export interface Speciality {
     created_at: string;
     updated_at: string;
     external_id?: string | null;
+    // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
+    external_source?: string | null;
+    synced_at?: string | null;
+    is_active?: boolean;
+}
+
+export interface SpecialityPayload {
+    name: string;
+    kafedra_id: number;
+    education_type?: EducationType | null;
 }
 
 export interface SpecialityListResponse {
@@ -42,5 +54,19 @@ export const specialityService = {
             params: { kafedra_id: kafedraId },
         });
         return response.data.stats;
+    },
+
+    createSpeciality: async (data: SpecialityPayload): Promise<Speciality> => {
+        const response = await api.post<Speciality>('/speciality/', data);
+        return response.data;
+    },
+
+    updateSpeciality: async (id: number, data: SpecialityPayload): Promise<Speciality> => {
+        const response = await api.put<Speciality>(`/speciality/${id}`, data);
+        return response.data;
+    },
+
+    deleteSpeciality: async (id: number, force?: boolean) => {
+        await api.delete(`/speciality/${id}`, { params: force ? { force: true } : undefined });
     },
 };

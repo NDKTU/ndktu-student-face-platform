@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, computed_field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from app.core.schemas import TashkentDatetime
 
@@ -8,7 +8,10 @@ ProctoringMode = Literal["face", "standard"]
 
 
 class QuizCreateRequest(BaseModel):
-    title: str
+    # Название собирается на сервере из предмета, группы, даты и семестра.
+    # Поле осталось необязательным ради старых клиентов: они всё ещё присылают
+    # свой заголовок, и он имеет приоритет над сгенерированным.
+    title: Optional[str] = None
     question_number: int
     duration: int
     pin: str
@@ -19,15 +22,26 @@ class QuizCreateRequest(BaseModel):
     user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    # Своей колонки у семестра нет — он нужен только как часть названия.
+    semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
     proctoring_mode: ProctoringMode = "standard"
 
-    @field_validator("title", "pin", mode="before")
+    @field_validator("pin", mode="before")
     @classmethod
     def must_not_be_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
         return v.strip()
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def blank_title_means_generate(cls, v: Optional[str]) -> Optional[str]:
+        """Пустая строка от клиента — это «сгенерируй», а не пустое название."""
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
 
     @model_validator(mode="after")
     def unify_lecturer(self):

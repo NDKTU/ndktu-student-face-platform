@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { resultService } from '@/services/resultService';
+import { resultService, type ResultListParams } from '@/services/resultService';
 
-export const useResults = (page = 1, limit = 10, userId?: number, grade?: number, group_id?: number, subject_id?: number, quiz_id?: number, username?: string, sort_dir?: string, enabled = true) => {
+export const useResults = (params: ResultListParams = {}, enabled = true) => {
     return useQuery({
-        queryKey: ['results', page, limit, userId, grade, group_id, subject_id, quiz_id, username, sort_dir],
-        queryFn: () => userId
-            ? resultService.getUserResults(userId, page, limit, grade, group_id, subject_id, quiz_id, username, sort_dir)
-            : resultService.getResults(page, limit, grade, group_id, subject_id, quiz_id, username, sort_dir),
+        queryKey: ['results', params],
+        queryFn: () => resultService.getResults(params),
         placeholderData: (previousData) => previousData,
         enabled,
     });
@@ -15,7 +13,7 @@ export const useResults = (page = 1, limit = 10, userId?: number, grade?: number
 export const useUserResults = (userId: number, page = 1, limit = 10, grade?: number, group_id?: number, subject_id?: number, quiz_id?: number) => {
     return useQuery({
         queryKey: ['userResults', userId, page, limit, grade, group_id, subject_id, quiz_id],
-        queryFn: () => resultService.getUserResults(userId, page, limit, grade, group_id, subject_id, quiz_id),
+        queryFn: () => resultService.getUserResults(userId, { page, limit, grade, group_id, subject_id, quiz_id }),
         enabled: !!userId,
         placeholderData: (previousData) => previousData,
     });

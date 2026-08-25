@@ -1,19 +1,17 @@
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useCreateCourse, useUpdateCourse } from '@/hooks/useCourses';
-import { useSubjects } from '@/hooks/useSubjects';
-import { useGroups } from '@/hooks/useGroups';
-import { useTeachers } from '@/hooks/useTeachers';
-import { useFaculties, useKafedras, useSpecialities } from '@/hooks/useReferenceData';
+import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
+import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import type { Course, CourseCreateRequest, CourseUpdateRequest } from '@/services/courseService';
 import { logger } from '@/utils/logger';
+import { buildCourseName } from '@/utils/generatedNames';
 import { courseSchema, type CourseFormValues } from '@/schemas/course';
 
 interface CourseModalProps {
@@ -26,78 +24,109 @@ interface CourseModalProps {
 const selectClassName =
     'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
+const emptyForm: CourseFormValues = {
+    teacher_id: '',
+    subject_id: '',
+    semester_number: '',
+    group_ids: [],
+};
+
 export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalProps) => {
     const { hasPermission } = useAuth();
 
     const {
-        register,
         handleSubmit,
+        register,
         reset,
         control,
+        setValue,
+        watch,
         formState: { errors },
     } = useForm<CourseFormValues>({
         resolver: zodResolver(courseSchema) as any,
-        defaultValues: {
-            name: '', description: '', subject_id: '', teacher_id: '',
-            semester_number: '', faculty_id: '', kafedra_id: '', speciality_id: '',
-            group_ids: [],
-        },
+        defaultValues: emptyForm,
     });
 
     const createMutation = useCreateCourse();
     const updateMutation = useUpdateCourse();
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-    const { data: subjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
-    const { data: teachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
-    const { data: facultiesData } = useFaculties(1, 100, undefined, hasPermission('read:faculty'));
-    const { data: kafedrasData } = useKafedras(1, 100, undefined, undefined, hasPermission('read:kafedra'));
-    const { data: specialitiesData } = useSpecialities(1, 100, undefined, undefined, hasPermission('read:speciality'));
-    const { data: groupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
+    const teacherId = watch('teacher_id');
+    const subjectId = watch('subject_id');
+    const semesterNumber = watch('semester_number');
+    const selectedGroupIds = watch('group_ids');
 
-    const subjectOptions = (subjectsData?.subjects || []).map(s => ({ value: s.id.toString(), label: s.name }));
+    const { data: teachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
+
+    // Fan va guruh ro'yxati tanlangan o'qituvchiga biriktirilganidan yig'iladi:
+    // barcha 754 fan va 206 guruhdan tanlash kursni noto'g'ri bog'lashning eng
+    // qulay yo'li edi.
+    const teacherUserId = teacherId ? parseInt(teacherId, 10) : undefined;
+    const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(teacherUserId);
+    const { data: assignedGroupsData, isFetching: isFetchingGroups } = useTeacherAssignedGroups(teacherUserId);
+
     const teacherOptions = (teachersData?.teachers || []).map(t => ({
         value: (t.employee?.user_id ?? '').toString(),
         label: t.employee?.full_name ?? '',
     }));
-    const facultyOptions = (facultiesData?.faculties || []).map(f => ({ value: f.id.toString(), label: f.name }));
-    const kafedraOptions = (kafedrasData?.kafedras || []).map(k => ({ value: k.id.toString(), label: k.name }));
-    const specialityOptions = (specialitiesData?.specialities || []).map(s => ({ value: s.id.toString(), label: s.name }));
-    const groups = groupsData?.groups || [];
+
+    // Tahrirlashda kursning joriy fani va guruhlari ro'yxatda bo'lmasligi mumkin
+    // (eski kurs, biriktiruvi keyin olib tashlangan) — ularni qo'shib qo'yamiz,
+    // aks holda saqlashda jimgina yo'qolardi.
+    const subjectOptions = useMemo(() => {
+        const options = (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
+            value: st.subject_id.toString(),
+            label: st.subject.name,
+        }));
+        if (course?.subject && !options.some(o => o.value === course.subject_id.toString())) {
+            options.push({ value: course.subject_id.toString(), label: course.subject.name });
+        }
+        return options;
+    }, [assignedSubjectsData, course]);
+
+    const groupOptions = useMemo(() => {
+        const options = (assignedGroupsData?.group_teachers ?? []).map(gt => ({
+            id: gt.group_id,
+            name: gt.group.name,
+        }));
+        for (const group of course?.groups ?? []) {
+            if (!options.some(o => o.id === group.id)) {
+                options.push({ id: group.id, name: group.name });
+            }
+        }
+        return options;
+    }, [assignedGroupsData, course]);
+
+    const hasTeacher = Boolean(teacherId);
+    const noSubjects = hasTeacher && !isFetchingSubjects && subjectOptions.length === 0;
+    const noGroups = hasTeacher && !isFetchingGroups && groupOptions.length === 0;
 
     useEffect(() => {
         if (!isOpen) return;
         if (course) {
             reset({
-                name: course.name,
-                description: course.description || '',
-                subject_id: course.subject_id.toString(),
                 teacher_id: course.teacher_id.toString(),
+                subject_id: course.subject_id.toString(),
                 semester_number: course.semester_number ? course.semester_number.toString() : '',
-                faculty_id: course.faculty_id ? course.faculty_id.toString() : '',
-                kafedra_id: course.kafedra_id ? course.kafedra_id.toString() : '',
-                speciality_id: course.speciality_id ? course.speciality_id.toString() : '',
                 group_ids: course.groups.map(g => g.id),
             });
         } else {
-            reset({
-                name: '', description: '', subject_id: '', teacher_id: '',
-                semester_number: '', faculty_id: '', kafedra_id: '', speciality_id: '',
-                group_ids: [],
-            });
+            reset(emptyForm);
         }
     }, [course, reset, isOpen]);
 
+    const previewName = useMemo(() => {
+        const subjectName = subjectOptions.find(o => o.value === subjectId)?.label;
+        const groupNames = groupOptions.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name);
+        return buildCourseName(subjectName, groupNames, semesterNumber ? parseInt(semesterNumber, 10) : undefined);
+    }, [subjectOptions, subjectId, groupOptions, selectedGroupIds, semesterNumber]);
+
     const onSubmit = (data: CourseFormValues) => {
+        // Nom yuborilmaydi — uni server fan, guruhlar va semestrdan yig'adi.
         const payload: CourseCreateRequest | CourseUpdateRequest = {
-            name: data.name,
-            description: data.description || undefined,
             subject_id: parseInt(data.subject_id, 10),
             teacher_id: parseInt(data.teacher_id, 10),
-            semester_number: data.semester_number ? parseInt(data.semester_number, 10) : undefined,
-            faculty_id: data.faculty_id ? parseInt(data.faculty_id, 10) : undefined,
-            kafedra_id: data.kafedra_id ? parseInt(data.kafedra_id, 10) : undefined,
-            speciality_id: data.speciality_id ? parseInt(data.speciality_id, 10) : undefined,
+            semester_number: parseInt(data.semester_number, 10),
             group_ids: data.group_ids,
         };
 
@@ -129,14 +158,26 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={course ? 'Kursni tahrirlash' : 'Kurs yaratish'}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <Input label="Nomi" {...register('name')} error={errors.name?.message} />
-
-                <div>
-                    <label className="text-sm font-medium block mb-1">Tavsif (ixtiyoriy)</label>
-                    <textarea
-                        className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        {...register('description')}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">O'qituvchi</label>
+                    <Controller
+                        name="teacher_id"
+                        control={control}
+                        render={({ field }) => (
+                            <Combobox
+                                options={teacherOptions}
+                                value={field.value}
+                                onChange={(val) => {
+                                    field.onChange(val);
+                                    setValue('subject_id', '');
+                                    setValue('group_ids', []);
+                                }}
+                                placeholder="O'qituvchini tanlang"
+                                searchPlaceholder="Qidirish..."
+                            />
+                        )}
                     />
+                    {errors.teacher_id && <p className="text-sm text-destructive">{errors.teacher_id.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -149,90 +190,30 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                                 options={subjectOptions}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Fanni tanlang"
+                                placeholder={hasTeacher ? 'Fanni tanlang' : "Avval o'qituvchini tanlang"}
                                 searchPlaceholder="Qidirish..."
+                                disabled={!hasTeacher || noSubjects}
                             />
                         )}
                     />
+                    {noSubjects && (
+                        <p className="text-sm text-destructive">
+                            O'qituvchiga fan biriktirilmagan. "O'qituvchilar" bo'limida fan biriktiring.
+                        </p>
+                    )}
                     {errors.subject_id && <p className="text-sm text-destructive">{errors.subject_id.message}</p>}
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">O'qituvchi</label>
-                    <Controller
-                        name="teacher_id"
-                        control={control}
-                        render={({ field }) => (
-                            <Combobox
-                                options={teacherOptions}
-                                value={field.value}
-                                onChange={field.onChange}
-                                placeholder="O'qituvchini tanlang"
-                                searchPlaceholder="Qidirish..."
-                            />
-                        )}
-                    />
-                    {errors.teacher_id && <p className="text-sm text-destructive">{errors.teacher_id.message}</p>}
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Semestr (ixtiyoriy)</label>
+                    <label className="text-sm font-medium">Semestr</label>
                     <select className={selectClassName} {...register('semester_number')}>
                         <option value="">Tanlanmagan</option>
                         <option value="1">1-semestr</option>
                         <option value="2">2-semestr</option>
                     </select>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Fakultet</label>
-                        <Controller
-                            name="faculty_id"
-                            control={control}
-                            render={({ field }) => (
-                                <Combobox
-                                    options={facultyOptions}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    placeholder="Tanlanmagan"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            )}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Kafedra</label>
-                        <Controller
-                            name="kafedra_id"
-                            control={control}
-                            render={({ field }) => (
-                                <Combobox
-                                    options={kafedraOptions}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    placeholder="Tanlanmagan"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            )}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Yo'nalish</label>
-                        <Controller
-                            name="speciality_id"
-                            control={control}
-                            render={({ field }) => (
-                                <Combobox
-                                    options={specialityOptions}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    placeholder="Tanlanmagan"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            )}
-                        />
-                    </div>
+                    {errors.semester_number && (
+                        <p className="text-sm text-destructive">{errors.semester_number.message}</p>
+                    )}
                 </div>
 
                 <div className="space-y-2">
@@ -242,7 +223,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                         control={control}
                         render={({ field }) => (
                             <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto p-3 border rounded-md bg-muted/20">
-                                {groups.map(group => (
+                                {groupOptions.map(group => (
                                     <div key={group.id} className="flex items-center space-x-2">
                                         <input
                                             type="checkbox"
@@ -262,11 +243,24 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                                         </label>
                                     </div>
                                 ))}
-                                {groups.length === 0 && <span className="text-sm text-muted-foreground">Guruhlar topilmadi.</span>}
+                                {!hasTeacher && (
+                                    <span className="text-sm text-muted-foreground">Avval o'qituvchini tanlang.</span>
+                                )}
+                                {noGroups && (
+                                    <span className="text-sm text-destructive">
+                                        O'qituvchiga guruh biriktirilmagan. "O'qituvchilar" bo'limida guruh biriktiring.
+                                    </span>
+                                )}
                             </div>
                         )}
                     />
+                    {errors.group_ids && <p className="text-sm text-destructive">{errors.group_ids.message}</p>}
                     <p className="text-xs text-muted-foreground">Saqlashda guruhlar ro'yxati to'liq almashtiriladi.</p>
+                </div>
+
+                <div className="space-y-1 rounded-md border border-dashed bg-muted/20 px-3 py-2">
+                    <label className="text-xs font-medium text-muted-foreground">Kurs nomi (avtomatik)</label>
+                    <p className="text-sm font-medium">{previewName}</p>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">

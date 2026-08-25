@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -26,11 +27,14 @@ interface QuizTableProps {
     onRepeat?: (quiz: Quiz) => void;
     onStart?: (quiz: Quiz, modeOverride?: ProctoringMode) => void;
     readOnly?: boolean;
+    /** 'list' — таблица со списком тестов, 'cards' — карточная сетка. */
+    variant?: 'cards' | 'list';
 }
 
 /**
- * Список тестов карточной сеткой в стиле референс-дизайна:
- * плитка-инициалы, название, фан/группа, полоса счётчиков, действия.
+ * Список тестов. По умолчанию — карточная сетка (страница активных тестов),
+ * variant='list' даёт таблицу как на «Natijalar»: на мобильных DataTable сам
+ * переключается на карточки.
  */
 export const QuizTable = ({
     quizzes,
@@ -50,6 +54,7 @@ export const QuizTable = ({
     onRepeat,
     onStart,
     readOnly,
+    variant = 'cards',
 }: QuizTableProps) => {
     const navigate = useNavigate();
     const hideActions = Boolean(isTeacher) || Boolean(readOnly);
@@ -144,6 +149,124 @@ export const QuizTable = ({
             </Button>
         </div>
     );
+
+    if (variant === 'list') {
+        const columns: DataTableColumn<Quiz>[] = [
+            {
+                key: 'title',
+                header: 'Test',
+                cell: (quiz) => (
+                    <div className="min-w-0">
+                        <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                        <p className="truncate text-xs capitalize text-muted-foreground">
+                            {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
+                                .filter((value) => value && value !== '-')
+                                .join(' · ') || '—'}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                key: 'pin',
+                header: 'PIN',
+                hideBelow: 'lg',
+                className: 'font-mono text-sm text-muted-foreground',
+                cell: (quiz) => quiz.pin,
+            },
+            {
+                key: 'question_number',
+                header: 'Savol',
+                hideBelow: 'md',
+                className: 'font-mono text-sm',
+                cell: (quiz) => quiz.question_number,
+            },
+            {
+                key: 'duration',
+                header: 'Daqiqa',
+                hideBelow: 'md',
+                className: 'font-mono text-sm',
+                cell: (quiz) => quiz.duration,
+            },
+            {
+                key: 'proctoring',
+                header: 'Rejim',
+                hideBelow: 'lg',
+                className: 'text-sm text-muted-foreground',
+                cell: (quiz) => (quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'),
+            },
+            {
+                key: 'is_active',
+                header: 'Holat',
+                cell: (quiz) => (
+                    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                        {!hideActions && (
+                            <Switch
+                                checked={quiz.is_active}
+                                onCheckedChange={() => onToggleStatus?.(quiz)}
+                                disabled={isUpdatingStatusId === quiz.id || isUpdatePending}
+                            />
+                        )}
+                        <span className={quiz.is_active ? 'text-sm font-medium text-success' : 'text-sm text-muted-foreground'}>
+                            {quiz.is_active ? 'Faol' : 'Yopiq'}
+                        </span>
+                    </div>
+                ),
+            },
+            {
+                key: 'actions',
+                header: 'Amallar',
+                headClassName: 'text-right',
+                className: 'text-right',
+                cell: (quiz) => (
+                    <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+                        {hideActions && showStart ? renderStartActions(quiz) : !hideActions ? renderManageActions(quiz) : null}
+                    </div>
+                ),
+            },
+        ];
+
+        return (
+            <DataTable
+                columns={columns}
+                data={quizzes}
+                rowKey={(quiz) => quiz.id}
+                onRowClick={!readOnly ? (quiz) => navigate(`/quizzes/${quiz.id}`) : undefined}
+                renderCard={(quiz) => (
+                    <div className="space-y-2 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                                <p className="truncate text-xs capitalize text-muted-foreground">
+                                    {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
+                                        .filter((value) => value && value !== '-')
+                                        .join(' · ') || '—'}
+                                </p>
+                            </div>
+                            <span className="shrink-0 rounded bg-muted px-2 py-1 font-mono text-xs">{quiz.pin}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {quiz.question_number} savol · {quiz.duration} daqiqa · {quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'}
+                        </p>
+                        <div className="flex items-center justify-between gap-2" onClick={(event) => event.stopPropagation()}>
+                            <div className="flex items-center gap-2">
+                                {!hideActions && (
+                                    <Switch
+                                        checked={quiz.is_active}
+                                        onCheckedChange={() => onToggleStatus?.(quiz)}
+                                        disabled={isUpdatingStatusId === quiz.id || isUpdatePending}
+                                    />
+                                )}
+                                <span className={quiz.is_active ? 'text-xs font-medium text-success' : 'text-xs text-muted-foreground'}>
+                                    {quiz.is_active ? 'Faol' : 'Yopiq'}
+                                </span>
+                            </div>
+                            {hideActions && showStart ? renderStartActions(quiz) : !hideActions ? renderManageActions(quiz) : null}
+                        </div>
+                    </div>
+                )}
+            />
+        );
+    }
 
     return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

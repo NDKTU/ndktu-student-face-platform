@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.organization_structure.model import GroupTeacher
+from app.modules.organization_structure.model import Group, GroupTeacher
 from app.modules.quiz.model import Quiz, Result, SubjectTeacher
 
 from .schemas import (
@@ -111,6 +111,27 @@ class ResultRepository:
             # Students only see their own results
             stmt = stmt.where(Result.user_id == current_user.id)
 
+        # Факультет и кафедра лежат на разных концах результата, поэтому условия
+        # собираем один раз и вешаем и на выборку, и на счётчик.
+        org_filters = []
+        if request.faculty_id:
+            # Факультет студента: у группы он проставлен всегда.
+            org_filters.append(Result.group_id.in_(select(Group.id).where(Group.faculty_id == request.faculty_id)))
+        if request.kafedra_id:
+            # Кафедра автора теста. Прямой связи «результат → кафедра» в данных
+            # нет: у групп пуст speciality_id, у предметов — kafedra_id, так что
+            # единственный рабочий путь идёт через преподавателя-автора.
+            org_filters.append(
+                Result.quiz_id.in_(
+                    select(Quiz.id)
+                    .join(Employee, Employee.user_id == Quiz.lecturer_id)
+                    .join(Teacher, Teacher.employee_id == Employee.id)
+                    .where(Teacher.kafedra_id == request.kafedra_id)
+                )
+            )
+        for condition in org_filters:
+            stmt = stmt.where(condition)
+
         if request.user_id:
             stmt = stmt.where(Result.user_id == request.user_id)
 
@@ -162,6 +183,9 @@ class ResultRepository:
             count_stmt = count_stmt.where(teacher_filter)
         elif is_student:
             count_stmt = count_stmt.where(Result.user_id == current_user.id)
+
+        for condition in org_filters:
+            count_stmt = count_stmt.where(condition)
 
         if request.user_id:
             count_stmt = count_stmt.where(Result.user_id == request.user_id)

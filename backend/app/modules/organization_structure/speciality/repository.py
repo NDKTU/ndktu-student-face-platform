@@ -64,14 +64,23 @@ class SpecialityRepository:
         )
 
     async def create_speciality(self, session: AsyncSession, data: SpecialityCreateRequest) -> Speciality:
-        stmt_check = select(Speciality).where(Speciality.name == data.name)
+        # Уникальность — по паре (кафедра, название): одно и то же направление
+        # может вестись на разных кафедрах, и БД ограничивает именно пару.
+        stmt_check = select(Speciality).where(
+            Speciality.kafedra_id == data.kafedra_id,
+            Speciality.name == data.name,
+        )
         if (await session.execute(stmt_check)).scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Speciality '{data.name}' already exists",
+                detail=f"Speciality '{data.name}' already exists in this kafedra",
             )
 
-        new_speciality = Speciality(name=data.name, kafedra_id=data.kafedra_id)
+        new_speciality = Speciality(
+            name=data.name,
+            kafedra_id=data.kafedra_id,
+            education_type=data.education_type,
+        )
         session.add(new_speciality)
 
         try:
@@ -137,17 +146,28 @@ class SpecialityRepository:
         speciality = await self.get_speciality(session, speciality_id)
         ensure_editable(speciality, "специальности")
 
-        if data.name is not None:
-            stmt_check = select(Speciality).where(Speciality.name == data.name, Speciality.id != speciality_id)
+        target_name = data.name if data.name is not None else speciality.name
+        target_kafedra_id = data.kafedra_id if data.kafedra_id is not None else speciality.kafedra_id
+
+        if data.name is not None or data.kafedra_id is not None:
+            stmt_check = select(Speciality).where(
+                Speciality.kafedra_id == target_kafedra_id,
+                Speciality.name == target_name,
+                Speciality.id != speciality_id,
+            )
             if (await session.execute(stmt_check)).scalar_one_or_none():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Speciality name already taken",
+                    detail="Speciality name already taken in this kafedra",
                 )
-            speciality.name = data.name
 
-        if data.kafedra_id is not None:
-            speciality.kafedra_id = data.kafedra_id
+        speciality.name = target_name
+        speciality.kafedra_id = target_kafedra_id
+
+        # None здесь означает «очистить», поэтому смотрим на факт передачи поля,
+        # иначе снять тип обучения было бы невозможно.
+        if "education_type" in data.model_fields_set:
+            speciality.education_type = data.education_type
 
         try:
             await session.commit()
@@ -161,9 +181,28 @@ class SpecialityRepository:
             )
         return speciality
 
-    async def delete_speciality(self, session: AsyncSession, speciality_id: int) -> None:
+    async def delete_speciality(self, session: AsyncSession, speciality_id: int, force: bool = False) -> None:
+        from app.modules.organization_structure.model import Group
+
         speciality = await self.get_speciality(session, speciality_id)
         ensure_editable(speciality, "специальности")
+
+        # У групп speciality_id — ON DELETE SET NULL: группы уцелеют, но потеряют
+        # привязку. Молча отвязывать нельзя, поэтому просим подтверждение.
+        if not force:
+            group_count = (
+                await session.execute(select(func.count(Group.id)).where(Group.speciality_id == speciality_id))
+            ).scalar() or 0
+            if group_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "requires_confirmation": True,
+                        "message": "Ushbu mutaxassislikni o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
+                        "warnings": [f"{group_count} ta guruh mutaxassisliksiz qoladi (guruhlar o'chmaydi)"],
+                    },
+                )
+
         try:
             await session.delete(speciality)
             await session.commit()

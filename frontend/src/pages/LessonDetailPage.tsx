@@ -65,7 +65,7 @@ export default function LessonDetailPage() {
 
             <Card><CardHeader><CardTitle>Dars videosi</CardTitle></CardHeader><CardContent>
                 {embedUrl ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe className="h-full w-full" src={embedUrl} title={video?.title ?? lesson.topic} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
-                    : video?.file_url ? <video className="aspect-video w-full rounded-xl bg-black" controls preload="metadata" src={video.file_url} />
+                    : video?.link_url ? <a href={video.link_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">{video.title || 'Video havolasi'} <ExternalLink className="h-4 w-4" /></a>
                     : <EmptyState icon={<BookOpen className="h-6 w-6" />} title="Video qo'shilmagan" description="Bu darsni video bo'lmasdan ham o'qish mumkin." />}
             </CardContent></Card>
 
@@ -96,13 +96,13 @@ function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose:
     const [file, setFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'Video yoki YouTube' }];
+    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'YouTube video' }];
 
     const submit = async () => {
         setSaving(true); setError('');
         try {
             let fileUrl: string | undefined;
-            if ((kind === 'file' || kind === 'video') && file) fileUrl = (await resourceService.upload(file)).url;
+            if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
             await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
             setTitle(''); setUrl(''); setText(''); setFile(null); onClose();
         } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
@@ -114,7 +114,7 @@ function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose:
         <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>
         {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
-        {kind === 'video' && <><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="YouTube havolasi (yoki quyida fayl tanlang)" /><Input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></>}
+        {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
         {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></div>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button><Button onClick={submit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button></div>

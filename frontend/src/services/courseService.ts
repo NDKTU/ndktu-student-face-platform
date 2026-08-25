@@ -54,7 +54,8 @@ export interface Course {
 }
 
 export interface CourseCreateRequest {
-    name: string;
+    /** Bo'sh qoldirilsa server fan, guruhlar va semestrdan yig'adi. */
+    name?: string;
     subject_id: number;
     teacher_id: number;
     description?: string;

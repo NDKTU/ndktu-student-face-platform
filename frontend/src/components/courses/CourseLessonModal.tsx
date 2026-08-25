@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, FilePlus2, Loader2, Upload, Youtube } from 'lucide-react';
+import { ClipboardList, FilePlus2, Loader2, Youtube } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -18,14 +18,13 @@ interface Props {
 
 export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
     const createLesson = useCreateLesson();
+    // Группа берётся у курса. Выбор остаётся только для курса с несколькими
+    // группами — там подставить её автоматически нельзя.
+    const needsGroupChoice = course.groups.length > 1;
     const [groupId, setGroupId] = useState('');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [date, setDate] = useState('');
-    const [duration, setDuration] = useState('15');
-    const [videoType, setVideoType] = useState<'youtube' | 'upload'>('youtube');
     const [youtubeUrl, setYoutubeUrl] = useState('');
-    const [videoFile, setVideoFile] = useState<File | null>(null);
     const [showResources, setShowResources] = useState(false);
     const [script, setScript] = useState('');
     const [extraFiles, setExtraFiles] = useState<File[]>([]);
@@ -40,14 +39,10 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
 
     useEffect(() => {
         if (!isOpen) return;
-        setGroupId(course.groups[0]?.id.toString() ?? '');
+        setGroupId(course.groups.length === 1 ? String(course.groups[0].id) : '');
         setTitle('');
         setDescription('');
-        setDate(new Date().toISOString().slice(0, 10));
-        setDuration('15');
-        setVideoType('youtube');
         setYoutubeUrl('');
-        setVideoFile(null);
         setShowResources(false);
         setScript('');
         setExtraFiles([]);
@@ -63,21 +58,16 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
     }, [isOpen, course.groups]);
 
     const submit = async () => {
-        if (!title.trim() || !groupId || !date) {
-            setError("Dars nomi, guruh va sana to'ldirilishi kerak");
+        if (!title.trim()) {
+            setError("Dars nomini kiriting");
             return;
         }
-        if (videoType === 'youtube' && !youtubeUrl.trim()) {
+        if (needsGroupChoice && !groupId) {
+            setError('Guruhni tanlang');
+            return;
+        }
+        if (!youtubeUrl.trim()) {
             setError('YouTube havolasini kiriting');
-            return;
-        }
-        if (videoType === 'upload' && !videoFile) {
-            setError('Video faylni tanlang');
-            return;
-        }
-        const durationMinutes = Number(duration);
-        if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
-            setError("Davomiylikni 1 dan 1440 daqiqagacha kiriting");
             return;
         }
         if (showHomework && homeworkTitle.trim() && !homeworkDeadline) {
@@ -90,30 +80,18 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
         try {
             const lesson = await createLesson.mutateAsync({
                 course_id: course.id,
-                group_id: Number(groupId),
+                group_id: groupId ? Number(groupId) : undefined,
                 topic_id: topicId,
                 topic: title.trim(),
-                date,
-                duration_minutes: durationMinutes,
                 description: description.trim() || null,
             });
 
-            if (videoType === 'youtube') {
-                await resourceService.create({
-                    lesson_id: lesson.id,
-                    resource_type: 'video',
-                    title: title.trim(),
-                    link_url: youtubeUrl.trim(),
-                });
-            } else if (videoFile) {
-                const { url } = await resourceService.upload(videoFile);
-                await resourceService.create({
-                    lesson_id: lesson.id,
-                    resource_type: 'video',
-                    title: videoFile.name,
-                    file_url: url,
-                });
-            }
+            await resourceService.create({
+                lesson_id: lesson.id,
+                resource_type: 'video',
+                title: title.trim(),
+                link_url: youtubeUrl.trim(),
+            });
 
             if (showResources && script.trim()) {
                 await resourceService.create({
@@ -174,45 +152,18 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                 </div>
 
                 <div>
-                    <label className="mb-2 block text-sm font-medium">Video manbasi</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button
-                            type="button"
-                            variant={videoType === 'youtube' ? 'primary' : 'outline'}
-                            onClick={() => setVideoType('youtube')}
-                        >
-                            <Youtube className="h-4 w-4" /> YouTube havola
-                        </Button>
-                        <Button
-                            type="button"
-                            variant={videoType === 'upload' ? 'primary' : 'outline'}
-                            onClick={() => setVideoType('upload')}
-                        >
-                            <Upload className="h-4 w-4" /> Video yuklash
-                        </Button>
-                    </div>
-                    <div className="mt-2">
-                        {videoType === 'youtube' ? (
-                            <Input
-                                value={youtubeUrl}
-                                onChange={(event) => setYoutubeUrl(event.target.value)}
-                                placeholder="https://www.youtube.com/watch?v=..."
-                            />
-                        ) : (
-                            <Input
-                                type="file"
-                                accept="video/mp4,video/webm,video/quicktime"
-                                onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
-                            />
-                        )}
-                    </div>
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Youtube className="h-4 w-4 text-red-600" /> Video (YouTube havolasi)
+                    </label>
+                    <Input
+                        value={youtubeUrl}
+                        onChange={(event) => setYoutubeUrl(event.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi qabul qilinadi.</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">Davomiyligi (daq)</label>
-                        <Input type="number" min={1} max={1440} value={duration} onChange={(event) => setDuration(event.target.value)} />
-                    </div>
+                {needsGroupChoice && (
                     <div>
                         <label className="mb-2 block text-sm font-medium">Guruh</label>
                         <Combobox
@@ -221,8 +172,9 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                             onChange={setGroupId}
                             placeholder="Guruhni tanlang"
                         />
+                        <p className="mt-1.5 text-xs text-muted-foreground">Bu kurs bir nechta guruhga biriktirilgan — darsni qaysi guruhga qo'shishni tanlang.</p>
                     </div>
-                </div>
+                )}
 
                 <div>
                     <label className="mb-2 block text-sm font-medium">Tavsif <span className="font-normal text-muted-foreground">(ixtiyoriy)</span></label>
@@ -232,13 +184,6 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                         onChange={(event) => setDescription(event.target.value)}
                         placeholder="Dars mazmuni haqida qisqacha"
                     />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">Dars sanasi</label>
-                        <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-                    </div>
                 </div>
 
                 <section className="rounded-xl border border-border/60 p-4">

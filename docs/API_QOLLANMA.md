@@ -371,11 +371,11 @@ Ta’lim yo‘nalishlari (kafedra va fakultetga bog‘langan).
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/speciality/` | `create:quiz` | Yangi mutaxassislik yaratish. | — | `name`*: string, `kafedra_id`*: integer |
+| `POST` | `/api/speciality/` | `create:quiz` | Yangi mutaxassislik yaratish. | — | `name`*: string, `kafedra_id`*: integer, `education_type`: Bakalavr/Magistr |
 | `GET` | `/api/speciality/` | `user_answers:read` | Mutaxassisliklar ro‘yxati (sahifalab, filtrlar bilan). | `name`, `kafedra_id`, `faculty_id`, `page`, `limit` | — |
 | `GET` | `/api/speciality/{speciality_id}` | `read:speciality` | Mutaxassislik ma’lumotini olish. | `speciality_id`* | — |
-| `PUT` | `/api/speciality/{speciality_id}` | `update:speciality` | Mutaxassislikni tahrirlash. | `speciality_id`* | `name`: string, `kafedra_id`: integer |
-| `DELETE` | `/api/speciality/{speciality_id}` | `delete:speciality` | Mutaxassislikni o‘chirish. | `speciality_id`* | — |
+| `PUT` | `/api/speciality/{speciality_id}` | `update:speciality` | Mutaxassislikni tahrirlash. | `speciality_id`* | `name`: string, `kafedra_id`: integer, `education_type`: Bakalavr/Magistr/null |
+| `DELETE` | `/api/speciality/{speciality_id}` | `delete:speciality` | Mutaxassislikni o‘chirish. Guruhlari bo‘lsa 409 (`requires_confirmation`) qaytadi — `force=true` bilan takrorlanadi, guruhlar o‘chmaydi, faqat mutaxassislikdan uziladi. | `speciality_id`*, `force` | — |
 
 ### 7.13. Bo‘limlar (`Department`)
 
@@ -453,7 +453,7 @@ Har bir urinish natijasi: to‘g‘ri/noto‘g‘ri soni, baho (2–5), proktori
 |---|---|---|---|---|---|
 | `GET` | `/api/result/{result_id}` | `read:result` | Natija ma’lumotini olish. | `result_id`* | — |
 | `DELETE` | `/api/result/{result_id}` | `delete:result` | Natijani o‘chirish. | `result_id`* | — |
-| `GET` | `/api/result/` | `user_answers:read` | Natijalar ro‘yxati (sahifalab, filtrlar bilan). | `user_id`, `quiz_id`, `subject_id`, `group_id`, `grade`, `username`, `page`, `limit`, `sort_dir` | — |
+| `GET` | `/api/result/` | `user_answers:read` | Natijalar ro‘yxati (sahifalab, filtrlar bilan). `faculty_id` — talabaning fakulteti (natija guruhi bo‘yicha), `kafedra_id` — testni yaratgan o‘qituvchining kafedrasi. | `user_id`, `quiz_id`, `subject_id`, `group_id`, `faculty_id`, `kafedra_id`, `grade`, `username`, `page`, `limit`, `sort_dir` | — |
 
 ### 7.19. Talaba javoblari (`User Answers`)
 
@@ -501,7 +501,7 @@ Dars (mavzu, sana, guruh) va u bo‘yicha davomat/baholar.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/lesson/` | `create:quiz` | Yangi dars yaratish. | — | `subject_teacher_id`: integer, `group_id`*: integer, `course_id`*: integer, `lesson_type`: lecture/seminar/independent/lab, `topic`*: string, `date`*: string, `description`: string |
+| `POST` | `/api/lesson/` | `create:quiz` | Yangi dars yaratish. `group_id` berilmasa kursning guruhi olinadi (kursda bir nechta guruh bo‘lsa majburiy), `date` berilmasa bugungi sana (Toshkent) qo‘yiladi. | — | `subject_teacher_id`: integer, `group_id`: integer, `course_id`*: integer, `topic_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `duration_minutes`: integer, `topic`*: string, `date`: string, `description`: string |
 | `GET` | `/api/lesson/` | `user_answers:read` | Darslar ro‘yxati (sahifalab, filtrlar bilan). | `subject_teacher_id`, `group_id`, `course_id`, `date_from`, `date_to`, `page`, `limit` | — |
 | `GET` | `/api/lesson/{lesson_id}` | `read:lesson` | Dars ma’lumotini olish. | `lesson_id`* | — |
 | `PUT` | `/api/lesson/{lesson_id}` | `update:lesson` | Darsni tahrirlash. | `lesson_id`* | `subject_teacher_id`: integer, `group_id`: integer, `course_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `topic`: string, `date`: string, `description`: string |
@@ -531,9 +531,9 @@ Fayllar va havolalar — darsga yoki kursga biriktiriladi.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/resource/` | `create:quiz` | Yangi resurs yaratish. | — | `lesson_id`: integer, `course_id`: integer, `resource_type`*: file/link/text, `title`*: string, `file_url`: string, `link_url`: string, `text_content`: string, `order_index`: integer |
+| `POST` | `/api/resource/` | `create:quiz` | Yangi resurs yaratish. `video` uchun `link_url` (YouTube) majburiy — video fayl qabul qilinmaydi. | — | `lesson_id`: integer, `course_id`: integer, `resource_type`*: file/link/text/video, `title`*: string, `file_url`: string, `link_url`: string, `text_content`: string, `order_index`: integer |
 | `GET` | `/api/resource/` | `user_answers:read` | Resurslar ro‘yxati (sahifalab, filtrlar bilan). | `lesson_id`, `course_id`, `page`, `limit` | — |
-| `POST` | `/api/resource/upload` | `create:quiz` | Dars materiali faylini yuklash (fayl turi tekshiriladi). | — | (form-data) `file`*: fayl |
+| `POST` | `/api/resource/upload` | `create:quiz` | Dars materiali faylini yuklash: rasm (5MB) va hujjat/arxiv (20MB). Video fayllar qabul qilinmaydi. | — | (form-data) `file`*: fayl |
 | `GET` | `/api/resource/{resource_id}` | `read:resource` | Resurs ma’lumotini olish. | `resource_id`* | — |
 | `PUT` | `/api/resource/{resource_id}` | `update:resource` | Resursni tahrirlash. | `resource_id`* | `title`: string, `file_url`: string, `link_url`: string, `text_content`: string, `order_index`: integer |
 | `DELETE` | `/api/resource/{resource_id}` | `delete:resource` | Resursni o‘chirish. | `resource_id`* | — |

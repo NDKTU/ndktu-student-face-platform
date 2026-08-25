@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useGroups } from '@/hooks/useGroups';
 import { useSubjects } from '@/hooks/useSubjects';
+import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
 import { useQuizzes } from '@/hooks/useQuizzes';
 import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
@@ -321,6 +322,8 @@ const ResultsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = isStudent ? 12 : 10;
 
+    const [selectedFaculty, setSelectedFaculty] = useState('');
+    const [selectedKafedra, setSelectedKafedra] = useState('');
     const [selectedGroup, setSelectedGroup] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('');
     const [selectedQuiz, setSelectedQuiz] = useState('');
@@ -329,33 +332,53 @@ const ResultsPage = () => {
     const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
     const [isExporting, setIsExporting] = useState(false);
 
+    const parsedFaculty = selectedFaculty ? parseInt(selectedFaculty, 10) : undefined;
+    const parsedKafedra = selectedKafedra ? parseInt(selectedKafedra, 10) : undefined;
     const parsedGroup   = selectedGroup   ? parseInt(selectedGroup, 10)   : undefined;
     const parsedSubject = selectedSubject ? parseInt(selectedSubject, 10) : undefined;
     const parsedQuiz    = selectedQuiz    ? parseInt(selectedQuiz, 10)    : undefined;
     const parsedGrade   = selectedGrade   ? parseInt(selectedGrade, 10)   : undefined;
 
-    useEffect(() => { setCurrentPage(1); }, [selectedGroup, selectedSubject, selectedQuiz, selectedGrade, usernameSearch, sortDir]);
+    useEffect(() => { setCurrentPage(1); }, [selectedFaculty, selectedKafedra, selectedGroup, selectedSubject, selectedQuiz, selectedGrade, usernameSearch, sortDir]);
 
-    const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError, refetch: refetchResults } = useResults(
-        currentPage, pageSize, undefined, parsedGrade, parsedGroup, parsedSubject, parsedQuiz,
-        usernameSearch || undefined, sortDir,
-        !isAuthLoading
-    );
+    const resultFilters = {
+        page: currentPage,
+        limit: pageSize,
+        grade: parsedGrade,
+        group_id: parsedGroup,
+        subject_id: parsedSubject,
+        quiz_id: parsedQuiz,
+        faculty_id: parsedFaculty,
+        kafedra_id: parsedKafedra,
+        username: usernameSearch || undefined,
+        sort_dir: sortDir,
+    };
 
+    const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError, refetch: refetchResults } =
+        useResults(resultFilters, !isAuthLoading);
+
+    const { data: facultiesData } = useFaculties(1, 200, undefined, isAdminOrTeacher);
+    const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, isAdminOrTeacher);
     const { data: groupsData }   = useGroups(1, 1000, '', undefined, undefined, isAdminOrTeacher);
     const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher);
-    const { data: quizzesData }  = useQuizzes(1, 1000, undefined, undefined, undefined, undefined, undefined, undefined, isAdminOrTeacher);
+    const { data: quizzesData }  = useQuizzes({ page: 1, limit: 1000 }, isAdminOrTeacher);
 
     const groups        = groupsData?.groups || [];
+    const facultyOptions = facultiesData?.faculties.map(f => ({ value: String(f.id), label: f.name })) || [];
+    // Кафедры не сужаем по выбранному факультету: общеобразовательные кафедры
+    // (математика, физика) ведут тесты у студентов всех факультетов.
+    const kafedraOptions = kafedrasData?.kafedras.map(k => ({ value: String(k.id), label: k.name })) || [];
     const subjectOptions = subjectsData?.subjects.map(s => ({ value: String(s.id), label: s.name })) || [];
     const quizOptions   = quizzesData?.quizzes.map(q => ({ value: String(q.id), label: q.title })) || [];
 
     const results    = resultsData?.results || [];
     const totalPages = resultsData ? Math.ceil(resultsData.total / pageSize) : 1;
 
-    const hasActiveFilters = !!(selectedGroup || selectedSubject || selectedQuiz || selectedGrade || usernameSearch || sortDir !== 'desc');
+    const hasActiveFilters = !!(selectedFaculty || selectedKafedra || selectedGroup || selectedSubject || selectedQuiz || selectedGrade || usernameSearch || sortDir !== 'desc');
 
     const handleClearFilters = () => {
+        setSelectedFaculty('');
+        setSelectedKafedra('');
         setSelectedGroup('');
         setSelectedSubject('');
         setSelectedQuiz('');
@@ -368,9 +391,7 @@ const ResultsPage = () => {
     const handleExportExcel = async () => {
         try {
             setIsExporting(true);
-            const response = await resultService.getResults(
-                1, 10000, parsedGrade, parsedGroup, parsedSubject, parsedQuiz, usernameSearch || undefined, sortDir
-            );
+            const response = await resultService.getResults({ ...resultFilters, page: 1, limit: 10000 });
             const items = response.results || [];
             if (items.length === 0) { toast.info('Eksport qilish uchun natijalar topilmadi.'); return; }
 
@@ -544,6 +565,32 @@ const ResultsPage = () => {
                                     placeholder="Ism yoki login..."
                                     value={usernameSearch}
                                     onChange={e => setUsernameSearch(e.target.value)}
+                                />
+                            </div>
+                        )}
+
+                        {isAdminOrTeacher && (
+                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Talabaning fakulteti">Fakultet</label>
+                                <Combobox
+                                    options={facultyOptions}
+                                    value={selectedFaculty}
+                                    onChange={val => setSelectedFaculty(val || '')}
+                                    placeholder="Barcha fakultetlar"
+                                    searchPlaceholder="Qidirish..."
+                                />
+                            </div>
+                        )}
+
+                        {isAdminOrTeacher && (
+                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Testni yaratgan o'qituvchining kafedrasi">Kafedra</label>
+                                <Combobox
+                                    options={kafedraOptions}
+                                    value={selectedKafedra}
+                                    onChange={val => setSelectedKafedra(val || '')}
+                                    placeholder="Barcha kafedralar"
+                                    searchPlaceholder="Qidirish..."
                                 />
                             </div>
                         )}

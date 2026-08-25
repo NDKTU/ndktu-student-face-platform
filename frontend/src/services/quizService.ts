@@ -24,7 +24,8 @@ export interface Quiz {
 }
 
 export interface QuizCreateRequest {
-    title: string;
+    /** Bo'sh qoldirilsa server fan, guruh, sana va semestrdan yig'adi. */
+    title?: string;
     question_number: number;
     duration: number;
     pin: string;
@@ -32,6 +33,8 @@ export interface QuizCreateRequest {
     lecturer_id?: number | null;
     group_id?: number | null;
     subject_id?: number | null;
+    /** Faqat sarlavhaga kiradi — quizzes jadvalida alohida ustun yo'q. */
+    semester_number?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
     attempt?: number | null;
@@ -85,6 +88,20 @@ export interface QuizAnalytics {
     questions: QuizQuestionAnalytics[];
 }
 
+/** Фильтры списка тестов — объектом: позиционных было восемь, а список
+ *  стал плоским и получил ещё фильтр по факультету. */
+export interface QuizListParams {
+    page?: number;
+    limit?: number;
+    title?: string;
+    is_active?: boolean;
+    user_id?: number;
+    group_id?: number;
+    subject_id?: number;
+    faculty_id?: number;
+    sort_dir?: string;
+}
+
 export const quizService = {
     getCatalog: async () => {
         const response = await api.get<{ faculties: QuizCatalogFaculty[] }>('/quiz/catalog');
@@ -96,9 +113,9 @@ export const quizService = {
         return response.data;
     },
 
-    getQuizzes: async (page = 1, limit = 10, title?: string, is_active?: boolean, user_id?: number, group_id?: number, subject_id?: number, sort_dir?: string) => {
+    getQuizzes: async (params: QuizListParams = {}) => {
         const response = await api.get<QuizListResponse>('/quiz/', {
-            params: { page, limit, title, is_active, user_id, group_id, subject_id, sort_dir },
+            params: { page: 1, limit: 10, ...params },
         });
         return response.data;
     },

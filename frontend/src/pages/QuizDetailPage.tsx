@@ -27,7 +27,7 @@ const QuizDetailPage = () => {
     const pageSize = 10;
     const quiz = useQuiz(quizId);
     const analytics = useQuizAnalytics(quizId);
-    const results = useResults(page, pageSize, undefined, undefined, undefined, undefined, quizId);
+    const results = useResults({ page, limit: pageSize, quiz_id: quizId });
 
     if (quiz.isError || analytics.isError) {
         return <ErrorState onRetry={() => { void quiz.refetch(); void analytics.refetch(); }} />;

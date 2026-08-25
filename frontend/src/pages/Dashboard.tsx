@@ -55,9 +55,9 @@ const Dashboard: React.FC = () => {
     const { data: teachers,  isLoading: isTeachersLoading }  = useQuery({ queryKey: ['dashboard-teachers'],  queryFn: () => teacherService.getTeachers(1, 1) });
     const { data: students,  isLoading: isStudentsLoading }  = useQuery({ queryKey: ['dashboard-students'],  queryFn: () => studentService.getStudents(1, 1) });
     const { data: subjects,  isLoading: isSubjectsLoading }  = useQuery({ queryKey: ['dashboard-subjects'],  queryFn: () => subjectService.getSubjects(1, 1) });
-    const { data: quizzes,   isLoading: isQuizzesLoading }   = useQuery({ queryKey: ['dashboard-quizzes'],   queryFn: () => quizService.getQuizzes(1, 1) });
+    const { data: quizzes,   isLoading: isQuizzesLoading }   = useQuery({ queryKey: ['dashboard-quizzes'],   queryFn: () => quizService.getQuizzes({ page: 1, limit: 1 }) });
     const { data: questions, isLoading: isQuestionsLoading } = useQuery({ queryKey: ['dashboard-questions'], queryFn: () => questionService.getQuestions(1, 1) });
-    const { data: results,   isLoading: isResultsLoading }   = useQuery({ queryKey: ['dashboard-results'],   queryFn: () => resultService.getResults(1, 1) });
+    const { data: results,   isLoading: isResultsLoading }   = useQuery({ queryKey: ['dashboard-results'],   queryFn: () => resultService.getResults({ page: 1, limit: 1 }) });
 
     const getGreeting = () => {
         const h = new Date().getHours();

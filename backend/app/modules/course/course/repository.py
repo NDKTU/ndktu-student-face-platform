@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
-from app.modules.organization_structure.model import Kafedra
+from app.modules.organization_structure.model import Group, Kafedra
 from app.modules.quiz.model import Subject, SubjectTeacher
 
 from .schemas import (
@@ -118,6 +118,80 @@ class CourseRepository:
         if (await session.execute(select(Subject.id).where(Subject.id == subject_id))).scalar_one_or_none() is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Subject {subject_id} not found")
 
+    async def _build_course_name(
+        self,
+        session: AsyncSession,
+        subject_id: int,
+        group_ids: list[int],
+        semester_number: int | None,
+    ) -> str:
+        """Собирает название курса: «Фан — 101-19, 102-19 (1-semestr)».
+
+        Руками его больше не печатают: оно однозначно следует из предмета, групп
+        и семестра, а расхождения в написании только мешали искать курс.
+        """
+        subject_name = (
+            await session.execute(select(Subject.name).where(Subject.id == subject_id))
+        ).scalar_one_or_none() or "Kurs"
+
+        group_names: list[str] = []
+        if group_ids:
+            group_names = list(
+                (
+                    await session.execute(select(Group.name).where(Group.id.in_(group_ids)).order_by(Group.name))
+                )
+                .scalars()
+                .all()
+            )
+
+        name = subject_name
+        if group_names:
+            # Курс на весь поток перечислять целиком незачем — колонка всего 255
+            # символов, а название должно читаться в строке таблицы.
+            shown = ", ".join(group_names[:3])
+            if len(group_names) > 3:
+                shown = f"{shown} +{len(group_names) - 3}"
+            name = f"{name} — {shown}"
+        if semester_number:
+            name = f"{name} ({semester_number}-semestr)"
+        return name[:255]
+
+    async def _derive_org_fields(
+        self,
+        session: AsyncSession,
+        subject_id: int,
+        group_ids: list[int],
+    ) -> tuple[int | None, int | None, int | None]:
+        """Выводит факультет, кафедру и направление из предмета и групп курса.
+
+        Раньше их выбирали тремя отдельными полями формы — три вопроса к тому,
+        что и так однозначно следует из предмета и групп. Колонки остались:
+        на них смотрят фильтры списка курсов и подпись в таблице.
+        """
+        kafedra_id = (
+            await session.execute(select(Subject.kafedra_id).where(Subject.id == subject_id))
+        ).scalar_one_or_none()
+
+        faculty_id: int | None = None
+        speciality_id: int | None = None
+        if group_ids:
+            rows = (
+                await session.execute(select(Group.faculty_id, Group.speciality_id).where(Group.id.in_(group_ids)))
+            ).all()
+            faculties = {row.faculty_id for row in rows if row.faculty_id}
+            specialities = {row.speciality_id for row in rows if row.speciality_id}
+            # Группы курса бывают с разных факультетов и направлений — тогда
+            # единого значения не существует и колонка честно остаётся пустой.
+            faculty_id = faculties.pop() if len(faculties) == 1 else None
+            speciality_id = specialities.pop() if len(specialities) == 1 else None
+
+        if faculty_id is None and kafedra_id is not None:
+            faculty_id = (
+                await session.execute(select(Kafedra.faculty_id).where(Kafedra.id == kafedra_id))
+            ).scalar_one_or_none()
+
+        return faculty_id, kafedra_id, speciality_id
+
     async def _serialize(self, session: AsyncSession, course: Course) -> CourseResponse:
         teacher_full_name_stmt = select(Employee.full_name).where(Employee.user_id == course.teacher_id)
         teacher_full_name = (await session.execute(teacher_full_name_stmt)).scalar_one_or_none()
@@ -178,20 +252,26 @@ class CourseRepository:
         await self._ensure_subject_exists(session, data.subject_id)
         await self._ensure_user_exists(session, data.teacher_id)
 
+        group_ids = sorted(set(data.group_ids))
+        derived_faculty_id, derived_kafedra_id, derived_speciality_id = await self._derive_org_fields(
+            session, data.subject_id, group_ids
+        )
+
         course = Course(
-            name=data.name,
+            name=data.name
+            or await self._build_course_name(session, data.subject_id, group_ids, data.semester_number),
             subject_id=data.subject_id,
             teacher_id=data.teacher_id,
             description=data.description,
             semester_number=data.semester_number,
-            faculty_id=data.faculty_id,
-            kafedra_id=data.kafedra_id,
-            speciality_id=data.speciality_id,
+            faculty_id=data.faculty_id if data.faculty_id is not None else derived_faculty_id,
+            kafedra_id=data.kafedra_id if data.kafedra_id is not None else derived_kafedra_id,
+            speciality_id=data.speciality_id if data.speciality_id is not None else derived_speciality_id,
         )
         session.add(course)
         await session.flush()
 
-        for group_id in set(data.group_ids):
+        for group_id in group_ids:
             session.add(CourseGroup(course_id=course.id, group_id=group_id))
 
         try:
@@ -273,9 +353,13 @@ class CourseRepository:
     async def update_course(self, session: AsyncSession, course_id: int, data: CourseUpdateRequest) -> CourseResponse:
         course = await self._load_with_relations(session, course_id)
 
+        subject_changed = False
+        semester_changed = False
+
         if data.subject_id is not None and data.subject_id != course.subject_id:
             await self._ensure_subject_exists(session, data.subject_id)
             course.subject_id = data.subject_id
+            subject_changed = True
         if data.teacher_id is not None and data.teacher_id != course.teacher_id:
             await self._ensure_user_exists(session, data.teacher_id)
             course.teacher_id = data.teacher_id
@@ -283,14 +367,18 @@ class CourseRepository:
             course.name = data.name
         if data.description is not None:
             course.description = data.description
-        if data.semester_number is not None:
+        if data.semester_number is not None and data.semester_number != course.semester_number:
             course.semester_number = data.semester_number
+            semester_changed = True
         if data.faculty_id is not None:
             course.faculty_id = data.faculty_id
         if data.kafedra_id is not None:
             course.kafedra_id = data.kafedra_id
         if data.speciality_id is not None:
             course.speciality_id = data.speciality_id
+
+        groups_changed = False
+        final_group_ids = sorted({group.id for group in course.groups})
 
         if data.group_ids is not None:
             existing_stmt = select(CourseGroup).where(CourseGroup.course_id == course.id)
@@ -304,6 +392,28 @@ class CourseRepository:
             for group_id in requested:
                 if group_id not in existing:
                     session.add(CourseGroup(course_id=course.id, group_id=group_id))
+
+            groups_changed = requested != set(existing)
+            final_group_ids = sorted(requested)
+
+        # Название, факультет, кафедра и направление выведены из предмета и групп,
+        # поэтому при их смене пересчитываются. Значения, присланные явно (старый
+        # фронт, импорт), остаются приоритетными и не затираются.
+        if subject_changed or groups_changed:
+            derived_faculty_id, derived_kafedra_id, derived_speciality_id = await self._derive_org_fields(
+                session, course.subject_id, final_group_ids
+            )
+            if data.faculty_id is None:
+                course.faculty_id = derived_faculty_id
+            if data.kafedra_id is None:
+                course.kafedra_id = derived_kafedra_id
+            if data.speciality_id is None:
+                course.speciality_id = derived_speciality_id
+
+        if data.name is None and (subject_changed or groups_changed or semester_changed):
+            course.name = await self._build_course_name(
+                session, course.subject_id, final_group_ids, course.semester_number
+            )
 
         try:
             await session.commit()

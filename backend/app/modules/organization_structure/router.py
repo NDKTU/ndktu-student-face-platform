@@ -391,10 +391,11 @@ async def update_speciality(
 )
 async def delete_speciality(
     speciality_id: int,
+    force: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("delete:speciality")),
 ):
-    await get_speciality_repository.delete_speciality(session=session, speciality_id=speciality_id)
+    await get_speciality_repository.delete_speciality(session=session, speciality_id=speciality_id, force=force)
 
 
 # ============================================================================

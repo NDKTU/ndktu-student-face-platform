@@ -15,7 +15,8 @@ from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListRes
 
 logger = logging.getLogger(__name__)
 
-_VIDEO_EXTS = {"mp4", "webm", "mov", "m4v"}
+# Видео файлом больше не принимаем: видеоурок хранится ссылкой (YouTube),
+# поэтому видеорасширения намеренно отсутствуют в списке разрешённых.
 _ALLOWED_EXTS = {
     "jpg",
     "jpeg",
@@ -31,12 +32,10 @@ _ALLOWED_EXTS = {
     "pptx",
     "txt",
     "zip",
-    *_VIDEO_EXTS,
 }
 _IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
 _IMAGE_MAX = 5 * 1024 * 1024
 _DOC_MAX = 20 * 1024 * 1024
-_VIDEO_MAX = 500 * 1024 * 1024
 
 
 class ResourceRepository:
@@ -69,9 +68,7 @@ class ResourceRepository:
         if ext not in _ALLOWED_EXTS:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
 
-        max_size = _VIDEO_MAX if ext in _VIDEO_EXTS else (_IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX)
-        if ext in _VIDEO_EXTS and file.content_type and not file.content_type.startswith("video/"):
-            raise HTTPException(status_code=400, detail="Uploaded video has an invalid content type")
+        max_size = _IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX
 
         upload_dir = settings.course_resource_upload_dir
         os.makedirs(upload_dir, exist_ok=True)

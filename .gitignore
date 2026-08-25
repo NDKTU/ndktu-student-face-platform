@@ -110,3 +110,4 @@ scripts/_assets/
 questions_images_2/
 *.tar.gz
 *.sql
+*.xlsx

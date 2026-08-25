@@ -43,7 +43,9 @@ class CourseSpecialityInfo(BaseModel):
 
 
 class CourseCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
+    # Название собирается на сервере из предмета, групп и семестра. Поле осталось
+    # необязательным ради старых клиентов: присланное имя имеет приоритет.
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     subject_id: int
     teacher_id: int
     description: Optional[str] = None

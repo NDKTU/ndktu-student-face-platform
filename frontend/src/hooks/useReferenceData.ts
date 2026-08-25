@@ -3,7 +3,7 @@ import { facultyService } from '@/services/facultyService';
 import { kafedraService } from '@/services/kafedraService';
 import { roleService } from '@/services/roleService';
 import { permissionService } from '@/services/permissionService';
-import { specialityService } from '@/services/specialityService';
+import { specialityService, type SpecialityPayload } from '@/services/specialityService';
 
 // Faculties
 export const useFaculties = (page = 1, limit = 100, name?: string, enabled: boolean = true) => {
@@ -95,6 +95,36 @@ export const useSpecialities = (page = 1, limit = 100, name?: string, kafedra_id
         queryKey: ['specialities', page, limit, name, kafedra_id],
         queryFn: () => specialityService.getSpecialities(page, limit, name, kafedra_id),
         enabled,
+    });
+};
+
+export const useCreateSpeciality = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: SpecialityPayload) => specialityService.createSpeciality(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['specialities'] });
+        },
+    });
+};
+
+export const useUpdateSpeciality = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: SpecialityPayload }) => specialityService.updateSpeciality(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['specialities'] });
+        },
+    });
+};
+
+export const useDeleteSpeciality = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, force }: { id: number; force?: boolean }) => specialityService.deleteSpeciality(id, force),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['specialities'] });
+        },
     });
 };
 

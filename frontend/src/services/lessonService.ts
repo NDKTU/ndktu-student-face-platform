@@ -63,14 +63,16 @@ export interface LessonListResponse {
 
 export interface LessonCreateRequest {
     subject_teacher_id?: number;
-    group_id: number;
+    /** Не нужен для курса с одной группой — бэкенд подставит её сам. */
+    group_id?: number;
     course_id?: number;
     sinf_id?: number | null;
     topic_id?: number | null;
     lesson_type?: LessonType | null;
     duration_minutes?: number | null;
     topic: string;
-    date: string;
+    /** Не передаём из формы курса — бэкенд проставит сегодняшнюю дату. */
+    date?: string;
     description?: string | null;
 }
 

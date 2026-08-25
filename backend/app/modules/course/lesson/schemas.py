@@ -48,13 +48,16 @@ class LessonResourceInfo(BaseModel):
 
 class LessonCreateRequest(BaseModel):
     subject_teacher_id: Optional[int] = None
-    group_id: int
+    # Группу можно не передавать: у курса она уже выбрана. Обязательна только
+    # если курс ведётся сразу у нескольких групп — тогда угадывать нельзя.
+    group_id: Optional[int] = None
     course_id: int
     topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     topic: str = Field(min_length=1, max_length=255)
-    date: date_type
+    # Дату можно не передавать — проставим сегодняшнюю по Ташкенту.
+    date: Optional[date_type] = None
     description: Optional[str] = None
 
 

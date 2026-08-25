@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from core.config import settings
 from fastapi import HTTPException, status
@@ -6,6 +7,7 @@ from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.organization_structure.model import Faculty, Group, GroupTeacher
@@ -206,6 +208,44 @@ class QuizRepository:
             },
         )
 
+    async def build_title(
+        self,
+        session: AsyncSession,
+        subject_id: int | None,
+        group_id: int | None,
+        semester_number: int | None,
+        created_at: datetime | None = None,
+    ) -> str:
+        """Собирает название теста: «Фан — Гуруҳ — 21.08.2026 (1-semestr)».
+
+        Организатор название больше не печатает: набранные вручную «Test 1» и
+        «matem» невозможно было различить в списке из тысяч тестов. Дата берётся
+        ташкентская — по ней тест и ищут в журнале.
+        """
+        subject_name = (
+            (await session.execute(select(Subject.name).where(Subject.id == subject_id))).scalar_one_or_none()
+            if subject_id
+            else None
+        )
+        group_name = (
+            (await session.execute(select(Group.name).where(Group.id == group_id))).scalar_one_or_none()
+            if group_id
+            else None
+        )
+
+        # При правке теста дата остаётся датой создания: иначе тест, к которому
+        # вернулись через неделю, «переезжал» бы в названии в другой день.
+        moment = created_at or datetime.now(TASHKENT_TZ)
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+
+        parts = [part for part in (subject_name, group_name) if part]
+        parts.append(moment.astimezone(TASHKENT_TZ).strftime("%d.%m.%Y"))
+        title = " — ".join(parts)
+        if semester_number:
+            title = f"{title} ({semester_number}-semestr)"
+        return title
+
     async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int) -> Quiz:
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
@@ -223,8 +263,15 @@ class QuizRepository:
             if available < data.question_number:
                 raise self._not_enough_questions(available, data.question_number)
 
+        title = data.title or await self.build_title(
+            session,
+            subject_id=data.subject_id,
+            group_id=data.group_id,
+            semester_number=data.semester_number,
+        )
+
         new_quiz = Quiz(
-            title=data.title,
+            title=title,
             question_number=data.question_number,
             duration=data.duration,
             pin=data.pin,
@@ -429,7 +476,13 @@ class QuizRepository:
             if linked < data.question_number:
                 raise self._not_enough_questions(linked, data.question_number)
 
-        quiz.title = data.title
+        quiz.title = data.title or await self.build_title(
+            session,
+            subject_id=data.subject_id,
+            group_id=data.group_id,
+            semester_number=data.semester_number,
+            created_at=quiz.created_at,
+        )
         quiz.question_number = data.question_number
         quiz.duration = data.duration
         quiz.pin = data.pin

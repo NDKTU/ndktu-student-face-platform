@@ -6,11 +6,16 @@ import PermissionGate from '@/components/auth/PermissionGate';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { Teacher } from '@/services/teacherService';
+import type { Faculty } from '@/services/facultyService';
 
 interface QuizFiltersProps {
     subjects: Subject[];
     groups: Group[];
     teachers: Teacher[];
+    /** Фильтр по факультету — только на странице со сплошным списком тестов. */
+    faculties?: Faculty[];
+    filterFacultyId?: number | undefined;
+    onFacultyChange?: (id: number | undefined) => void;
     filterSubjectId: number | undefined;
     onSubjectChange: (id: number | undefined) => void;
     filterGroupId: number | undefined;
@@ -33,6 +38,9 @@ export const QuizFilters = ({
     subjects,
     groups,
     teachers,
+    faculties,
+    filterFacultyId,
+    onFacultyChange,
     filterSubjectId,
     onSubjectChange,
     filterGroupId,
@@ -51,6 +59,20 @@ export const QuizFilters = ({
         <Card>
             <CardContent className="p-4">
                 <div className="flex flex-wrap gap-4 items-end">
+                    {faculties && onFacultyChange && (
+                        <PermissionGate permission="read:faculty">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
+                                <label className="text-sm font-medium">Fakultet bo'yicha filtri</label>
+                                <Combobox
+                                    options={faculties.map(f => ({ value: f.id.toString(), label: f.name }))}
+                                    value={filterFacultyId?.toString()}
+                                    onChange={(val) => onFacultyChange(val ? parseInt(val) : undefined)}
+                                    placeholder="Barcha fakultetlar"
+                                    searchPlaceholder="Fakultetni qidirish..."
+                                />
+                            </div>
+                        </PermissionGate>
+                    )}
                     <PermissionGate permission="read:subject">
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">Fan bo'yicha filtri</label>

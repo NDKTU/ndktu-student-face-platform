@@ -294,7 +294,12 @@ class TeacherRepository:
         stmt = (
             select(Teacher)
             .join(Teacher.employee)
-            .options(selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject))
+            .options(
+                # employee грузим явно: схема ответа разворачивает ФИО из него,
+                # а ленивая подгрузка в async-сессии падает с MissingGreenlet.
+                selectinload(Teacher.employee),
+                selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject),
+            )
             .where(Employee.user_id == user_id)
         )
 

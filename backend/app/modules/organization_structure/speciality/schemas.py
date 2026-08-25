@@ -1,13 +1,17 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.core.schemas import ExternalRefFields, TashkentDatetime
 
+# EPOS EducationType. Ручные записи могут его не указывать.
+EDUCATION_TYPES = Literal["Bakalavr", "Magistr"]
+
 
 class SpecialityCreateRequest(BaseModel):
     name: str
     kafedra_id: int
+    education_type: Optional[EDUCATION_TYPES] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -16,10 +20,17 @@ class SpecialityCreateRequest(BaseModel):
             raise ValueError("Name cannot be empty")
         return v.strip()
 
+    @field_validator("education_type", mode="before")
+    @classmethod
+    def blank_education_type_is_none(cls, v: Optional[str]) -> Optional[str]:
+        # Пустой select на фронте приходит как "" — считаем это «не указано».
+        return v or None
+
 
 class SpecialityUpdateRequest(BaseModel):
     name: Optional[str] = None
     kafedra_id: Optional[int] = None
+    education_type: Optional[EDUCATION_TYPES] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -29,6 +40,11 @@ class SpecialityUpdateRequest(BaseModel):
                 raise ValueError("Name cannot be empty")
             return v.strip()
         return v
+
+    @field_validator("education_type", mode="before")
+    @classmethod
+    def blank_education_type_is_none(cls, v: Optional[str]) -> Optional[str]:
+        return v or None
 
 
 class SpecialityResponse(ExternalRefFields):

@@ -350,7 +350,7 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/user-answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`)}
+                    onClick={() => navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`)}
                 >
                     Javoblarni ko'rish
                 </Button>
@@ -463,7 +463,7 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => navigate(`/user-answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`)}
+                                            onClick={() => navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`)}
                                         >
                                             Javoblarni ko'rish
                                         </Button>

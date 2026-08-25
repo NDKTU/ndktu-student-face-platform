@@ -84,6 +84,10 @@ class ResultListRequest(BaseModel):
     quiz_id: Optional[int] = None
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
+    # Факультет — со стороны студента (группа результата).
+    faculty_id: Optional[int] = None
+    # Кафедра — со стороны автора теста, см. list_results.
+    kafedra_id: Optional[int] = None
     grade: Optional[int] = None
     username: Optional[str] = None
 

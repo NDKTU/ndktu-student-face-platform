@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Employee, Student, Teacher, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson, LessonResult
@@ -85,10 +87,19 @@ class LessonRepository:
         course_group_stmt = select(CourseGroup.group_id).where(CourseGroup.course_id == course.id)
         course_group_ids = set((await session.execute(course_group_stmt)).scalars().all())
         if group_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="group_id is required when creating a lesson in a Course",
-            )
+            # Группу курса не спрашиваем повторно: если она одна — берём её.
+            if len(course_group_ids) == 1:
+                group_id = next(iter(course_group_ids))
+            elif not course_group_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Course has no groups: add a group to the Course first",
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="group_id is required: this Course has several groups",
+                )
         if group_id not in course_group_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,20 +130,21 @@ class LessonRepository:
     ) -> Lesson:
         is_admin = await self._is_role(current_user, "admin")
 
-        _, subject_teacher, _ = await self._resolve_course_context(
+        _, subject_teacher, group_id = await self._resolve_course_context(
             session, data.course_id, current_user, data.group_id, is_admin
         )
         await self._validate_topic(session, data.course_id, data.topic_id)
 
         new_lesson = Lesson(
             subject_teacher_id=subject_teacher.id,
-            group_id=data.group_id,
+            group_id=group_id,
             course_id=data.course_id,
             topic_id=data.topic_id,
             lesson_type=data.lesson_type,
             duration_minutes=data.duration_minutes,
             topic=data.topic,
-            date=data.date,
+            # Форма дарса даты не спрашивает: занятие заводят в день проведения.
+            date=data.date or datetime.now(TASHKENT_TZ).date(),
             description=data.description,
         )
         session.add(new_lesson)
