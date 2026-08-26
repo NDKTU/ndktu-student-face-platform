@@ -1,12 +1,13 @@
 import logging
 
+from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.password_hash import hash_password
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission, Role, Student, Teacher, User
+from app.modules.auth.model import Permission, Role, Student, Teacher, TeacherSubject, User
 
 from .schemas import (
     UserCreateRequest,
@@ -145,6 +146,18 @@ class UserRepository:
 
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # Удаление пользователя сносит его строку `teachers`, Postgres каскадит
+        # в `teacher_subject` и упирается в RESTRICT на
+        # `lessons.teacher_subject_id` — до этой проверки наружу уходил
+        # неотличимый 500. `force` проверку не обходит, ровно как в
+        # `delete_teacher`: проведённые занятия не подтверждаемое последствие,
+        # а жёсткое препятствие.
+        await ensure_no_lessons(
+            session,
+            "Bu foydalanuvchining o'qituvchi yozuvi",
+            TeacherSubject.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == user_id)),
+        )
 
         if not force:
             result_count = (
