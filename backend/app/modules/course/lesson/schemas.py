@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
-ATTENDANCE_VALUES = Literal["present", "absent", "late"]
 LESSON_TYPE_VALUES = Literal["lecture", "seminar", "independent", "lab"]
 
 
@@ -15,7 +14,7 @@ class LessonSubjectInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class LessonSubjectTeacherInfo(BaseModel):
+class LessonTeacherSubjectInfo(BaseModel):
     id: int
     subject_id: int
     teacher_id: int
@@ -47,14 +46,13 @@ class LessonResourceInfo(BaseModel):
 
 
 class LessonCreateRequest(BaseModel):
-    subject_teacher_id: Optional[int] = None
+    teacher_subject_id: Optional[int] = None
     # Группу можно не передавать: у курса она уже выбрана. Обязательна только
     # если курс ведётся сразу у нескольких групп — тогда угадывать нельзя.
     group_id: Optional[int] = None
     course_id: int
     topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
-    duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     topic: str = Field(min_length=1, max_length=255)
     # Дату можно не передавать — проставим сегодняшнюю по Ташкенту.
     date: Optional[date_type] = None
@@ -62,12 +60,11 @@ class LessonCreateRequest(BaseModel):
 
 
 class LessonUpdateRequest(BaseModel):
-    subject_teacher_id: Optional[int] = None
+    teacher_subject_id: Optional[int] = None
     group_id: Optional[int] = None
     course_id: Optional[int] = None
     topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
-    duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     topic: Optional[str] = Field(default=None, min_length=1, max_length=255)
     date: Optional[date_type] = None
     description: Optional[str] = None
@@ -75,18 +72,17 @@ class LessonUpdateRequest(BaseModel):
 
 class LessonResponse(BaseModel):
     id: int
-    subject_teacher_id: int
+    teacher_subject_id: int
     group_id: int
     course_id: int
     topic_id: Optional[int] = None
     lesson_type: Optional[str] = None
-    duration_minutes: Optional[int] = None
     topic: str
     date: date_type
     description: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
-    subject_teacher: Optional[LessonSubjectTeacherInfo] = None
+    teacher_subject: Optional[LessonTeacherSubjectInfo] = None
     group: Optional[LessonGroupInfo] = None
     course_topic: Optional[LessonTopicInfo] = None
     resources: list[LessonResourceInfo] = []
@@ -95,7 +91,7 @@ class LessonResponse(BaseModel):
 
 
 class LessonListRequest(BaseModel):
-    subject_teacher_id: Optional[int] = None
+    teacher_subject_id: Optional[int] = None
     group_id: Optional[int] = None
     course_id: Optional[int] = None
     date_from: Optional[date_type] = None
@@ -115,42 +111,3 @@ class LessonListResponse(BaseModel):
     page: int
     limit: int
     lessons: List[LessonResponse]
-
-
-# ── Lesson results ──────────────────────────────────────────────────────────
-
-
-class LessonResultUserInfo(BaseModel):
-    id: int
-    username: str
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LessonResultUpsertItem(BaseModel):
-    user_id: int
-    attendance: ATTENDANCE_VALUES
-    grade: Optional[int] = Field(default=None, ge=0, le=5)
-    notes: Optional[str] = None
-
-
-class LessonResultsBulkUpsertRequest(BaseModel):
-    items: List[LessonResultUpsertItem]
-
-
-class LessonResultResponse(BaseModel):
-    id: int
-    lesson_id: int
-    user_id: int
-    attendance: str
-    grade: Optional[int] = None
-    notes: Optional[str] = None
-    created_at: TashkentDatetime
-    updated_at: TashkentDatetime
-    user: Optional[LessonResultUserInfo] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LessonResultListResponse(BaseModel):
-    total: int
-    results: List[LessonResultResponse]

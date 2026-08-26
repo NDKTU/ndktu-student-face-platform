@@ -97,3 +97,108 @@ async def test_delete_quiz(auth_client, test_subject, test_group):
 
     response = await auth_client.get(f"/quiz/{quiz_id}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_quiz_type_defaults_and_filters(auth_client, test_subject, test_group):
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "title": "Math Quiz Type",
+        "question_number": 5,
+        "duration": 30,
+        "pin": "2468",
+        "user_id": user_id,
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+    }
+    create_resp = await auth_client.post("/quiz/", json=payload)
+    quiz_id = create_resp.json()["id"]
+
+    detail = await auth_client.get(f"/quiz/{quiz_id}")
+    assert detail.json()["quiz_type"] == "LESSON_QUIZ"
+
+    empty = await auth_client.get("/quiz/?quiz_type=SEMESTER_FINAL")
+    assert empty.status_code == 200
+    assert empty.json()["total"] == 0
+
+    matching = await auth_client.get("/quiz/?quiz_type=LESSON_QUIZ")
+    assert matching.json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_quiz_type_rejects_unknown_value(auth_client, test_subject, test_group):
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "title": "Math Quiz Bad Type",
+        "question_number": 5,
+        "duration": 30,
+        "pin": "1357",
+        "user_id": user_id,
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+        "quiz_type": "MIDTERM",
+    }
+    response = await auth_client.post("/quiz/", json=payload)
+    assert response.status_code == 422
+
+@pytest.mark.asyncio
+async def test_quiz_type_persists_on_create(auth_client, test_subject, test_group):
+    """quiz_type присланный при создании должен реально попасть в БД, а не
+    молча замениться дефолтом — и быть виден и в детальном ответе, и в
+    фильтре списка."""
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "title": "Semester Final Quiz",
+        "question_number": 5,
+        "duration": 30,
+        "pin": "3141",
+        "user_id": user_id,
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+        "quiz_type": "SEMESTER_FINAL",
+    }
+    create_resp = await auth_client.post("/quiz/", json=payload)
+    assert create_resp.status_code == 201
+    assert create_resp.json()["quiz_type"] == "SEMESTER_FINAL"
+    quiz_id = create_resp.json()["id"]
+
+    detail = await auth_client.get(f"/quiz/{quiz_id}")
+    assert detail.json()["quiz_type"] == "SEMESTER_FINAL"
+
+    matching = await auth_client.get("/quiz/?quiz_type=SEMESTER_FINAL")
+    assert matching.json()["total"] == 1
+    assert matching.json()["quizzes"][0]["id"] == quiz_id
+
+
+@pytest.mark.asyncio
+async def test_quiz_type_persists_on_update(auth_client, test_subject, test_group):
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    payload = {
+        "title": "Quiz Type Update",
+        "question_number": 5,
+        "duration": 30,
+        "pin": "2718",
+        "user_id": user_id,
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+    }
+    create_resp = await auth_client.post("/quiz/", json=payload)
+    quiz_id = create_resp.json()["id"]
+    assert create_resp.json()["quiz_type"] == "LESSON_QUIZ"
+
+    payload["quiz_type"] = "YEAR_PROMOTION"
+    update_resp = await auth_client.put(f"/quiz/{quiz_id}", json=payload)
+    assert update_resp.status_code == 200
+    assert update_resp.json()["quiz_type"] == "YEAR_PROMOTION"
+
+    detail = await auth_client.get(f"/quiz/{quiz_id}")
+    assert detail.json()["quiz_type"] == "YEAR_PROMOTION"
+

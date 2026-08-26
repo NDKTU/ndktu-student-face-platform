@@ -27,6 +27,7 @@ type CredentialsForm = z.infer<typeof credentialsSchema>;
 
 const ProfilePage = () => {
     const { user } = useAuth();
+    const isStudent = Boolean(user?.student) || user?.roles?.some(role => role.name.toLowerCase() === 'student');
 
     const {
         register,
@@ -275,60 +276,62 @@ const ProfilePage = () => {
                 </CardContent>
             </Card>
 
-            {/* Change Credentials Form */}
-            <Card className="w-full">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <KeyRound className="h-5 w-5" />
-                        Kirish ma'lumotlarini o'zgartirish
-                    </CardTitle>
-                    <CardDescription>O'z login va parolingizni shu yerdan yangilashingiz mumkin.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-md">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Joriy parol <span className="text-destructive">*</span></label>
-                            <Input
-                                type="password"
-                                placeholder="Tasdiqlash uchun joriy parolingizni kiriting"
-                                {...register('current_password')}
-                            />
-                            {errors.current_password && (
-                                <p className="text-sm text-destructive">{errors.current_password.message}</p>
-                            )}
-                        </div>
+            {/* Change Credentials Form (Hidden for students) */}
+            {!isStudent && (
+                <Card className="w-full">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <KeyRound className="h-5 w-5" />
+                            Kirish ma'lumotlarini o'zgartirish
+                        </CardTitle>
+                        <CardDescription>O'z login va parolingizni shu yerdan yangilashingiz mumkin.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Joriy parol <span className="text-destructive">*</span></label>
+                                <Input
+                                    type="password"
+                                    placeholder="Tasdiqlash uchun joriy parolingizni kiriting"
+                                    {...register('current_password')}
+                                />
+                                {errors.current_password && (
+                                    <p className="text-sm text-destructive">{errors.current_password.message}</p>
+                                )}
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Yangi Login (Username)</label>
-                            <Input
-                                type="text"
-                                placeholder="Ixtiyoriy: Yangi login nomini kiriting"
-                                {...register('new_username')}
-                            />
-                            {errors.new_username && (
-                                <p className="text-sm text-destructive">{errors.new_username.message}</p>
-                            )}
-                        </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Yangi Login (Username)</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Ixtiyoriy: Yangi login nomini kiriting"
+                                    {...register('new_username')}
+                                />
+                                {errors.new_username && (
+                                    <p className="text-sm text-destructive">{errors.new_username.message}</p>
+                                )}
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Yangi Parol</label>
-                            <Input
-                                type="password"
-                                placeholder="Ixtiyoriy: Yangi parolni kiriting (min. 4 ta belgi)"
-                                {...register('new_password')}
-                            />
-                            {errors.new_password && (
-                                <p className="text-sm text-destructive">{errors.new_password.message}</p>
-                            )}
-                        </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Yangi Parol</label>
+                                <Input
+                                    type="password"
+                                    placeholder="Ixtiyoriy: Yangi parolni kiriting (min. 4 ta belgi)"
+                                    {...register('new_password')}
+                                />
+                                {errors.new_password && (
+                                    <p className="text-sm text-destructive">{errors.new_password.message}</p>
+                                )}
+                            </div>
 
-                        <Button type="submit" isLoading={isSubmitting} className="w-full sm:w-auto mt-2">
-                            <Save className="mr-2 h-4 w-4" />
-                            Saqlash
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                            <Button type="submit" isLoading={isSubmitting} className="w-full sm:w-auto mt-2">
+                                <Save className="mr-2 h-4 w-4" />
+                                Saqlash
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 };

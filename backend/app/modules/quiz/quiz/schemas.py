@@ -2,6 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
+from app.core.enums import QuizType
 from app.core.schemas import TashkentDatetime
 
 ProctoringMode = Literal["face", "standard"]
@@ -26,6 +27,7 @@ class QuizCreateRequest(BaseModel):
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
     proctoring_mode: ProctoringMode = "standard"
+    quiz_type: QuizType = QuizType.LESSON_QUIZ
 
     @field_validator("pin", mode="before")
     @classmethod
@@ -61,6 +63,7 @@ class QuizCreateResponse(BaseModel):
     pin: str
     is_active: bool
     proctoring_mode: ProctoringMode
+    quiz_type: QuizType
     attempt: Optional[int] = 1
     lecturer_id: Optional[int]
     created_by_user_id: Optional[int] = None
@@ -91,6 +94,7 @@ class QuizListRequest(BaseModel):
     faculty_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None
+    quiz_type: Optional[QuizType] = None
 
     page: int = 1
 

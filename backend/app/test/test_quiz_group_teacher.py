@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.modules.organization_structure.model import GroupTeacher
+from app.modules.organization_structure.model import TeacherGroup
 
 
 @pytest.mark.asyncio
@@ -10,7 +10,7 @@ async def test_create_quiz_does_not_create_group_teacher(
 ):
     """Создание теста не выдаёт создателю прав на группу.
 
-    Раньше `create_quiz` заводил связку GroupTeacher, если её не было. Под разделением
+    Раньше `create_quiz` заводил связку с группой, если её не было. Под разделением
     ролей это дыра: тест создаёт организатор, и он молча становился бы преподавателем
     группы — то есть получал бы доступ к её тестам и результатам. Права не должны
     появляться как побочный эффект действия.
@@ -18,7 +18,7 @@ async def test_create_quiz_does_not_create_group_teacher(
     user_id = test_user["id"]
     group_id = test_group["id"]
 
-    stmt = select(GroupTeacher).where(GroupTeacher.teacher_id == user_id, GroupTeacher.group_id == group_id)
+    stmt = select(TeacherGroup).where(TeacherGroup.group_id == group_id)
     assert (await async_db.execute(stmt)).scalar_one_or_none() is None
 
     await make_questions(subject_id=test_subject.id, user_id=user_id, count=2)
@@ -54,7 +54,7 @@ async def test_repeat_quiz_does_not_create_group_teacher(
     create_resp = await auth_client.post(
         "/quiz/",
         json={
-            "title": "Repeat No GroupTeacher",
+            "title": "Repeat No TeacherGroup",
             "question_number": 1,
             "duration": 30,
             "pin": "4321",
@@ -71,5 +71,5 @@ async def test_repeat_quiz_does_not_create_group_teacher(
     assert repeat_resp.status_code == 201
 
     async_db.expire_all()
-    stmt = select(GroupTeacher).where(GroupTeacher.teacher_id == user_id, GroupTeacher.group_id == group_id)
+    stmt = select(TeacherGroup).where(TeacherGroup.group_id == group_id)
     assert (await async_db.execute(stmt)).scalar_one_or_none() is None

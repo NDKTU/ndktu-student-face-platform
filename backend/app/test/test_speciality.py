@@ -95,3 +95,13 @@ async def test_delete_with_groups_requires_confirmation(auth_client, async_db, t
 
     await async_db.refresh(group)
     assert group.speciality_id is None
+
+
+@pytest.mark.asyncio
+async def test_speciality_accepts_doctorate(auth_client, test_kafedra):
+    response = await auth_client.post(
+        "/speciality/",
+        json={"name": "Sun'iy intellekt", "kafedra_id": test_kafedra["id"], "education_type": "Doktorantura"},
+    )
+    assert response.status_code == 201
+    assert response.json()["education_type"] == "Doktorantura"

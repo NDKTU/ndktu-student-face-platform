@@ -9,7 +9,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import Employee, Student, Teacher, User
+    from app.modules.auth.model import Student, Teacher
     from app.modules.quiz.model import Quiz, Result
 
 
@@ -79,26 +79,33 @@ class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     results: Mapped[list["Result"]] = relationship("Result", back_populates="group")
 
-    group_teachers: Mapped[list["GroupTeacher"]] = relationship(
-        "GroupTeacher", back_populates="group", cascade="all, delete-orphan"
+    teacher_groups: Mapped[list["TeacherGroup"]] = relationship(
+        "TeacherGroup", back_populates="group", cascade="all, delete-orphan"
     )
 
     def __str__(self):
         return self.name
 
 
-class GroupTeacher(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "group_teachers"
-    __table_args__ = (UniqueConstraint("group_id", "teacher_id", name="idx_unique_group_teacher"),)
+class TeacherGroup(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+    __tablename__ = "teacher_group"
+    __table_args__ = (
+        UniqueConstraint("teacher_id", "group_id", name="uq_teacher_group"),
+        external_ref_index("teacher_group"),
+    )
 
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    teacher_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
-    group: Mapped["Group"] = relationship("Group", back_populates="group_teachers")
-    teacher: Mapped["User"] = relationship("User", back_populates="group_teachers")
+    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="teacher_groups")
+    group: Mapped["Group"] = relationship("Group", back_populates="teacher_groups")
 
     def __str__(self):
-        return f"{self.group_id} - {self.teacher_id}"
+        return f"TeacherGroup teacher={self.teacher_id} group={self.group_id}"
 
 
 class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
@@ -121,20 +128,6 @@ class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     kafedra: Mapped["Kafedra"] = relationship("Kafedra", back_populates="specialities")
     groups: Mapped[list["Group"]] = relationship("Group", back_populates="speciality")
-
-    def __str__(self):
-        return self.name
-
-
-class Department(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
-    """Административный отдел. В EPOS этой сущности соответствует ``section``."""
-
-    __tablename__ = "departments"
-    __table_args__ = (external_ref_index("departments"),)
-
-    name: Mapped[str] = mapped_column(String(255), unique=True)
-
-    employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="department")
 
     def __str__(self):
         return self.name

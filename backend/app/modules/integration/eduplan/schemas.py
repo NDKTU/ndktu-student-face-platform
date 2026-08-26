@@ -17,11 +17,10 @@ class EduPlanEntity(str, Enum):
 
     faculty = "faculty"
     kafedra = "kafedra"
-    department = "department"
     speciality = "speciality"
     group = "group"
     subject = "subject"
-    employee = "employee"
+    teacher = "teacher"
 
 
 #: Порядок обхода. Ребёнок не может примениться раньше родителя: кафедра
@@ -29,11 +28,10 @@ class EduPlanEntity(str, Enum):
 SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.faculty,
     EduPlanEntity.kafedra,
-    EduPlanEntity.department,
     EduPlanEntity.speciality,
     EduPlanEntity.group,
     EduPlanEntity.subject,
-    EduPlanEntity.employee,
+    EduPlanEntity.teacher,
 )
 
 
@@ -57,13 +55,6 @@ class EduPlanDepartment(_Lenient):
     faculty_id: int
 
 
-class EduPlanSection(_Lenient):
-    """EduPlan section — наш административный отдел."""
-
-    id: int
-    name: str
-
-
 class EduPlanSpeciality(_Lenient):
     id: int
     name: str
@@ -84,7 +75,6 @@ class EduPlanSubject(_Lenient):
     id: int
     name: str
     department_id: int
-    credits: Optional[int] = None
 
 
 class EduPlanTeacherProfile(_Lenient):

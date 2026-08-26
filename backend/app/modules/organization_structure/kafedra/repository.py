@@ -1,6 +1,7 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -194,11 +195,12 @@ class KafedraRepository:
             (await session.execute(select(Teacher.id).where(Teacher.kafedra_id == kafedra_id))).scalars().all()
         )
         if teacher_ids:
-            from app.modules.organization_structure.model import GroupTeacher
-            from app.modules.quiz.model import SubjectTeacher
+            from app.modules.auth.model import TeacherSubject
+            from app.modules.organization_structure.model import TeacherGroup
 
-            await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
-            await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))
+            await ensure_no_lessons(session, "Bu kafedra o'qituvchilari", TeacherSubject.teacher_id.in_(teacher_ids))
+            await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id.in_(teacher_ids)))
+            await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id.in_(teacher_ids)))
             await session.execute(delete(Teacher).where(Teacher.id.in_(teacher_ids)))
 
         await session.delete(kafedra)
