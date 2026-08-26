@@ -41,18 +41,26 @@ class QuizRepository:
             return stmt.where(Quiz.group_id == group_id) if group_id else stmt.where(Quiz.id == -1)
         if is_teacher:
             group_ids = list(
-                (await session.execute(
-                    select(TeacherGroup.group_id)
-                    .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
-                    .where(Teacher.user_id == current_user.id)
-                )).scalars().all()
+                (
+                    await session.execute(
+                        select(TeacherGroup.group_id)
+                        .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                        .where(Teacher.user_id == current_user.id)
+                    )
+                )
+                .scalars()
+                .all()
             )
             subject_ids = list(
-                (await session.execute(
-                    select(TeacherSubject.subject_id)
-                    .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
-                    .where(Teacher.user_id == current_user.id)
-                )).scalars().all()
+                (
+                    await session.execute(
+                        select(TeacherSubject.subject_id)
+                        .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                        .where(Teacher.user_id == current_user.id)
+                    )
+                )
+                .scalars()
+                .all()
             )
             conditions = [Quiz.lecturer_id == current_user.id]
             if group_ids:
@@ -115,21 +123,27 @@ class QuizRepository:
             ).scalar() or 0
 
         latest_result_ids = list(
-            (await session.execute(
-                select(func.max(Result.id))
-                .where(Result.quiz_id == quiz_id)
-                .group_by(Result.user_id)
-            )).scalars().all()
+            (
+                await session.execute(
+                    select(func.max(Result.id)).where(Result.quiz_id == quiz_id).group_by(Result.user_id)
+                )
+            )
+            .scalars()
+            .all()
         )
         completed_results = []
         if latest_result_ids:
             completed_results = list(
-                (await session.execute(
-                    select(Result).where(
-                        Result.id.in_(latest_result_ids),
-                        Result.status == "completed",
+                (
+                    await session.execute(
+                        select(Result).where(
+                            Result.id.in_(latest_result_ids),
+                            Result.status == "completed",
+                        )
                     )
-                )).scalars().all()
+                )
+                .scalars()
+                .all()
             )
 
         grades = [result.grade for result in completed_results if result.grade is not None]
@@ -426,9 +440,7 @@ class QuizRepository:
         if request.subject_id:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
         if request.faculty_id:
-            count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(
-                Group.faculty_id == request.faculty_id
-            )
+            count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
         if request.is_active is not None:
             count_stmt = count_stmt.where(Quiz.is_active == request.is_active)
         if request.quiz_type:

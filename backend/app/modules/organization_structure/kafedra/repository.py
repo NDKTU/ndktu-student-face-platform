@@ -21,9 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class KafedraRepository:
-    async def get_kafedra_stats(
-        self, session: AsyncSession, faculty_id: int | None = None
-    ) -> KafedraStatsResponse:
+    async def get_kafedra_stats(self, session: AsyncSession, faculty_id: int | None = None) -> KafedraStatsResponse:
         """Return catalogue counters without downloading all related rows."""
         from app.modules.auth.model import Teacher
         from app.modules.organization_structure.model import Speciality

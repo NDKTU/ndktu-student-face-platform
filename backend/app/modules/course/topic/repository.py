@@ -45,12 +45,16 @@ class CourseTopicRepository:
         course = await get_course_repository.get_course_orm(session, course_id)
         await get_course_repository._ensure_view_access(session, course, current_user)
         topics = (
-            await session.execute(
-                select(CourseTopic)
-                .where(CourseTopic.course_id == course_id)
-                .order_by(CourseTopic.order_index, CourseTopic.id)
+            (
+                await session.execute(
+                    select(CourseTopic)
+                    .where(CourseTopic.course_id == course_id)
+                    .order_by(CourseTopic.order_index, CourseTopic.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return CourseTopicListResponse(topics=[await self._serialize(session, topic) for topic in topics])
 
     async def create_topic(

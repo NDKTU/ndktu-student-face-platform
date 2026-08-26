@@ -136,9 +136,7 @@ class CourseRepository:
         group_names: list[str] = []
         if group_ids:
             group_names = list(
-                (
-                    await session.execute(select(Group.name).where(Group.id.in_(group_ids)).order_by(Group.name))
-                )
+                (await session.execute(select(Group.name).where(Group.id.in_(group_ids)).order_by(Group.name)))
                 .scalars()
                 .all()
             )
@@ -257,8 +255,7 @@ class CourseRepository:
         )
 
         course = Course(
-            name=data.name
-            or await self._build_course_name(session, data.subject_id, group_ids, data.semester_number),
+            name=data.name or await self._build_course_name(session, data.subject_id, group_ids, data.semester_number),
             subject_id=data.subject_id,
             teacher_id=data.teacher_id,
             description=data.description,

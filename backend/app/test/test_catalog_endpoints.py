@@ -17,15 +17,11 @@ async def test_catalog_and_analytics_endpoints(
     )
     assert speciality_response.status_code == 201
 
-    kafedra_stats = await auth_client.get(
-        "/kafedra/stats", params={"faculty_id": test_faculty["id"]}
-    )
+    kafedra_stats = await auth_client.get("/kafedra/stats", params={"faculty_id": test_faculty["id"]})
     assert kafedra_stats.status_code == 200
     assert kafedra_stats.json()["stats"][0]["speciality_count"] == 1
 
-    speciality_stats = await auth_client.get(
-        "/speciality/stats", params={"kafedra_id": test_kafedra["id"]}
-    )
+    speciality_stats = await auth_client.get("/speciality/stats", params={"kafedra_id": test_kafedra["id"]})
     assert speciality_stats.status_code == 200
     assert speciality_stats.json()["stats"][0]["group_count"] == 0
 

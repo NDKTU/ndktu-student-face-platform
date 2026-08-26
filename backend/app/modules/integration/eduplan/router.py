@@ -13,6 +13,7 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.user.schemas import UserLoginRequest, UserLoginResponse
+
 from . import credentials
 from .auth_service import eduplan_auth_service
 from .client import EduPlanClient

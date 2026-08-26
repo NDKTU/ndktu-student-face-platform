@@ -33,9 +33,7 @@ async def test_ensure_role_creates_role_and_grants_user_me_without_lazy_load(asy
     await get_user_repository.ensure_role(async_db, user, "newrole")
 
     role = (
-        await async_db.execute(
-            select(Role).where(Role.name == "newrole").options(selectinload(Role.permissions))
-        )
+        await async_db.execute(select(Role).where(Role.name == "newrole").options(selectinload(Role.permissions)))
     ).scalar_one()
 
     assert role in user.roles

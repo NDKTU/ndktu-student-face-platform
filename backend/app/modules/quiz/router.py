@@ -192,9 +192,7 @@ async def get_question_catalog(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("read:question")),
 ):
-    return await get_question_repository.get_catalog(
-        session=session, current_user=current_user, search=search
-    )
+    return await get_question_repository.get_catalog(session=session, current_user=current_user, search=search)
 
 
 @question_router.get("/{question_id}", response_model=QuestionCreateResponse)

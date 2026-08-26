@@ -2,15 +2,13 @@ import logging
 from typing import Any
 
 import httpx
-import app.core.database.models_registry  # noqa: F401
-from app.core.config import settings
-from app.core.utils.password_hash import hash_password
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Role, Teacher, User
+import app.core.database.models_registry  # noqa: F401
+from app.core.utils.password_hash import hash_password
+from app.modules.auth.model import Teacher, User
 from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.service import auth_service

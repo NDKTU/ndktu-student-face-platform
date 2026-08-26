@@ -145,6 +145,7 @@ async def test_quiz_type_rejects_unknown_value(auth_client, test_subject, test_g
     response = await auth_client.post("/quiz/", json=payload)
     assert response.status_code == 422
 
+
 @pytest.mark.asyncio
 async def test_quiz_type_persists_on_create(auth_client, test_subject, test_group):
     """quiz_type присланный при создании должен реально попасть в БД, а не
@@ -201,4 +202,3 @@ async def test_quiz_type_persists_on_update(auth_client, test_subject, test_grou
 
     detail = await auth_client.get(f"/quiz/{quiz_id}")
     assert detail.json()["quiz_type"] == "YEAR_PROMOTION"
-

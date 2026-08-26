@@ -152,6 +152,7 @@ async def test_question_type_defaults_to_quiz(auth_client, test_subject):
     assert response.status_code == 200
     assert response.json()["question_type"] == "QUIZ"
 
+
 @pytest.mark.asyncio
 async def test_question_type_persists_on_create(auth_client, test_subject):
     """question_type присланный при создании должен реально попасть в БД, а
