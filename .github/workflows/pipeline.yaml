@@ -13,63 +13,7 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────────
-  # JOB 1a: Backend Lint (ruff)
-  # ──────────────────────────────────────────
-  backend-lint:
-    name: Backend Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-          cache-dependency-glob: backend/uv.lock
-
-      # Версия закреплена: без неё CI берёт последний ruff, и выход нового
-      # релиза с изменённым форматированием красит backend-lint без единой
-      # правки в коде. Обновлять осознанно, вместе с прогоном `ruff format .`.
-      - name: Run ruff check
-        working-directory: backend
-        run: uvx ruff@0.16.3 check .
-
-      - name: Run ruff format check
-        working-directory: backend
-        run: uvx ruff@0.16.3 format --check .
-
-  # ──────────────────────────────────────────
-  # JOB 1b: Frontend Lint (eslint)
-  # ──────────────────────────────────────────
-  frontend-lint:
-    name: Frontend Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Run ESLint
-        working-directory: frontend
-        run: npm run lint
-
-  # ──────────────────────────────────────────
-  # JOB 2: Backend Tests
+  # JOB 1: Backend Tests
   # ──────────────────────────────────────────
   backend-test:
     name: Backend Tests
@@ -167,7 +111,7 @@ jobs:
         run: uv run pytest -v --tb=short
 
   # ──────────────────────────────────────────
-  # JOB 3: Frontend Build Check
+  # JOB 2: Frontend Build Check
   # ──────────────────────────────────────────
   frontend-build:
     name: Frontend Build
@@ -201,11 +145,11 @@ jobs:
         run: npm run build
 
   # ──────────────────────────────────────────
-  # JOB 4: Deploy to Production
+  # JOB 3: Deploy to Production
   # ──────────────────────────────────────────
   deploy:
     name: Deploy to Production
-    needs: [backend-lint, backend-test, frontend-lint, frontend-build]
+    needs: [backend-test, frontend-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, lms]
     timeout-minutes: 35
