@@ -49,7 +49,13 @@ def upgrade() -> None:
             external_id     = e.external_id,
             external_source = e.external_source,
             synced_at       = e.synced_at,
-            is_active       = e.is_active
+            is_active       = e.is_active,
+            -- Ikkitasidan eng ertasi — "bu odam tizimimizda qachon
+            -- paydo bo'lgan" degan halol javob. `updated_at` esa
+            -- o'qituvchi qatoriniki bo'lib qoladi: u "bu qator oxirgi
+            -- marta qachon o'zgargan" degani, yozilayotgani esa aynan
+            -- o'qituvchi qatori.
+            created_at      = LEAST(t.created_at, e.created_at)
         FROM employees e
         WHERE t.employee_id = e.id
     """)

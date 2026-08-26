@@ -88,7 +88,10 @@ class TeacherUpdateRequest(BaseModel):
     last_name: str
     third_name: str
     image_url: Optional[str] = None
-    kafedra_id: Optional[int] = None
+    # Majburiy — birlashuvdan oldingi shartnomadagidek. Ixtiyoriy bo'lsa,
+    # `kafedra_id` siz yuborilgan so'rov o'qituvchini kafedrasidan jimgina
+    # ajratib qo'yardi.
+    kafedra_id: int
 
     @field_validator("first_name", "last_name", "third_name", mode="before")
     @classmethod

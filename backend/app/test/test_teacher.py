@@ -56,7 +56,13 @@ async def test_create_teacher_duplicate_username(auth_client):
 
 
 @pytest.mark.asyncio
-async def test_create_teacher_duplicate_full_name_leaves_no_orphan_user(auth_client):
+async def test_create_teacher_duplicate_full_name_is_rejected(auth_client):
+    """Bir xil `full_name` bilan ikkinchi o'qituvchi yaratilmaydi.
+
+    Diqqat: bu tekshiruv `create_user` gacha ishlaydi, ya'ni bu test
+    tranzaksiya chegarasi haqida hech nima isbotlamaydi — u faqat nom
+    bo'yicha rad etishni tekshiradi.
+    """
     payload = {
         "username": "teacher_name_a",
         "password": "password123",
@@ -71,11 +77,6 @@ async def test_create_teacher_duplicate_full_name_leaves_no_orphan_user(auth_cli
     second_payload = {**payload, "username": "teacher_name_b"}
     second = await auth_client.post("/teacher/", json=second_payload)
     assert second.status_code == 400
-
-    # Muvaffaqiyatsiz urinishdan yetim `User` qolmasligi kerak.
-    users_resp = await auth_client.get("/user/", params={"username": "teacher_name_b"})
-    assert users_resp.status_code == 200
-    assert users_resp.json()["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -126,6 +127,22 @@ async def test_update_teacher_changes_names_and_kafedra(auth_client, test_teache
     assert data["full_name"] == "Doe Johnny Smith"
     # Hisob o'zgarmaydi: `username`/`user_id` o'sha-o'sha.
     assert data["user_id"] == test_teacher["user_id"]
+
+
+@pytest.mark.asyncio
+async def test_update_teacher_requires_kafedra_id(auth_client, test_teacher):
+    """Regress: `kafedra_id` ixtiyoriy bo'lib qolgan edi, va uni yubormagan
+    `PUT /teacher/{id}` o'qituvchini kafedrasidan jimgina ajratib qo'yardi.
+    Birlashuvdan oldingi shartnomadagidek — majburiy, ya'ni 422."""
+    response = await auth_client.put(
+        f"/teacher/{test_teacher['id']}",
+        json={"first_name": "John", "last_name": "Doe", "third_name": "Smith"},
+    )
+    assert response.status_code == 422
+
+    # Kafedra tegilmagan holicha qoladi.
+    read_back = await auth_client.get(f"/teacher/{test_teacher['id']}")
+    assert read_back.json()["kafedra_id"] == test_teacher["kafedra_id"]
 
 
 @pytest.mark.asyncio

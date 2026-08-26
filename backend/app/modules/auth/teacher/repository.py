@@ -138,48 +138,20 @@ class TeacherRepository:
 
         return TeacherListResponse(total=total, page=request.page, limit=request.limit, teachers=teachers)
 
-    async def update_teacher(self, session: AsyncSession, teacher_id: int, data: TeacherUpdateRequest) -> Teacher:
-        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == teacher_id)
-        result = await session.execute(stmt)
-        teacher = result.scalar_one_or_none()
+    async def _apply_personal_fields(
+        self,
+        session: AsyncSession,
+        teacher: Teacher,
+        data: TeacherUpdateRequest | TeacherSelfUpdateRequest,
+    ) -> None:
+        """Ism qismlari va suratni yozadi, `full_name` ni qayta hisoblaydi va
+        bu nom boshqa o'qituvchida band emasligini tekshiradi.
 
-        if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
-
-        ensure_editable(teacher, "преподавателя")
-
-        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
-
-        if full_name != teacher.full_name:
-            existing = (
-                await session.execute(select(Teacher).where(Teacher.full_name == full_name, Teacher.id != teacher_id))
-            ).scalar_one_or_none()
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Teacher name already taken",
-                )
-
-        teacher.first_name = data.first_name
-        teacher.last_name = data.last_name
-        teacher.third_name = data.third_name
-        teacher.full_name = full_name
-        teacher.image_url = data.image_url
-        teacher.kafedra_id = data.kafedra_id
-
-        await session.commit()
-        await session.refresh(teacher)
-        return teacher
-
-    async def update_my_profile(self, session: AsyncSession, user_id: int, data: TeacherSelfUpdateRequest) -> Teacher:
-        """`PUT /teacher/me`: o'qituvchi faqat o'z ism-sharifi va suratini
-        o'zgartiradi. Kafedra, hemis_id va zerkal maydonlari bu yo'ldan
-        o'tmaydi — ular administrator va EduPlan sinxronizatsiyasi qo'lida.
+        Ikkala tahrirlash yo'li — administratorniki va o'qituvchining o'ziniki —
+        aynan shu maydonlar ustida bir xil ishlaydi. Ular faqat *qo'shimcha*
+        nima yozishi bilan farq qiladi, va bu farq chaqiruv joyida ko'rinib
+        turishi kerak, shuning uchun bu yerga kirmaydi.
         """
-        teacher = await self.get_teacher_by_user_id(session=session, user_id=user_id)
-
-        ensure_editable(teacher, "преподавателя")
-
         full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
 
         if full_name != teacher.full_name:
@@ -197,6 +169,38 @@ class TeacherRepository:
         teacher.third_name = data.third_name
         teacher.full_name = full_name
         teacher.image_url = data.image_url
+
+    async def update_teacher(self, session: AsyncSession, teacher_id: int, data: TeacherUpdateRequest) -> Teacher:
+        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == teacher_id)
+        result = await session.execute(stmt)
+        teacher = result.scalar_one_or_none()
+
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+        ensure_editable(teacher, "преподавателя")
+
+        await self._apply_personal_fields(session, teacher, data)
+        # Kafedrani faqat administrator yo'li o'zgartiradi.
+        teacher.kafedra_id = data.kafedra_id
+
+        await session.commit()
+        await session.refresh(teacher)
+        return teacher
+
+    async def update_my_profile(self, session: AsyncSession, user_id: int, data: TeacherSelfUpdateRequest) -> Teacher:
+        """`PUT /teacher/me`: o'qituvchi faqat o'z ism-sharifi va suratini
+        o'zgartiradi. Kafedra, hemis_id va zerkal maydonlari bu yo'ldan
+        o'tmaydi — ular administrator va EduPlan sinxronizatsiyasi qo'lida.
+        """
+        teacher = await self.get_teacher_by_user_id(session=session, user_id=user_id)
+
+        ensure_editable(teacher, "преподавателя")
+
+        # Kafedra bu yerda ataylab yozilmaydi: `TeacherSelfUpdateRequest` da
+        # bunday maydon yo'q, ya'ni o'qituvchi o'zini boshqa kafedraga
+        # ko'chira olmaydi.
+        await self._apply_personal_fields(session, teacher, data)
 
         await session.commit()
         await session.refresh(teacher)
