@@ -17,8 +17,13 @@ class HemisLoginResponse(BaseModel):
 
 class HemisPreviewResponse(BaseModel):
     hemis_data: dict
+    user_id: Optional[int] = None
     user_exists: bool
+    # Найденные в зеркале строки. Без них экран сопоставления не мог подставить
+    # то, что нашёл сервер: response_model отбрасывал поля, которых нет в схеме.
+    faculty_id: Optional[int] = None
     faculty_exists: bool
+    group_id: Optional[int] = None
     group_exists: bool
     existing_results: list[dict] = []
     suggested_group: str = "N/A"

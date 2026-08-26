@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
@@ -54,6 +54,14 @@ class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __table_args__ = (
         UniqueConstraint("faculty_id", "name", name="uq_groups_faculty_id_name"),
         external_ref_index("groups"),
+        # Частичный, а не обычный UNIQUE: у групп, до которых студент ещё не
+        # доходил, поле пустое, и таких строк в таблице сколько угодно.
+        Index(
+            "uq_groups_hemis_group_id",
+            "hemis_group_id",
+            unique=True,
+            postgresql_where=text("hemis_group_id IS NOT NULL"),
+        ),
     )
 
     faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"))
@@ -70,6 +78,12 @@ class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     course: Mapped[int | None] = mapped_column(Integer, nullable=True)
     education_shape: Mapped[str | None] = mapped_column(String(32), nullable=True)
     student_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Та же группа в студенческом HEMIS. external_id занят EPOS, поэтому нужен
+    # отдельный столбец. Заполняется при первом однозначном совпадении по имени
+    # и дальше служит единственным ключом привязки студента: названия групп в
+    # HEMIS и EPOS расходятся и переименовываются, идентификатор — нет.
+    hemis_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="groups")
     speciality: Mapped["Speciality | None"] = relationship("Speciality", back_populates="groups")

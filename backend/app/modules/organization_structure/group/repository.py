@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Group, TeacherGroup
@@ -53,7 +54,9 @@ class GroupRepository:
         return new_group
 
     async def get_group(self, session: AsyncSession, group_id: int) -> Group:
-        stmt = select(Group).where(Group.id == group_id)
+        # faculty подгружается сразу: у группы его спрашивают почти всегда, а
+        # ленивая загрузка в асинхронной сессии обернулась бы MissingGreenlet.
+        stmt = select(Group).options(selectinload(Group.faculty)).where(Group.id == group_id)
         result = await session.execute(stmt)
         group = result.scalar_one_or_none()
 
@@ -260,43 +263,74 @@ class GroupRepository:
         совпадениям. Сортировка выводит точные совпадения вперёд, чтобы
         ``.first()`` не выбрал случайное частичное.
         """
+        # lower(), а не сравнение как есть: EPOS отдаёт «33a-25 KEM», а clean и
+        # normalized приведены к нижнему регистру, и точная ветка никогда бы не
+        # срабатывала — оставалась бы только подстрока, дающая лишние совпадения.
+        lowered = func.lower(Group.name)
         return (
             select(Group)
             .where(
                 or_(
-                    Group.name == normalized,
-                    Group.name == clean,
-                    Group.name.ilike(f"%{clean.replace(' ', '')}%"),
+                    lowered == normalized,
+                    lowered == clean,
+                    lowered.like(f"%{clean.replace(' ', '')}%"),
                 )
             )
             .order_by(
-                case((Group.name == normalized, 0), (Group.name == clean, 1), else_=2),
+                case((lowered == normalized, 0), (lowered == clean, 1), else_=2),
                 Group.id,
             )
         )
 
-    async def get_or_create(self, session: AsyncSession, name: str, faculty_id: int) -> Group:
-        clean, normalized = self._normalize_name(name)
-        # .first(), а не .scalar_one_or_none(): при неуникальных именах
-        # последний бросал бы MultipleResultsFound прямо на входе студента.
-        obj = (await session.execute(self._fuzzy_match_stmt(clean, normalized))).scalars().first()
-        if not obj:
-            try:
-                obj = Group(name=normalized, faculty_id=faculty_id)
-                session.add(obj)
-                await session.flush()
-                await session.refresh(obj)
-            except IntegrityError:
-                await session.rollback()
-                obj = (
-                    await session.execute(
-                        select(Group).where(
-                            Group.name == normalized,
-                            Group.faculty_id == faculty_id,
-                        )
-                    )
-                ).scalar_one()
-        return obj
+    async def find_by_hemis_id(self, session: AsyncSession, hemis_group_id: str) -> Group | None:
+        stmt = (
+            select(Group)
+            .options(selectinload(Group.faculty))
+            .where(Group.hemis_group_id == hemis_group_id)
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def resolve_for_hemis(
+        self,
+        session: AsyncSession,
+        hemis_group_id: str | None,
+        name: str,
+        remember: bool = True,
+    ) -> Group | None:
+        """Группа студента по данным Hemis. Ничего не создаёт.
+
+        Оргструктура — зеркало EPOS, поэтому группы здесь только находят.
+        Сначала по ``hemis_group_id``: это точный ключ, переживающий любое
+        переименование. Пока он не проставлен — разовый мост по имени, и при
+        однозначном совпадении идентификатор запоминается, чтобы следующий вход
+        уже не зависел от названия.
+
+        Неоднозначное совпадение не разрешается вслепую: привязка не к той
+        группе увела бы студента в чужие тесты, а результаты — в чужую
+        статистику. Такой случай остаётся администратору.
+        """
+        if hemis_group_id:
+            group = await self.find_by_hemis_id(session, hemis_group_id)
+            if group:
+                return group
+
+        candidates = await self.find_candidates_by_name(session, name)
+        if len(candidates) != 1:
+            if candidates:
+                logger.warning(
+                    "Группа Hemis %r (id=%s): несколько кандидатов %s — привязка оставлена администратору",
+                    name,
+                    hemis_group_id,
+                    [c.name for c in candidates],
+                )
+            return None
+
+        group = candidates[0]
+        if remember and hemis_group_id and group.hemis_group_id is None:
+            group.hemis_group_id = hemis_group_id
+            await session.flush()
+            logger.info("Группа %s (id=%s) связана с Hemis id=%s", group.name, group.id, hemis_group_id)
+        return group
 
     async def find_id_by_name_fuzzy(self, session: AsyncSession, name: str) -> tuple[int | None, str]:
         clean, normalized = self._normalize_name(name)
@@ -313,7 +347,8 @@ class GroupRepository:
         группу вслепую.
         """
         clean, normalized = self._normalize_name(name)
-        return list((await session.execute(self._fuzzy_match_stmt(clean, normalized))).scalars().all())
+        stmt = self._fuzzy_match_stmt(clean, normalized).options(selectinload(Group.faculty))
+        return list((await session.execute(stmt)).scalars().all())
 
 
 get_group_repository = GroupRepository()

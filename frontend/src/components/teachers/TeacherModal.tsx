@@ -2,12 +2,11 @@ import { toast } from 'sonner';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'react-router-dom';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
+import { Input } from '@/components/ui/Input';
 import { useKafedras } from '@/hooks/useReferenceData';
-import { useEmployees } from '@/hooks/useEmployees';
 import { useCreateTeacher, useUpdateTeacher } from '@/hooks/useTeachers';
 import { useAuth } from '@/context/AuthContext';
 import type { Teacher } from '@/services/teacherService';
@@ -28,33 +27,35 @@ interface TeacherModalProps {
 export const TeacherModal = ({ isOpen, onClose, teacher, onSuccess }: TeacherModalProps) => {
     const { hasPermission } = useAuth();
     const { data: kafedrasData } = useKafedras(1, 100, undefined, undefined, hasPermission('read:kafedra'));
-    const { data: employeesData } = useEmployees(1, 100);
     const kafedras = kafedrasData?.kafedras || [];
-    const employees = employeesData?.employees || [];
 
     const createForm = useForm<TeacherCreateFormValues>({
         resolver: zodResolver(teacherCreateSchema),
-        defaultValues: { employee_id: 0, kafedra_id: 0 },
+        defaultValues: { username: '', password: '', first_name: '', last_name: '', third_name: '', kafedra_id: null },
     });
 
     const updateForm = useForm<TeacherUpdateFormValues>({
         resolver: zodResolver(teacherUpdateSchema),
-        defaultValues: { kafedra_id: 0 },
+        defaultValues: { first_name: '', last_name: '', third_name: '', kafedra_id: null },
     });
 
     const createMutation = useCreateTeacher();
     const updateMutation = useUpdateTeacher();
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-    const selectedEmployeeIdCreate = createForm.watch('employee_id');
     const selectedKafedraIdCreate = createForm.watch('kafedra_id');
     const selectedKafedraIdUpdate = updateForm.watch('kafedra_id');
 
     useEffect(() => {
         if (teacher) {
-            updateForm.reset({ kafedra_id: teacher.kafedra_id });
+            updateForm.reset({
+                first_name: teacher.first_name,
+                last_name: teacher.last_name,
+                third_name: teacher.third_name,
+                kafedra_id: teacher.kafedra_id,
+            });
         } else {
-            createForm.reset({ employee_id: 0, kafedra_id: 0 });
+            createForm.reset({ username: '', password: '', first_name: '', last_name: '', third_name: '', kafedra_id: null });
         }
     }, [teacher, isOpen]);
 
@@ -76,31 +77,49 @@ export const TeacherModal = ({ isOpen, onClose, teacher, onSuccess }: TeacherMod
         return (
             <Modal isOpen={isOpen} onClose={onClose} title="O'qituvchi yaratish">
                 <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Xodim</label>
-                        <Combobox
-                            options={employees.map(e => ({ value: e.id.toString(), label: e.full_name }))}
-                            value={selectedEmployeeIdCreate ? selectedEmployeeIdCreate.toString() : ""}
-                            onChange={(val) => createForm.setValue('employee_id', val ? Number(val) : 0)}
-                            placeholder="Xodimni tanlang..."
-                            searchPlaceholder="Xodimni qidirish..."
-                        />
-                        {createForm.formState.errors.employee_id && (
-                            <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.employee_id.message}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                            Kerakli xodim topilmadimi?{' '}
-                            <Link to="/employees" className="underline">
-                                Avval xodim yarating
-                            </Link>
-                        </p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Login</label>
+                            <Input {...createForm.register('username')} placeholder="Login" />
+                            {createForm.formState.errors.username && (
+                                <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.username.message}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Parol</label>
+                            <Input type="password" {...createForm.register('password')} placeholder="Parol" />
+                            {createForm.formState.errors.password && (
+                                <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.password.message}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Familiya</label>
+                            <Input {...createForm.register('last_name')} placeholder="Familiya" />
+                            {createForm.formState.errors.last_name && (
+                                <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.last_name.message}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Ism</label>
+                            <Input {...createForm.register('first_name')} placeholder="Ism" />
+                            {createForm.formState.errors.first_name && (
+                                <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.first_name.message}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                            <label className="text-sm font-medium text-foreground">Otasining ismi</label>
+                            <Input {...createForm.register('third_name')} placeholder="Otasining ismi" />
+                            {createForm.formState.errors.third_name && (
+                                <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.third_name.message}</p>
+                            )}
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Kafedra</label>
                         <Combobox
                             options={kafedras.map(k => ({ value: k.id.toString(), label: k.name }))}
                             value={selectedKafedraIdCreate ? selectedKafedraIdCreate.toString() : ""}
-                            onChange={(val) => createForm.setValue('kafedra_id', val ? Number(val) : 0)}
+                            onChange={(val) => createForm.setValue('kafedra_id', val ? Number(val) : null)}
                             placeholder="Kafedrani tanlang..."
                             searchPlaceholder="Kafedrani qidirish..."
                         />
@@ -120,12 +139,26 @@ export const TeacherModal = ({ isOpen, onClose, teacher, onSuccess }: TeacherMod
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="O'qituvchini tahrirlash">
             <form onSubmit={updateForm.handleSubmit(onUpdateSubmit)} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Familiya</label>
+                        <Input {...updateForm.register('last_name')} placeholder="Familiya" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Ism</label>
+                        <Input {...updateForm.register('first_name')} placeholder="Ism" />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                        <label className="text-sm font-medium text-foreground">Otasining ismi</label>
+                        <Input {...updateForm.register('third_name')} placeholder="Otasining ismi" />
+                    </div>
+                </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Kafedra</label>
                     <Combobox
                         options={kafedras.map(k => ({ value: k.id.toString(), label: k.name }))}
                         value={selectedKafedraIdUpdate ? selectedKafedraIdUpdate.toString() : ""}
-                        onChange={(val) => updateForm.setValue('kafedra_id', val ? Number(val) : 0)}
+                        onChange={(val) => updateForm.setValue('kafedra_id', val ? Number(val) : null)}
                         placeholder="Kafedrani tanlang..."
                         searchPlaceholder="Kafedrani qidirish..."
                     />

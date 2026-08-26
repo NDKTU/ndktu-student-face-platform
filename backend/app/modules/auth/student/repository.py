@@ -228,7 +228,7 @@ class StudentRepository:
         self,
         session: AsyncSession,
         user_id: int,
-        group_id: int,
+        group_id: int | None,
         faculty_name: str,
         me_data: dict,
     ) -> Student:

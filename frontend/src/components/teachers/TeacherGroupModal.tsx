@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Search } from 'lucide-react';
 import { useGroups } from '@/hooks/useGroups';
-import { useAssignGroups } from '@/hooks/useTeachers';
+import { useAssignGroups, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import { useAuth } from '@/context/AuthContext';
 import type { Teacher } from '@/services/teacherService';
 
@@ -36,25 +36,31 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
         hasPermission('read:group'),
     );
     const assignGroupsMutation = useAssignGroups();
+    // Biriktirilgan guruhlar ro'yxat javobida yo'q — alohida so'rov bilan olinadi.
+    const { data: assigned } = useTeacherAssignedGroups(isOpen ? teacher?.user_id : undefined);
     const groups = groupsData?.groups || [];
 
     const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
 
     useEffect(() => {
         if (teacher && isOpen) {
-            setSelectedGroupIds(teacher.employee?.user?.group_teachers?.map((g: any) => g.group_id) || []);
             setSearchQuery('');
             setDebouncedSearch('');
         }
     }, [teacher, isOpen]);
+
+    useEffect(() => {
+        setSelectedGroupIds(assigned?.group_teachers?.map(g => g.group_id) ?? []);
+    }, [assigned]);
 
     const handleToggleGroup = (id: number) => {
         setSelectedGroupIds(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
     };
 
     const handleSave = () => {
-        if (!teacher || !teacher.employee?.user) return;
-        assignGroupsMutation.mutate({ user_id: teacher.employee.user.id, group_ids: selectedGroupIds }, {
+        if (!teacher) return;
+        // `teachers.id`, `users.id` emas: biriktirma o'qituvchi kartochkasiga bog'lanadi.
+        assignGroupsMutation.mutate({ teacher_id: teacher.id, group_ids: selectedGroupIds }, {
             onSuccess: () => {
                 toast.success('Guruhlar biriktirildi');
                 onClose();
@@ -64,7 +70,7 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.employee?.full_name} ga guruhlarni biriktirish`}>
+        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.full_name} ga guruhlarni biriktirish`}>
             <div className="space-y-4">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

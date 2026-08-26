@@ -64,7 +64,7 @@ export const CourseFilters = ({
                             <div className="flex flex-col gap-2 min-w-[200px] flex-1">
                                 <label className="text-sm font-medium">O'qituvchi bo'yicha filtri</label>
                                 <Combobox
-                                    options={teachers.map(t => ({ value: (t.employee?.user_id ?? '').toString(), label: t.employee?.full_name ?? '' }))}
+                                    options={teachers.map(t => ({ value: (t?.user_id ?? '').toString(), label: t?.full_name ?? '' }))}
                                     value={filterTeacherId?.toString()}
                                     onChange={(val) => onTeacherChange(val ? parseInt(val) : undefined)}
                                     placeholder="Barcha o'qituvchilar"

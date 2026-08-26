@@ -27,7 +27,7 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                 </Button>
                 <div>
                     <h1 className="page-title capitalize">
-                        {teacher.employee?.full_name || `O'qituvchi #${teacher.id}`}
+                        {teacher?.full_name || `O'qituvchi #${teacher.id}`}
                     </h1>
                 </div>
             </div>
@@ -40,23 +40,23 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-2">
                             <span className="font-semibold text-muted-foreground">F.I.SH:</span>
-                            <span>{teacher.employee?.full_name || '-'}</span>
+                            <span>{teacher?.full_name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <span className="font-semibold text-muted-foreground">Ism:</span>
-                            <span>{teacher.employee?.first_name || '-'}</span>
+                            <span>{teacher?.first_name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <span className="font-semibold text-muted-foreground">Familiya:</span>
-                            <span>{teacher.employee?.last_name || '-'}</span>
+                            <span>{teacher?.last_name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <span className="font-semibold text-muted-foreground">Otasining ismi:</span>
-                            <span>{teacher.employee?.third_name || '-'}</span>
+                            <span>{teacher?.third_name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <span className="font-semibold text-muted-foreground">Foydalanuvchi:</span>
-                            <span>{teacher.employee?.user?.username || '-'}</span>
+                            <span>{teacher.user?.username || '-'}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -84,9 +84,9 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                         <CardTitle>Biriktirilgan fanlar</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {teacher.subject_teachers && teacher.subject_teachers.length > 0 ? (
+                        {teacher.teacher_subjects && teacher.teacher_subjects.length > 0 ? (
                             <div className="grid grid-cols-1 gap-2">
-                                {teacher.subject_teachers.map(st => (
+                                {teacher.teacher_subjects.map(st => (
                                     <div
                                         key={st.subject_id}
                                         className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer group transition-colors"
@@ -111,9 +111,9 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                         <CardTitle>Biriktirilgan guruhlar</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {teacher.employee?.user?.group_teachers && teacher.employee.user.group_teachers.length > 0 ? (
+                        {teacher.teacher_groups && teacher.teacher_groups.length > 0 ? (
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                {teacher.employee.user.group_teachers.map(gt => (
+                                {teacher.teacher_groups.map(gt => (
                                     <li key={gt.group_id}>{gt.group?.name || `ID: ${gt.group_id}`}</li>
                                 ))}
                             </ul>

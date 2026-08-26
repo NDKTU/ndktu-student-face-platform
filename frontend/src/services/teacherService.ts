@@ -1,43 +1,56 @@
 import api from './api';
 
-export interface TeacherEmployeeInfo {
+export interface TeacherUserInfo {
+    id: number;
+    username: string;
+    roles?: { id: number; name: string }[];
+}
+
+/** `employee` kartochkasi `teacher` bilan birlashtirilgan: maydonlar endi
+ *  javobning o'zida yotadi, ichma-ich `employee` obyekti yo'q. */
+export interface Teacher {
     id: number;
     user_id: number;
+    kafedra_id: number | null;
     first_name: string;
     last_name: string;
     third_name: string;
     full_name: string;
-    phone_number: string | null;
     image_url: string | null;
-    user?: {
-        id: number;
-        username: string;
-        group_teachers?: { group_id: number; group: { id: number; name: string } }[];
-    };
-}
-
-export interface Teacher {
-    id: number;
-    employee_id: number;
-    kafedra_id: number;
+    hemis_id: string | null;
+    external_id?: string | null;
+    external_source?: string | null;
+    synced_at?: string | null;
+    is_active?: boolean;
     kafedra?: {
         id: number;
         name: string;
         faculty_id?: number;
     };
-    employee?: TeacherEmployeeInfo;
-    subject_teachers?: { subject_id: number; subject: { id: number; name: string } }[];
+    user?: TeacherUserInfo;
+    teacher_groups?: { group_id: number; group: { id: number; name: string } }[];
+    teacher_subjects?: { id: number; subject_id: number; subject: { id: number; name: string } }[];
     created_at: string;
     updated_at: string;
 }
 
 export interface TeacherCreateRequest {
-    kafedra_id: number;
-    employee_id: number;
+    username: string;
+    password: string;
+    first_name: string;
+    last_name: string;
+    third_name: string;
+    image_url?: string | null;
+    kafedra_id?: number | null;
+    roles?: { id: number }[];
 }
 
 export interface TeacherUpdateRequest {
-    kafedra_id: number;
+    first_name?: string;
+    last_name?: string;
+    third_name?: string;
+    image_url?: string | null;
+    kafedra_id?: number | null;
 }
 
 export interface TeacherListResponse {
@@ -85,8 +98,8 @@ export const teacherService = {
         await api.delete(url);
     },
 
-    assignGroups: async (user_id: number, group_ids: number[]) => {
-        const response = await api.post('/teacher/assign_groups', { user_id, group_ids });
+    assignGroups: async (teacher_id: number, group_ids: number[]) => {
+        const response = await api.post('/teacher/assign_groups', { teacher_id, group_ids });
         return response.data;
     },
 

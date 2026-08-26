@@ -35,7 +35,7 @@ export const TeacherSubjectModal = ({ isOpen, onClose, teacher }: TeacherSubject
 
     useEffect(() => {
         if (teacher && isOpen) {
-            setSelectedSubjectIds(teacher.subject_teachers?.map(s => s.subject_id) || []);
+            setSelectedSubjectIds(teacher.teacher_subjects?.map(s => s.subject_id) || []);
             setSearchQuery('');
             setDebouncedSearch('');
         }
@@ -57,7 +57,7 @@ export const TeacherSubjectModal = ({ isOpen, onClose, teacher }: TeacherSubject
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.employee?.full_name} ga fanlarni biriktirish`}>
+        <Modal isOpen={isOpen} onClose={onClose} title={`${teacher?.full_name} ga fanlarni biriktirish`}>
             <div className="space-y-4">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

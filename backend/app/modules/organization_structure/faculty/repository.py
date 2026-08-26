@@ -242,19 +242,5 @@ class FacultyRepository:
             ]
         )
 
-    async def get_or_create(self, session: AsyncSession, name: str) -> Faculty:
-        stmt = select(Faculty).where(Faculty.name == name)
-        obj = (await session.execute(stmt)).scalar_one_or_none()
-        if not obj:
-            obj = Faculty(name=name)
-            session.add(obj)
-            await session.flush()
-            await session.refresh(obj)
-        return obj
-
-    async def find_id_by_name(self, session: AsyncSession, name: str) -> int | None:
-        stmt = select(Faculty.id).where(Faculty.name == name)
-        return (await session.execute(stmt)).scalar_one_or_none()
-
 
 get_faculty_repository = FacultyRepository()

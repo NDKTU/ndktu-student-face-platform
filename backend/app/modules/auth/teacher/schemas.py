@@ -138,6 +138,12 @@ class TeacherCreateResponse(ExternalRefFields):
     kafedra: Optional[TeacherKafedraInfo] = None
     user: Optional[TeacherUserInfo] = None
 
+    # Repozitoriy bu bog'lanishlarni allaqachon eager yuklaydi, lekin ular
+    # sxemada bo'lmagani uchun javobdan tushib qolar edi — natijada darslar
+    # sahifasi va biriktirish oynalari bo'sh ro'yxat ko'rsatardi.
+    teacher_groups: list[TeacherGroupLinkInfo] = []
+    teacher_subjects: list[TeacherSubjectLinkInfo] = []
+
     model_config = ConfigDict(
         from_attributes=True,
     )

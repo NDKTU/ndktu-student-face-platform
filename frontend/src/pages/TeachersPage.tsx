@@ -152,7 +152,7 @@ const TeachersPage = () => {
             className: 'font-medium',
             cell: (teacher) => (
                 <div>
-                    <div className="capitalize">{teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}</div>
+                    <div className="capitalize">{teacher?.full_name || teacher.user?.username || 'Noma\'lum'}</div>
                     {teacher.kafedra && (
                         <div className="text-xs text-muted-foreground capitalize">
                             {teacher.kafedra?.name}
@@ -165,7 +165,7 @@ const TeachersPage = () => {
             key: 'username',
             header: 'Foydalanuvchi',
             hideBelow: 'md',
-            cell: (teacher) => teacher.employee?.user?.username || '-',
+            cell: (teacher) => teacher.user?.username || '-',
         },
         {
             key: 'created_at',
@@ -229,13 +229,13 @@ const TeachersPage = () => {
                             <div className="rounded-xl border border-border bg-card p-4">
                                 <div className="min-w-0">
                                     <p className="font-medium capitalize text-foreground">
-                                        {teacher.employee?.full_name || teacher.employee?.user?.username || 'Noma\'lum'}
+                                        {teacher?.full_name || teacher.user?.username || 'Noma\'lum'}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground capitalize">
                                         {teacher.kafedra?.name || '—'}
                                     </p>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
-                                        {teacher.employee?.user?.username || '-'} · {new Date(teacher.created_at).toLocaleDateString()}
+                                        {teacher.user?.username || '-'} · {new Date(teacher.created_at).toLocaleDateString()}
                                     </p>
                                 </div>
                                 <div className="mt-3 border-t border-border pt-3">
@@ -275,7 +275,7 @@ const TeachersPage = () => {
                             </ul>
                             <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
                         </div>
-                    ) : `Siz haqiqatan ham "${teacherToDelete?.employee?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
+                    ) : `Siz haqiqatan ham "${teacherToDelete?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"

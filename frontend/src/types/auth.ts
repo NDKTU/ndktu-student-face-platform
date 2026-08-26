@@ -8,6 +8,18 @@ export interface EmployeeTeacherInfo {
     kafedra: Kafedra | null;
 }
 
+/** `/user/me` javobidagi o'qituvchi kartochkasi: `employee` bilan birlashtirilgan,
+ *  shuning uchun ism maydonlari to'g'ridan-to'g'ri shu yerda. */
+export interface UserTeacher {
+    id: number;
+    first_name: string;
+    last_name: string;
+    third_name: string;
+    full_name: string;
+    image_url: string | null;
+    kafedra: Kafedra | null;
+}
+
 export interface Employee {
     id: number;
     first_name: string;
@@ -64,7 +76,7 @@ export interface User {
     username: string;
     is_active: boolean;
     roles: UserRole[];
-    employee?: Employee;
+    teacher?: UserTeacher | null;
     student?: Student;
     created_at: string;
     updated_at: string;

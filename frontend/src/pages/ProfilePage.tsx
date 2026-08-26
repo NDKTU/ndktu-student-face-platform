@@ -83,8 +83,8 @@ const ProfilePage = () => {
                         </div>
                         <div className="space-y-2">
                              <h2 className="text-xl font-bold break-words">
-                                {user.employee
-                                    ? `${user.employee.last_name} ${user.employee.first_name}`
+                                {user.teacher
+                                    ? `${user.teacher.last_name} ${user.teacher.first_name}`
                                     : user.student
                                         ? `${user.student.last_name} ${user.student.first_name}`
                                         : user.username
@@ -111,16 +111,16 @@ const ProfilePage = () => {
                             </div>
                             
                              {/* Employee Specific Details */}
-                            {user.employee && (
+                            {user.teacher && (
                                 <>
-                                    {user.employee.teacher && (
+                                    {user.teacher && (
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                                                 <Calendar className="h-3.5 w-3.5" />
                                                 Kafedra
                                             </label>
                                             <div className="text-base font-semibold">
-                                               {user.employee.teacher.kafedra?.name || 'Mavjud emas'}
+                                               {user.teacher.kafedra?.name || 'Mavjud emas'}
                                             </div>
                                         </div>
                                     )}
@@ -130,7 +130,7 @@ const ProfilePage = () => {
                                             F.I.O
                                         </label>
                                         <div className="text-base font-semibold">
-                                           {user.employee.last_name} {user.employee.first_name} {user.employee.third_name}
+                                           {user.teacher.last_name} {user.teacher.first_name} {user.teacher.third_name}
                                         </div>
                                     </div>
                                 </>

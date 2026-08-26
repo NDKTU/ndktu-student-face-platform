@@ -53,8 +53,8 @@ export const useDeleteTeacher = () => {
 export const useAssignGroups = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ user_id, group_ids }: { user_id: number; group_ids: number[] }) =>
-            teacherService.assignGroups(user_id, group_ids),
+        mutationFn: ({ teacher_id, group_ids }: { teacher_id: number; group_ids: number[] }) =>
+            teacherService.assignGroups(teacher_id, group_ids),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teachers'] });
         },

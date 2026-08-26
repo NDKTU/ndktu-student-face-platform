@@ -54,9 +54,9 @@ export default function LessonsPage() {
             }));
         }
         return (teachersData?.teachers ?? []).flatMap(t =>
-            (t.subject_teachers ?? []).map((st: any) => ({
+            (t.teacher_subjects ?? []).map(st => ({
                 value: st.id.toString(),
-                label: `${t.employee?.full_name ?? ''} / ${st.subject?.name ?? '?'}`,
+                label: `${t.full_name ?? ''} / ${st.subject?.name ?? '?'}`,
             }))
         );
     }, [isTeacher, isAdmin, teachersData, assignedSubjectsData]);

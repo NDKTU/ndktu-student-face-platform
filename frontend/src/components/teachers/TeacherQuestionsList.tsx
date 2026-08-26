@@ -54,7 +54,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
         pageSize,
         debouncedSearch,
         subject.id,
-        teacher.employee!.user_id,
+        teacher.user_id,
     );
 
     const deleteQuestionMutation = useDeleteQuestion();
@@ -99,7 +99,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
     const handleConfirmBulkDelete = () => {
         bulkDeleteMutation.mutate({
             subject_id: subject.id,
-            user_id: teacher.employee!.user_id,
+            user_id: teacher.user_id,
         }, {
             onSuccess: (data: any) => {
                 toast.success(`${data.deleted_count} ta savol o'chirildi`);
@@ -125,7 +125,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                     </Button>
                     <div>
                         <h1 className="page-title">
-                            {teacher.employee!.full_name} — {subject.name}
+                            {teacher.full_name} — {subject.name}
                         </h1>
                         <p className="page-description mt-0.5">Savollar ro'yxati</p>
                     </div>
@@ -142,7 +142,7 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                     </div>
                     <Button
                         variant="outline"
-                        onClick={() => downloadExcelMutation.mutate({ subject_id: subject.id, user_id: teacher.employee!.user_id })}
+                        onClick={() => downloadExcelMutation.mutate({ subject_id: subject.id, user_id: teacher.user_id })}
                         disabled={downloadExcelMutation.isPending}
                     >
                         {downloadExcelMutation.isPending ? (

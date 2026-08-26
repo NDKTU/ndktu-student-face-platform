@@ -192,11 +192,19 @@ class HemisLoginService:
         if user_id:
             existing_results_list = await get_result_repository.get_recent_by_user(session, user_id, limit=10)
 
-        faculty_name = self._extract_name(me_data.get("faculty")) or "Unknown"
-        faculty_id = await get_faculty_repository.find_id_by_name(session, faculty_name)
-
         group_name = self._extract_name(me_data.get("group")) or "Unknown"
-        group_id, suggested_group = await get_group_repository.find_id_by_name_fuzzy(session, group_name)
+        group = await get_group_repository.resolve_for_hemis(
+            session,
+            self._extract_id(me_data.get("group")),
+            group_name,
+            remember=False,
+        )
+        group_id = group.id if group else None
+        suggested_group = group_name
+
+        # Факультет не ищется по имени: он определяется группой, ровно как при
+        # сохранении. Нет группы — админу нечего подставлять, выбирает вручную.
+        faculty_id = group.faculty_id if group else None
 
         return {
             "hemis_data": me_data,
@@ -238,26 +246,33 @@ class HemisLoginService:
         faculty_id: int | None = None,
         group_id: int | None = None,
     ):
-        # Faculty
-        if faculty_id:
-            faculty = await get_faculty_repository.get_faculty(session, faculty_id)
-        else:
-            faculty_name = self._extract_name(me_data.get("faculty")) or "Unknown"
-            faculty = await get_faculty_repository.get_or_create(session, faculty_name)
-
-        # Group
+        # Группа. Оргструктура — зеркало EPOS, и Hemis в ней ничего не заводит:
+        # группа либо уже есть, либо студент остаётся непривязанным.
         if group_id:
             group = await get_group_repository.get_group(session, group_id)
         else:
-            group_name = self._extract_name(me_data.get("group")) or "Unknown"
-            group = await get_group_repository.get_or_create(session, group_name, faculty.id)
+            group = await self._resolve_group(session, me_data)
+
+        # Факультет берётся у группы, а не из Hemis. Написание названий в двух
+        # системах расходится («Konchilik» против «konchilik»), и поиск по имени
+        # раз за разом заводил бы факультет-двойник мимо зеркала.
+        faculty_name = self._faculty_name(me_data, group)
+        if group is None and faculty_id:
+            faculty = await get_faculty_repository.get_faculty(session, faculty_id)
+            faculty_name = faculty.name
 
         # User — repo hashes internally and stores both hash + plaintext
         user = await get_user_repository.get_or_create_for_hemis(session, username, password)
         await get_user_repository.ensure_role(session, user, "student")
 
         # Student
-        await student_repository.upsert_for_hemis(session, user.id, group.id, faculty.name, me_data)
+        await student_repository.upsert_for_hemis(
+            session,
+            user.id,
+            group.id if group else None,
+            faculty_name,
+            me_data,
+        )
 
         await session.commit()
         await session.refresh(user)
@@ -272,6 +287,42 @@ class HemisLoginService:
         if isinstance(data, str):
             return data
         return ""
+
+    @staticmethod
+    def _extract_id(data) -> str | None:
+        """Идентификатор справочника Hemis. Строкой — как hemis_id у преподавателя."""
+        if isinstance(data, dict):
+            value = data.get("id")
+            if value is not None and str(value).strip():
+                return str(value)
+        return None
+
+    async def _resolve_group(self, session: AsyncSession, me_data: dict):
+        """Ищет группу студента, не создавая её."""
+        group_name = self._extract_name(me_data.get("group")) or "Unknown"
+        group = await get_group_repository.resolve_for_hemis(
+            session,
+            self._extract_id(me_data.get("group")),
+            group_name,
+        )
+        if group is None:
+            # Не ошибка входа: студента пускаем, но без группы он не увидит
+            # тестов, поэтому случай должен быть виден администратору.
+            logger.warning(
+                "Группа %r из Hemis не найдена в оргструктуре — студент остаётся без привязки",
+                group_name,
+            )
+        return group
+
+    def _faculty_name(self, me_data: dict, group) -> str:
+        """Название факультета для карточки студента.
+
+        Это снимок, а не связь: у группы берём имя из зеркала EPOS, и только
+        когда группа не определилась — строку, как её отдал Hemis.
+        """
+        if group is not None and group.faculty is not None:
+            return group.faculty.name
+        return self._extract_name(me_data.get("faculty")) or "Unknown"
 
 
 hemis_service = HemisLoginService()

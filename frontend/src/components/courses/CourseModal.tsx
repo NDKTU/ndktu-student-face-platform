@@ -66,8 +66,8 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     const { data: assignedGroupsData, isFetching: isFetchingGroups } = useTeacherAssignedGroups(teacherUserId);
 
     const teacherOptions = (teachersData?.teachers || []).map(t => ({
-        value: (t.employee?.user_id ?? '').toString(),
-        label: t.employee?.full_name ?? '',
+        value: (t?.user_id ?? '').toString(),
+        label: t?.full_name ?? '',
     }));
 
     // Tahrirlashda kursning joriy fani va guruhlari ro'yxatda bo'lmasligi mumkin
