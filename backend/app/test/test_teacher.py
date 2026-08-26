@@ -326,3 +326,113 @@ async def test_teacher_cannot_change_kafedra_or_hemis_id_via_me(async_client, te
     assert data["kafedra_id"] == test_kafedra["id"]
     assert data["hemis_id"] is None
     assert data["external_source"] is None
+
+
+# ── Dars tarixi biriktiruvni himoya qiladi (lessons.teacher_subject_id RESTRICT) ──
+
+
+async def _teacher_with_lesson(auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra):
+    """O'qituvchiga kurs va bitta dars beradi.
+
+    Dars yaratilganda `get_or_create_teacher_subject_for_course` (o'qituvchi,
+    fan) biriktiruvini yaratadi va dars aynan shunga bog'lanadi.
+    """
+    course = await auth_client.post(
+        "/course/",
+        json={
+            "name": "Course with a lesson",
+            "subject_id": test_subject.id,
+            "teacher_id": test_teacher["user_id"],
+            "group_ids": [test_group["id"]],
+            "faculty_id": test_faculty["id"],
+            "kafedra_id": test_kafedra["id"],
+        },
+    )
+    assert course.status_code == 201
+
+    lesson = await auth_client.post(
+        "/lesson/",
+        json={"course_id": course.json()["id"], "topic": "Introduction", "date": "2026-08-25"},
+    )
+    assert lesson.status_code == 201
+    return lesson.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_delete_teacher_with_lessons_returns_409(
+    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+):
+    """O'tkazilgan dars bor o'qituvchi o'chmaydi — 500 emas, tushunarli 409.
+
+    `lessons.teacher_subject_id` ataylab RESTRICT: biriktiruv bilan birga dars
+    tarixi ham jimgina yo'q bo'lib ketmasligi kerak. Ilgari bu FK CASCADE edi
+    va darslar sezdirmay o'chib ketardi.
+    """
+    lesson_id = await _teacher_with_lesson(
+        auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+    )
+
+    response = await auth_client.delete(f"/teacher/{test_teacher['id']}")
+    assert response.status_code == 409
+    assert "dars" in response.json()["detail"]
+
+    # `force` bu to'siqni ochmaydi: bu tasdiqlanadigan oqibat emas.
+    forced = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
+    assert forced.status_code == 409
+
+    # O'qituvchi ham, dars ham joyida.
+    assert (await auth_client.get(f"/teacher/{test_teacher['id']}")).status_code == 200
+    assert (await auth_client.get(f"/lesson/{lesson_id}")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_assign_subjects_cannot_detach_subject_with_lessons(
+    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+):
+    """Dars o'tilgan fanni biriktiruvdan chiqarib bo'lmaydi — 409."""
+    lesson_id = await _teacher_with_lesson(
+        auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+    )
+
+    response = await auth_client.post(
+        "/teacher/assign_subjects",
+        json={"teacher_id": test_teacher["id"], "subject_ids": []},
+    )
+    assert response.status_code == 409
+    assert "dars" in response.json()["detail"]
+
+    assert (await auth_client.get(f"/lesson/{lesson_id}")).status_code == 200
+    read_back = await auth_client.get(f"/teacher/assigned_subjects/by-user/{test_teacher['user_id']}")
+    assert [st["subject"]["id"] for st in read_back.json()["subject_teachers"]] == [test_subject.id]
+
+
+@pytest.mark.asyncio
+async def test_assign_subjects_keeps_untouched_rows(
+    auth_client, async_db, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+):
+    """Ro'yxatni o'zgartirmay qayta saqlash ishlaydi va satr `id` si saqlanadi.
+
+    Regress: ilgari `assign_subjects` barcha biriktirmalarni o'chirib qaytadan
+    yozardi. RESTRICT ostida bu o'zgarmagan fan uchun ham yiqilardi, muvaffaqiyat
+    holida esa satr yangi `id` olib, darslar undan uzilardi.
+    """
+    from sqlalchemy import select
+
+    from app.modules.auth.model import TeacherSubject
+
+    subject_id = test_subject.id
+    await _teacher_with_lesson(auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra)
+
+    # Faqat ustun tanlanadi, ya'ni identity-map ishtirok etmaydi — `expire_all`
+    # kerak emas (u fixture'dagi ORM obyektini ham eskirtirib yuborardi).
+    before = (await async_db.execute(select(TeacherSubject.id).order_by(TeacherSubject.id))).scalars().all()
+    assert before
+
+    response = await auth_client.post(
+        "/teacher/assign_subjects",
+        json={"teacher_id": test_teacher["id"], "subject_ids": [subject_id]},
+    )
+    assert response.status_code == 200
+
+    after = (await async_db.execute(select(TeacherSubject.id).order_by(TeacherSubject.id))).scalars().all()
+    assert after == before

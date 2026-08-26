@@ -1,8 +1,10 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Float, asc, case, cast, desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -224,6 +226,11 @@ class TeacherRepository:
 
         teacher_user_id = teacher.user_id
 
+        # `force` bu tekshiruvni chetlab o'tmaydi: o'tkazilgan darslar
+        # tasdiqlanadigan oqibat emas, balki qat'iy to'siq — `lessons` dagi
+        # RESTRICT ularni ataylab himoya qiladi.
+        await ensure_no_lessons(session, "Bu o'qituvchi", TeacherSubject.teacher_id == teacher_id)
+
         if not force:
             st_count = (
                 await session.execute(
@@ -280,8 +287,16 @@ class TeacherRepository:
         # 4. Fan biriktirmalari
         await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id == teacher_id))
 
-        await session.delete(teacher)
-        await session.commit()
+        try:
+            await session.delete(teacher)
+            await session.commit()
+        except IntegrityError:
+            # Poyga: tekshiruvdan keyin dars qo'shilgan bo'lishi mumkin.
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete: teacher is referenced by other records",
+            )
 
     async def assign_groups(self, session: AsyncSession, data: TeacherGroupAssignRequest) -> None:
         # 1. O'qituvchi kartochkasi: `TeacherGroup.teacher_id` endi `teachers.id`,
@@ -333,30 +348,53 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-        # 2. Delete existing
-        for ts in teacher.teacher_subjects:
-            await session.delete(ts)
+        # 2. Ro'yxatni farq bo'yicha yangilaymiz — hammasini o'chirib qaytadan
+        # yozmaymiz. Sabab: `lessons.teacher_subject_id` — RESTRICT, ya'ni
+        # o'zgarmay qolgan fanning satrini ham o'chirib bo'lmaydi, qolaversa
+        # qayta yozilgan satr yangi `id` olardi va darslar undan uzilardi.
+        requested = set(data.subject_ids)
+        existing = {ts.subject_id: ts for ts in teacher.teacher_subjects}
+
+        removed_subject_ids = sorted(existing.keys() - requested)
+        if removed_subject_ids:
+            # Biriktiruvdan chiqarilayotgan fan bo'yicha dars o'tilgan bo'lsa,
+            # bog'lanishni uzib bo'lmaydi.
+            await ensure_no_lessons(
+                session,
+                "Biriktiruvdan chiqarilayotgan fanlar",
+                TeacherSubject.teacher_id == data.teacher_id,
+                TeacherSubject.subject_id.in_(removed_subject_ids),
+            )
+            for subject_id in removed_subject_ids:
+                await session.delete(existing[subject_id])
 
         await session.flush()
 
         # 3. Fetch subjects to validate
+        added_subject_ids = sorted(requested - existing.keys())
         if data.subject_ids:
             stmt_subjects = select(Subject).where(Subject.id.in_(data.subject_ids))
             result_subjects = await session.execute(stmt_subjects)
             subjects = result_subjects.scalars().all()
 
-            if len(subjects) != len(data.subject_ids):
+            if len(subjects) != len(requested):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="One or more subject_ids are invalid",
                 )
 
             # 4. Create new entries
-            for subject_id in data.subject_ids:
+            for subject_id in added_subject_ids:
                 session.add(TeacherSubject(subject_id=subject_id, teacher_id=data.teacher_id))
 
         try:
             await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot detach: subject assignment is referenced by other records",
+            )
         except Exception:
             await session.rollback()
             raise HTTPException(

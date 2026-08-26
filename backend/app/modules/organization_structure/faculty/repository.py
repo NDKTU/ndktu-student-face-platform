@@ -1,6 +1,7 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -155,6 +156,8 @@ class FacultyRepository:
                 from app.modules.auth.model import TeacherSubject
                 from app.modules.organization_structure.model import TeacherGroup
 
+                ts_of_faculty = TeacherSubject.teacher_id.in_(teacher_ids)
+                await ensure_no_lessons(session, "Bu fakultet o'qituvchilari", ts_of_faculty)
                 await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(Teacher).where(Teacher.id.in_(teacher_ids)))

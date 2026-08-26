@@ -1,6 +1,7 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -186,7 +187,10 @@ class SubjectRepository:
                     },
                 )
 
-        # 1. Sever TeacherSubject links
+        # 1. Sever TeacherSubject links. `force` bu to'siqni ochmaydi: bu fan
+        # bo'yicha dars o'tilgan bo'lsa, biriktiruv `lessons` RESTRICT tufayli
+        # uzilmaydi.
+        await ensure_no_lessons(session, "Bu fan", TeacherSubject.subject_id == subject_id)
         await session.execute(delete(TeacherSubject).where(TeacherSubject.subject_id == subject_id))
 
         # 2. Soft-delete Questions belonging to this subject — questions are never
