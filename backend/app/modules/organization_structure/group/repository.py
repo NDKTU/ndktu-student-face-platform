@@ -179,6 +179,7 @@ class GroupRepository:
 
     async def delete_group(self, session: AsyncSession, group_id: int, force: bool = False) -> None:
         from app.modules.auth.model import Student
+        from app.modules.course.model import Lesson
         from app.modules.quiz.model import Quiz
 
         stmt = select(Group).where(Group.id == group_id)
@@ -203,8 +204,16 @@ class GroupRepository:
             teacher_count = (
                 await session.execute(select(func.count(TeacherGroup.id)).where(TeacherGroup.group_id == group_id))
             ).scalar() or 0
+            # `lessons.group_id` — ON DELETE CASCADE, в отличие от
+            # `lessons.teacher_subject_id` с его RESTRICT. То есть через группу
+            # история занятий сносится молча: ни 409 от базы, ни ошибки. Жёсткий
+            # запрет здесь ставить нельзя — удаление группы штатная операция, —
+            # но оператор обязан увидеть, что именно он уничтожает, до `force`.
+            lesson_count = (
+                await session.execute(select(func.count(Lesson.id)).where(Lesson.group_id == group_id))
+            ).scalar() or 0
 
-            total = student_count + result_count + quiz_count + teacher_count
+            total = student_count + result_count + quiz_count + teacher_count + lesson_count
             if total > 0:
                 warnings = []
                 if student_count > 0:
@@ -215,6 +224,8 @@ class GroupRepository:
                     warnings.append(f"{quiz_count} ta guruhga oid testlar guruhsiz qoladi")
                 if teacher_count > 0:
                     warnings.append(f"{teacher_count} ta o'qituvchi guruhdan uziladi")
+                if lesson_count > 0:
+                    warnings.append(f"{lesson_count} ta o'tilgan dars tarixi butunlay o'chadi (tiklab bo'lmaydi)")
 
                 raise HTTPException(
                     status_code=409,
@@ -227,7 +238,9 @@ class GroupRepository:
 
         # FK ondelete="SET NULL" on Student.group_id and Result.group_id means
         # linked students/results lose their group reference but are NOT deleted.
-        # TeacherGroup has cascade delete orphan.
+        # TeacherGroup has cascade delete orphan. Lesson.group_id, наоборот,
+        # CASCADE: занятия группы уходят вместе с ней — об этом и предупреждает
+        # список выше.
         await session.delete(group)
         await session.commit()
 

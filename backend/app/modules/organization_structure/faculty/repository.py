@@ -110,6 +110,7 @@ class FacultyRepository:
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func, select
 
+        from app.modules.course.model import Lesson
         from app.modules.organization_structure.model import Group, Kafedra
 
         ensure_editable(await self.get_faculty(session, faculty_id), "факультета")
@@ -121,6 +122,17 @@ class FacultyRepository:
             group_count = (
                 await session.execute(select(func.count(Group.id)).where(Group.faculty_id == faculty_id))
             ).scalar() or 0
+            # Занятия факультета считаются через `lessons.group_id`, а не через
+            # `ensure_no_lessons`: та проверяет `teacher_subject_id` с его
+            # RESTRICT и здесь ничего не заметит — группы у `lessons` привязаны
+            # CASCADE и уносят историю занятий молча.
+            lesson_count = (
+                await session.execute(
+                    select(func.count(Lesson.id)).where(
+                        Lesson.group_id.in_(select(Group.id).where(Group.faculty_id == faculty_id))
+                    )
+                )
+            ).scalar() or 0
 
             if kafedra_count > 0 or group_count > 0:
                 warnings = []
@@ -129,6 +141,11 @@ class FacultyRepository:
                 if group_count > 0:
                     warnings.append(
                         f"{group_count} ta guruh o'chadi (talabalarning guruhi belgilanmagan holatga o'tadi)"
+                    )
+                if lesson_count > 0:
+                    warnings.append(
+                        f"{lesson_count} ta o'tilgan dars tarixi guruhlar bilan birga butunlay o'chadi "
+                        f"(tiklab bo'lmaydi)"
                     )
 
                 raise HTTPException(

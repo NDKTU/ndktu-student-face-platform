@@ -81,3 +81,84 @@ async def test_delete_group(auth_client, test_group):
     # Verify deletion
     response = await auth_client.get(f"/group/{test_group['id']}")
     assert response.status_code == 404
+
+
+async def _lesson_in_group(auth_client, test_teacher, test_subject, test_faculty, test_kafedra, group_id):
+    """Проводит одно занятие в группе, как это делает преподаватель через UI."""
+    course = await auth_client.post(
+        "/course/",
+        json={
+            "name": "Discrete math",
+            "subject_id": test_subject.id,
+            "teacher_id": test_teacher["user_id"],
+            "group_ids": [group_id],
+            "faculty_id": test_faculty["id"],
+            "kafedra_id": test_kafedra["id"],
+        },
+    )
+    assert course.status_code == 201, course.text
+    lesson = await auth_client.post(
+        "/lesson/",
+        json={"course_id": course.json()["id"], "topic": "Grafalar", "date": "2026-08-21"},
+    )
+    assert lesson.status_code == 201, lesson.text
+    return lesson.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_delete_group_warns_about_lessons_it_would_destroy(
+    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+):
+    """`lessons.group_id` — CASCADE, поэтому удаление группы уносит историю
+    занятий молча: RESTRICT на `teacher_subject_id` тут не срабатывает. Жёсткого
+    запрета нет — но оператор обязан увидеть счётчик до подтверждения."""
+    await _lesson_in_group(auth_client, test_teacher, test_subject, test_faculty, test_kafedra, test_group["id"])
+
+    response = await auth_client.delete(f"/group/{test_group['id']}")
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["requires_confirmation"] is True
+    lesson_warnings = [w for w in detail["warnings"] if "dars tarixi" in w]
+    assert lesson_warnings == ["1 ta o'tilgan dars tarixi butunlay o'chadi (tiklab bo'lmaydi)"]
+
+
+@pytest.mark.asyncio
+async def test_delete_group_without_lessons_says_nothing_about_them(auth_client, test_group, async_db):
+    """Счётчик не выдумывается: без занятий в списке предупреждений его нет."""
+    from datetime import date
+
+    from app.modules.auth.model import Student
+
+    async_db.add(
+        Student(
+            user_id=None,
+            group_id=test_group["id"],
+            first_name="A",
+            last_name="B",
+            third_name="C",
+            full_name="A B C",
+            student_id_number="1",
+            image_path="",
+            birth_date=date(2000, 1, 1),
+            gender="male",
+            university="NDKTU",
+            specialty="SE",
+            student_status="active",
+            education_form="kunduzgi",
+            education_type="bakalavr",
+            payment_form="kontrakt",
+            education_lang="uz",
+            faculty="IT",
+            level="1",
+            semester="1",
+            address="Namangan",
+            avg_gpa=0.0,
+        )
+    )
+    await async_db.commit()
+
+    response = await auth_client.delete(f"/group/{test_group['id']}")
+    assert response.status_code == 409
+    warnings = response.json()["detail"]["warnings"]
+    assert any("talaba guruhsiz qoladi" in w for w in warnings)
+    assert not any("dars tarixi" in w for w in warnings)
