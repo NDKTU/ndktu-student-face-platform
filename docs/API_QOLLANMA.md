@@ -1,6 +1,6 @@
 # NDKTU Platformasi — API qo‘llanmasi
 
-> Versiya: API 1.0.0 · Hujjat sanasi: 2026-08-21 · Endpointlar soni: **159** · Manba: backend OpenAPI spetsifikatsiyasi (avtomatik yig‘ilgan, qo‘lda izohlangan)
+> Versiya: API 1.0.0 · Hujjat sanasi: 2026-08-26 · Endpointlar soni: **157** · Manba: backend OpenAPI spetsifikatsiyasi (avtomatik yig‘ilgan, qo‘lda izohlangan)
 
 
 ## Mundarija
@@ -13,7 +13,8 @@
 6. [Asosiy jarayonlar (qadam-baqadam misollar)](#6-asosiy-jarayonlar)
 7. [To‘liq ma’lumotnoma — barcha endpointlar](#7-toliq-malumotnoma)
 8. [Yuz orqali nazorat (face-detection) servisi](#8-yuz-orqali-nazorat-servisi)
-9. [Tez-tez so‘raladigan savollar](#9-tez-tez-soraladigan-savollar)
+9. [Joylashtirish (deployment) haqida eslatmalar](#9-joylashtirish-deployment-haqida-eslatmalar)
+10. [Tez-tez so‘raladigan savollar](#10-tez-tez-soraladigan-savollar)
 
 ---
 
@@ -102,7 +103,7 @@ curl -s "https://lms.nsumt.uz/api/faculty/?page=1&limit=20" -H "Authorization: B
 
 Tizimda **RBAC** (rolga asoslangan kirish): foydalanuvchi → rollar → ruxsatlar. Har bir endpoint kodda `PermissionRequired("amal:resurs")` bilan himoyalangan. Ruxsat bo‘lmasa — **403**.
 
-Ruxsat nomlari qoidasi: `create:` / `read:` / `update:` / `delete:` + resurs nomi. Maxsus ruxsatlar: `user:me` (o‘z profili), `employee:me`, `quiz_process:*` (test topshirish), `hemis_admin_preview` / `hemis_admin_sync`, `read:eduplan` / `sync:eduplan`, `user_answers:read`.
+Ruxsat nomlari qoidasi: `create:` / `read:` / `update:` / `delete:` + resurs nomi. Maxsus ruxsatlar: `user:me` (o‘z profili), `teacher:me` (o‘zining o‘qituvchi kartochkasi), `quiz_process:*` (test topshirish), `hemis_admin_preview` / `hemis_admin_sync`, `read:eduplan` / `sync:eduplan`, `user_answers:read`.
 
 | Rol | Odatda nima qiladi | Kirishdan keyin qayerga tushadi |
 |---|---|---|
@@ -116,7 +117,7 @@ Rollar va ruxsatlar **dinamik**: admin yangi rol yaratib, unga istalgan ruxsatla
 
 ### Barcha ruxsatlar ro‘yxati
 
-`create:psychology`, `create:question`, `create:quiz`, `create:submission`, `create:user`, `delete:assignment`, `delete:course`, `delete:department`, `delete:employee`, `delete:faculty`, `delete:group`, `delete:kafedra`, `delete:lesson`, `delete:permission`, `delete:psychology`, `delete:psychology_results`, `delete:question`, `delete:quiz`, `delete:resource`, `delete:result`, `delete:role`, `delete:speciality`, `delete:student`, `delete:subject`, `delete:teacher`, `delete:user`, `employee:me`, `hemis_admin_sync`, `quiz_process:end_quiz`, `quiz_process:start_quiz`, `quiz_process:submit_answer`, `read:active_quiz`, `read:assignment`, `read:course`, `read:department`, `read:eduplan`, `read:employee`, `read:faculty`, `read:group`, `read:kafedra`, `read:lesson`, `read:permission`, `read:psychology`, `read:psychology_results`, `read:question`, `read:quiz`, `read:resource`, `read:result`, `read:role`, `read:speciality`, `read:student`, `read:subject`, `read:submission`, `read:teacher`, `read:user`, `sync:eduplan`, `update:assignment`, `update:course`, `update:department`, `update:employee`, `update:faculty`, `update:group`, `update:kafedra`, `update:lesson`, `update:lesson_result`, `update:permission`, `update:psychology`, `update:quiz`, `update:resource`, `update:role`, `update:speciality`, `update:student`, `update:subject`, `update:submission`, `update:teacher`, `update:user`, `user:me`, `user_answers:read`
+`create:psychology`, `create:question`, `create:quiz`, `create:submission`, `create:user`, `delete:course`, `delete:faculty`, `delete:group`, `delete:homework`, `delete:kafedra`, `delete:lesson`, `delete:permission`, `delete:psychology`, `delete:psychology_results`, `delete:question`, `delete:quiz`, `delete:resource`, `delete:result`, `delete:role`, `delete:speciality`, `delete:student`, `delete:subject`, `delete:teacher`, `delete:user`, `hemis_admin_sync`, `quiz_process:end_quiz`, `quiz_process:start_quiz`, `quiz_process:submit_answer`, `read:active_quiz`, `read:course`, `read:eduplan`, `read:faculty`, `read:group`, `read:homework`, `read:kafedra`, `read:lesson`, `read:permission`, `read:psychology`, `read:psychology_results`, `read:question`, `read:quiz`, `read:resource`, `read:result`, `read:role`, `read:speciality`, `read:student`, `read:subject`, `read:submission`, `read:teacher`, `read:user`, `sync:eduplan`, `teacher:me`, `update:course`, `update:faculty`, `update:group`, `update:homework`, `update:kafedra`, `update:lesson`, `update:permission`, `update:psychology`, `update:quiz`, `update:resource`, `update:role`, `update:speciality`, `update:student`, `update:subject`, `update:submission`, `update:teacher`, `update:user`, `user:me`, `user_answers:read`
 
 
 ---
@@ -225,7 +226,7 @@ Tizimdagi har bir akkaunt. Xodimlar login/parol bilan, talabalar HEMIS orqali ki
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
 | `POST` | `/api/user/login` | `ochiq` | Xodim (admin/o‘qituvchi/psixolog) uchun tizimga kirish — login va parol bilan. Javobda `access_token` qaytadi. | — | `username`*: string, `password`*: string |
-| `GET` | `/api/user/me` | `employee:me` | Joriy foydalanuvchi profili: rollar, ruxsatlar, talaba/xodim ma’lumotlari. Frontend har yuklanishda chaqiradi. | — | — |
+| `GET` | `/api/user/me` | `user:me` | Joriy foydalanuvchi profili: rollar, ruxsatlar, `teacher` yoki `student` bloki (qaysi biriga tegishli bo‘lsa). Frontend har yuklanishda chaqiradi. | — | — |
 | `POST` | `/api/user/logout` | `user:me` | Sessiyani yopish — Redis’dagi sessiya o‘chiriladi, token darhol yaroqsiz bo‘ladi. | — | — |
 | `PUT` | `/api/user/me/credentials` | `user:me` | O‘z login/parolini o‘zgartirish (joriy parol talab qilinadi). Keyin qayta kirish kerak. | — | `current_password`*: string, `new_username`: string, `new_password`: string |
 | `POST` | `/api/user/` | `create:quiz` | Yangi foydalanuvchi yaratish. | — | `username`*: string, `password`*: string, `roles`*: object[] |
@@ -274,49 +275,27 @@ Talabalar HEMIS’dan keladi (import yoki birinchi kirishda). Qo‘lda yaratilma
 
 ### 7.5. O‘qituvchilar (`Teacher`)
 
-O‘qituvchi — xodimning (`employee`) o‘qitish roli. Fan va guruhlar biriktiriladi, shular asosida savollar banki, testlar va reyting ishlaydi.
+O‘qituvchi endi to‘g‘ridan-to‘g‘ri `User`ga bog‘langan xodim kartochkasining o‘zi (avvalgi alohida `Employee` modeli yo‘q — ism-familiya, `image_url` va `hemis_id` shu yerda). Fan va guruhlar biriktiriladi, shular asosida savollar banki, testlar va reyting ishlaydi.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/teacher/` | `create:quiz` | Yangi o‘qituvchi yaratish. | — | `employee_id`*: integer, `kafedra_id`*: integer |
-| `GET` | `/api/teacher/` | `user_answers:read` | O‘qituvchilar ro‘yxati (sahifalab, filtrlar bilan). | `full_name`, `kafedra_id`, `page`, `limit` | — |
+| `POST` | `/api/teacher/` | `create:teacher` | Yangi o‘qituvchi yaratish — bu so‘rov bir vaqtning o‘zida `User` va `Teacher` yozuvini yaratadi (login ma’lumotlari shu yerda beriladi). | — | `username`*: string, `password`*: string, `first_name`*: string, `last_name`*: string, `third_name`*: string, `image_url`: string, `kafedra_id`: integer, `roles`: object[] |
+| `GET` | `/api/teacher/` | `read:teacher` | O‘qituvchilar ro‘yxati (sahifalab, filtrlar bilan). | `full_name`, `kafedra_id`, `page`, `limit` | — |
+| `GET` | `/api/teacher/me` | `teacher:me` | O‘z o‘qituvchi profilini olish. | — | — |
+| `PUT` | `/api/teacher/me` | `teacher:me` | O‘z o‘qituvchi profilini tahrirlash (ism-familiya, rasm). Hisob ma’lumotlari (`username`/parol) va `kafedra_id` bu yerda o‘zgarmaydi — ular mos ravishda `user` endpoint’lari va administrator orqali boshqariladi. | — | `first_name`*: string, `last_name`*: string, `third_name`*: string, `image_url`: string |
+| `POST` | `/api/teacher/upload_image` | `create:teacher` | O‘qituvchi rasmini yuklash (faqat rasm fayllari, turi tekshiriladi). | — | (form-data) `file`*: fayl |
 | `GET` | `/api/teacher/{teacher_id}` | `read:teacher` | O‘qituvchi ma’lumotini olish. | `teacher_id`* | — |
-| `PUT` | `/api/teacher/{teacher_id}` | `update:teacher` | O‘qituvchini tahrirlash. | `teacher_id`* | `kafedra_id`*: integer |
+| `PUT` | `/api/teacher/{teacher_id}` | `update:teacher` | O‘qituvchini tahrirlash (`kafedra_id` majburiy). | `teacher_id`* | `first_name`*: string, `last_name`*: string, `third_name`*: string, `image_url`: string, `kafedra_id`*: integer |
 | `DELETE` | `/api/teacher/{teacher_id}` | `delete:teacher` | O‘qituvchini o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `teacher_id`*, `force` | — |
-| `POST` | `/api/teacher/assign_groups` | `update:teacher` | O‘qituvchiga guruhlarni biriktirish. | — | `user_id`*: integer, `group_ids`*: integer[] |
-| `POST` | `/api/teacher/assign_subjects` | `update:teacher` | O‘qituvchiga fanlarni biriktirish. | — | `teacher_id`*: integer, `subject_ids`*: integer[] |
-| `GET` | `/api/teacher/assigned_subjects/by-user/{user_id}` | `user:me` | Foydalanuvchi (o‘qituvchi) ga biriktirilgan fanlar — savollar banki va testlar shu ro‘yxatdan ishlaydi. | `user_id`* | — |
-| `GET` | `/api/teacher/assigned_groups/by-user/{user_id}` | `user:me` | O‘qituvchiga biriktirilgan guruhlar. | `user_id`* | — |
+| `POST` | `/api/teacher/assign_groups` | `update:teacher` | O‘qituvchiga guruhlarni biriktirish. **Diqqat:** `teacher_id` — bu `teachers.id`, `users.id` emas. | — | `teacher_id`*: integer, `group_ids`*: integer[] |
+| `POST` | `/api/teacher/assign_subjects` | `update:teacher` | O‘qituvchiga fanlarni biriktirish. `teacher_id` — `teachers.id`. | — | `teacher_id`*: integer, `subject_ids`*: integer[] |
+| `GET` | `/api/teacher/assigned_subjects/by-user/{user_id}` | `user:me` | Foydalanuvchi (o‘qituvchi) ga biriktirilgan fanlar — savollar banki va testlar shu ro‘yxatdan ishlaydi. `user_id` — `users.id`. | `user_id`* | — |
+| `GET` | `/api/teacher/assigned_groups/by-user/{user_id}` | `user:me` | O‘qituvchiga biriktirilgan guruhlar. `user_id` — `users.id`. | `user_id`* | — |
 | `GET` | `/api/teacher/ranking/overall` | `read:teacher` | O‘qituvchilar reytingi (Bayes vaznli baho — past talabali o‘qituvchi bitta yuqori baho bilan yuqoriga chiqib ketmaydi). Filtrlar: fakultet, kafedra, guruh. | `faculty_id`, `kafedra_id`, `group_id`, `search`, `page`, `limit` | — |
 | `GET` | `/api/teacher/ranking/faculty` | `read:teacher` | Fakultetlar reytingi — o‘rtacha natija bo‘yicha. | `page`, `limit` | — |
 | `GET` | `/api/teacher/ranking/kafedra` | `read:teacher` | Kafedralar reytingi — o‘rtacha natija bo‘yicha. | `page`, `limit` | — |
 
-### 7.6. O‘qituvchi biriktirishlari (`TeacherAssignment`)
-
-O‘qituvchi – fan – guruh uchligi. EduPlan yuklamalaridan avtomatik yaratilishi ham mumkin.
-
-| Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
-|---|---|---|---|---|---|
-| `POST` | `/api/teacher-assignment/` | `create:quiz` | Yangi topshiriq yaratish. | — | `teacher_id`*: integer, `subject_id`*: integer, `group_id`*: integer |
-| `GET` | `/api/teacher-assignment/` | `user_answers:read` | Topshiriqlar ro‘yxati (sahifalab, filtrlar bilan). | `teacher_id`, `subject_id`, `group_id`, `page`, `limit` | — |
-| `DELETE` | `/api/teacher-assignment/{assignment_id}` | `delete:assignment` | Topshiriqni o‘chirish. | `assignment_id`* | — |
-
-### 7.7. Xodimlar (`Employee`)
-
-Universitet xodimlari (HEMIS `hemis_id` bilan). EduPlan’dan ko‘zgulanadi; HEMIS orqali kirish faqat mavjud xodim uchun ishlaydi — akkaunt avtomatik yaratilmaydi.
-
-| Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
-|---|---|---|---|---|---|
-| `POST` | `/api/employee/` | `create:quiz` | Yangi xodim yaratish. | — | `username`*: string, `password`*: string, `first_name`*: string, `last_name`*: string, `third_name`*: string, `phone_number`: string, `image_url`: string, `department_id`: integer, `roles`: object[] |
-| `GET` | `/api/employee/` | `user_answers:read` | Xodimlar ro‘yxati (sahifalab, filtrlar bilan). | `full_name`, `page`, `limit` | — |
-| `POST` | `/api/employee/upload_image` | `create:question` | Xodim rasmini yuklash (faqat rasm fayllari, turi tekshiriladi). | — | (form-data) `file`*: fayl |
-| `GET` | `/api/employee/me` | `employee:me` | O‘z xodim profilini olish. | — | — |
-| `PUT` | `/api/employee/me` | `employee:me` | O‘z xodim profilini tahrirlash. | — | `first_name`*: string, `last_name`*: string, `third_name`*: string, `phone_number`: string, `image_url`: string, `department_id`: integer |
-| `GET` | `/api/employee/{employee_id}` | `read:employee` | Xodim ma’lumotini olish. | `employee_id`* | — |
-| `PUT` | `/api/employee/{employee_id}` | `update:employee` | Xodimni tahrirlash. | `employee_id`* | `first_name`*: string, `last_name`*: string, `third_name`*: string, `phone_number`: string, `image_url`: string, `department_id`: integer |
-| `DELETE` | `/api/employee/{employee_id}` | `delete:employee` | Xodimni o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `employee_id`*, `force` | — |
-
-### 7.8. HEMIS integratsiyasi (`Hemis`)
+### 7.6. HEMIS integratsiyasi (`Hemis`)
 
 Talabalar manbai. `login` — talaba kirishi; `preview`/`sync` — admin uchun talabalarni ommaviy import qilish (avval ko‘rib chiqish, keyin yozish).
 
@@ -326,7 +305,7 @@ Talabalar manbai. `login` — talaba kirishi; `preview`/`sync` — admin uchun t
 | `POST` | `/api/hemis/preview` | `sync:eduplan` | HEMIS’dan talabalar ro‘yxatini **ko‘rib chiqish** (hech narsa yozilmaydi) — import oldidan. | — | `login`*: string, `password`*: string, `faculty_id`: integer, `group_id`: integer |
 | `POST` | `/api/hemis/sync` | `hemis_admin_sync` | HEMIS’dan talabalarni bazaga import qilish (preview tasdiqlangandan keyin). | — | `login`*: string, `password`*: string, `faculty_id`: integer, `group_id`: integer |
 
-### 7.9. Fakultetlar (`Faculty`)
+### 7.7. Fakultetlar (`Faculty`)
 
 Tashkiliy tuzilmaning yuqori pog‘onasi. EduPlan’dan kelgan yozuvlar **faqat o‘qish uchun** (tahrirlash 409 qaytaradi).
 
@@ -339,7 +318,7 @@ Tashkiliy tuzilmaning yuqori pog‘onasi. EduPlan’dan kelgan yozuvlar **faqat 
 | `PUT` | `/api/faculty/{faculty_id}` | `update:faculty` | Fakultetni tahrirlash. | `faculty_id`* | `name`*: string |
 | `DELETE` | `/api/faculty/{faculty_id}` | `delete:faculty` | Fakultetni o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `faculty_id`*, `force` | — |
 
-### 7.10. Kafedralar (`Kafedra`)
+### 7.8. Kafedralar (`Kafedra`)
 
 Fakultet ichidagi kafedralar. Diqqat: EduPlan’da bu `department` deb ataladi.
 
@@ -351,7 +330,7 @@ Fakultet ichidagi kafedralar. Diqqat: EduPlan’da bu `department` deb ataladi.
 | `PUT` | `/api/kafedra/{kafedra_id}` | `update:kafedra` | Kafedrani tahrirlash. | `kafedra_id`* | `name`*: string, `faculty_id`*: integer |
 | `DELETE` | `/api/kafedra/{kafedra_id}` | `delete:kafedra` | Kafedrani o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `kafedra_id`*, `force` | — |
 
-### 7.11. Guruhlar (`Group`)
+### 7.9. Guruhlar (`Group`)
 
 Talabalar guruhlari. O‘chirishdan oldin `delete-info` bilan bog‘liq yozuvlarni tekshiring — natijalar guruhga bog‘langan.
 
@@ -365,31 +344,19 @@ Talabalar guruhlari. O‘chirishdan oldin `delete-info` bilan bog‘liq yozuvlar
 | `GET` | `/api/group/{group_id}/students` | `read:student` | Guruh talabalari (qidiruv va sahifalash bilan). | `group_id`*, `page`, `limit`, `search` | — |
 | `GET` | `/api/group/{group_id}/delete-info` | `read:group` | Guruhni o‘chirishdan oldin nimalar bog‘liqligini ko‘rsatadi (talabalar, testlar, natijalar). | `group_id`* | — |
 
-### 7.12. Mutaxassisliklar (`Speciality`)
+### 7.10. Mutaxassisliklar (`Speciality`)
 
 Ta’lim yo‘nalishlari (kafedra va fakultetga bog‘langan).
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/speciality/` | `create:quiz` | Yangi mutaxassislik yaratish. | — | `name`*: string, `kafedra_id`*: integer, `education_type`: Bakalavr/Magistr |
+| `POST` | `/api/speciality/` | `create:quiz` | Yangi mutaxassislik yaratish. | — | `name`*: string, `kafedra_id`*: integer, `education_type`: Bakalavr/Magistr/Doktorantura |
 | `GET` | `/api/speciality/` | `user_answers:read` | Mutaxassisliklar ro‘yxati (sahifalab, filtrlar bilan). | `name`, `kafedra_id`, `faculty_id`, `page`, `limit` | — |
 | `GET` | `/api/speciality/{speciality_id}` | `read:speciality` | Mutaxassislik ma’lumotini olish. | `speciality_id`* | — |
-| `PUT` | `/api/speciality/{speciality_id}` | `update:speciality` | Mutaxassislikni tahrirlash. | `speciality_id`* | `name`: string, `kafedra_id`: integer, `education_type`: Bakalavr/Magistr/null |
+| `PUT` | `/api/speciality/{speciality_id}` | `update:speciality` | Mutaxassislikni tahrirlash. | `speciality_id`* | `name`: string, `kafedra_id`: integer, `education_type`: Bakalavr/Magistr/Doktorantura/null |
 | `DELETE` | `/api/speciality/{speciality_id}` | `delete:speciality` | Mutaxassislikni o‘chirish. Guruhlari bo‘lsa 409 (`requires_confirmation`) qaytadi — `force=true` bilan takrorlanadi, guruhlar o‘chmaydi, faqat mutaxassislikdan uziladi. | `speciality_id`*, `force` | — |
 
-### 7.13. Bo‘limlar (`Department`)
-
-Ma’muriy bo‘limlar. EduPlan’da bu `section` deb ataladi.
-
-| Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
-|---|---|---|---|---|---|
-| `POST` | `/api/department/` | `create:quiz` | Yangi bo‘lim yaratish. | — | `name`*: string |
-| `GET` | `/api/department/` | `user_answers:read` | Bo‘limlar ro‘yxati (sahifalab, filtrlar bilan). | `name`, `page`, `limit` | — |
-| `GET` | `/api/department/{department_id}` | `read:department` | Bo‘lim ma’lumotini olish. | `department_id`* | — |
-| `PUT` | `/api/department/{department_id}` | `update:department` | Bo‘limni tahrirlash. | `department_id`* | `name`*: string |
-| `DELETE` | `/api/department/{department_id}` | `delete:department` | Bo‘limni o‘chirish. | `department_id`* | — |
-
-### 7.14. Fanlar (`Subject`)
+### 7.11. Fanlar (`Subject`)
 
 O‘quv fanlari. Savollar, testlar va kurslar fanga bog‘lanadi.
 
@@ -401,40 +368,42 @@ O‘quv fanlari. Savollar, testlar va kurslar fanga bog‘lanadi.
 | `PUT` | `/api/subject/{subject_id}` | `update:subject` | Fanni tahrirlash. | `subject_id`* | `name`*: string |
 | `DELETE` | `/api/subject/{subject_id}` | `delete:subject` | Fanni o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `subject_id`*, `force` | — |
 
-### 7.15. Savollar banki (`Question`)
+### 7.12. Savollar banki (`Question`)
 
 Har bir savol — HTML matn (rasm bilan bo‘lishi mumkin), 4 variant va to‘g‘ri javob. Savollar **ma’ruzachiga** tegishli; test yaratilganda uning bankidan yig‘iladi. Versiyalanadi: tahrirlansa eski natijalar buzilmaydi.
+
+`question_type` — hozircha faqat baza ustuni: amalda ishlaydigan yagona qiymat `QUIZ` (`option_a..option_d`/`correct_option` shakliga mos). `TRUE_FALSE`, `MULTI_SELECT`, `TYPE_ANSWER`, `PUZZLE` — kelajak uchun zaxira, ular hali alohida javob shakliga ega emas.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
 | `GET` | `/api/question/download_excel` | `read:question` | Savollarni Excel faylga yuklab olish (fan / muallif / matn bo‘yicha filtr). | `subject_id`, `user_id`, `text` | — |
-| `POST` | `/api/question/` | `create:psychology` | Yangi savol yaratish. | — | `subject_id`*: integer, `user_id`*: integer, `text`*: string, `option_a`*: string, `option_b`*: string, `option_c`*: string, `option_d`*: string, `correct_option`: a/b/c/d |
+| `POST` | `/api/question/` | `create:psychology` | Yangi savol yaratish. | — | `subject_id`*: integer, `user_id`*: integer, `text`*: string, `option_a`*: string, `option_b`*: string, `option_c`*: string, `option_d`*: string, `correct_option`: a/b/c/d, `question_type`: QUIZ/TRUE_FALSE/MULTI_SELECT/TYPE_ANSWER/PUZZLE (standart `QUIZ`) |
 | `GET` | `/api/question/` | `user_answers:read` | Savollar ro‘yxati (sahifalab, filtrlar bilan). | `text`, `subject_id`, `user_id`, `page`, `limit` | — |
 | `GET` | `/api/question/{question_id}` | `read:psychology` | Savol ma’lumotini olish. | `question_id`* | — |
-| `PUT` | `/api/question/{question_id}` | `update:psychology` | Savolni tahrirlash. | `question_id`* | `subject_id`*: integer, `user_id`*: integer, `text`*: string, `option_a`*: string, `option_b`*: string, `option_c`*: string, `option_d`*: string, `correct_option`: a/b/c/d |
+| `PUT` | `/api/question/{question_id}` | `update:psychology` | Savolni tahrirlash. | `question_id`* | `subject_id`*: integer, `user_id`*: integer, `text`*: string, `option_a`*: string, `option_b`*: string, `option_c`*: string, `option_d`*: string, `correct_option`: a/b/c/d, `question_type`: QUIZ/TRUE_FALSE/MULTI_SELECT/TYPE_ANSWER/PUZZLE |
 | `DELETE` | `/api/question/{question_id}` | `delete:psychology` | Savolni o‘chirish. | `question_id`* | — |
 | `DELETE` | `/api/question/bulk/subject-user` | `delete:question` | Bitta fan va bitta muallifga tegishli **barcha** savollarni ommaviy o‘chirish. Ehtiyot bo‘ling. | — | `subject_id`*: integer, `user_id`*: integer |
 | `POST` | `/api/question/upload_image` | `create:question` | Savol matni uchun rasm yuklash — `/uploads/questions/<uuid>.png` manzili qaytadi, uni savol HTML’iga qo‘yasiz. | — | (form-data) `file`*: fayl |
 | `POST` | `/api/question/upload_excel` | `create:question` | Savollarni Excel fayldan ommaviy import qilish (fan ko‘rsatiladi). | `subject_id`* | (form-data) `file`*: fayl |
 
-### 7.16. Testlar (`Quiz`)
+### 7.13. Testlar (`Quiz`)
 
 Test = fan + guruh + ma’ruzachi + savollar soni + davomiylik + PIN + proktoring rejimi (`standard` / `face`). Faollashtirilgan test talabalar ro‘yxatida ko‘rinadi.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/quiz/` | `create:quiz` | Yangi test yaratish. | — | `title`*: string, `question_number`*: integer, `duration`*: integer, `pin`*: string, `lecturer_id`: integer, `user_id`: integer, `group_id`: integer, `subject_id`: integer, `is_active`: boolean, `proctoring_mode`: face/standard |
-| `GET` | `/api/quiz/` | `user_answers:read` | Testlar ro‘yxati (sahifalab, filtrlar bilan). | `title`, `user_id`, `created_by_user_id`, `group_id`, `subject_id`, `is_active`, `proctoring_mode`, `page`, `limit`, `sort_dir` | — |
+| `POST` | `/api/quiz/` | `create:quiz` | Yangi test yaratish. | — | `title`*: string, `question_number`*: integer, `duration`*: integer, `pin`*: string, `lecturer_id`: integer, `user_id`: integer, `group_id`: integer, `subject_id`: integer, `is_active`: boolean, `proctoring_mode`: face/standard, `quiz_type`: LESSON_QUIZ/SEMESTER_FINAL/YEAR_PROMOTION/PUBLIC_FREE (standart `LESSON_QUIZ`) |
+| `GET` | `/api/quiz/` | `user_answers:read` | Testlar ro‘yxati (sahifalab, filtrlar bilan). | `title`, `user_id`, `created_by_user_id`, `group_id`, `subject_id`, `faculty_id`, `is_active`, `proctoring_mode`, `quiz_type`, `page`, `limit`, `sort_dir` | — |
 | `GET` | `/api/quiz/available-questions` | `create:quiz` | Tanlangan ma’ruzachi va fan bo‘yicha nechta savol mavjudligi — test yaratishda savollar yetarlimi, tekshirish uchun. | `lecturer_id`*, `subject_id`* | — |
-| `GET` | `/api/quiz/active` | `read:active_quiz` | Hozir faol testlar — talaba shu ro‘yxatdan testni tanlaydi. | `title`, `user_id`, `created_by_user_id`, `group_id`, `subject_id`, `is_active`, `proctoring_mode`, `page`, `limit`, `sort_dir` | — |
+| `GET` | `/api/quiz/active` | `read:active_quiz` | Hozir faol testlar — talaba shu ro‘yxatdan testni tanlaydi. | `title`, `user_id`, `created_by_user_id`, `group_id`, `subject_id`, `faculty_id`, `is_active`, `proctoring_mode`, `quiz_type`, `page`, `limit`, `sort_dir` | — |
 | `GET` | `/api/quiz/{quiz_id}` | `read:quiz` | Test ma’lumotini olish. | `quiz_id`* | — |
-| `PUT` | `/api/quiz/{quiz_id}` | `update:quiz` | Testni tahrirlash. | `quiz_id`* | `title`*: string, `question_number`*: integer, `duration`*: integer, `pin`*: string, `lecturer_id`: integer, `user_id`: integer, `group_id`: integer, `subject_id`: integer, `is_active`: boolean, `proctoring_mode`: face/standard |
+| `PUT` | `/api/quiz/{quiz_id}` | `update:quiz` | Testni tahrirlash. | `quiz_id`* | `title`*: string, `question_number`*: integer, `duration`*: integer, `pin`*: string, `lecturer_id`: integer, `user_id`: integer, `group_id`: integer, `subject_id`: integer, `is_active`: boolean, `proctoring_mode`: face/standard, `quiz_type`: LESSON_QUIZ/SEMESTER_FINAL/YEAR_PROMOTION/PUBLIC_FREE |
 | `DELETE` | `/api/quiz/{quiz_id}` | `delete:quiz` | Testni o‘chirish (`force=true` — bog‘liq yozuvlar bilan birga). | `quiz_id`*, `force` | — |
 | `GET` | `/api/quiz/{quiz_id}/delete-info` | `read:quiz` | Testni o‘chirishdan oldin bog‘liq natijalar sonini ko‘rsatadi. | `quiz_id`* | — |
 | `POST` | `/api/quiz/{quiz_id}/repeat` | `create:quiz` | Testni qayta yaratish (2-urinish): yangi PIN bilan nusxa, eski natijalar saqlanadi. | `quiz_id`* | — |
 | `POST` | `/api/quiz/upload` | `create:quiz` | Test uchun rasm yuklash. | — | (form-data) `file`*: fayl |
 
-### 7.17. Test topshirish jarayoni (`Quiz Process`)
+### 7.14. Test topshirish jarayoni (`Quiz Process`)
 
 Talaba tomonidan ishlatiladigan 4 ta endpoint. Tartib: `start_quiz` → har javobga `submit_answer` → `end_quiz`. Vaqt serverda hisoblanadi, urinish uzilsa davom ettiriladi.
 
@@ -445,7 +414,7 @@ Talaba tomonidan ishlatiladigan 4 ta endpoint. Tartib: `start_quiz` → har javo
 | `POST` | `/api/quiz_process/end_quiz` | `quiz_process:end_quiz` | Testni yakunlash — natija hisoblanadi. Proktoring qoidabuzarlik aniqlagan bo‘lsa `cheating_detected`, sabab va dalil rasmi manzili yuboriladi. | — | `quiz_id`*: integer, `result_id`*: integer, `cheating_detected`: boolean, `reason`: string, `cheating_image_url`: string |
 | `POST` | `/api/quiz_process/upload_cheating_evidence` | `quiz_process:end_quiz` | Kameradan olingan dalil rasmini (boshqa shaxs / ikki yuz) saqlash — manzili `end_quiz` ga beriladi. | — | `quiz_id`*: integer, `user_id`: integer, `image_data`*: string |
 
-### 7.18. Natijalar (`Result`)
+### 7.15. Natijalar (`Result`)
 
 Har bir urinish natijasi: to‘g‘ri/noto‘g‘ri soni, baho (2–5), proktoring belgilari. Filtrlar: talaba, test, fan, guruh, baho.
 
@@ -455,7 +424,7 @@ Har bir urinish natijasi: to‘g‘ri/noto‘g‘ri soni, baho (2–5), proktori
 | `DELETE` | `/api/result/{result_id}` | `delete:result` | Natijani o‘chirish. | `result_id`* | — |
 | `GET` | `/api/result/` | `user_answers:read` | Natijalar ro‘yxati (sahifalab, filtrlar bilan). `faculty_id` — talabaning fakulteti (natija guruhi bo‘yicha), `kafedra_id` — testni yaratgan o‘qituvchining kafedrasi. | `user_id`, `quiz_id`, `subject_id`, `group_id`, `faculty_id`, `kafedra_id`, `grade`, `username`, `page`, `limit`, `sort_dir` | — |
 
-### 7.19. Talaba javoblari (`User Answers`)
+### 7.16. Talaba javoblari (`User Answers`)
 
 Natijani savolma-savol tahlil qilish.
 
@@ -463,7 +432,7 @@ Natijani savolma-savol tahlil qilish.
 |---|---|---|---|---|---|
 | `GET` | `/api/user_answers/` | `user_answers:read` | Talabaning har bir savolga bergan javoblari — natijani tahlil qilish uchun (`result_id` bo‘yicha). | `page`, `limit`, `user_id`, `quiz_id`, `question_id`, `result_id` | — |
 
-### 7.20. Psixologik testlar (`Psychology`)
+### 7.17. Psixologik testlar (`Psychology`)
 
 Psixolog (`psixologik` roli) metodikalar tuzadi (savollar JSONB, turlari: `text`, `true_false`, `scale`, `image_stimulus`, `image_choice`, `multi_choice`), talaba topshiradi, ball avtomatik hisoblanadi.
 
@@ -483,7 +452,7 @@ Psixolog (`psixologik` roli) metodikalar tuzadi (savollar JSONB, turlari: `text`
 | `DELETE` | `/api/psychology/test/results/{result_id}` | `delete:psychology_results` | Natijani o‘chirish. | `result_id`* | — |
 | `GET` | `/api/psychology/test/results/{result_id}` | `read:psychology_results` | Natija ma’lumotini olish. | `result_id`* | — |
 
-### 7.21. Kurslar (LMS) (`Course`)
+### 7.18. Kurslar (LMS) (`Course`)
 
 O‘qituvchining kursi: fan + guruhlar + semestr. Darslar, topshiriqlar va materiallar kursga bog‘lanadi.
 
@@ -495,37 +464,35 @@ O‘qituvchining kursi: fan + guruhlar + semestr. Darslar, topshiriqlar va mater
 | `PUT` | `/api/course/{course_id}` | `update:course` | Kursni tahrirlash. | `course_id`* | `name`: string, `subject_id`: integer, `teacher_id`: integer, `description`: string, `semester_number`: integer, `group_ids`: integer[], `faculty_id`: integer, `kafedra_id`: integer, `speciality_id`: integer |
 | `DELETE` | `/api/course/{course_id}` | `delete:course` | Kursni o‘chirish. | `course_id`* | — |
 
-### 7.22. Darslar (`Lesson`)
+### 7.19. Darslar (`Lesson`)
 
-Dars (mavzu, sana, guruh) va u bo‘yicha davomat/baholar.
+Dars (mavzu, sana, guruh). Diqqat: darsga bog‘langan davomat/baho (`LessonResult`) modeli olib tashlangan — bu funksiya hozircha yo‘q.
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/lesson/` | `create:quiz` | Yangi dars yaratish. `group_id` berilmasa kursning guruhi olinadi (kursda bir nechta guruh bo‘lsa majburiy), `date` berilmasa bugungi sana (Toshkent) qo‘yiladi. | — | `subject_teacher_id`: integer, `group_id`: integer, `course_id`*: integer, `topic_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `duration_minutes`: integer, `topic`*: string, `date`: string, `description`: string |
-| `GET` | `/api/lesson/` | `user_answers:read` | Darslar ro‘yxati (sahifalab, filtrlar bilan). | `subject_teacher_id`, `group_id`, `course_id`, `date_from`, `date_to`, `page`, `limit` | — |
+| `POST` | `/api/lesson/` | `create:quiz` | Yangi dars yaratish. `group_id` berilmasa kursning guruhi olinadi (kursda bir nechta guruh bo‘lsa majburiy), `date` berilmasa bugungi sana (Toshkent) qo‘yiladi. | — | `teacher_subject_id`: integer, `group_id`: integer, `course_id`*: integer, `topic_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `topic`*: string, `date`: string, `description`: string |
+| `GET` | `/api/lesson/` | `user_answers:read` | Darslar ro‘yxati (sahifalab, filtrlar bilan). | `teacher_subject_id`, `group_id`, `course_id`, `date_from`, `date_to`, `page`, `limit` | — |
 | `GET` | `/api/lesson/{lesson_id}` | `read:lesson` | Dars ma’lumotini olish. | `lesson_id`* | — |
-| `PUT` | `/api/lesson/{lesson_id}` | `update:lesson` | Darsni tahrirlash. | `lesson_id`* | `subject_teacher_id`: integer, `group_id`: integer, `course_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `topic`: string, `date`: string, `description`: string |
+| `PUT` | `/api/lesson/{lesson_id}` | `update:lesson` | Darsni tahrirlash. | `lesson_id`* | `teacher_subject_id`: integer, `group_id`: integer, `course_id`: integer, `lesson_type`: lecture/seminar/independent/lab, `topic`: string, `date`: string, `description`: string |
 | `DELETE` | `/api/lesson/{lesson_id}` | `delete:lesson` | Darsni o‘chirish. | `lesson_id`* | — |
-| `GET` | `/api/lesson/{lesson_id}/results` | `read:lesson` | Dars bo‘yicha davomat/baholar ro‘yxati. | `lesson_id`* | — |
-| `PUT` | `/api/lesson/{lesson_id}/results` | `update:lesson_result` | Dars bo‘yicha davomat va baholarni bir yo‘la saqlash (upsert). | `lesson_id`* | `items`*: object[] |
 
-### 7.23. Topshiriqlar (`Assignment`)
+### 7.20. Uy vazifalari (`Homework`)
 
-Uy vazifalari: o‘qituvchi beradi, talaba topshiradi, o‘qituvchi baholaydi.
+Uy vazifalari: o‘qituvchi beradi, talaba topshiradi, o‘qituvchi baholaydi. (Ilgari `Assignment`/`AssignmentSubmission` deb atalgan — `/api/assignment/*` endpointlari olib tashlangan, o‘rniga `/api/homework/*`.)
 
 | Metod | Manzil | Ruxsat | Nima qiladi | Parametrlar | Body maydonlari |
 |---|---|---|---|---|---|
-| `POST` | `/api/assignment/` | `create:quiz` | Yangi topshiriq yaratish. | — | `course_id`*: integer, `lesson_id`: integer, `title`*: string, `description`: string, `deadline`*: string, `max_grade`: integer, `allow_file`: boolean, `allow_text`: boolean, `allowed_file_types`: string[] |
-| `GET` | `/api/assignment/` | `user_answers:read` | Topshiriqlar ro‘yxati (sahifalab, filtrlar bilan). | `course_id`, `lesson_id`, `page`, `limit` | — |
-| `GET` | `/api/assignment/{assignment_id}` | `read:assignment` | Topshiriq ma’lumotini olish. | `assignment_id`* | — |
-| `PUT` | `/api/assignment/{assignment_id}` | `update:assignment` | Topshiriqni tahrirlash. | `assignment_id`* | `lesson_id`: integer, `title`: string, `description`: string, `deadline`: string, `max_grade`: integer, `allow_file`: boolean, `allow_text`: boolean, `allowed_file_types`: string[] |
-| `DELETE` | `/api/assignment/{assignment_id}` | `delete:assignment` | Topshiriqni o‘chirish. | `assignment_id`* | — |
-| `POST` | `/api/assignment/{assignment_id}/submit` | `create:submission` | Talaba topshiriqni topshiradi. | `assignment_id`* | `submitted_text`: string, `submitted_files`: object[] |
-| `GET` | `/api/assignment/{assignment_id}/my-submission` | `read:submission` | Talaba o‘zining topshirgan ishini ko‘radi. | `assignment_id`* | — |
-| `GET` | `/api/assignment/{assignment_id}/submissions` | `read:submission` | O‘qituvchi uchun: topshiriq bo‘yicha barcha topshirilgan ishlar. | `assignment_id`* | — |
-| `PUT` | `/api/assignment/{assignment_id}/submission/{user_id}/grade` | `update:submission` | Topshirilgan ishga baho qo‘yish. | `assignment_id`*, `user_id`* | `grade`*: integer, `feedback`: string |
+| `POST` | `/api/homework/` | `create:homework` | Yangi uy vazifasi yaratish. | — | `course_id`*: integer, `lesson_id`: integer, `title`*: string, `description`: string, `deadline`*: string, `max_grade`: integer, `allow_file`: boolean, `allow_text`: boolean, `allowed_file_types`: string[] |
+| `GET` | `/api/homework/` | `read:homework` | Uy vazifalari ro‘yxati (sahifalab, filtrlar bilan). | `course_id`, `lesson_id`, `page`, `limit` | — |
+| `GET` | `/api/homework/{homework_id}` | `read:homework` | Uy vazifasi ma’lumotini olish. | `homework_id`* | — |
+| `PUT` | `/api/homework/{homework_id}` | `update:homework` | Uy vazifasini tahrirlash. | `homework_id`* | `lesson_id`: integer, `title`: string, `description`: string, `deadline`: string, `max_grade`: integer, `allow_file`: boolean, `allow_text`: boolean, `allowed_file_types`: string[] |
+| `DELETE` | `/api/homework/{homework_id}` | `delete:homework` | Uy vazifasini o‘chirish. | `homework_id`* | — |
+| `POST` | `/api/homework/{homework_id}/submit` | `create:submission` | Talaba uy vazifasini topshiradi. | `homework_id`* | `submitted_text`: string, `submitted_files`: object[] |
+| `GET` | `/api/homework/{homework_id}/my-submission` | `read:submission` | Talaba o‘zining topshirgan ishini ko‘radi. | `homework_id`* | — |
+| `GET` | `/api/homework/{homework_id}/submissions` | `read:submission` | O‘qituvchi uchun: uy vazifasi bo‘yicha barcha topshirilgan ishlar. | `homework_id`* | — |
+| `PUT` | `/api/homework/{homework_id}/submission/{user_id}/grade` | `update:submission` | Topshirilgan ishga baho qo‘yish. | `homework_id`*, `user_id`* | `grade`*: integer, `feedback`: string |
 
-### 7.24. Dars materiallari (`Resource`)
+### 7.21. Dars materiallari (`Resource`)
 
 Fayllar va havolalar — darsga yoki kursga biriktiriladi.
 
@@ -538,7 +505,7 @@ Fayllar va havolalar — darsga yoki kursga biriktiriladi.
 | `PUT` | `/api/resource/{resource_id}` | `update:resource` | Resursni tahrirlash. | `resource_id`* | `title`: string, `file_url`: string, `link_url`: string, `text_content`: string, `order_index`: integer |
 | `DELETE` | `/api/resource/{resource_id}` | `delete:resource` | Resursni o‘chirish. | `resource_id`* | — |
 
-### 7.25. EduPlan (EPOS) sinxronizatsiyasi (`EduPlan`)
+### 7.22. EduPlan (EPOS) sinxronizatsiyasi (`EduPlan`)
 
 Tashkiliy tuzilma manbai. **Faqat o‘qish**, EduPlan’ga hech narsa yozilmaydi. Ikki bosqich: `preview` (takliflar) → `apply` (qo‘llash). Hech narsa o‘chirilmaydi. Sozlamalarda `APP_CONFIG__EDUPLAN__*` yoqilgan bo‘lishi kerak.
 
@@ -550,7 +517,7 @@ Tashkiliy tuzilma manbai. **Faqat o‘qish**, EduPlan’ga hech narsa yozilmaydi
 | `POST` | `/api/integration/eduplan/workloads` | `sync:eduplan` | EduPlan yuklamalaridan o‘qituvchi–fan–guruh biriktirishlarini yaratish. | `academic_year_id` | — |
 | `POST` | `/api/integration/eduplan/run` | `sync:eduplan` | To‘liq avtomatik sinxronizatsiya (cron uchun): aniq takliflar qo‘llanadi, konfliktlar adminga qoldiriladi. Redis qulfi parallel ishga tushishdan saqlaydi. | — | — |
 
-### 7.26. Loglar (`Logs`)
+### 7.23. Loglar (`Logs`)
 
 Frontend xatoliklarini yig‘ish.
 
@@ -558,7 +525,7 @@ Frontend xatoliklarini yig‘ish.
 |---|---|---|---|---|---|
 | `POST` | `/api/logs/client` | `ochiq` | Frontend xatoliklarini serverga yuborish (monitoring uchun). | — | `entries`*: object[] |
 
-### 7.27. Tizim (`Tizim`)
+### 7.24. Tizim (`Tizim`)
 
 Xizmat endpointlari.
 
@@ -581,7 +548,34 @@ Alohida mikroservis (`face-detection/`, port 8001). Test `proctoring_mode = "fac
 
 ---
 
-## 9. Tez-tez so‘raladigan savollar
+## 9. Joylashtirish (deployment) haqida eslatmalar
+
+Model refaktori davomida aniqlangan, operator bilishi shart bo‘lgan uchta narsa.
+
+### 9.1. Ikkita migratsiya qaytarib bo‘lmaydi
+
+`a7b8c9d0e1f2` (`merge employee into teacher`) va `b8c9d0e1f2a3` (`split teacher assignment into teacher_group and teacher_subject`) migratsiyalarining `downgrade()` metodi yo‘q — ular ma’lumotni geri qaytarib bo‘lmaydigan tarzda o‘chiradi/qayta shakllantiradi. **Bu ikkalasini prodakshinga qo‘llashdan oldin bazadan zaxira nusxa (`make backup-database`) oling.**
+
+### 9.2. Migratsiyadan oldin: nechta `group_teachers` yozuvi yo‘qoladi
+
+`b8c9d0e1f2a3` migratsiyasi `group_teachers` jadvalidagi, xodim kartochkasi (`teachers` yozuvi) yo‘q foydalanuvchilarga tegishli qatorlarni tashlab ketadi — ularni keyinga qoldirib bo‘lmaydi. **Migratsiyani qo‘llashdan oldin prodakshin bazasida shu so‘rovni ishga tushiring:**
+
+```sql
+SELECT count(*) AS will_be_lost
+FROM group_teachers gt
+LEFT JOIN teachers t ON t.user_id = gt.teacher_id
+WHERE t.id IS NULL;
+```
+
+Natija `0` dan farq qilsa — shuncha o‘qituvchi↔guruh biriktiruvi qaytarib bo‘lmas tarzda yo‘qoladi; migratsiyadan oldin nima qilish kerakligini hal qiling (yo‘q xodim kartochkalarini yarating, yoki yo‘qotishga rozi bo‘ling).
+
+### 9.3. Ruxsat nomlari o‘zgardi
+
+`*:assignment` ruxsatlari `*:homework` bilan almashtirildi; `*:employee`, `*:department`, `*:teacher_assignment` va `update:lesson_result` ruxsatlari butunlay olib tashlandi. Bu eski ruxsat nomlarini ushlab turgan **admin bo‘lmagan** rollar mos huquqlarni yo‘qotadi (admin roliga ta’sir qilmaydi — u ilova ishga tushganda barcha ruxsatlarni avtomatik oladi). Migratsiyadan keyin shu rollarni tekshirib, kerak bo‘lsa yangi `*:homework` ruxsatlarini qayta biriktiring.
+
+---
+
+## 10. Tez-tez so‘raladigan savollar
 
 **Token necha vaqt yashaydi?** — Harakatsizlikda 30 daqiqa; faol ishlatilganda JWT `exp` (absolyut chegara) gacha.
 
