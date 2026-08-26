@@ -14,9 +14,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 
-async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject_filters) -> None:
+async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject_filters: ColumnElement[bool]) -> None:
     """Бросает 409, если по отбираемым связкам уже есть занятия.
 
     ``entity`` — то, что удаляют, в виде подлежащего для сообщения:

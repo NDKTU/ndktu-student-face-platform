@@ -281,12 +281,10 @@ class TeacherRepository:
         # 2. Questions
         await session.execute(delete(Question).where(Question.user_id == teacher_user_id))
 
-        # 3. Guruh biriktirmalari — endi `teachers.id` bo'yicha.
-        await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id == teacher_id))
-
-        # 4. Fan biriktirmalari
-        await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id == teacher_id))
-
+        # 3. Guruh va fan biriktirmalarini alohida o'chirmaymiz: ular
+        # `Teacher.teacher_groups` / `Teacher.teacher_subjects` dagi
+        # `cascade="all, delete-orphan"` bilan ketadi. Ikkinchi mexanizm
+        # qo'shsak, ikkalasi vaqt o'tib bir-biridan uzoqlashadi.
         try:
             await session.delete(teacher)
             await session.commit()
@@ -308,26 +306,34 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-        # 2. Delete existing
-        for tg in teacher.teacher_groups:
-            await session.delete(tg)
+        # 2. Ro'yxatni farq bo'yicha yangilaymiz — `assign_subjects` dagidek.
+        # Bu yerda hech qanday FK `teacher_group.id` ga qaramaydi, lekin jadval
+        # `ExternalRefMixin` ni oladi: satrni o'chirib qayta yozish EduPlan'dan
+        # kelgan biriktirmani jimgina "qo'lda kiritilgan" ga aylantirib,
+        # `external_source` va `synced_at` ni yo'qotardi.
+        requested = set(data.group_ids)
+        existing = {tg.group_id: tg for tg in teacher.teacher_groups}
+
+        for group_id in sorted(existing.keys() - requested):
+            await session.delete(existing[group_id])
 
         await session.flush()
 
         # 3. Fetch specific groups to validate
+        added_group_ids = sorted(requested - existing.keys())
         if data.group_ids:
             stmt_groups = select(Group).where(Group.id.in_(data.group_ids))
             result_groups = await session.execute(stmt_groups)
             groups = result_groups.scalars().all()
 
-            if len(groups) != len(data.group_ids):
+            if len(groups) != len(requested):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="One or more group_ids are invalid",
                 )
 
             # 4. Create new TeacherGroup entries
-            for group_id in data.group_ids:
+            for group_id in added_group_ids:
                 session.add(TeacherGroup(group_id=group_id, teacher_id=data.teacher_id))
 
         try:

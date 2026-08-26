@@ -436,3 +436,139 @@ async def test_assign_subjects_keeps_untouched_rows(
 
     after = (await async_db.execute(select(TeacherSubject.id).order_by(TeacherSubject.id))).scalars().all()
     assert after == before
+
+
+@pytest.mark.asyncio
+async def test_assign_groups_keeps_untouched_rows(auth_client, async_db, test_teacher, test_group, test_faculty):
+    """Ro'yxatni o'zgartirmay qayta saqlash EduPlan belgilarini yo'qotmaydi.
+
+    `teacher_group.id` ga hech qanday FK qaramaydi, lekin jadval
+    `ExternalRefMixin` ni oladi: satrni o'chirib qayta yozish EduPlan'dan kelgan
+    biriktirmani jimgina qo'lda kiritilganga aylantirib qo'yardi.
+    """
+    from sqlalchemy import select
+
+    from app.modules.organization_structure.model import TeacherGroup
+
+    second_group = await auth_client.post("/group/", json={"name": "SE-2025", "faculty_id": test_faculty["id"]})
+    assert second_group.status_code == 201
+    second_group_id = second_group.json()["id"]
+
+    assign = await auth_client.post(
+        "/teacher/assign_groups",
+        json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"], second_group_id]},
+    )
+    assert assign.status_code == 200
+
+    # Bitta satrni EduPlan'niki qilib belgilaymiz — sinxronizatsiya qilgani kabi.
+    synced = (
+        await async_db.execute(select(TeacherGroup).where(TeacherGroup.group_id == test_group["id"]))
+    ).scalar_one()
+    synced.external_source = "eduplan"
+    await async_db.commit()
+    synced_id = synced.id
+
+    # O'sha ro'yxatni qayta saqlaymiz.
+    again = await auth_client.post(
+        "/teacher/assign_groups",
+        json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"], second_group_id]},
+    )
+    assert again.status_code == 200
+
+    async_db.expire_all()
+    rows = (await async_db.execute(select(TeacherGroup).order_by(TeacherGroup.id))).scalars().all()
+    assert {r.group_id for r in rows} == {test_group["id"], second_group_id}
+
+    kept = next(r for r in rows if r.group_id == test_group["id"])
+    assert kept.id == synced_id, "satr qayta yozilgan — id o'zgargan"
+    assert kept.external_source == "eduplan", "EduPlan belgisi yo'qolgan"
+
+
+@pytest.mark.asyncio
+async def test_assign_groups_removes_only_dropped_rows(auth_client, async_db, test_teacher, test_group, test_faculty):
+    """Ro'yxatdan chiqarilgan guruh uziladi, qolgani joyida qoladi."""
+    from sqlalchemy import select
+
+    from app.modules.organization_structure.model import TeacherGroup
+
+    second_group = await auth_client.post("/group/", json={"name": "SE-2026", "faculty_id": test_faculty["id"]})
+    assert second_group.status_code == 201
+    second_group_id = second_group.json()["id"]
+
+    await auth_client.post(
+        "/teacher/assign_groups",
+        json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"], second_group_id]},
+    )
+    async_db.expire_all()
+    kept_id = (
+        await async_db.execute(select(TeacherGroup.id).where(TeacherGroup.group_id == test_group["id"]))
+    ).scalar_one()
+
+    response = await auth_client.post(
+        "/teacher/assign_groups",
+        json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"]]},
+    )
+    assert response.status_code == 200
+
+    async_db.expire_all()
+    rows = (await async_db.execute(select(TeacherGroup))).scalars().all()
+    assert [(r.id, r.group_id) for r in rows] == [(kept_id, test_group["id"])]
+
+
+@pytest.mark.asyncio
+async def test_delete_teacher_cascades_assignments(auth_client, async_db, test_teacher, test_group, test_subject):
+    """Biriktirmalari bor o'qituvchi o'chganda ular ham ketadi.
+
+    Ular endi ORM cascade (`Teacher.teacher_groups` / `teacher_subjects` dagi
+    `delete-orphan`) bilan o'chadi — ilgarigi qo'lda yozilgan bulk `delete()`
+    bilan emas. Async sessiyada bu yo'l `session.delete()` ichida to'plamlarni
+    yuklaydi, shuning uchun uni test bilan qoplash shart.
+    """
+    from sqlalchemy import func, select
+
+    from app.modules.auth.model import TeacherSubject
+    from app.modules.organization_structure.model import TeacherGroup
+
+    assert (
+        await auth_client.post(
+            "/teacher/assign_groups",
+            json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"]]},
+        )
+    ).status_code == 200
+    assert (
+        await auth_client.post(
+            "/teacher/assign_subjects",
+            json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
+        )
+    ).status_code == 200
+
+    # Biriktirma bor — tasdiqsiz o'chirmaydi.
+    assert (await auth_client.delete(f"/teacher/{test_teacher['id']}")).status_code == 409
+
+    response = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
+    assert response.status_code == 204
+
+    async_db.expire_all()
+    assert (await async_db.execute(select(func.count(TeacherGroup.id)))).scalar() == 0
+    assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_subject_detaches_teacher_assignment(auth_client, async_db, test_teacher, test_subject):
+    """Fan o'chganda biriktirma uziladi (dars yo'q bo'lsa)."""
+    from sqlalchemy import func, select
+
+    from app.modules.auth.model import TeacherSubject
+
+    assert (
+        await auth_client.post(
+            "/teacher/assign_subjects",
+            json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
+        )
+    ).status_code == 200
+
+    response = await auth_client.delete(f"/subject/{test_subject.id}?force=true")
+    assert response.status_code == 204
+
+    async_db.expire_all()
+    assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0

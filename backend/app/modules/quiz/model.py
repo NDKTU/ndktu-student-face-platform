@@ -37,7 +37,6 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     teacher_subjects: Mapped[list["TeacherSubject"]] = relationship(
         "TeacherSubject",
         back_populates="subject",
-        cascade="all, delete-orphan",
     )
 
     questions: Mapped[list["Question"]] = relationship("Question", back_populates="subject")
