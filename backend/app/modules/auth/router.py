@@ -55,13 +55,6 @@ from .teacher.schemas import (
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
-from .teacher_assignment.repository import get_teacher_assignment_repository
-from .teacher_assignment.schemas import (
-    TeacherAssignmentCreateRequest,
-    TeacherAssignmentListRequest,
-    TeacherAssignmentListResponse,
-    TeacherAssignmentResponse,
-)
 from .user.repository import get_user_repository
 from .user.schemas import (
     UserChangeCredentialsRequest,
@@ -657,51 +650,6 @@ async def kafedra_ranking(
 
 
 # ============================================================================
-#  TEACHER ASSIGNMENT
-# ============================================================================
-teacher_assignment_router = APIRouter(
-    tags=["TeacherAssignment"],
-    prefix="/teacher-assignment",
-)
-
-
-@teacher_assignment_router.post(
-    "/",
-    response_model=TeacherAssignmentResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
-)
-async def create_assignment(
-    data: TeacherAssignmentCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:teacher_assignment")),
-):
-    return await get_teacher_assignment_repository.create_assignment(session=session, data=data)
-
-
-@teacher_assignment_router.get("/", response_model=TeacherAssignmentListResponse)
-async def list_assignments(
-    data: TeacherAssignmentListRequest = Depends(),
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:teacher_assignment")),
-):
-    return await get_teacher_assignment_repository.list_assignments(session=session, request=data)
-
-
-@teacher_assignment_router.delete(
-    "/{assignment_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
-)
-async def delete_assignment(
-    assignment_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:teacher_assignment")),
-):
-    await get_teacher_assignment_repository.delete_assignment(session=session, assignment_id=assignment_id)
-
-
-# ============================================================================
 #  HEMIS
 # ============================================================================
 hemis_router = APIRouter(prefix="/hemis", tags=["Hemis"])
@@ -752,5 +700,4 @@ router.include_router(role_router)
 router.include_router(permission_router)
 router.include_router(student_router)
 router.include_router(teacher_router)
-router.include_router(teacher_assignment_router)
 router.include_router(hemis_router)

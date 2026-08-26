@@ -9,9 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Student, Teacher, User
-from app.modules.organization_structure.model import Faculty, Group, GroupTeacher
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, SubjectTeacher, UserAnswers
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
     QuizAnalyticsResponse,
@@ -42,13 +42,15 @@ class QuizRepository:
         if is_teacher:
             group_ids = list(
                 (await session.execute(
-                    select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+                    select(TeacherGroup.group_id)
+                    .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                    .where(Teacher.user_id == current_user.id)
                 )).scalars().all()
             )
             subject_ids = list(
                 (await session.execute(
-                    select(SubjectTeacher.subject_id)
-                    .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+                    select(TeacherSubject.subject_id)
+                    .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
                     .where(Teacher.user_id == current_user.id)
                 )).scalars().all()
             )
@@ -289,7 +291,7 @@ class QuizRepository:
             for question in result_questions.scalars().all():
                 session.add(QuizQuestion(quiz=new_quiz, question=question))
 
-        # Связка GroupTeacher здесь раньше создавалась автоматически. Убрано: под
+        # Связка TeacherGroup здесь раньше создавалась автоматически. Убрано: под
         # разделением ролей это значило бы, что организатор, создав тест группе,
         # молча становится её преподавателем. Права не должны появляться как
         # побочный эффект действия.
@@ -337,14 +339,18 @@ class QuizRepository:
 
         elif is_teacher:
             # Check teacher's groups
-            gt_stmt = select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+            gt_stmt = (
+                select(TeacherGroup.group_id)
+                .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                .where(Teacher.user_id == current_user.id)
+            )
             gt_result = await session.execute(gt_stmt)
             allowed_group_ids = gt_result.scalars().all()
 
             # Check teacher's subjects
             st_stmt = (
-                select(SubjectTeacher.subject_id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+                select(TeacherSubject.subject_id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
                 .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
@@ -352,7 +358,7 @@ class QuizRepository:
 
             # Тесты, собранные из банка этого преподавателя, видны ему всегда —
             # даже если предмет или группа за ним формально не закреплены. Раньше
-            # видимость держалась на GroupTeacher, который создавался побочным
+            # видимость держалась на TeacherGroup, который создавался побочным
             # эффектом создания теста; теперь тест создаёт организатор, и такая
             # связка не появляется.
             conditions = [Quiz.lecturer_id == current_user.id]
@@ -570,7 +576,7 @@ class QuizRepository:
                 new_qq = QuizQuestion(quiz_id=new_quiz.id, question_id=qq.question_id)
                 session.add(new_qq)
 
-        # Связка GroupTeacher здесь тоже не создаётся — см. комментарий в create_quiz.
+        # Связка TeacherGroup здесь тоже не создаётся — см. комментарий в create_quiz.
 
         try:
             await session.commit()

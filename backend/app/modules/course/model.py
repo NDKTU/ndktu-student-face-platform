@@ -11,9 +11,9 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import User
+    from app.modules.auth.model import TeacherSubject, User
     from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
-    from app.modules.quiz.model import Subject, SubjectTeacher
+    from app.modules.quiz.model import Subject
 
 
 class Course(Base, IdIntPk, TimestampMixin):
@@ -139,9 +139,9 @@ class CourseTopic(Base, IdIntPk, TimestampMixin):
 class Lesson(Base, IdIntPk, TimestampMixin):
     __tablename__ = "lessons"
 
-    subject_teacher_id: Mapped[int] = mapped_column(
+    teacher_subject_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("subject_teachers.id", ondelete="CASCADE"),
+        ForeignKey("teacher_subject.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
@@ -172,7 +172,7 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     date: Mapped[date_type] = mapped_column(Date, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    subject_teacher: Mapped["SubjectTeacher"] = relationship("SubjectTeacher")
+    teacher_subject: Mapped["TeacherSubject"] = relationship("TeacherSubject")
     group: Mapped["Group"] = relationship("Group")
     course: Mapped["Course"] = relationship("Course", back_populates="lessons")
     course_topic: Mapped["CourseTopic | None"] = relationship("CourseTopic", back_populates="lessons")

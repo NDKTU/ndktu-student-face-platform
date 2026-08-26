@@ -152,20 +152,20 @@ class FacultyRepository:
                 (await session.execute(select(Teacher.id).where(Teacher.kafedra_id.in_(kafedra_ids)))).scalars().all()
             )
             if teacher_ids:
-                from app.modules.organization_structure.model import GroupTeacher
-                from app.modules.quiz.model import SubjectTeacher
+                from app.modules.auth.model import TeacherSubject
+                from app.modules.organization_structure.model import TeacherGroup
 
-                await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
-                await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))
+                await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id.in_(teacher_ids)))
+                await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(Teacher).where(Teacher.id.in_(teacher_ids)))
             await session.execute(delete(Kafedra).where(Kafedra.faculty_id == faculty_id))
 
         # 2. Cascade delete Groups
         group_ids = (await session.execute(select(Group.id).where(Group.faculty_id == faculty_id))).scalars().all()
         if group_ids:
-            from app.modules.organization_structure.model import GroupTeacher
+            from app.modules.organization_structure.model import TeacherGroup
 
-            await session.execute(delete(GroupTeacher).where(GroupTeacher.group_id.in_(group_ids)))
+            await session.execute(delete(TeacherGroup).where(TeacherGroup.group_id.in_(group_ids)))
             await session.execute(delete(Group).where(Group.faculty_id == faculty_id))
 
         stmt = select(Faculty).where(Faculty.id == faculty_id)

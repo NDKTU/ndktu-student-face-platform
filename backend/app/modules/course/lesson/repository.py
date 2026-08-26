@@ -7,11 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
-from app.modules.auth.model import Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
-from app.modules.organization_structure.model import GroupTeacher
-from app.modules.quiz.model import SubjectTeacher
+from app.modules.organization_structure.model import TeacherGroup
 
 from .schemas import (
     LessonCreateRequest,
@@ -34,7 +33,7 @@ class LessonRepository:
         current_user: User,
         group_id: int | None,
         is_admin: bool,
-    ) -> tuple[Course, SubjectTeacher, int]:
+    ) -> tuple[Course, TeacherSubject, int]:
         course = await get_course_repository.get_course_orm(session, course_id)
         if not is_admin and course.teacher_id != current_user.id:
             raise HTTPException(
@@ -64,8 +63,8 @@ class LessonRepository:
                 detail="group_id does not belong to this Course",
             )
 
-        subject_teacher = await get_course_repository.get_or_create_subject_teacher_for_course(session, course)
-        return course, subject_teacher, group_id
+        teacher_subject = await get_course_repository.get_or_create_teacher_subject_for_course(session, course)
+        return course, teacher_subject, group_id
 
     async def _validate_topic(self, session: AsyncSession, course_id: int, topic_id: int | None) -> None:
         if topic_id is None:
@@ -88,13 +87,13 @@ class LessonRepository:
     ) -> Lesson:
         is_admin = await self._is_role(current_user, "admin")
 
-        _, subject_teacher, group_id = await self._resolve_course_context(
+        _, teacher_subject, group_id = await self._resolve_course_context(
             session, data.course_id, current_user, data.group_id, is_admin
         )
         await self._validate_topic(session, data.course_id, data.topic_id)
 
         new_lesson = Lesson(
-            subject_teacher_id=subject_teacher.id,
+            teacher_subject_id=teacher_subject.id,
             group_id=group_id,
             course_id=data.course_id,
             topic_id=data.topic_id,
@@ -123,7 +122,7 @@ class LessonRepository:
         stmt = (
             select(Lesson)
             .options(
-                selectinload(Lesson.subject_teacher).selectinload(SubjectTeacher.subject),
+                selectinload(Lesson.teacher_subject).selectinload(TeacherSubject.subject),
                 selectinload(Lesson.group),
                 selectinload(Lesson.course_topic),
                 selectinload(Lesson.resources),
@@ -145,7 +144,7 @@ class LessonRepository:
         current_user: User,
     ) -> LessonListResponse:
         stmt = select(Lesson).options(
-            selectinload(Lesson.subject_teacher).selectinload(SubjectTeacher.subject),
+            selectinload(Lesson.teacher_subject).selectinload(TeacherSubject.subject),
             selectinload(Lesson.group),
             selectinload(Lesson.course_topic),
             selectinload(Lesson.resources),
@@ -159,21 +158,25 @@ class LessonRepository:
         if is_admin:
             pass
         elif is_teacher:
-            gt_stmt = select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
-            allowed_group_ids = (await session.execute(gt_stmt)).scalars().all()
-
-            st_stmt = (
-                select(SubjectTeacher.id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+            gt_stmt = (
+                select(TeacherGroup.group_id)
+                .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
                 .where(Teacher.user_id == current_user.id)
             )
-            allowed_subject_teacher_ids = (await session.execute(st_stmt)).scalars().all()
+            allowed_group_ids = (await session.execute(gt_stmt)).scalars().all()
+
+            ts_stmt = (
+                select(TeacherSubject.id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                .where(Teacher.user_id == current_user.id)
+            )
+            allowed_teacher_subject_ids = (await session.execute(ts_stmt)).scalars().all()
 
             conditions = []
             if allowed_group_ids:
                 conditions.append(Lesson.group_id.in_(allowed_group_ids))
-            if allowed_subject_teacher_ids:
-                conditions.append(Lesson.subject_teacher_id.in_(allowed_subject_teacher_ids))
+            if allowed_teacher_subject_ids:
+                conditions.append(Lesson.teacher_subject_id.in_(allowed_teacher_subject_ids))
             role_filter = or_(*conditions) if conditions else (Lesson.id == -1)
         elif is_student:
             student_stmt = select(Student.group_id).where(Student.user_id == current_user.id)
@@ -186,8 +189,8 @@ class LessonRepository:
         if role_filter is not None:
             stmt = stmt.where(role_filter)
 
-        if request.subject_teacher_id:
-            stmt = stmt.where(Lesson.subject_teacher_id == request.subject_teacher_id)
+        if request.teacher_subject_id:
+            stmt = stmt.where(Lesson.teacher_subject_id == request.teacher_subject_id)
         if request.group_id:
             stmt = stmt.where(Lesson.group_id == request.group_id)
         if request.course_id is not None:
@@ -211,8 +214,8 @@ class LessonRepository:
         count_stmt = select(func.count()).select_from(Lesson)
         if role_filter is not None:
             count_stmt = count_stmt.where(role_filter)
-        if request.subject_teacher_id:
-            count_stmt = count_stmt.where(Lesson.subject_teacher_id == request.subject_teacher_id)
+        if request.teacher_subject_id:
+            count_stmt = count_stmt.where(Lesson.teacher_subject_id == request.teacher_subject_id)
         if request.group_id:
             count_stmt = count_stmt.where(Lesson.group_id == request.group_id)
         if request.course_id is not None:
@@ -245,8 +248,8 @@ class LessonRepository:
                 detail="Teacher is not the owner of this Course",
             )
 
-        if data.subject_teacher_id is not None:
-            lesson.subject_teacher_id = data.subject_teacher_id
+        if data.teacher_subject_id is not None:
+            lesson.teacher_subject_id = data.teacher_subject_id
         if data.group_id is not None:
             lesson.group_id = data.group_id
         if data.topic_id is not None:

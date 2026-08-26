@@ -5,10 +5,10 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
 from app.modules.organization_structure.model import Group, Kafedra
-from app.modules.quiz.model import Subject, SubjectTeacher
+from app.modules.quiz.model import Subject
 
 from .schemas import (
     CourseCreateRequest,
@@ -439,7 +439,7 @@ class CourseRepository:
     async def get_course_orm(self, session: AsyncSession, course_id: int) -> Course:
         return await self._load_with_relations(session, course_id)
 
-    async def get_or_create_subject_teacher_for_course(self, session: AsyncSession, course: Course) -> SubjectTeacher:
+    async def get_or_create_teacher_subject_for_course(self, session: AsyncSession, course: Course) -> TeacherSubject:
         teacher_stmt = select(Teacher).where(Teacher.user_id == course.teacher_id)
         teacher = (await session.execute(teacher_stmt)).scalar_one_or_none()
         if not teacher:
@@ -448,18 +448,18 @@ class CourseRepository:
                 detail=f"User {course.teacher_id} is not registered as a teacher",
             )
 
-        st_stmt = select(SubjectTeacher).where(
-            SubjectTeacher.subject_id == course.subject_id,
-            SubjectTeacher.teacher_id == teacher.id,
+        ts_stmt = select(TeacherSubject).where(
+            TeacherSubject.subject_id == course.subject_id,
+            TeacherSubject.teacher_id == teacher.id,
         )
-        subject_teacher = (await session.execute(st_stmt)).scalar_one_or_none()
-        if subject_teacher:
-            return subject_teacher
+        teacher_subject = (await session.execute(ts_stmt)).scalar_one_or_none()
+        if teacher_subject:
+            return teacher_subject
 
-        subject_teacher = SubjectTeacher(subject_id=course.subject_id, teacher_id=teacher.id)
-        session.add(subject_teacher)
+        teacher_subject = TeacherSubject(subject_id=course.subject_id, teacher_id=teacher.id)
+        session.add(teacher_subject)
         await session.flush()
-        return subject_teacher
+        return teacher_subject
 
 
 get_course_repository = CourseRepository()

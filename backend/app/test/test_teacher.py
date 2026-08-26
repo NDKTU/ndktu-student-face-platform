@@ -175,21 +175,41 @@ async def test_assign_and_read_subjects(auth_client, test_teacher, test_subject)
 
 
 @pytest.mark.asyncio
-async def test_assign_and_read_groups(auth_client, test_teacher, test_group):
-    """Guruhlar hamon `User` ga biriktiriladi, javob esa o'qituvchi
-    kartochkasidan o'qiladi — `teacher.user.group_teachers` zanjiri tirik."""
+async def test_assign_and_read_groups(auth_client, async_db, test_teacher, test_group):
+    """Guruh biriktiruvi endi to'g'ridan-to'g'ri o'qituvchi kartochkasiga
+    yoziladi: so'rov `teachers.id` kutadi, `users.id` emas."""
+    from sqlalchemy import select
+
+    from app.modules.organization_structure.model import TeacherGroup
+
     user_id = test_teacher["user_id"]
     assign = await auth_client.post(
         "/teacher/assign_groups",
-        json={"user_id": user_id, "group_ids": [test_group["id"]]},
+        json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"]]},
     )
     assert assign.status_code == 200
+
+    # Aynan `teachers.id` yozilganini tekshiramiz: `users.id` yozilib qolsa,
+    # id'lar baribir mavjud bo'lgani uchun hech qanday xato ko'rinmaydi.
+    async_db.expire_all()
+    rows = (await async_db.execute(select(TeacherGroup))).scalars().all()
+    assert [(r.teacher_id, r.group_id) for r in rows] == [(test_teacher["id"], test_group["id"])]
 
     response = await auth_client.get(f"/teacher/assigned_groups/by-user/{user_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["user_id"] == user_id
     assert [gt["group"]["id"] for gt in data["group_teachers"]] == [test_group["id"]]
+
+
+@pytest.mark.asyncio
+async def test_assign_groups_rejects_user_id(auth_client, test_teacher, test_group):
+    """Eski shartnoma (`user_id`) endi qabul qilinmaydi — 422."""
+    response = await auth_client.post(
+        "/teacher/assign_groups",
+        json={"user_id": test_teacher["user_id"], "group_ids": [test_group["id"]]},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

@@ -5,9 +5,9 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Student, Teacher, User
-from app.modules.organization_structure.model import Group, GroupTeacher
-from app.modules.quiz.model import Quiz, Result, SubjectTeacher
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.modules.organization_structure.model import Group, TeacherGroup
+from app.modules.quiz.model import Quiz, Result
 
 from .schemas import (
     ResultListRequest,
@@ -72,22 +72,26 @@ class ResultRepository:
             # Admins see everything, no role-based filter applied
             pass
         elif is_teacher:
-            # Get teacher's assigned groups (group_teachers.teacher_id = users.id)
-            gt_stmt = select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+            # Guruh biriktirmalari (teacher_group.teacher_id = teachers.id)
+            gt_stmt = (
+                select(TeacherGroup.group_id)
+                .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                .where(Teacher.user_id == current_user.id)
+            )
             gt_result = await session.execute(gt_stmt)
             allowed_group_ids = gt_result.scalars().all()
 
-            # Get teacher's assigned subjects (subject_teachers.teacher_id = teachers.id)
+            # Fan biriktirmalari (teacher_subject.teacher_id = teachers.id)
             st_stmt = (
-                select(SubjectTeacher.subject_id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
+                select(TeacherSubject.subject_id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
                 .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
 
             # Результаты по тестам, собранным из банка этого преподавателя, видны
-            # ему всегда. Раньше это обеспечивала связка GroupTeacher, которая
+            # ему всегда. Раньше это обеспечивала связка TeacherGroup, которая
             # создавалась побочным эффектом создания теста; теперь тест создаёт
             # организатор, и такой связки не появляется.
             own_quizzes = Result.quiz_id.in_(select(Quiz.id).where(Quiz.lecturer_id == current_user.id))

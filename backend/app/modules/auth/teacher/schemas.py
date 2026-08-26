@@ -19,7 +19,7 @@ class TeacherGroupInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherUserGroupTeacherInfo(BaseModel):
+class TeacherGroupLinkInfo(BaseModel):
     group_id: int
     group: TeacherGroupInfo
     model_config = ConfigDict(from_attributes=True)
@@ -31,7 +31,7 @@ class TeacherSubjectInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TeacherSubjectTeacherInfo(BaseModel):
+class TeacherSubjectLinkInfo(BaseModel):
     id: int
     subject_id: int
     subject: TeacherSubjectInfo
@@ -166,7 +166,9 @@ class TeacherListResponse(BaseModel):
 
 
 class TeacherGroupAssignRequest(BaseModel):
-    user_id: int
+    # `teachers.id` — `users.id` emas. Guruh biriktirmasi endi o'qituvchi
+    # kartochkasiga bog'lanadi (`teacher_group.teacher_id -> teachers.id`).
+    teacher_id: int
     group_ids: list[int]
 
 
@@ -182,9 +184,18 @@ class TeacherAssignedSubjectsResponse(BaseModel):
     last_name: str
     third_name: str
     full_name: str
-    subject_teachers: list[TeacherSubjectTeacherInfo]
+    subject_teachers: list[TeacherSubjectLinkInfo] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_subject_teachers(cls, data: Any) -> Any:
+        # ORM tomonida bog'lanish `Teacher.teacher_subjects` deb ataladi, javob
+        # kaliti esa mijozlar uchun o'zgarmay qoldi.
+        if hasattr(data, "teacher_subjects"):
+            data.__dict__["subject_teachers"] = data.teacher_subjects
+        return data
 
 
 class TeacherAssignedGroupsResponse(BaseModel):
@@ -194,17 +205,18 @@ class TeacherAssignedGroupsResponse(BaseModel):
     last_name: str
     third_name: str
     full_name: str
-    group_teachers: list[TeacherUserGroupTeacherInfo] = []
+    group_teachers: list[TeacherGroupLinkInfo] = []
 
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
     @classmethod
     def extract_group_teachers(cls, data: Any) -> Any:
-        # Guruhlar hamon `GroupTeacher.teacher_id -> users.id` orqali biriktirilgan,
-        # shuning uchun ular `teacher.user.group_teachers` da yotadi.
-        if hasattr(data, "user") and data.user is not None:
-            data.__dict__["group_teachers"] = data.user.group_teachers
+        # Guruhlar endi to'g'ridan-to'g'ri o'qituvchi kartochkasiga biriktirilgan
+        # (`TeacherGroup.teacher_id -> teachers.id`), javob kaliti esa mijozlar
+        # uchun o'zgarmay qoldi.
+        if hasattr(data, "teacher_groups"):
+            data.__dict__["group_teachers"] = data.teacher_groups
         return data
 
 

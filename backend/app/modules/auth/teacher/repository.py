@@ -8,11 +8,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Teacher, User
+from app.modules.auth.model import Teacher, TeacherSubject, User
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
-from app.modules.organization_structure.model import Faculty, Group, GroupTeacher, Kafedra
-from app.modules.quiz.model import Result, Subject, SubjectTeacher
+from app.modules.organization_structure.model import Faculty, Group, Kafedra, TeacherGroup
+from app.modules.quiz.model import Result, Subject
 
 from .schemas import (
     FacultyRankingResponse,
@@ -42,6 +42,8 @@ class TeacherRepository:
         return (
             selectinload(Teacher.kafedra),
             selectinload(Teacher.user).selectinload(User.roles),
+            selectinload(Teacher.teacher_groups).selectinload(TeacherGroup.group),
+            selectinload(Teacher.teacher_subjects).selectinload(TeacherSubject.subject),
         )
 
     @staticmethod
@@ -209,8 +211,7 @@ class TeacherRepository:
     async def delete_teacher(self, session: AsyncSession, teacher_id: int, force: bool = False) -> None:
         from sqlalchemy import delete
 
-        from app.modules.organization_structure.model import GroupTeacher
-        from app.modules.quiz.model import Question, Quiz, SubjectTeacher
+        from app.modules.quiz.model import Question, Quiz
 
         stmt = select(Teacher).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
@@ -226,13 +227,11 @@ class TeacherRepository:
         if not force:
             st_count = (
                 await session.execute(
-                    select(func.count(SubjectTeacher.id)).where(SubjectTeacher.teacher_id == teacher_id)
+                    select(func.count(TeacherSubject.id)).where(TeacherSubject.teacher_id == teacher_id)
                 )
             ).scalar() or 0
             gt_count = (
-                await session.execute(
-                    select(func.count(GroupTeacher.id)).where(GroupTeacher.teacher_id == teacher_user_id)
-                )
+                await session.execute(select(func.count(TeacherGroup.id)).where(TeacherGroup.teacher_id == teacher_id))
             ).scalar() or 0
             quiz_count = (
                 await session.execute(select(func.count(Quiz.id)).where(Quiz.lecturer_id == teacher_user_id))
@@ -275,26 +274,28 @@ class TeacherRepository:
         # 2. Questions
         await session.execute(delete(Question).where(Question.user_id == teacher_user_id))
 
-        # 3. Group Assignments
-        await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id == teacher_user_id))
+        # 3. Guruh biriktirmalari — endi `teachers.id` bo'yicha.
+        await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id == teacher_id))
 
-        # 4. Subject Assignments (handled by SQLAlchemy cascade)
+        # 4. Fan biriktirmalari
+        await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id == teacher_id))
 
         await session.delete(teacher)
         await session.commit()
 
     async def assign_groups(self, session: AsyncSession, data: TeacherGroupAssignRequest) -> None:
-        # 1. Fetch User (since GroupTeacher uses teacher_id pointing to User.id)
-        stmt = select(User).where(User.id == data.user_id).options(selectinload(User.group_teachers))
+        # 1. O'qituvchi kartochkasi: `TeacherGroup.teacher_id` endi `teachers.id`,
+        # ilgarigidek `users.id` emas.
+        stmt = select(Teacher).where(Teacher.id == data.teacher_id).options(selectinload(Teacher.teacher_groups))
         result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
+        teacher = result.scalar_one_or_none()
 
-        if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
         # 2. Delete existing
-        for gt in user.group_teachers:
-            await session.delete(gt)
+        for tg in teacher.teacher_groups:
+            await session.delete(tg)
 
         await session.flush()
 
@@ -310,10 +311,9 @@ class TeacherRepository:
                     detail="One or more group_ids are invalid",
                 )
 
-            # 4. Create new GroupTeacher entries
+            # 4. Create new TeacherGroup entries
             for group_id in data.group_ids:
-                new_gt = GroupTeacher(group_id=group_id, teacher_id=data.user_id)
-                session.add(new_gt)
+                session.add(TeacherGroup(group_id=group_id, teacher_id=data.teacher_id))
 
         try:
             await session.commit()
@@ -325,8 +325,8 @@ class TeacherRepository:
             )
 
     async def assign_subjects(self, session: AsyncSession, data: TeacherSubjectAssignRequest) -> None:
-        # 1. Fetch Teacher (since SubjectTeacher uses teacher_id pointing to Teacher.id)
-        stmt = select(Teacher).where(Teacher.id == data.teacher_id).options(selectinload(Teacher.subject_teachers))
+        # 1. Fetch Teacher (since TeacherSubject uses teacher_id pointing to Teacher.id)
+        stmt = select(Teacher).where(Teacher.id == data.teacher_id).options(selectinload(Teacher.teacher_subjects))
         result = await session.execute(stmt)
         teacher = result.scalar_one_or_none()
 
@@ -334,8 +334,8 @@ class TeacherRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
         # 2. Delete existing
-        for st in teacher.subject_teachers:
-            await session.delete(st)
+        for ts in teacher.teacher_subjects:
+            await session.delete(ts)
 
         await session.flush()
 
@@ -353,8 +353,7 @@ class TeacherRepository:
 
             # 4. Create new entries
             for subject_id in data.subject_ids:
-                new_st = SubjectTeacher(subject_id=subject_id, teacher_id=data.teacher_id)
-                session.add(new_st)
+                session.add(TeacherSubject(subject_id=subject_id, teacher_id=data.teacher_id))
 
         try:
             await session.commit()
@@ -368,7 +367,7 @@ class TeacherRepository:
     async def get_assigned_subjects_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
             select(Teacher)
-            .options(selectinload(Teacher.subject_teachers).selectinload(SubjectTeacher.subject))
+            .options(selectinload(Teacher.teacher_subjects).selectinload(TeacherSubject.subject))
             .where(Teacher.user_id == user_id)
         )
 
@@ -387,10 +386,9 @@ class TeacherRepository:
         stmt = (
             select(Teacher)
             .options(
-                # user'ni aniq yuklaymiz: javob sxemasi guruhlarni
-                # `teacher.user.group_teachers` dan oladi, lazy-load esa
-                # async sessiyada MissingGreenlet bilan yiqiladi.
-                selectinload(Teacher.user).selectinload(User.group_teachers).selectinload(GroupTeacher.group)
+                # Guruhlarni aniq yuklaymiz: lazy-load async sessiyada
+                # MissingGreenlet bilan yiqiladi.
+                selectinload(Teacher.teacher_groups).selectinload(TeacherGroup.group)
             )
             .where(Teacher.user_id == user_id)
         )
@@ -490,8 +488,8 @@ class TeacherRepository:
             select(*columns)
             .outerjoin(Kafedra, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(Faculty, Kafedra.faculty_id == Faculty.id)
-            .outerjoin(GroupTeacher, Teacher.user_id == GroupTeacher.teacher_id)
-            .outerjoin(Result, GroupTeacher.group_id == Result.group_id)
+            .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
         )
 
         if faculty_id is not None:
@@ -499,7 +497,7 @@ class TeacherRepository:
         if kafedra_id is not None:
             stmt = stmt.where(Teacher.kafedra_id == kafedra_id)
         if group_id is not None:
-            stmt = stmt.where(GroupTeacher.group_id == group_id)
+            stmt = stmt.where(TeacherGroup.group_id == group_id)
 
         stmt = stmt.group_by(
             Teacher.id,
@@ -592,8 +590,8 @@ class TeacherRepository:
             )
             .outerjoin(Kafedra, Kafedra.faculty_id == Faculty.id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
-            .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
+            .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
             .group_by(Faculty.id, Faculty.name)
             .order_by(desc("rank_score"))
         )
@@ -654,8 +652,8 @@ class TeacherRepository:
             )
             .outerjoin(Faculty, Faculty.id == Kafedra.faculty_id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
-            .outerjoin(GroupTeacher, GroupTeacher.teacher_id == Teacher.user_id)
-            .outerjoin(Result, Result.group_id == GroupTeacher.group_id)
+            .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
             .group_by(Kafedra.id, Kafedra.name, Kafedra.faculty_id, Faculty.name)
             .order_by(desc("rank_score"))
         )

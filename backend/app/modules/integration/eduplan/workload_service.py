@@ -1,13 +1,16 @@
-"""Импорт нагрузки EduPlan в связки преподаватель-предмет-группа.
+"""Импорт нагрузки EduPlan в связки преподаватель-предмет и преподаватель-группа.
 
-Ради этого интеграция и затевалась: сейчас ``teacher_assignments`` заполняют
-руками.
+Ради этого интеграция и затевалась: сейчас ``teacher_subject`` и
+``teacher_group`` заполняют руками.
+
+Тройка (преподаватель, предмет, группа) больше не хранится: нагрузка
+раскладывается на две пары — ``teacher_subject`` и ``teacher_group``.
 
 Три особенности источника, из-за которых наивный импорт не работает:
 
 * на одну связку (преподаватель, предмет, группа) в EduPlan приходится по
   строке нагрузки на каждый вид занятий — лекция, практика, лаборатория и так
-  далее. Без схлопывания ограничение ``uq_teacher_subject_group`` сорвало бы
+  далее. Без схлопывания ограничение ``uq_teacher_subject`` сорвало бы
   транзакцию на первой же паре;
 * нагрузка может быть выдана не на группу, а на поток — его нужно развернуть
   в перечень групп;
@@ -24,8 +27,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Teacher, TeacherAssignment
-from app.modules.organization_structure.model import Group
+from app.modules.auth.model import Teacher, TeacherSubject
+from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Subject
 
 from .client import EduPlanClient
@@ -118,7 +121,11 @@ class EduPlanWorkloadService:
                     bucket["semester_types"].add(wl.semester_type)
 
         created, updated = await self._persist(session, collapsed)
-        deactivated = await self._deactivate_missing(session, set(collapsed))
+        deactivated = await self._deactivate_missing(
+            session,
+            {(teacher_id, subject_id) for teacher_id, subject_id, _ in collapsed},
+            {(teacher_id, group_id) for teacher_id, _, group_id in collapsed},
+        )
 
         await session.commit()
 
@@ -161,33 +168,48 @@ class EduPlanWorkloadService:
         if not collapsed:
             return 0, 0
 
-        existing_rows = (await session.execute(select(TeacherAssignment))).scalars().all()
-        existing = {(r.teacher_id, r.subject_id, r.group_id): r for r in existing_rows}
+        # (teacher, subject) va (teacher, group) juftliklariga yoyamiz.
+        by_subject: dict[tuple[int, int], dict] = defaultdict(lambda: {"load_types": set(), "semester_types": set()})
+        pairs_group: set[tuple[int, int]] = set()
+        for (teacher_id, subject_id, group_id), bucket in collapsed.items():
+            b = by_subject[(teacher_id, subject_id)]
+            b["load_types"] |= bucket["load_types"]
+            b["semester_types"] |= bucket["semester_types"]
+            pairs_group.add((teacher_id, group_id))
 
         created = updated = 0
         now = utcnow_naive()
 
-        for key, bucket in collapsed.items():
-            teacher_id, subject_id, group_id = key
-            load_types = sorted(bucket["load_types"])
-            semester_type = ", ".join(sorted(bucket["semester_types"])) or None
-
-            row = existing.get(key)
+        existing_ts = {
+            (r.teacher_id, r.subject_id): r for r in (await session.execute(select(TeacherSubject))).scalars().all()
+        }
+        for key, bucket in by_subject.items():
+            row = existing_ts.get(key)
             if row is None:
-                row = TeacherAssignment(
-                    teacher_id=teacher_id,
-                    subject_id=subject_id,
-                    group_id=group_id,
-                )
+                row = TeacherSubject(teacher_id=key[0], subject_id=key[1])
                 created += 1
             else:
                 updated += 1
-
-            row.load_types = load_types
-            row.semester_type = semester_type
-            # external_id намеренно не заполняем: одно назначение собрано из
+            row.load_types = sorted(bucket["load_types"])
+            row.semester_type = ", ".join(sorted(bucket["semester_types"])) or None
+            # external_id намеренно не заполняем: одна связка собрана из
             # нескольких строк нагрузки и одного внешнего id не имеет.
             # Источник фиксируем, чтобы отличать импортированное от ручного.
+            row.external_source = SOURCE_EDUPLAN
+            row.synced_at = now
+            row.is_active = True
+            session.add(row)
+
+        existing_tg = {
+            (r.teacher_id, r.group_id): r for r in (await session.execute(select(TeacherGroup))).scalars().all()
+        }
+        for key in pairs_group:
+            row = existing_tg.get(key)
+            if row is None:
+                row = TeacherGroup(teacher_id=key[0], group_id=key[1])
+                created += 1
+            else:
+                updated += 1
             row.external_source = SOURCE_EDUPLAN
             row.synced_at = now
             row.is_active = True
@@ -197,22 +219,52 @@ class EduPlanWorkloadService:
         return created, updated
 
     @staticmethod
-    async def _deactivate_missing(session: AsyncSession, present: set[tuple[int, int, int]]) -> int:
-        """Назначения, пропавшие из нагрузки, гасим, но не удаляем.
+    async def _deactivate_missing(
+        session: AsyncSession,
+        present_subjects: set[tuple[int, int]],
+        present_groups: set[tuple[int, int]],
+    ) -> int:
+        """Связки, пропавшие из нагрузки, гасим, но не удаляем.
 
         Удаление оторвало бы преподавателя от уже проведённых тестов. Ручные
-        назначения (external_source IS NULL) не трогаем вовсе.
+        связки (external_source IS NULL) не трогаем вовсе.
         """
-        stmt = select(TeacherAssignment).where(
-            TeacherAssignment.external_source == SOURCE_EDUPLAN,
-            TeacherAssignment.is_active.is_(True),
-        )
-        rows = (await session.execute(stmt)).scalars().all()
-
         deactivated = 0
         now = utcnow_naive()
-        for row in rows:
-            if (row.teacher_id, row.subject_id, row.group_id) not in present:
+
+        ts_rows = (
+            (
+                await session.execute(
+                    select(TeacherSubject).where(
+                        TeacherSubject.external_source == SOURCE_EDUPLAN,
+                        TeacherSubject.is_active.is_(True),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in ts_rows:
+            if (row.teacher_id, row.subject_id) not in present_subjects:
+                row.is_active = False
+                row.synced_at = now
+                session.add(row)
+                deactivated += 1
+
+        tg_rows = (
+            (
+                await session.execute(
+                    select(TeacherGroup).where(
+                        TeacherGroup.external_source == SOURCE_EDUPLAN,
+                        TeacherGroup.is_active.is_(True),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in tg_rows:
+            if (row.teacher_id, row.group_id) not in present_groups:
                 row.is_active = False
                 row.synced_at = now
                 session.add(row)

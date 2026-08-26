@@ -12,7 +12,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import Teacher, User
+    from app.modules.auth.model import TeacherSubject, User
     from app.modules.organization_structure.model import Group
 
 
@@ -34,9 +34,10 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         index=True,
     )
 
-    subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
-        "SubjectTeacher",
+    teacher_subjects: Mapped[list["TeacherSubject"]] = relationship(
+        "TeacherSubject",
         back_populates="subject",
+        cascade="all, delete-orphan",
     )
 
     questions: Mapped[list["Question"]] = relationship("Question", back_populates="subject")
@@ -47,19 +48,6 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     def __str__(self):
         return self.name
-
-
-class SubjectTeacher(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "subject_teachers"
-
-    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
-
-    subject: Mapped["Subject"] = relationship("Subject", back_populates="subject_teachers")
-    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="subject_teachers")
-
-    def __str__(self):
-        return f"{self.subject.name} - {self.teacher.name}"
 
 
 class Question(Base, IdIntPk, TimestampMixin):
