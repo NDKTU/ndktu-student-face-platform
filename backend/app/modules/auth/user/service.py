@@ -110,17 +110,28 @@ class UserService:
     async def login(self, session: AsyncSession, data: UserLoginRequest) -> UserLoginResponse:
         user = await self.get_user_by_username(session, data.username)
 
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username")
+        if user and user.password:
+            if verify_password(data.password, user.password):
+                ensure_user_active(user)
+                access_token = await self.create_session_token(user.id)
+                return UserLoginResponse(type="Bearer", access_token=access_token)
+            else:
+                logger.warning(
+                    "Local login failed for user %s (password mismatch), attempting EduPlan fallback.",
+                    data.username,
+                )
 
-        if not verify_password(data.password, user.password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+        # EduPlan SSO fallback for staff/teachers
+        try:
+            from app.modules.integration.eduplan.auth_service import eduplan_auth_service
 
-        ensure_user_active(user)
-
-        access_token = await self.create_session_token(user.id)
-
-        return UserLoginResponse(type="Bearer", access_token=access_token)
+            access_token = await eduplan_auth_service.login(session, data.username, data.password)
+            return UserLoginResponse(type="Bearer", access_token=access_token)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("EduPlan login fallback failed: %s", e)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
 
     async def get_current_user(self, session: AsyncSession, token: str) -> User:
         # Декод + проверка Single Active Session + продление idle-TTL в одном месте.

@@ -3,6 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/face
+ENV UV_NO_SYNC=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -26,4 +27,4 @@ RUN uv sync --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "app/main.py"]
+CMD ["uv", "run", "--no-dev", "--no-sync", "app/main.py"]

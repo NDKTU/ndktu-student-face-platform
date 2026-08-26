@@ -7,7 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Permission, Role, Student, Teacher, TeacherSubject, User
+from app.modules.auth.model import Permission, Role, RolePermission, Student, Teacher, TeacherSubject, User
 
 from .schemas import (
     UserCreateRequest,
@@ -336,7 +336,12 @@ class UserRepository:
             perm_stmt = select(Permission).where(Permission.name == "user:me")
             permission = (await session.execute(perm_stmt)).scalar_one_or_none()
             if permission:
-                role.permissions.append(permission)
+                # Пишем связь напрямую через RolePermission, а не через
+                # `role.permissions.append(...)`: у только что созданного
+                # `role` коллекция `permissions` не инициализирована, и
+                # первое обращение к ней после flush уйдёт в ленивую
+                # подгрузку, которая в async-сессии падает MissingGreenlet.
+                session.add(RolePermission(role_id=role.id, permission_id=permission.id))
                 await session.flush()
 
         if role not in user.roles:

@@ -12,7 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.user.schemas import UserLoginRequest, UserLoginResponse
 from . import credentials
+from .auth_service import eduplan_auth_service
 from .client import EduPlanClient
 from .schemas import (
     ApplyRequest,
@@ -183,3 +185,21 @@ async def eduplan_run_full_sync(
     остаются администратору. Та же точка входа, что и у ночного расписания.
     """
     return await eduplan_sync_runner.run(session, triggered_by="manual")
+
+
+@router.post(
+    "/login",
+    response_model=UserLoginResponse,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
+async def eduplan_login(
+    data: UserLoginRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+):
+    """EduPlan hisob qaydnomasi orqali kirish."""
+    access_token = await eduplan_auth_service.login(
+        session=session,
+        username=data.username,
+        password=data.password,
+    )
+    return UserLoginResponse(type="Bearer", access_token=access_token)
