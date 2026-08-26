@@ -218,7 +218,17 @@ class EduPlanRepository:
                 full_name=full_name,
             )
         else:
-            user = row.user
+            # Не `row.user`: на боевом пути (`EduPlanSyncService.apply`) строка
+            # приезжает из голого `session.get` в свежей сессии, связь не
+            # подгружена, и ленивая загрузка в async-сессии падает
+            # `MissingGreenlet` — молча, потому что `_apply_one` пишет это в
+            # `result.errors`. Отдельный запрос с `selectinload(User.roles)`:
+            # `roles` — единственное, что читает и меняет `_ensure_role`, а
+            # через `select`, а не `session.get`, потому что `get` вернул бы
+            # объект из identity map, не применив loader options.
+            user = (
+                await session.execute(select(User).where(User.id == row.user_id).options(selectinload(User.roles)))
+            ).scalar_one_or_none()
 
         row.first_name = first_name
         row.last_name = last_name
