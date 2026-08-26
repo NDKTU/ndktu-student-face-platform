@@ -25,6 +25,7 @@ from .schemas import (
     TeacherListResponse,
     TeacherRankingResponse,
     TeacherRankItem,
+    TeacherSelfUpdateRequest,
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
@@ -104,6 +105,16 @@ class TeacherRepository:
 
         return teacher
 
+    async def get_teacher_by_user_id(self, session: AsyncSession, user_id: int) -> Teacher:
+        stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.user_id == user_id)
+        result = await session.execute(stmt)
+        teacher = result.scalar_one_or_none()
+
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found for this user")
+
+        return teacher
+
     async def list_teachers(self, session: AsyncSession, request: TeacherListRequest) -> TeacherListResponse:
         stmt = select(Teacher).options(*self._eager_load_options())
         count_stmt = select(func.count()).select_from(Teacher)
@@ -155,6 +166,37 @@ class TeacherRepository:
         teacher.full_name = full_name
         teacher.image_url = data.image_url
         teacher.kafedra_id = data.kafedra_id
+
+        await session.commit()
+        await session.refresh(teacher)
+        return teacher
+
+    async def update_my_profile(self, session: AsyncSession, user_id: int, data: TeacherSelfUpdateRequest) -> Teacher:
+        """`PUT /teacher/me`: o'qituvchi faqat o'z ism-sharifi va suratini
+        o'zgartiradi. Kafedra, hemis_id va zerkal maydonlari bu yo'ldan
+        o'tmaydi — ular administrator va EduPlan sinxronizatsiyasi qo'lida.
+        """
+        teacher = await self.get_teacher_by_user_id(session=session, user_id=user_id)
+
+        ensure_editable(teacher, "преподавателя")
+
+        full_name = self._generate_full_name(data.first_name, data.last_name, data.third_name)
+
+        if full_name != teacher.full_name:
+            existing = (
+                await session.execute(select(Teacher).where(Teacher.full_name == full_name, Teacher.id != teacher.id))
+            ).scalar_one_or_none()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Teacher name already taken",
+                )
+
+        teacher.first_name = data.first_name
+        teacher.last_name = data.last_name
+        teacher.third_name = data.third_name
+        teacher.full_name = full_name
+        teacher.image_url = data.image_url
 
         await session.commit()
         await session.refresh(teacher)

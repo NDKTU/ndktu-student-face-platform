@@ -51,6 +51,7 @@ from .teacher.schemas import (
     TeacherListRequest,
     TeacherListResponse,
     TeacherRankingResponse,
+    TeacherSelfUpdateRequest,
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
@@ -466,6 +467,25 @@ async def upload_teacher_image(
 ):
     url = await get_teacher_repository.upload_image(file=file)
     return {"url": url}
+
+
+# "/me" "/{teacher_id}" dan oldin turishi shart, aks holda "me" path
+# parametri sifatida o'qiladi va 422 qaytadi.
+@teacher_router.get("/me", response_model=TeacherCreateResponse)
+async def get_my_teacher_profile(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("teacher:me")),
+):
+    return await get_teacher_repository.get_teacher_by_user_id(session=session, user_id=current_user.id)
+
+
+@teacher_router.put("/me", response_model=TeacherCreateResponse)
+async def update_my_teacher_profile(
+    data: TeacherSelfUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("teacher:me")),
+):
+    return await get_teacher_repository.update_my_profile(session=session, user_id=current_user.id, data=data)
 
 
 @teacher_router.get("/{teacher_id}", response_model=TeacherCreateResponse)

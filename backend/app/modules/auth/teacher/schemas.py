@@ -98,6 +98,27 @@ class TeacherUpdateRequest(BaseModel):
         return v.strip()
 
 
+class TeacherSelfUpdateRequest(BaseModel):
+    """`PUT /teacher/me` — o'qituvchi o'zi haqida tahrirlay oladigan maydonlar.
+
+    `kafedra_id`, `hemis_id` va tashqi tizim maydonlari bu yerda ataylab yo'q:
+    biriktiruvni administrator, zerkal maydonlarini esa EduPlan
+    sinxronizatsiyasi boshqaradi.
+    """
+
+    first_name: str
+    last_name: str
+    third_name: str
+    image_url: Optional[str] = None
+
+    @field_validator("first_name", "last_name", "third_name", mode="before")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Field cannot be empty")
+        return v.strip()
+
+
 class TeacherCreateResponse(ExternalRefFields):
     id: int
     user_id: int

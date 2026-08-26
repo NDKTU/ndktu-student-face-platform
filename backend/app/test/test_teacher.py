@@ -5,6 +5,7 @@ endpoint'i qolmadi. Shu sababli eski `test_employee.py` dagi qamrov
 """
 
 import pytest
+import pytest_asyncio
 
 
 @pytest.mark.asyncio
@@ -199,3 +200,92 @@ async def test_user_me_and_list_expose_teacher_profile(async_client, auth_client
     users = listed.json()["users"]
     assert len(users) == 1
     assert users[0]["teacher"]["kafedra"]["id"] == test_kafedra["id"]
+
+
+@pytest_asyncio.fixture
+async def teacher_token(async_client, test_teacher):
+    """`test_teacher` fikstura o'qituvchisining o'z tokeni.
+
+    Admin klientidan farqli o'laroq bu boshqa foydalanuvchi, shuning uchun
+    `/teacher/me` da chaqiruvchini aniqlash yo'li haqiqatan tekshiriladi.
+    (Fikstura unga `Admin` rolini beradi — test bazasida `teacher` roli yo'q,
+    ya'ni bu yerda ruxsat tekshiruvi emas, shaxsni aniqlash sinaladi.)
+    """
+    login = await async_client.post(
+        "/user/login",
+        json={"username": "teacher_fixture_user", "password": "password123"},
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_teacher_reads_own_profile(async_client, test_teacher, test_kafedra, teacher_token):
+    """`GET /teacher/me` — chaqiruvchining o'z kartochkasi. Eski
+    `GET /employee/me` ning o'rnini bosadi."""
+    response = await async_client.get("/teacher/me", headers=teacher_token)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == test_teacher["id"]
+    assert data["user_id"] == test_teacher["user_id"]
+    assert data["full_name"] == "Doe John Smith"
+    assert data["kafedra"]["id"] == test_kafedra["id"]
+
+
+@pytest.mark.asyncio
+async def test_user_without_teacher_profile_gets_404_on_me(auth_client):
+    """Admin foydalanuvchida o'qituvchi kartochkasi yo'q — 404."""
+    response = await auth_client.get("/teacher/me")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_teacher_updates_own_names_and_full_name_is_recomputed(
+    async_client, test_teacher, test_kafedra, teacher_token
+):
+    """`PUT /teacher/me` ism qismlarini va suratni yangilaydi, `full_name` ni
+    qayta hisoblaydi; kafedra esa bu yo'ldan o'zgarmaydi."""
+    payload = {
+        "first_name": "Jonathan",
+        "last_name": "Doe",
+        "third_name": "Smithson",
+        "image_url": "https://files/profile/jon.png",
+    }
+    response = await async_client.put("/teacher/me", json=payload, headers=teacher_token)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["full_name"] == "Doe Jonathan Smithson"
+    assert body["image_url"] == payload["image_url"]
+
+    # Qayta o'qiganda ham o'sha — va kafedra tegilmagan.
+    read_back = await async_client.get("/teacher/me", headers=teacher_token)
+    assert read_back.status_code == 200
+    data = read_back.json()
+    assert data["first_name"] == "Jonathan"
+    assert data["third_name"] == "Smithson"
+    assert data["full_name"] == "Doe Jonathan Smithson"
+    assert data["image_url"] == payload["image_url"]
+    assert data["kafedra_id"] == test_kafedra["id"]
+
+
+@pytest.mark.asyncio
+async def test_teacher_cannot_change_kafedra_or_hemis_id_via_me(async_client, test_kafedra, teacher_token):
+    """Kafedra, hemis_id va zerkal maydonlari `PUT /teacher/me` sxemasida yo'q:
+    yuborilgani e'tiborsiz qoldiriladi, admin qarori o'z kuchida qoladi."""
+    response = await async_client.put(
+        "/teacher/me",
+        json={
+            "first_name": "John",
+            "last_name": "Doe",
+            "third_name": "Smith",
+            "kafedra_id": 9999,
+            "hemis_id": "HACKED-1",
+            "external_source": "eduplan",
+        },
+        headers=teacher_token,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["kafedra_id"] == test_kafedra["id"]
+    assert data["hemis_id"] is None
+    assert data["external_source"] is None
