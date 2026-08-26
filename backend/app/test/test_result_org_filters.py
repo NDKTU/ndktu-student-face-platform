@@ -61,7 +61,7 @@ async def test_filter_results_by_faculty_and_kafedra(
         auth_client,
         subject_id=test_subject.id,
         group_id=test_group["id"],
-        lecturer_user_id=test_teacher["employee"]["user_id"],
+        lecturer_user_id=test_teacher["user_id"],
         pin="1234",
     )
 

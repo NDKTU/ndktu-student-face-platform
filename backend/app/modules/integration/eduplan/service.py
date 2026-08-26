@@ -21,9 +21,8 @@ from core.redis_client import redis_client
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Employee
+from app.modules.auth.model import Teacher
 from app.modules.organization_structure.model import (
-    Department,
     Faculty,
     Group,
     Kafedra,
@@ -45,7 +44,6 @@ from .schemas import (
     EduPlanEntity,
     EduPlanFaculty,
     EduPlanGroup,
-    EduPlanSection,
     EduPlanSpeciality,
     EduPlanStaff,
     EduPlanSubject,
@@ -65,11 +63,10 @@ SNAPSHOT_TTL_SECONDS = 3600
 ENTITY_MODEL = {
     EduPlanEntity.faculty: Faculty,
     EduPlanEntity.kafedra: Kafedra,
-    EduPlanEntity.department: Department,
     EduPlanEntity.speciality: Speciality,
     EduPlanEntity.group: Group,
     EduPlanEntity.subject: Subject,
-    EduPlanEntity.employee: Employee,
+    EduPlanEntity.teacher: Teacher,
 }
 
 
@@ -86,7 +83,6 @@ class EduPlanSyncService:
             snapshot = {
                 "faculties": await client.faculties(),
                 "departments": await client.departments(),
-                "sections": await client.sections(),
                 "specialities": await client.specialities(),
                 "groups": await client.groups(),
                 "subjects": await client.subjects(),
@@ -197,8 +193,8 @@ class EduPlanSyncService:
             model = ENTITY_MODEL[entity]
             linked = await eduplan_repository.index_by_external(session, model)
 
-            if entity == EduPlanEntity.employee:
-                local_rows = await eduplan_repository.load_employees(session)
+            if entity == EduPlanEntity.teacher:
+                local_rows = await eduplan_repository.load_teachers(session)
             else:
                 local_rows = await eduplan_repository.load_all(session, model)
 
@@ -232,7 +228,7 @@ class EduPlanSyncService:
 
     @staticmethod
     def _display_name(entity: EduPlanEntity, row) -> str:
-        return row.full_name if entity == EduPlanEntity.employee else row.name
+        return row.full_name if entity == EduPlanEntity.teacher else row.name
 
     @staticmethod
     def _external_items(entity: EduPlanEntity, snapshot: dict[str, list[dict]]):
@@ -248,11 +244,6 @@ class EduPlanSyncService:
             for raw in snapshot["departments"]:
                 d = EduPlanDepartment.model_validate(raw)
                 yield str(d.id), d.name, {"name": d.name, "faculty_external_id": str(d.faculty_id)}, by_name
-
-        elif entity == EduPlanEntity.department:
-            for raw in snapshot["sections"]:
-                s = EduPlanSection.model_validate(raw)
-                yield str(s.id), s.name, {"name": s.name}, by_name
 
         elif entity == EduPlanEntity.speciality:
             for raw in snapshot["specialities"]:
@@ -293,15 +284,16 @@ class EduPlanSyncService:
                     {
                         "name": s.name,
                         "kafedra_external_id": str(s.department_id),
-                        "credits": s.credits,
                     },
                     by_name,
                 )
 
-        elif entity == EduPlanEntity.employee:
+        elif entity == EduPlanEntity.teacher:
             for raw in snapshot["staff"]:
                 st = EduPlanStaff.model_validate(raw)
                 profile = st.teacher
+                if profile is None:
+                    continue  # o'qituvchi bo'lmagan xodimlar zerkal qilinmaydi
                 yield (
                     str(st.id),
                     st.full_name or st.username,
@@ -312,12 +304,7 @@ class EduPlanSyncService:
                         "last_name": st.last_name or "",
                         "third_name": st.third_name or "",
                         "full_name": st.full_name,
-                        "position": profile.position if profile else None,
-                        "staff_type": profile.staff_type if profile else None,
-                        "is_teacher": profile is not None,
-                        "kafedra_external_id": (
-                            str(profile.department_id) if profile and profile.department_id else None
-                        ),
+                        "kafedra_external_id": (str(profile.department_id) if profile.department_id else None),
                     },
                     lambda row: row.full_name,
                 )
@@ -327,11 +314,10 @@ class EduPlanSyncService:
         source_key = {
             EduPlanEntity.faculty: "faculties",
             EduPlanEntity.kafedra: "departments",
-            EduPlanEntity.department: "sections",
             EduPlanEntity.speciality: "specialities",
             EduPlanEntity.group: "groups",
             EduPlanEntity.subject: "subjects",
-            EduPlanEntity.employee: "staff",
+            EduPlanEntity.teacher: "staff",
         }
         summary = []
         for entity in SYNC_ORDER:
@@ -459,11 +445,6 @@ class EduPlanSyncService:
                 )
                 kafedra_faculty[row.id] = faculty_id
 
-            elif entity == EduPlanEntity.department:
-                row = await eduplan_repository.upsert_department(
-                    session, proposal.external_id, changes["name"], existing
-                )
-
             elif entity == EduPlanEntity.speciality:
                 kafedra_id = id_map[EduPlanEntity.kafedra].get(changes["kafedra_external_id"])
                 if kafedra_id is None:
@@ -511,14 +492,13 @@ class EduPlanSyncService:
                     proposal.external_id,
                     changes["name"],
                     kafedra_id,
-                    changes.get("credits"),
                     existing,
                 )
 
-            elif entity == EduPlanEntity.employee:
+            elif entity == EduPlanEntity.teacher:
                 kafedra_ext = changes.get("kafedra_external_id")
                 kafedra_id = id_map[EduPlanEntity.kafedra].get(kafedra_ext) if kafedra_ext else None
-                row = await eduplan_repository.upsert_employee(
+                row = await eduplan_repository.upsert_teacher(
                     session,
                     external_id=proposal.external_id,
                     username=changes["username"],
@@ -527,9 +507,6 @@ class EduPlanSyncService:
                     last_name=changes["last_name"],
                     third_name=changes["third_name"],
                     full_name=changes["full_name"] or changes["username"],
-                    position=changes.get("position"),
-                    staff_type=changes.get("staff_type"),
-                    is_teacher=bool(changes.get("is_teacher")),
                     kafedra_id=kafedra_id,
                     existing=existing,
                 )

@@ -10,14 +10,6 @@ from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
 
-from .department.repository import get_department_repository
-from .department.schemas import (
-    DepartmentCreateRequest,
-    DepartmentListRequest,
-    DepartmentListResponse,
-    DepartmentResponse,
-    DepartmentUpdateRequest,
-)
 from .faculty.repository import get_faculty_repository
 from .faculty.schemas import (
     FacultyCreateRequest,
@@ -399,74 +391,6 @@ async def delete_speciality(
 
 
 # ============================================================================
-#  DEPARTMENT
-# ============================================================================
-department_router = APIRouter(
-    tags=["Department"],
-    prefix="/department",
-)
-
-
-@department_router.post(
-    "/",
-    response_model=DepartmentResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def create_department(
-    data: DepartmentCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:department")),
-):
-    return await get_department_repository.create_department(session=session, data=data)
-
-
-@department_router.get("/{department_id}", response_model=DepartmentResponse)
-async def get_department(
-    department_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:department")),
-):
-    return await get_department_repository.get_department(session=session, department_id=department_id)
-
-
-@department_router.get("/", response_model=DepartmentListResponse)
-async def list_departments(
-    data: DepartmentListRequest = Depends(),
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:department")),
-):
-    return await get_department_repository.list_departments(session=session, request=data)
-
-
-@department_router.put(
-    "/{department_id}",
-    response_model=DepartmentResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def update_department(
-    department_id: int,
-    data: DepartmentUpdateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:department")),
-):
-    return await get_department_repository.update_department(session=session, department_id=department_id, data=data)
-
-
-@department_router.delete(
-    "/{department_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def delete_department(
-    department_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:department")),
-):
-    await get_department_repository.delete_department(session=session, department_id=department_id)
-
-
-# ============================================================================
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
@@ -474,4 +398,3 @@ router.include_router(faculty_router)
 router.include_router(kafedra_router)
 router.include_router(group_router)
 router.include_router(speciality_router)
-router.include_router(department_router)

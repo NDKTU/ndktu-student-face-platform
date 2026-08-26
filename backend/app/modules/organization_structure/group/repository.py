@@ -7,8 +7,8 @@ from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import User
-from app.modules.organization_structure.model import Group, GroupTeacher
+from app.modules.auth.model import Teacher, User
+from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Result
 
 from .schemas import (
@@ -71,7 +71,7 @@ class GroupRepository:
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
         is_student = any(role.name.lower() == "student" for role in current_user.roles)
 
-        # Track if we already joined GroupTeacher to avoid duplicate JOINs
+        # Track if we already joined TeacherGroup to avoid duplicate JOINs
         already_joined_group_teacher = False
         assigned_group_id = None
 
@@ -79,8 +79,8 @@ class GroupRepository:
             # Admins see ALL groups — no filter applied, ignore request.teacher_id
             pass
         elif is_teacher:
-            stmt = stmt.join(GroupTeacher, Group.id == GroupTeacher.group_id).where(
-                GroupTeacher.teacher_id == current_user.id
+            stmt = stmt.join(TeacherGroup, Group.id == TeacherGroup.group_id).where(
+                TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == current_user.id))
             )
             already_joined_group_teacher = True
         elif is_student:
@@ -95,10 +95,12 @@ class GroupRepository:
                 stmt = stmt.where(Group.id == -1)
 
         # Only apply explicit teacher_id filter for non-admin users
-        # and only if it wasn't already joined via role-based filter
+        # and only if it wasn't already joined via role-based filter.
+        # `request.teacher_id` ataylab `users.id` bo'lib qoladi — shartnoma
+        # o'zgarmasin, shuning uchun `Teacher` orqali sakraymiz.
         if not is_admin and request.teacher_id and not already_joined_group_teacher:
-            stmt = stmt.join(GroupTeacher, Group.id == GroupTeacher.group_id).where(
-                GroupTeacher.teacher_id == request.teacher_id
+            stmt = stmt.join(TeacherGroup, Group.id == TeacherGroup.group_id).where(
+                TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == request.teacher_id))
             )
 
         if request.name:
@@ -122,8 +124,8 @@ class GroupRepository:
         if is_admin:
             pass
         elif is_teacher:
-            count_stmt = count_stmt.join(GroupTeacher, Group.id == GroupTeacher.group_id).where(
-                GroupTeacher.teacher_id == current_user.id
+            count_stmt = count_stmt.join(TeacherGroup, Group.id == TeacherGroup.group_id).where(
+                TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == current_user.id))
             )
         elif is_student:
             if assigned_group_id:
@@ -132,8 +134,8 @@ class GroupRepository:
                 count_stmt = count_stmt.where(Group.id == -1)
 
         if not is_admin and request.teacher_id and not already_joined_group_teacher:
-            count_stmt = count_stmt.join(GroupTeacher, Group.id == GroupTeacher.group_id).where(
-                GroupTeacher.teacher_id == request.teacher_id
+            count_stmt = count_stmt.join(TeacherGroup, Group.id == TeacherGroup.group_id).where(
+                TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == request.teacher_id))
             )
         if request.name:
             count_stmt = count_stmt.where(Group.name.ilike(f"%{request.name}%"))
@@ -177,7 +179,7 @@ class GroupRepository:
 
     async def delete_group(self, session: AsyncSession, group_id: int, force: bool = False) -> None:
         from app.modules.auth.model import Student
-        from app.modules.organization_structure.model import GroupTeacher
+        from app.modules.course.model import Lesson
         from app.modules.quiz.model import Quiz
 
         stmt = select(Group).where(Group.id == group_id)
@@ -200,10 +202,18 @@ class GroupRepository:
                 await session.execute(select(func.count(Quiz.id)).where(Quiz.group_id == group_id))
             ).scalar() or 0
             teacher_count = (
-                await session.execute(select(func.count(GroupTeacher.id)).where(GroupTeacher.group_id == group_id))
+                await session.execute(select(func.count(TeacherGroup.id)).where(TeacherGroup.group_id == group_id))
+            ).scalar() or 0
+            # `lessons.group_id` — ON DELETE CASCADE, в отличие от
+            # `lessons.teacher_subject_id` с его RESTRICT. То есть через группу
+            # история занятий сносится молча: ни 409 от базы, ни ошибки. Жёсткий
+            # запрет здесь ставить нельзя — удаление группы штатная операция, —
+            # но оператор обязан увидеть, что именно он уничтожает, до `force`.
+            lesson_count = (
+                await session.execute(select(func.count(Lesson.id)).where(Lesson.group_id == group_id))
             ).scalar() or 0
 
-            total = student_count + result_count + quiz_count + teacher_count
+            total = student_count + result_count + quiz_count + teacher_count + lesson_count
             if total > 0:
                 warnings = []
                 if student_count > 0:
@@ -214,6 +224,8 @@ class GroupRepository:
                     warnings.append(f"{quiz_count} ta guruhga oid testlar guruhsiz qoladi")
                 if teacher_count > 0:
                     warnings.append(f"{teacher_count} ta o'qituvchi guruhdan uziladi")
+                if lesson_count > 0:
+                    warnings.append(f"{lesson_count} ta o'tilgan dars tarixi butunlay o'chadi (tiklab bo'lmaydi)")
 
                 raise HTTPException(
                     status_code=409,
@@ -226,7 +238,9 @@ class GroupRepository:
 
         # FK ondelete="SET NULL" on Student.group_id and Result.group_id means
         # linked students/results lose their group reference but are NOT deleted.
-        # GroupTeacher has cascade delete orphan.
+        # TeacherGroup has cascade delete orphan. Lesson.group_id, наоборот,
+        # CASCADE: занятия группы уходят вместе с ней — об этом и предупреждает
+        # список выше.
         await session.delete(group)
         await session.commit()
 

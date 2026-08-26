@@ -5,10 +5,10 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Employee, Student, Teacher, User
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
 from app.modules.organization_structure.model import Group, Kafedra
-from app.modules.quiz.model import Subject, SubjectTeacher
+from app.modules.quiz.model import Subject
 
 from .schemas import (
     CourseCreateRequest,
@@ -65,15 +65,14 @@ class CourseRepository:
             select(
                 Course.teacher_id,
                 User.username,
-                Employee.full_name,
+                Teacher.full_name,
                 Kafedra.id.label("kafedra_id"),
                 Kafedra.name.label("kafedra_name"),
                 func.count(func.distinct(Course.id)).label("course_count"),
                 func.count(func.distinct(Lesson.id)).label("lesson_count"),
             )
             .join(User, User.id == Course.teacher_id)
-            .outerjoin(Employee, Employee.user_id == User.id)
-            .outerjoin(Teacher, Teacher.employee_id == Employee.id)
+            .outerjoin(Teacher, Teacher.user_id == User.id)
             .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
             .outerjoin(Lesson, Lesson.course_id == Course.id)
         )
@@ -85,15 +84,15 @@ class CourseRepository:
             stmt = stmt.where(Course.kafedra_id == kafedra_id)
         if search:
             pattern = f"%{search}%"
-            stmt = stmt.where(or_(Employee.full_name.ilike(pattern), User.username.ilike(pattern)))
+            stmt = stmt.where(or_(Teacher.full_name.ilike(pattern), User.username.ilike(pattern)))
 
         stmt = stmt.group_by(
             Course.teacher_id,
             User.username,
-            Employee.full_name,
+            Teacher.full_name,
             Kafedra.id,
             Kafedra.name,
-        ).order_by(Employee.full_name.asc().nullslast(), User.username.asc())
+        ).order_by(Teacher.full_name.asc().nullslast(), User.username.asc())
         rows = (await session.execute(stmt)).all()
         return CourseTeacherSummaryResponse(
             teachers=[
@@ -193,7 +192,7 @@ class CourseRepository:
         return faculty_id, kafedra_id, speciality_id
 
     async def _serialize(self, session: AsyncSession, course: Course) -> CourseResponse:
-        teacher_full_name_stmt = select(Employee.full_name).where(Employee.user_id == course.teacher_id)
+        teacher_full_name_stmt = select(Teacher.full_name).where(Teacher.user_id == course.teacher_id)
         teacher_full_name = (await session.execute(teacher_full_name_stmt)).scalar_one_or_none()
         lesson_count = (
             await session.execute(select(func.count(Lesson.id)).where(Lesson.course_id == course.id))
@@ -440,12 +439,8 @@ class CourseRepository:
     async def get_course_orm(self, session: AsyncSession, course_id: int) -> Course:
         return await self._load_with_relations(session, course_id)
 
-    async def get_or_create_subject_teacher_for_course(self, session: AsyncSession, course: Course) -> SubjectTeacher:
-        teacher_stmt = (
-            select(Teacher)
-            .join(Employee, Teacher.employee_id == Employee.id)
-            .where(Employee.user_id == course.teacher_id)
-        )
+    async def get_or_create_teacher_subject_for_course(self, session: AsyncSession, course: Course) -> TeacherSubject:
+        teacher_stmt = select(Teacher).where(Teacher.user_id == course.teacher_id)
         teacher = (await session.execute(teacher_stmt)).scalar_one_or_none()
         if not teacher:
             raise HTTPException(
@@ -453,18 +448,18 @@ class CourseRepository:
                 detail=f"User {course.teacher_id} is not registered as a teacher",
             )
 
-        st_stmt = select(SubjectTeacher).where(
-            SubjectTeacher.subject_id == course.subject_id,
-            SubjectTeacher.teacher_id == teacher.id,
+        ts_stmt = select(TeacherSubject).where(
+            TeacherSubject.subject_id == course.subject_id,
+            TeacherSubject.teacher_id == teacher.id,
         )
-        subject_teacher = (await session.execute(st_stmt)).scalar_one_or_none()
-        if subject_teacher:
-            return subject_teacher
+        teacher_subject = (await session.execute(ts_stmt)).scalar_one_or_none()
+        if teacher_subject:
+            return teacher_subject
 
-        subject_teacher = SubjectTeacher(subject_id=course.subject_id, teacher_id=teacher.id)
-        session.add(subject_teacher)
+        teacher_subject = TeacherSubject(subject_id=course.subject_id, teacher_id=teacher.id)
+        session.add(teacher_subject)
         await session.flush()
-        return subject_teacher
+        return teacher_subject
 
 
 get_course_repository = CourseRepository()

@@ -2,16 +2,17 @@ import random
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
+from app.core.enums import QuestionType, QuizType
 from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import Teacher, User
+    from app.modules.auth.model import TeacherSubject, User
     from app.modules.organization_structure.model import Group
 
 
@@ -32,10 +33,9 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         nullable=True,
         index=True,
     )
-    credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    subject_teachers: Mapped[list["SubjectTeacher"]] = relationship(
-        "SubjectTeacher",
+    teacher_subjects: Mapped[list["TeacherSubject"]] = relationship(
+        "TeacherSubject",
         back_populates="subject",
     )
 
@@ -49,24 +49,20 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         return self.name
 
 
-class SubjectTeacher(Base, IdIntPk, TimestampMixin):
-    __tablename__ = "subject_teachers"
-
-    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"))
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("teachers.id"))
-
-    subject: Mapped["Subject"] = relationship("Subject", back_populates="subject_teachers")
-    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="subject_teachers")
-
-    def __str__(self):
-        return f"{self.subject.name} - {self.teacher.name}"
-
-
 class Question(Base, IdIntPk, TimestampMixin):
     __tablename__ = "questions"
 
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Savol turi (QuestionType). Ustun satr sifatida saqlanadi — Postgres enum
+    # tipi emas. Diqqat: hozircha faqat "QUIZ" haqiqatan ishlaydi, qolgan
+    # turlar uchun option_a..option_d / correct_option shakli mos kelmaydi.
+    question_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text(f"'{QuestionType.QUIZ.value}'"),
+    )
 
     text: Mapped[str] = mapped_column(nullable=False)
     option_a: Mapped[str] = mapped_column(nullable=False)
@@ -150,6 +146,15 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     subject_id: Mapped[int | None] = mapped_column(
         ForeignKey("subjects.id", ondelete="SET NULL"),
         nullable=True,
+    )
+
+    # Nazorat turi (QuizType). Ilgari bu ma'lumot hech qayerda saqlanmagan —
+    # testlar faqat nomi bilan farqlangan, shuning uchun ro'yxatni turi
+    # bo'yicha filtrlash ham imkonsiz edi.
+    quiz_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text(f"'{QuizType.LESSON_QUIZ.value}'"),
     )
 
     title: Mapped[str] = mapped_column(nullable=False)

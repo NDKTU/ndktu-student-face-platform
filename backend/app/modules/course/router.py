@@ -9,18 +9,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .assignment.repository import get_assignment_repository
-from .assignment.schemas import (
-    AssignmentCreateRequest,
-    AssignmentListRequest,
-    AssignmentListResponse,
-    AssignmentResponse,
-    AssignmentUpdateRequest,
-    SubmissionGradeRequest,
-    SubmissionListResponse,
-    SubmissionResponse,
-    SubmissionSubmitRequest,
-)
 from .course.repository import get_course_repository
 from .course.schemas import (
     CourseCreateRequest,
@@ -30,14 +18,24 @@ from .course.schemas import (
     CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
+from .homework.repository import get_homework_repository
+from .homework.schemas import (
+    HomeworkCreateRequest,
+    HomeworkListRequest,
+    HomeworkListResponse,
+    HomeworkResponse,
+    HomeworkUpdateRequest,
+    SubmissionGradeRequest,
+    SubmissionListResponse,
+    SubmissionResponse,
+    SubmissionSubmitRequest,
+)
 from .lesson.repository import get_lesson_repository
 from .lesson.schemas import (
     LessonCreateRequest,
     LessonListRequest,
     LessonListResponse,
     LessonResponse,
-    LessonResultListResponse,
-    LessonResultsBulkUpsertRequest,
     LessonUpdateRequest,
 )
 from .resource.repository import get_resource_repository
@@ -280,165 +278,127 @@ async def delete_lesson(
     await get_lesson_repository.delete_lesson(session=session, lesson_id=lesson_id, current_user=current_user)
 
 
-# ── Lesson results ──────────────────────────────────────────────────────────
-
-
-@lesson_router.get(
-    "/{lesson_id}/results",
-    response_model=LessonResultListResponse,
-)
-async def list_lesson_results(
-    lesson_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    return await get_lesson_repository.list_lesson_results(
-        session=session, lesson_id=lesson_id, current_user=current_user
-    )
-
-
-@lesson_router.put(
-    "/{lesson_id}/results",
-    response_model=LessonResultListResponse,
-    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
-)
-async def upsert_lesson_results(
-    lesson_id: int,
-    data: LessonResultsBulkUpsertRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("update:lesson_result")),
-):
-    return await get_lesson_repository.upsert_lesson_results(
-        session=session,
-        lesson_id=lesson_id,
-        data=data,
-        current_user=current_user,
-    )
-
-
 # ============================================================================
-#  ASSIGNMENT
+#  HOMEWORK
 # ============================================================================
-assignment_router = APIRouter(tags=["Assignment"], prefix="/assignment")
+homework_router = APIRouter(tags=["Homework"], prefix="/homework")
 
 
-@assignment_router.post(
+@homework_router.post(
     "/",
-    response_model=AssignmentResponse,
+    response_model=HomeworkResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
-async def create_assignment(
-    data: AssignmentCreateRequest,
+async def create_homework(
+    data: HomeworkCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("create:assignment")),
+    current_user: "User" = Depends(PermissionRequired("create:homework")),
 ):
-    return await get_assignment_repository.create_assignment(session=session, data=data, current_user=current_user)
+    return await get_homework_repository.create_homework(session=session, data=data, current_user=current_user)
 
 
-@assignment_router.get("/", response_model=AssignmentListResponse)
-async def list_assignments(
-    data: AssignmentListRequest = Depends(),
+@homework_router.get("/", response_model=HomeworkListResponse)
+async def list_homeworks(
+    data: HomeworkListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:assignment")),
+    current_user: "User" = Depends(PermissionRequired("read:homework")),
 ):
-    return await get_assignment_repository.list_assignments(session=session, request=data, current_user=current_user)
+    return await get_homework_repository.list_homeworks(session=session, request=data, current_user=current_user)
 
 
-@assignment_router.get("/{assignment_id}", response_model=AssignmentResponse)
-async def get_assignment(
-    assignment_id: int,
+@homework_router.get("/{homework_id}", response_model=HomeworkResponse)
+async def get_homework(
+    homework_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:assignment")),
+    current_user: "User" = Depends(PermissionRequired("read:homework")),
 ):
-    return await get_assignment_repository.get_assignment(
-        session=session, assignment_id=assignment_id, current_user=current_user
+    return await get_homework_repository.get_homework(
+        session=session, homework_id=homework_id, current_user=current_user
     )
 
 
-@assignment_router.put("/{assignment_id}", response_model=AssignmentResponse)
-async def update_assignment(
-    assignment_id: int,
-    data: AssignmentUpdateRequest,
+@homework_router.put("/{homework_id}", response_model=HomeworkResponse)
+async def update_homework(
+    homework_id: int,
+    data: HomeworkUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("update:assignment")),
+    current_user: "User" = Depends(PermissionRequired("update:homework")),
 ):
-    return await get_assignment_repository.update_assignment(
-        session=session, assignment_id=assignment_id, data=data, current_user=current_user
+    return await get_homework_repository.update_homework(
+        session=session, homework_id=homework_id, data=data, current_user=current_user
     )
 
 
-@assignment_router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_assignment(
-    assignment_id: int,
+@homework_router.delete("/{homework_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_homework(
+    homework_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("delete:assignment")),
+    current_user: "User" = Depends(PermissionRequired("delete:homework")),
 ):
-    await get_assignment_repository.delete_assignment(
-        session=session, assignment_id=assignment_id, current_user=current_user
-    )
+    await get_homework_repository.delete_homework(session=session, homework_id=homework_id, current_user=current_user)
 
 
 # ── Submissions ────────────────────────────────────────────────────────────
 
 
-@assignment_router.post(
-    "/{assignment_id}/submit",
+@homework_router.post(
+    "/{homework_id}/submit",
     response_model=SubmissionResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
-async def submit_assignment(
-    assignment_id: int,
+async def submit_homework(
+    homework_id: int,
     data: SubmissionSubmitRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("create:submission")),
 ):
-    return await get_assignment_repository.submit(
-        session=session, assignment_id=assignment_id, data=data, current_user=current_user
+    return await get_homework_repository.submit(
+        session=session, homework_id=homework_id, data=data, current_user=current_user
     )
 
 
-@assignment_router.get("/{assignment_id}/my-submission", response_model=SubmissionResponse)
+@homework_router.get("/{homework_id}/my-submission", response_model=SubmissionResponse)
 async def get_my_submission(
-    assignment_id: int,
+    homework_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("read:submission")),
 ):
-    s = await get_assignment_repository.get_my_submission(
-        session=session, assignment_id=assignment_id, current_user=current_user
+    s = await get_homework_repository.get_my_submission(
+        session=session, homework_id=homework_id, current_user=current_user
     )
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No submission yet")
     return s
 
 
-@assignment_router.get("/{assignment_id}/submissions", response_model=SubmissionListResponse)
+@homework_router.get("/{homework_id}/submissions", response_model=SubmissionListResponse)
 async def list_submissions(
-    assignment_id: int,
+    homework_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("read:submission")),
 ):
-    return await get_assignment_repository.list_submissions(
-        session=session, assignment_id=assignment_id, current_user=current_user
+    return await get_homework_repository.list_submissions(
+        session=session, homework_id=homework_id, current_user=current_user
     )
 
 
-@assignment_router.put(
-    "/{assignment_id}/submission/{user_id}/grade",
+@homework_router.put(
+    "/{homework_id}/submission/{user_id}/grade",
     response_model=SubmissionResponse,
     dependencies=[Depends(RateLimiter(times=30, seconds=60))],
 )
 async def grade_submission(
-    assignment_id: int,
+    homework_id: int,
     user_id: int,
     data: SubmissionGradeRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("update:submission")),
 ):
-    return await get_assignment_repository.grade_submission(
+    return await get_homework_repository.grade_submission(
         session=session,
-        assignment_id=assignment_id,
+        homework_id=homework_id,
         user_id=user_id,
         data=data,
         current_user=current_user,
@@ -535,5 +495,5 @@ router = APIRouter()
 router.include_router(course_router)
 router.include_router(topic_router)
 router.include_router(lesson_router)
-router.include_router(assignment_router)
+router.include_router(homework_router)
 router.include_router(resource_router)

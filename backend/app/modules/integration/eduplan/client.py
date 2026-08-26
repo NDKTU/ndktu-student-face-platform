@@ -198,10 +198,6 @@ class EduPlanClient:
         """В терминах EduPlan department — это наша кафедра."""
         return await self._paginate("/api/v1/departments/", "skip")
 
-    async def sections(self) -> list[dict]:
-        """В терминах EduPlan section — это наш административный отдел."""
-        return await self._paginate("/api/v1/sections/", "skip")
-
     async def specialities(self) -> list[dict]:
         return await self._paginate("/api/v1/specialities/", "page")
 

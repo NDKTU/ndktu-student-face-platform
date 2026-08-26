@@ -1,12 +1,13 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Employee, Teacher, User
-from app.modules.quiz.model import Subject, SubjectTeacher
+from app.modules.auth.model import Teacher, TeacherSubject, User
+from app.modules.quiz.model import Subject
 
 from .schemas import (
     SubjectCreateRequest,
@@ -66,10 +67,9 @@ class SubjectRepository:
             pass
         elif is_teacher:
             st_stmt = (
-                select(SubjectTeacher.subject_id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
+                select(TeacherSubject.subject_id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
@@ -83,8 +83,8 @@ class SubjectRepository:
             stmt = stmt.where(teacher_filter)
 
         if request.teacher_id:
-            stmt = stmt.join(SubjectTeacher, Subject.id == SubjectTeacher.subject_id).where(
-                SubjectTeacher.teacher_id == request.teacher_id
+            stmt = stmt.join(TeacherSubject, Subject.id == TeacherSubject.subject_id).where(
+                TeacherSubject.teacher_id == request.teacher_id
             )
 
         if request.name:
@@ -104,8 +104,8 @@ class SubjectRepository:
             count_stmt = count_stmt.where(teacher_filter)
 
         if request.teacher_id:
-            count_stmt = count_stmt.join(SubjectTeacher, Subject.id == SubjectTeacher.subject_id).where(
-                SubjectTeacher.teacher_id == request.teacher_id
+            count_stmt = count_stmt.join(TeacherSubject, Subject.id == TeacherSubject.subject_id).where(
+                TeacherSubject.teacher_id == request.teacher_id
             )
 
         if request.name:
@@ -143,7 +143,7 @@ class SubjectRepository:
     async def delete_subject(self, session: AsyncSession, subject_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func
 
-        from app.modules.quiz.model import Question, Quiz, SubjectTeacher
+        from app.modules.quiz.model import Question, Quiz
 
         # Admin requested to aggressively delete the subject and its dependencies.
         ensure_editable(await self.get_subject(session, subject_id), "предмета")
@@ -151,7 +151,7 @@ class SubjectRepository:
         if not force:
             teachers_count = (
                 await session.execute(
-                    select(func.count(SubjectTeacher.id)).where(SubjectTeacher.subject_id == subject_id)
+                    select(func.count(TeacherSubject.id)).where(TeacherSubject.subject_id == subject_id)
                 )
             ).scalar() or 0
             questions_count = (
@@ -187,8 +187,11 @@ class SubjectRepository:
                     },
                 )
 
-        # 1. Sever SubjectTeacher links
-        await session.execute(delete(SubjectTeacher).where(SubjectTeacher.subject_id == subject_id))
+        # 1. Sever TeacherSubject links. `force` bu to'siqni ochmaydi: bu fan
+        # bo'yicha dars o'tilgan bo'lsa, biriktiruv `lessons` RESTRICT tufayli
+        # uzilmaydi.
+        await ensure_no_lessons(session, "Bu fan", TeacherSubject.subject_id == subject_id)
+        await session.execute(delete(TeacherSubject).where(TeacherSubject.subject_id == subject_id))
 
         # 2. Soft-delete Questions belonging to this subject — questions are never
         # physically removed (see Question.is_active), so quiz_questions/user_answers

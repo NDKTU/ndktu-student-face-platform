@@ -10,13 +10,12 @@ __all__ = [
     "RolePermission",
     "Permission",
     "Student",
-    "Employee",
     "Faculty",
     "Kafedra",
     "Group",
     "Teacher",
     "Subject",
-    "SubjectTeacher",
+    "TeacherSubject",
     "Speciality",
     "Course",
     "CourseGroup",
@@ -26,49 +25,43 @@ __all__ = [
     "QuizQuestion",
     "Result",
     "UserAnswers",
-    "GroupTeacher",
+    "TeacherGroup",
     "PsychologyMethod",
     "Lesson",
-    "LessonResult",
-    "Assignment",
-    "AssignmentSubmission",
-    "TeacherAssignment",
-    "Department",
+    "Homework",
+    "HomeworkSubmission",
     "Resource",
     "EduPlanCredential",
 ]
 
 from app.modules.auth.model import (
-    Employee,
     Permission,
     Role,
     RolePermission,
     Student,
     Teacher,
-    TeacherAssignment,
+    TeacherSubject,
     User,
     UserRole,
 )
 from app.modules.course.model import (
-    Assignment,
-    AssignmentSubmission,
     Course,
     CourseGroup,
     CourseTopic,
+    Homework,
+    HomeworkSubmission,
     Lesson,
-    LessonResult,
     Resource,
 )
 from app.modules.integration.eduplan.model import (
     EduPlanCredential,
 )
 from app.modules.organization_structure.model import (
-    Department,
     Faculty,
     Group,
-    GroupTeacher,
     Kafedra,
     Speciality,
+    TeacherGroup,
 )
 from app.modules.psychology.model import (
     PsychologyMethod,
@@ -79,6 +72,5 @@ from app.modules.quiz.model import (
     QuizQuestion,
     Result,
     Subject,
-    SubjectTeacher,
     UserAnswers,
 )

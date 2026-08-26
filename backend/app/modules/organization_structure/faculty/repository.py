@@ -1,6 +1,7 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
+from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -109,6 +110,7 @@ class FacultyRepository:
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func, select
 
+        from app.modules.course.model import Lesson
         from app.modules.organization_structure.model import Group, Kafedra
 
         ensure_editable(await self.get_faculty(session, faculty_id), "факультета")
@@ -120,6 +122,17 @@ class FacultyRepository:
             group_count = (
                 await session.execute(select(func.count(Group.id)).where(Group.faculty_id == faculty_id))
             ).scalar() or 0
+            # Занятия факультета считаются через `lessons.group_id`, а не через
+            # `ensure_no_lessons`: та проверяет `teacher_subject_id` с его
+            # RESTRICT и здесь ничего не заметит — группы у `lessons` привязаны
+            # CASCADE и уносят историю занятий молча.
+            lesson_count = (
+                await session.execute(
+                    select(func.count(Lesson.id)).where(
+                        Lesson.group_id.in_(select(Group.id).where(Group.faculty_id == faculty_id))
+                    )
+                )
+            ).scalar() or 0
 
             if kafedra_count > 0 or group_count > 0:
                 warnings = []
@@ -128,6 +141,11 @@ class FacultyRepository:
                 if group_count > 0:
                     warnings.append(
                         f"{group_count} ta guruh o'chadi (talabalarning guruhi belgilanmagan holatga o'tadi)"
+                    )
+                if lesson_count > 0:
+                    warnings.append(
+                        f"{lesson_count} ta o'tilgan dars tarixi guruhlar bilan birga butunlay o'chadi "
+                        f"(tiklab bo'lmaydi)"
                     )
 
                 raise HTTPException(
@@ -152,20 +170,22 @@ class FacultyRepository:
                 (await session.execute(select(Teacher.id).where(Teacher.kafedra_id.in_(kafedra_ids)))).scalars().all()
             )
             if teacher_ids:
-                from app.modules.organization_structure.model import GroupTeacher
-                from app.modules.quiz.model import SubjectTeacher
+                from app.modules.auth.model import TeacherSubject
+                from app.modules.organization_structure.model import TeacherGroup
 
-                await session.execute(delete(SubjectTeacher).where(SubjectTeacher.teacher_id.in_(teacher_ids)))
-                await session.execute(delete(GroupTeacher).where(GroupTeacher.teacher_id.in_(teacher_ids)))
+                ts_of_faculty = TeacherSubject.teacher_id.in_(teacher_ids)
+                await ensure_no_lessons(session, "Bu fakultet o'qituvchilari", ts_of_faculty)
+                await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id.in_(teacher_ids)))
+                await session.execute(delete(TeacherGroup).where(TeacherGroup.teacher_id.in_(teacher_ids)))
                 await session.execute(delete(Teacher).where(Teacher.id.in_(teacher_ids)))
             await session.execute(delete(Kafedra).where(Kafedra.faculty_id == faculty_id))
 
         # 2. Cascade delete Groups
         group_ids = (await session.execute(select(Group.id).where(Group.faculty_id == faculty_id))).scalars().all()
         if group_ids:
-            from app.modules.organization_structure.model import GroupTeacher
+            from app.modules.organization_structure.model import TeacherGroup
 
-            await session.execute(delete(GroupTeacher).where(GroupTeacher.group_id.in_(group_ids)))
+            await session.execute(delete(TeacherGroup).where(TeacherGroup.group_id.in_(group_ids)))
             await session.execute(delete(Group).where(Group.faculty_id == faculty_id))
 
         stmt = select(Faculty).where(Faculty.id == faculty_id)

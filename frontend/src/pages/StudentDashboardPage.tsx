@@ -36,7 +36,7 @@ const StudentDashboardPage = () => {
             to: '/profile',
             icon: User,
             title: t('Profil'),
-            description: t("Shaxsiy ma'lumotlar va parol"),
+            description: t("Shaxsiy ma'lumotlar"),
         },
     ];
 

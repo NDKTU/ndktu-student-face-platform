@@ -9,9 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Employee, Student, Teacher, User
-from app.modules.organization_structure.model import Faculty, Group, GroupTeacher
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, SubjectTeacher, UserAnswers
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
     QuizAnalyticsResponse,
@@ -42,15 +42,16 @@ class QuizRepository:
         if is_teacher:
             group_ids = list(
                 (await session.execute(
-                    select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+                    select(TeacherGroup.group_id)
+                    .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                    .where(Teacher.user_id == current_user.id)
                 )).scalars().all()
             )
             subject_ids = list(
                 (await session.execute(
-                    select(SubjectTeacher.subject_id)
-                    .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                    .join(Employee, Teacher.employee_id == Employee.id)
-                    .where(Employee.user_id == current_user.id)
+                    select(TeacherSubject.subject_id)
+                    .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                    .where(Teacher.user_id == current_user.id)
                 )).scalars().all()
             )
             conditions = [Quiz.lecturer_id == current_user.id]
@@ -277,6 +278,7 @@ class QuizRepository:
             pin=data.pin,
             is_active=data.is_active,
             proctoring_mode=data.proctoring_mode,
+            quiz_type=data.quiz_type.value,
             lecturer_id=data.lecturer_id,
             created_by_user_id=created_by_user_id,
             group_id=data.group_id,
@@ -289,7 +291,7 @@ class QuizRepository:
             for question in result_questions.scalars().all():
                 session.add(QuizQuestion(quiz=new_quiz, question=question))
 
-        # Связка GroupTeacher здесь раньше создавалась автоматически. Убрано: под
+        # Связка TeacherGroup здесь раньше создавалась автоматически. Убрано: под
         # разделением ролей это значило бы, что организатор, создав тест группе,
         # молча становится её преподавателем. Права не должны появляться как
         # побочный эффект действия.
@@ -337,23 +339,26 @@ class QuizRepository:
 
         elif is_teacher:
             # Check teacher's groups
-            gt_stmt = select(GroupTeacher.group_id).where(GroupTeacher.teacher_id == current_user.id)
+            gt_stmt = (
+                select(TeacherGroup.group_id)
+                .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+                .where(Teacher.user_id == current_user.id)
+            )
             gt_result = await session.execute(gt_stmt)
             allowed_group_ids = gt_result.scalars().all()
 
             # Check teacher's subjects
             st_stmt = (
-                select(SubjectTeacher.subject_id)
-                .join(Teacher, Teacher.id == SubjectTeacher.teacher_id)
-                .join(Employee, Teacher.employee_id == Employee.id)
-                .where(Employee.user_id == current_user.id)
+                select(TeacherSubject.subject_id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                .where(Teacher.user_id == current_user.id)
             )
             st_result = await session.execute(st_stmt)
             allowed_subject_ids = st_result.scalars().all()
 
             # Тесты, собранные из банка этого преподавателя, видны ему всегда —
             # даже если предмет или группа за ним формально не закреплены. Раньше
-            # видимость держалась на GroupTeacher, который создавался побочным
+            # видимость держалась на TeacherGroup, который создавался побочным
             # эффектом создания теста; теперь тест создаёт организатор, и такая
             # связка не появляется.
             conditions = [Quiz.lecturer_id == current_user.id]
@@ -385,6 +390,9 @@ class QuizRepository:
 
         if request.is_active is not None:
             stmt = stmt.where(Quiz.is_active == request.is_active)
+
+        if request.quiz_type:
+            stmt = stmt.where(Quiz.quiz_type == request.quiz_type.value)
 
         # Always prioritize active quizzes first, then sort by date
         sort_field = (
@@ -423,6 +431,8 @@ class QuizRepository:
             )
         if request.is_active is not None:
             count_stmt = count_stmt.where(Quiz.is_active == request.is_active)
+        if request.quiz_type:
+            count_stmt = count_stmt.where(Quiz.quiz_type == request.quiz_type.value)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -488,6 +498,7 @@ class QuizRepository:
         quiz.pin = data.pin
         quiz.is_active = data.is_active
         quiz.proctoring_mode = data.proctoring_mode
+        quiz.quiz_type = data.quiz_type.value
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
 
@@ -548,6 +559,7 @@ class QuizRepository:
             pin=str(random.randint(1000, 9999)),  # Generate a new 4-digit PIN
             is_active=quiz.is_active,
             proctoring_mode=quiz.proctoring_mode,
+            quiz_type=quiz.quiz_type,
             # Банк вопросов остаётся лекторским, а пересдачу выдаёт организатор —
             # поэтому лектор наследуется, а создатель берётся текущий.
             lecturer_id=quiz.lecturer_id,
@@ -564,7 +576,7 @@ class QuizRepository:
                 new_qq = QuizQuestion(quiz_id=new_quiz.id, question_id=qq.question_id)
                 session.add(new_qq)
 
-        # Связка GroupTeacher здесь тоже не создаётся — см. комментарий в create_quiz.
+        # Связка TeacherGroup здесь тоже не создаётся — см. комментарий в create_quiz.
 
         try:
             await session.commit()

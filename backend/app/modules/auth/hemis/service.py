@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Employee, User
+from app.modules.auth.model import Teacher, User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
@@ -90,9 +90,9 @@ class HemisLoginService:
                 detail="Hemis не вернул идентификатор сотрудника",
             )
 
-        employee = (await session.execute(select(Employee).where(Employee.hemis_id == hemis_id))).scalar_one_or_none()
+        teacher = (await session.execute(select(Teacher).where(Teacher.hemis_id == hemis_id))).scalar_one_or_none()
 
-        if employee is None:
+        if teacher is None:
             logger.warning("Вход преподавателя %s: hemis_id %s не найден в зеркале", data.login, hemis_id)
             raise HTTPException(
                 status_code=403,
@@ -101,7 +101,7 @@ class HemisLoginService:
                 ),
             )
 
-        user = await session.get(User, employee.user_id)
+        user = await session.get(User, teacher.user_id)
         if user is None:
             raise HTTPException(status_code=403, detail="У сотрудника нет учётной записи")
 
