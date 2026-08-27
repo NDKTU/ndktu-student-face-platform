@@ -20,7 +20,6 @@ const PATH_LABELS: Record<string, string> = {
     '/roles':               'Rollar',
     '/permissions':         'Ruxsatlar',
     '/teachers':            "O'qituvchilar",
-    '/employees':           'Xodimlar',
     '/teacher-ranking':     'Reyting',
     '/faculties':           'Fakultetlar',
     '/kafedras':            'Kafedralar',

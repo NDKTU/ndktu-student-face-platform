@@ -22,7 +22,6 @@ const QuizDetailPage = lazy(() => import('@/pages/QuizDetailPage'));
 const ActiveQuizzesPage = lazy(() => import('@/pages/ActiveQuizzesPage'));
 const ResultsPage = lazy(() => import('@/pages/ResultsPage'));
 const TeachersPage = lazy(() => import('@/pages/TeachersPage'));
-const EmployeesPage = lazy(() => import('@/pages/EmployeesPage'));
 const HemisSyncPage = lazy(() => import('@/pages/HemisSyncPage'));
 const EduPlanSyncPage = lazy(() => import('@/pages/EduPlanSyncPage'));
 const FacultyPage = lazy(() => import('@/pages/FacultyPage'));
@@ -132,7 +131,6 @@ function App() {
                                         <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                                         <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
                                         <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
-                                        <Route path="/employees" element={<PermissionRoute permission="read:employee"><EmployeesPage /></PermissionRoute>} />
                                         <Route path="/teacher-ranking" element={<PermissionRoute permission="read:teacher"><TeacherRankingPage /></PermissionRoute>} />
 
                                         <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />

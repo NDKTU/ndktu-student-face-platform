@@ -14,7 +14,6 @@ import {
     PlayCircle,
     Trophy,
     BarChart2,
-    Briefcase,
     User,
     Library,
     Database,
@@ -41,7 +40,6 @@ export const SIDEBAR_SECTION_ORDER = [
 
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
-    employee:      { label: 'Xodimlar',         href: '/employees',   icon: Briefcase },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
     student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
 
