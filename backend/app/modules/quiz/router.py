@@ -576,9 +576,10 @@ user_answers_router = APIRouter(
 async def get_user_answers(
     data: UserAnswersListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("user_answers:read")),
+    current_user: User = Depends(PermissionRequired("user_answers:read")),
 ):
-    return await user_answers_repository.get_all(session, data)
+    # current_user, а не `_`: студенту репозиторий сузит выборку до его ответов.
+    return await user_answers_repository.get_all(session, data, current_user)
 
 
 # ============================================================================
