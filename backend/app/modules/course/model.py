@@ -202,6 +202,9 @@ class Homework(Base, IdIntPk, TimestampMixin):
     allow_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allowed_file_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # O'qituvchi ilova qiladigan fayllar: shart, namuna, tarqatma material.
+    # `allow_file` esa buning aksi — talaba fayl yubora oladimi, degani.
+    attachments: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
     course: Mapped["Course"] = relationship("Course")
     lesson: Mapped["Lesson | None"] = relationship("Lesson")

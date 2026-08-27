@@ -27,6 +27,14 @@ export interface ResourceCreateRequest {
     order_index?: number;
 }
 
+export interface ResourceUpdateRequest {
+    title?: string;
+    file_url?: string;
+    link_url?: string;
+    text_content?: string;
+    order_index?: number;
+}
+
 export const resourceService = {
     list: async (params: { lesson_id?: number; course_id?: number }) => {
         const response = await api.get<{ total: number; resources: Resource[] }>('/resource/', { params });
@@ -34,6 +42,10 @@ export const resourceService = {
     },
     create: async (data: ResourceCreateRequest) => {
         const response = await api.post<Resource>('/resource/', data);
+        return response.data;
+    },
+    update: async (id: number, data: ResourceUpdateRequest) => {
+        const response = await api.put<Resource>(`/resource/${id}`, data);
         return response.data;
     },
     delete: async (id: number) => {

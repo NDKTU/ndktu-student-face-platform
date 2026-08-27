@@ -28,6 +28,8 @@ export interface Assignment {
     allow_file: boolean;
     allow_text: boolean;
     allowed_file_types: string[];
+    /** O'qituvchi biriktirgan fayllar (shart, namuna, tarqatma material). */
+    attachments: SubmissionFile[];
     stats?: AssignmentStats | null;
     created_at: string;
     updated_at: string;
@@ -37,7 +39,7 @@ export interface AssignmentListResponse {
     total: number;
     page: number;
     limit: number;
-    assignments: Assignment[];
+    homeworks: Assignment[];
 }
 
 export interface AssignmentCreateRequest {
@@ -50,6 +52,7 @@ export interface AssignmentCreateRequest {
     allow_file?: boolean;
     allow_text?: boolean;
     allowed_file_types?: string[];
+    attachments?: SubmissionFile[];
 }
 
 export interface AssignmentUpdateRequest {
@@ -61,6 +64,7 @@ export interface AssignmentUpdateRequest {
     allow_file?: boolean;
     allow_text?: boolean;
     allowed_file_types?: string[];
+    attachments?: SubmissionFile[];
 }
 
 export interface SubmissionUserInfo {

@@ -25,6 +25,7 @@ class HomeworkCreateRequest(BaseModel):
     allow_file: bool = True
     allow_text: bool = True
     allowed_file_types: List[str] = []
+    attachments: List[SubmissionFile] = []
 
 
 class HomeworkUpdateRequest(BaseModel):
@@ -36,6 +37,7 @@ class HomeworkUpdateRequest(BaseModel):
     allow_file: Optional[bool] = None
     allow_text: Optional[bool] = None
     allowed_file_types: Optional[List[str]] = None
+    attachments: Optional[List[SubmissionFile]] = None
 
 
 class HomeworkStats(BaseModel):
@@ -57,6 +59,7 @@ class HomeworkResponse(BaseModel):
     allow_file: bool
     allow_text: bool
     allowed_file_types: List[str] = []
+    attachments: List[SubmissionFile] = []
     stats: Optional[HomeworkStats] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime

@@ -110,6 +110,7 @@ class HomeworkRepository:
             allow_file=data.allow_file,
             allow_text=data.allow_text,
             allowed_file_types=data.allowed_file_types,
+            attachments=[f.model_dump() for f in data.attachments],
         )
         session.add(a)
         await session.commit()
@@ -139,6 +140,9 @@ class HomeworkRepository:
                 if field == "deadline":
                     val = _to_naive_utc(val)
                 setattr(a, field, val)
+        if data.attachments is not None:
+            # Ro'yxat butunlay almashtiriladi: forma yakuniy holatni yuboradi.
+            a.attachments = [f.model_dump() for f in data.attachments]
         await session.commit()
         await session.refresh(a)
         return await self._serialize_homework(session, a)
