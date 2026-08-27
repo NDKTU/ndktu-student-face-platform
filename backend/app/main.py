@@ -1,3 +1,4 @@
+import mimetypes
 import os
 
 import uvicorn
@@ -29,6 +30,25 @@ os.makedirs(settings.question_upload_dir, exist_ok=True)
 os.makedirs(settings.profile_upload_dir, exist_ok=True)
 os.makedirs(settings.evidence_dir, exist_ok=True)
 os.makedirs(settings.course_resource_upload_dir, exist_ok=True)
+
+# Slim-obrazda /etc/mime.types yo'q, shuning uchun `mimetypes` ofis fayllarini
+# tanimaydi. Starlette esa noma'lum kengaytma uchun `text/plain` qo'yadi —
+# natijada .docx brauzerda ochilib, ekranga ikkilik matn to'kilardi.
+# Turlarni o'zimiz ro'yxatdan o'tkazamiz, shunda brauzer faylni yuklab oladi.
+for _extension, _mime in {
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".zip": "application/zip",
+    ".rar": "application/vnd.rar",
+    ".7z": "application/x-7z-compressed",
+    ".pdf": "application/pdf",
+}.items():
+    mimetypes.add_type(_mime, _extension)
+
 
 # Legacy alias: uploads/ used to be nested one level deeper under uploads/questions/.
 # Already-stored URLs still reference /uploads/questions/..., so this mount (registered
