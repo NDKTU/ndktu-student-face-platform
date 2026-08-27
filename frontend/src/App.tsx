@@ -82,10 +82,12 @@ const PermissionRoute = ({ permission, children }: { permission: string | string
 };
 
 const DashboardRedirect = () => {
-    const { user } = useAuth();
-    const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
-    const isTeacher = user?.roles?.some(role => role.name.toLowerCase() === 'teacher');
-    const isPsixologik = user?.roles?.some(role => role.name.toLowerCase() === 'psixologik');
+    const { user, activeRole } = useAuth();
+    // Bir nechta roli borlar uchun tanlangan ko'rinish hal qiladi.
+    const scope = activeRole ? [activeRole] : (user?.roles ?? []);
+    const isStudent = scope.some(role => role.name.toLowerCase() === 'student');
+    const isTeacher = scope.some(role => role.name.toLowerCase() === 'teacher');
+    const isPsixologik = scope.some(role => role.name.toLowerCase() === 'psixologik');
 
     if (isPsixologik) {
         return <Navigate to="/psychology" replace />;
@@ -116,11 +118,11 @@ function App() {
                                 <Route element={<ProtectedRoute />}>
                                     {/* Фокус-режим: прохождение тестов без сайдбара */}
                                     <Route element={<FocusLayout />}>
-                                        <Route path="/quiz-test" element={<PermissionRoute permission="quiz_process:start_quiz"><QuizTestPage /></PermissionRoute>} />
                                         <Route path="/psychology/test/:methodId" element={<PermissionRoute permission="read:psychology"><PsychologyTestPage /></PermissionRoute>} />
                                     </Route>
 
                                     <Route element={<MainLayout />}>
+                                        <Route path="/quiz-test" element={<PermissionRoute permission="quiz_process:start_quiz"><QuizTestPage /></PermissionRoute>} />
                                         <Route path="/" element={<DashboardRedirect />} />
                                         <Route path="/profile" element={<ProfilePage />} />
 

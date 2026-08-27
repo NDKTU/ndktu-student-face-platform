@@ -320,10 +320,34 @@ const UserModal = ({
                 payload.password = data.password;
             }
 
+            const currentRoleIds = [...(user.roles?.map(r => r.id) ?? [])].sort();
+            const nextRoleIds = [...data.role_ids].sort();
+            const rolesChanged =
+                currentRoleIds.length !== nextRoleIds.length ||
+                currentRoleIds.some((id, index) => id !== nextRoleIds[index]);
+
             updateMutation.mutate({ id: user.id, data: payload }, {
                 onSuccess: (updatedUser: any) => {
-                    toast.success('Foydalanuvchi yangilandi');
-                    onSuccess(updatedUser);
+                    if (!rolesChanged) {
+                        toast.success('Foydalanuvchi yangilandi');
+                        onSuccess(updatedUser);
+                        return;
+                    }
+                    // `assign_role` rollar to'plamini butunlay almashtiradi —
+                    // qo'shmaydi, shuning uchun formadagi ro'yxat yakuniy holat.
+                    assignRolesMutation.mutate(
+                        { user_id: user.id, role_ids: data.role_ids },
+                        {
+                            onSuccess: () => {
+                                toast.success('Foydalanuvchi va rollari yangilandi');
+                                onSuccess(updatedUser);
+                            },
+                            onError: (error) => {
+                                logger.error('Failed to assign roles', error);
+                                toast.error("Rollarni o'zgartirishda xatolik yuz berdi");
+                            },
+                        },
+                    );
                 },
                 onError: (error) => {
                     logger.error('Failed to update user', error);
@@ -369,39 +393,37 @@ const UserModal = ({
                 />
 
                 {!user && (
-                    <>
-                        <Input
-                            label="Parol"
-                            type="password"
-                            autoComplete="new-password"
-                            {...register('password')}
-                            error={errors.password?.message}
-                        />
-
-                        <div className="space-y-2 relative z-0">
-                            <label className="text-sm font-medium">Rollar</label>
-                            <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-2 border rounded-md">
-                                {roles.map((role) => (
-                                    <div key={role.id} className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id={`role-${role.id}`}
-                                            value={role.id}
-                                            {...register('role_ids')}
-                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                        />
-                                        <label htmlFor={`role-${role.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
-                                            {role.name}
-                                        </label>
-                                    </div>
-                                ))}
-                            </div>
-                            {errors.role_ids && (
-                                <p className="text-xs text-destructive">{errors.role_ids.message}</p>
-                            )}
-                        </div>
-                    </>
+                    <Input
+                        label="Parol"
+                        type="password"
+                        autoComplete="new-password"
+                        {...register('password')}
+                        error={errors.password?.message}
+                    />
                 )}
+
+                <div className="space-y-2 relative z-0">
+                    <label className="text-sm font-medium">Rollar</label>
+                    <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-2 border rounded-md">
+                        {roles.map((role) => (
+                            <div key={role.id} className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    id={`role-${role.id}`}
+                                    value={role.id}
+                                    {...register('role_ids')}
+                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                />
+                                <label htmlFor={`role-${role.id}`} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {role.name}
+                                </label>
+                            </div>
+                        ))}
+                    </div>
+                    {errors.role_ids && (
+                        <p className="text-xs text-destructive">{errors.role_ids.message}</p>
+                    )}
+                </div>
 
 
 

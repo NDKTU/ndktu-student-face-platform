@@ -3,13 +3,30 @@ import api from '@/services/api';
 import { userService } from '@/services/userService';
 import { getToken, setToken, clearToken } from '@/services/tokenStorage';
 import { logger } from '@/utils/logger';
-import type { User } from '@/types/auth';
+import type { User, UserRole } from '@/types/auth';
+
+/** Tanlangan ko'rinish foydalanuvchiga bog'lab saqlanadi: bitta brauzerda
+ *  boshqa hisobga kirilganda oldingi tanlov qo'llanib qolmasligi kerak. */
+const activeRoleKey = (userId: number) => `activeRole:${userId}`;
+
+const readStoredRole = (userId: number): number | null => {
+    try {
+        const raw = localStorage.getItem(activeRoleKey(userId));
+        return raw ? Number(raw) : null;
+    } catch {
+        return null;
+    }
+};
 
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     permissions: ReadonlySet<string>;
+    /** Faol ko'rinish roli. Bir nechta roli borlar uchun interfeys shunga qarab torayadi. */
+    activeRole: UserRole | null;
+    availableRoles: UserRole[];
+    setActiveRole: (roleId: number | null) => void;
     hasPermission: (name: string) => boolean;
     hasAnyPermission: (...names: string[]) => boolean;
     login: (token: string) => Promise<void>;
@@ -22,6 +39,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
 
     const fetchUser = async () => {
         try {
@@ -90,16 +108,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const isAuthenticated = !!user;
 
+    const availableRoles = useMemo<UserRole[]>(() => user?.roles ?? [], [user]);
+
+    // Saqlangan tanlov foydalanuvchida qolmagan bo'lishi mumkin (rollari
+    // o'zgargan) — bunday holda hech narsa toraytirilmaydi.
+    const activeRole = useMemo<UserRole | null>(
+        () => availableRoles.find((role) => role.id === activeRoleId) ?? null,
+        [availableRoles, activeRoleId],
+    );
+
+    useEffect(() => {
+        if (!user) {
+            setActiveRoleId(null);
+            return;
+        }
+        const stored = readStoredRole(user.id);
+        const roles = user.roles ?? [];
+        if (stored !== null && roles.some((role) => role.id === stored)) {
+            setActiveRoleId(stored);
+            return;
+        }
+        // Ko'rinish har doim aniq bo'lsin: saqlangan tanlov bo'lmasa, huquqi
+        // eng keng rol olinadi — shunda foydalanuvchi hech narsani yo'qotmaydi,
+        // kerak bo'lsa o'zi torroq ko'rinishga o'tadi.
+        const widest = roles.reduce<UserRole | null>(
+            (best, role) =>
+                best === null || (role.permissions?.length ?? 0) > (best.permissions?.length ?? 0) ? role : best,
+            null,
+        );
+        setActiveRoleId(widest?.id ?? null);
+    }, [user]);
+
+    const setActiveRole = (roleId: number | null) => {
+        setActiveRoleId(roleId);
+        if (!user) return;
+        try {
+            if (roleId === null) localStorage.removeItem(activeRoleKey(user.id));
+            else localStorage.setItem(activeRoleKey(user.id), String(roleId));
+        } catch {
+            // xotira mavjud bo'lmasa ham tanlov joriy sessiyada ishlaydi
+        }
+    };
+
     const permissions = useMemo<ReadonlySet<string>>(() => {
         const set = new Set<string>();
         if (!user) return set;
-        for (const role of user.roles ?? []) {
+        // Ko'rinish tanlanganda faqat o'sha rolning huquqlari hisobga olinadi.
+        const source = activeRole ? [activeRole] : (user.roles ?? []);
+        for (const role of source) {
             for (const p of role.permissions ?? []) {
                 set.add(p.name);
             }
         }
         return set;
-    }, [user]);
+    }, [user, activeRole]);
 
     const hasPermission = (name: string) => permissions.has(name);
     const hasAnyPermission = (...names: string[]) => names.some((n) => permissions.has(n));
@@ -111,6 +173,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isAuthenticated,
                 isLoading,
                 permissions,
+                activeRole,
+                availableRoles,
+                setActiveRole,
                 hasPermission,
                 hasAnyPermission,
                 login,

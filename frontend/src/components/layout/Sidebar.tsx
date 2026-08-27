@@ -20,12 +20,13 @@ interface SidebarProps {
 const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     const location = useLocation();
     const { t } = useTranslation();
-    const { user, permissions } = useAuth();
+    const { user, permissions, activeRole } = useAuth();
 
     const sections = useMemo(() => {
-        const roleNames = (user?.roles ?? []).map((r) => r.name);
+        // Ko'rinish tanlangan bo'lsa — faqat o'sha rol, aks holda barchasi.
+        const roleNames = (activeRole ? [activeRole] : (user?.roles ?? [])).map((r) => r.name);
         return buildSidebar(permissions, roleNames);
-    }, [user, permissions]);
+    }, [user, permissions, activeRole]);
 
     return (
         <>
@@ -102,7 +103,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                         </div>
                         <div className="flex flex-col">
                             <span className="max-w-[150px] truncate text-sm font-medium text-sidebar-foreground">{user?.username}</span>
-                            <span className="max-w-[150px] truncate text-xs text-sidebar-muted">{user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
+                            <span className="max-w-[150px] truncate text-xs text-sidebar-muted">{activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
                         </div>
                     </div>
                 </div>

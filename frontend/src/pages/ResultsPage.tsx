@@ -283,11 +283,14 @@ const HeroStats = ({ results, total }: HeroStatsProps) => {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const ResultsPage = () => {
-    const { user, isLoading: isAuthLoading } = useAuth();
+    const { user, activeRole, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
 
-    const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
-    const isAdmin = user?.roles?.some(role => role.name.toLowerCase() === 'admin');
+    // Tanlangan ko'rinishga bo'ysunadi: bir nechta roli bor foydalanuvchi
+    // «Talaba» ko'rinishida o'zining natijalarini ko'radi.
+    const roleScope = activeRole ? [activeRole] : (user?.roles ?? []);
+    const isStudent = roleScope.some(role => role.name.toLowerCase() === 'student');
+    const isAdmin = roleScope.some(role => role.name.toLowerCase() === 'admin');
     const isAdminOrTeacher = !isStudent;
 
     const { mutate: deleteResult, isPending: isDeleting } = useDeleteResult();
@@ -692,7 +695,10 @@ const ResultsPage = () => {
                             <ResultCard
                                 key={result.id}
                                 result={result}
-                                onClick={() => setSelectedResult(result)}
+                                // Talaba uchun oraliq panel ortiqcha: kartochkaning
+                                // o'zi javoblar tahliliga olib boradi. Panel
+                                // administratorga qoladi — u yerda o'chirish bor.
+                                onClick={() => handleViewAnswers(result)}
                             />
                         ))}
                     </div>

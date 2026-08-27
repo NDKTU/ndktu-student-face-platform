@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { setLanguage } from '@/i18n';
-import { User, LogOut, Sun, Moon, Menu, ChevronDown } from 'lucide-react';
+import { User, LogOut, Sun, Moon, Menu, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -63,7 +63,7 @@ const getPageLabel = (pathname: string) => {
 };
 
 const Navbar = ({ onMenuClick }: NavbarProps) => {
-    const { user, logout } = useAuth();
+    const { user, logout, activeRole, availableRoles, setActiveRole } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const { t, i18n } = useTranslation();
     const location = useLocation();
@@ -170,10 +170,43 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                                 <div className="px-2.5 py-2 mb-1">
                                     <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                        {user?.roles?.map(r => r.name).join(', ') || t('Foydalanuvchi')}
+                                        {activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}
                                     </p>
                                 </div>
-                                <div className="h-px bg-border mb-1" />
+
+                                {/* Bir nechta roli borlar uchun ko'rinish tanlash:
+                                    interfeys tanlangan rol huquqlariga qarab torayadi. */}
+                                {availableRoles.length > 1 && (
+                                    <>
+                                        <div className="h-px bg-border mb-1" />
+                                        <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                            {t("Ko'rinishni tanlang")}
+                                        </p>
+                                        {availableRoles.map((role) => (
+                                            <button
+                                                key={role.id}
+                                                role="menuitem"
+                                                onClick={() => {
+                                                    setActiveRole(role.id);
+                                                    setIsProfileOpen(false);
+                                                    // Joriy sahifa yangi ko'rinishda yopiq bo'lishi mumkin.
+                                                    navigate('/');
+                                                }}
+                                                className={cn(
+                                                    'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                                                    activeRole?.id === role.id
+                                                        ? 'bg-primary/10 text-primary font-medium'
+                                                        : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+                                                )}
+                                            >
+                                                <span className="truncate">{role.name}</span>
+                                                {activeRole?.id === role.id && <Check className="h-3.5 w-3.5 shrink-0" />}
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
+
+                                <div className="h-px bg-border my-1" />
                                 <Link
                                     to="/profile"
                                     role="menuitem"
