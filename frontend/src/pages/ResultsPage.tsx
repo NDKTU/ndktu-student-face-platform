@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import {
     Loader2, FileText, X, FileSpreadsheet, Trash2,
     AlertTriangle, BookOpen, Calendar,
-    ChevronRight, ArrowRight, Eye, ShieldAlert,
+    ChevronRight, Eye, ShieldAlert,
 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
@@ -39,145 +39,6 @@ const gradeConfig = {
 
 const getGradeConf = (grade: number) =>
     gradeConfig[grade as keyof typeof gradeConfig] ?? gradeConfig[1];
-
-// ─── Slide-over panel ─────────────────────────────────────────────────────────
-
-interface SlideOverProps {
-    result: Result | null;
-    onClose: () => void;
-    onViewAnswers: (result: Result) => void;
-    onDelete?: (id: number) => void;
-    isAdmin?: boolean;
-}
-
-const SlideOver = ({ result, onClose, onViewAnswers, onDelete, isAdmin }: SlideOverProps) => {
-    if (!result) return null;
-
-    const conf = getGradeConf(result.grade);
-    const total = result.correct_answers + result.wrong_answers;
-    const pct = total > 0 ? Math.round((result.correct_answers / total) * 100) : 0;
-    const studentName = result.student_name || result.user?.username || `Foydalanuvchi ${result.user_id}`;
-
-    return (
-        <>
-            <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-            <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-card shadow-2xl border-l border-border overflow-y-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Natija tafsiloti</p>
-                        <p className="text-sm font-medium text-foreground mt-0.5 truncate max-w-[260px]">{studentName}</p>
-                    </div>
-                    <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground transition-colors">
-                        <X className="h-4 w-4" />
-                    </button>
-                </div>
-
-                <div className="flex-1 px-6 py-5 space-y-5">
-                    {/* Grade hero */}
-                    <div className={cn('rounded-2xl p-6 text-center', conf.softBg)}>
-                        <p className="font-display text-8xl font-semibold tracking-tight leading-none" style={{ color: conf.color }}>
-                            {result.grade}
-                        </p>
-                        <p className={cn('mt-2 text-sm font-semibold', conf.softText)}>{conf.label}</p>
-                    </div>
-
-                    {/* Score bar */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-foreground">Natija</span>
-                            <span className="font-mono text-sm font-semibold text-foreground">{result.correct_answers} / {total}</span>
-                        </div>
-                        <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                            <div
-                                className={cn('h-full rounded-full transition-all duration-700', conf.bg)}
-                                style={{ width: `${pct}%` }}
-                            />
-                        </div>
-                        <div className="flex justify-between mt-1.5">
-                            <span className="text-xs text-muted-foreground">{result.correct_answers} to'g'ri</span>
-                            <span className="text-xs font-mono font-medium text-foreground">{pct}%</span>
-                        </div>
-                    </div>
-
-                    {/* Info grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-muted/60 p-3">
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Fan</p>
-                            <p className="text-sm font-medium text-foreground truncate">{result.subject?.name || '—'}</p>
-                        </div>
-                        <div className="rounded-xl bg-muted/60 p-3">
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Test</p>
-                            <p className="text-sm font-medium text-foreground truncate">{result.quiz?.title || `Test ${result.quiz_id}`}</p>
-                        </div>
-                        {result.group && (
-                            <div className="rounded-xl bg-muted/60 p-3">
-                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Guruh</p>
-                                <p className="text-sm font-medium text-foreground truncate">{result.group.name}</p>
-                            </div>
-                        )}
-                        <div className="rounded-xl bg-muted/60 p-3">
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Sana</p>
-                            <p className="text-xs font-mono font-medium text-foreground">
-                                {new Date(result.created_at).toLocaleString('uz-UZ', { hour12: false })}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Cheating evidence */}
-                    {result.cheating_detected && (
-                        <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4 space-y-3">
-                            <div className="flex items-center gap-2">
-                                <ShieldAlert className="h-4 w-4 text-destructive shrink-0" />
-                                <p className="text-sm font-semibold text-destructive">Firibgarlik aniqlandi</p>
-                            </div>
-                            {result.reason_for_stop && (
-                                <p className="text-xs text-foreground/70 leading-relaxed">{result.reason_for_stop}</p>
-                            )}
-                            {result.cheating_image_url && (
-                                <div className="mt-2 overflow-hidden rounded-xl border border-destructive/20">
-                                    <img
-                                        src={result.cheating_image_url}
-                                        alt="Firibgarlik dalili"
-                                        className="w-full object-cover"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div className="shrink-0 px-6 py-4 border-t border-border flex gap-2">
-                    <Button
-                        variant="primary"
-                        className="flex-1"
-                        onClick={() => onViewAnswers(result)}
-                    >
-                        Javoblarni ko'rish
-                        <ArrowRight className="ml-2 h-3.5 w-3.5" />
-                    </Button>
-                    {isAdmin && onDelete && (
-                        <Button
-                            variant="outline"
-                            className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                            onClick={() => onDelete(result.id)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
-            </aside>
-        </>
-    );
-};
 
 // ─── Student result card ──────────────────────────────────────────────────────
 
@@ -295,7 +156,6 @@ const ResultsPage = () => {
 
     const { mutate: deleteResult, isPending: isDeleting } = useDeleteResult();
     const [resultToDelete, setResultToDelete] = useState<number | null>(null);
-    const [selectedResult, setSelectedResult] = useState<Result | null>(null);
 
     const handleDeleteClick = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
@@ -308,7 +168,6 @@ const ResultsPage = () => {
                 onSuccess: () => {
                     toast.success("Natija o'chirildi");
                     setResultToDelete(null);
-                    if (selectedResult?.id === resultToDelete) setSelectedResult(null);
                 }
             });
         }
@@ -512,7 +371,7 @@ const ResultsPage = () => {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={e => { e.stopPropagation(); setSelectedResult(result); }}
+                        onClick={e => { e.stopPropagation(); handleViewAnswers(result); }}
                     >
                         <Eye className="h-3.5 w-3.5" />
                     </Button>
@@ -714,7 +573,7 @@ const ResultsPage = () => {
                             isLoading={isResultsLoading}
                             isError={isResultsError}
                             onRetry={() => refetchResults()}
-                            onRowClick={(result) => setSelectedResult(result)}
+                            onRowClick={(result) => handleViewAnswers(result)}
                             emptyIcon={<FileText className="h-6 w-6" />}
                             emptyTitle="Natijalar topilmadi"
                             emptyDescription={hasActiveFilters ? "Filtrlarni o'zgartirib ko'ring." : "Hozircha test natijalari yo'q."}
@@ -765,15 +624,6 @@ const ResultsPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isResultsLoading}
-            />
-
-            {/* Slide-over */}
-            <SlideOver
-                result={selectedResult}
-                onClose={() => setSelectedResult(null)}
-                onViewAnswers={handleViewAnswers}
-                onDelete={isAdmin ? id => { setSelectedResult(null); setResultToDelete(id); } : undefined}
-                isAdmin={isAdmin}
             />
 
             <ConfirmDialog
