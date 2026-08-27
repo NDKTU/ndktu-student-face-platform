@@ -43,6 +43,14 @@ import { sanitizeHtml } from '@/utils/sanitize';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
+
+/** Test topshirish paytida sidebar ko'rinmasin — sahifa butun ekranni egallaydi. */
+const FocusOverlay = ({ children }: { children: React.ReactNode }) => (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+        <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">{children}</div>
+    </div>
+);
+
 const QuizTestPage = () => {
     const { user } = useAuth();
 
@@ -492,6 +500,7 @@ const QuizTestPage = () => {
         const showCheatingAlert = results.cheating_detected || false;
 
         return (
+            <FocusOverlay>
             <div className="flex items-center justify-center min-h-[80vh]">
                 <Card className="w-full max-w-lg">
                     {showCheatingAlert && (
@@ -575,6 +584,7 @@ const QuizTestPage = () => {
                     </CardContent>
                 </Card>
             </div>
+            </FocusOverlay>
         );
     }
 
@@ -603,6 +613,7 @@ const QuizTestPage = () => {
     const shouldProctor = effectiveProctoringMode === 'face';
 
     return (
+        <FocusOverlay>
         <div className="space-y-6 max-w-4xl mx-auto">
             {/* Video Monitoring Component */}
             {shouldProctor && (
@@ -749,6 +760,7 @@ const QuizTestPage = () => {
                 </div>
             </div>
         </div>
+        </FocusOverlay>
     );
 };
 

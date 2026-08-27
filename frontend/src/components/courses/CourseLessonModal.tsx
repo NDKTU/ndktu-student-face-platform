@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, FilePlus2, Loader2, Youtube } from 'lucide-react';
+import { ClipboardList, FilePlus2, Loader2, Trash2, Youtube } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -8,7 +8,8 @@ import { useCreateLesson, useUpdateLesson } from '@/hooks/useLessons';
 import { resourceService } from '@/services/resourceService';
 import { assignmentService } from '@/services/assignmentService';
 import type { Course } from '@/services/courseService';
-import type { Lesson } from '@/services/lessonService';
+import type { Lesson, LessonResourceInfo } from '@/services/lessonService';
+import type { Assignment } from '@/services/assignmentService';
 
 interface Props {
     isOpen: boolean;
@@ -41,6 +42,9 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     const [homeworkDeadline, setHomeworkDeadline] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    // Video alohida maydonda tahrirlanadi, ro'yxatda qolgan resurslar ko'rsatiladi.
+    const [otherResources, setOtherResources] = useState<LessonResourceInfo[]>([]);
+    const [homeworks, setHomeworks] = useState<Assignment[]>([]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -64,7 +68,34 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
         deadline.setDate(deadline.getDate() + 7);
         setHomeworkDeadline(deadline.toISOString().slice(0, 16));
         setError('');
+        setOtherResources((lesson?.resources ?? []).filter((r) => r.resource_type !== 'video'));
+        setHomeworks([]);
+        if (lesson) {
+            // Vazifalar dars javobida yo'q — alohida so'rov bilan olinadi.
+            assignmentService
+                .list({ lesson_id: lesson.id, limit: 50 })
+                .then((data) => setHomeworks(data.assignments ?? []))
+                .catch(() => setHomeworks([]));
+        }
     }, [isOpen, course.groups, lesson]);
+
+    const removeResource = async (resourceId: number) => {
+        try {
+            await resourceService.delete(resourceId);
+            setOtherResources((items) => items.filter((item) => item.id !== resourceId));
+        } catch {
+            setError("Resursni o'chirishda xatolik");
+        }
+    };
+
+    const removeHomework = async (homeworkId: number) => {
+        try {
+            await assignmentService.delete(homeworkId);
+            setHomeworks((items) => items.filter((item) => item.id !== homeworkId));
+        } catch {
+            setError("Vazifani o'chirishda xatolik");
+        }
+    };
 
     const submit = async () => {
         if (!title.trim()) {
@@ -221,8 +252,31 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     />
                 </div>
 
-                {!isEditing && (
                 <section className="rounded-xl border border-border/60 p-4">
+                    {isEditing && (
+                        <div className="mb-4 space-y-2">
+                            {otherResources.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">Qo'shimcha resurs yo'q.</p>
+                            ) : otherResources.map((resource) => (
+                                <div key={resource.id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                    <span className="min-w-0 flex-1 truncate text-sm">{resource.title}</span>
+                                    <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                                        {resource.resource_type}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Resursni o'chirish"
+                                        className="text-muted-foreground hover:text-destructive"
+                                        onClick={() => void removeResource(resource.id)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <p className="text-sm font-semibold">Resurslar</p>
@@ -256,10 +310,32 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         </div>
                     )}
                 </section>
-                )}
 
-                {!isEditing && (
                 <section className="rounded-xl border border-border/60 p-4">
+                    {isEditing && (
+                        <div className="mb-4 space-y-2">
+                            {homeworks.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">Bu darsga vazifa biriktirilmagan.</p>
+                            ) : homeworks.map((homework) => (
+                                <div key={homework.id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                    <span className="min-w-0 flex-1 truncate text-sm">{homework.title}</span>
+                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                        {new Date(homework.deadline).toLocaleDateString()}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Vazifani o'chirish"
+                                        className="text-muted-foreground hover:text-destructive"
+                                        onClick={() => void removeHomework(homework.id)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <p className="text-sm font-semibold">Uy vazifasi</p>
@@ -285,7 +361,6 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         </div>
                     )}
                 </section>
-                )}
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="-mx-6 -mb-4 flex justify-end gap-2 border-t border-border/60 px-6 pt-4">
