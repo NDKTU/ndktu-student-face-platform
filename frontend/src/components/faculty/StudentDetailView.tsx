@@ -91,9 +91,10 @@ export const StudentDetailView = ({
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(
-                        `/results/answers?user_id=${student.user_id}&quiz_id=${r.quiz_id}`
-                    )}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${r.quiz_id}`);
+                    }}
                 >
                     Javoblarni ko'rish
                 </Button>
@@ -170,6 +171,9 @@ export const StudentDetailView = ({
                             columns={resultColumns}
                             data={results}
                             rowKey={(r) => r.id}
+                            onRowClick={(r) => navigate(
+                                `/results/answers?user_id=${student.user_id}&quiz_id=${r.quiz_id}`
+                            )}
                             isLoading={isResultsLoading}
                             isError={isResultsError}
                             onRetry={() => refetch()}
@@ -188,9 +192,10 @@ export const StudentDetailView = ({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => navigate(
-                                                `/results/answers?user_id=${student.user_id}&quiz_id=${r.quiz_id}`
-                                            )}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${r.quiz_id}`);
+                                            }}
                                         >
                                             Javoblarni ko'rish
                                         </Button>

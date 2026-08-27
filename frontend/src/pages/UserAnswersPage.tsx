@@ -8,13 +8,28 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/utils/sanitize';
 
 const OPTION_LABELS = { a: 'A', b: 'B', c: 'C', d: 'D' } as const;
 
-const stripHtml = (html: string) => {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent || div.innerText || '';
+/** Savol va javoblar HTML sifatida saqlanadi (jodit), rasmlar esa base64 bilan
+ *  o'sha HTML ichida yotadi — shuning uchun matn sifatida emas, render qilinadi. */
+const RICH_TEXT = '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_p]:m-0 [&_p+p]:mt-1 break-words';
+
+/** Tanlangan javobni harf bilan ko'rsatadi: eski yozuvlarda `answer` maydonida
+ *  harf emas, variantning to'liq matni (ba'zan base64 rasm) saqlangan. */
+const answerLetter = (
+    raw: string | null | undefined,
+    question: { option_a?: string; option_b?: string; option_c?: string; option_d?: string } | null,
+): string | null => {
+    if (!raw) return null;
+    const key = raw.trim().toLowerCase();
+    if (key in OPTION_LABELS) return OPTION_LABELS[key as keyof typeof OPTION_LABELS];
+    if (question) {
+        const hit = (['a', 'b', 'c', 'd'] as const).find(o => question[`option_${o}`] === raw);
+        if (hit) return OPTION_LABELS[hit];
+    }
+    return null;
 };
 
 const UserAnswersPage = () => {
@@ -111,9 +126,16 @@ const UserAnswersPage = () => {
                                     <span className="font-mono text-xs font-bold text-muted-foreground bg-muted rounded-md px-2 py-1 shrink-0 mt-0.5">
                                         #{questionNumber}
                                     </span>
-                                    <p className="flex-1 text-sm font-medium text-foreground leading-relaxed">
-                                        {question ? stripHtml(question.text) : `Savol #${answer.question_id}`}
-                                    </p>
+                                    {question ? (
+                                        <div
+                                            className={cn('min-w-0 flex-1 text-sm font-medium text-foreground leading-relaxed', RICH_TEXT)}
+                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text) }}
+                                        />
+                                    ) : (
+                                        <p className="min-w-0 flex-1 text-sm font-medium text-foreground leading-relaxed">
+                                            {`Savol #${answer.question_id}`}
+                                        </p>
+                                    )}
                                     {answer.is_correct ? (
                                         <CheckCircle2 className="h-4.5 w-4.5 text-success shrink-0 mt-0.5" />
                                     ) : (
@@ -147,7 +169,10 @@ const UserAnswersPage = () => {
                                                         <span className="font-mono font-bold text-xs mt-0.5 shrink-0 opacity-70">
                                                             {OPTION_LABELS[opt]})
                                                         </span>
-                                                        <span className="leading-snug">{optionText}</span>
+                                                        <span
+                                                            className={cn('min-w-0 flex-1 leading-snug', RICH_TEXT)}
+                                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(optionText) }}
+                                                        />
                                                     </div>
                                                 );
                                             })}
@@ -157,12 +182,7 @@ const UserAnswersPage = () => {
                                         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                                             <span>Tanlangan javob:</span>
                                             <span className="font-mono font-semibold text-foreground">
-                                                {answer.answer
-                                                    ? (['a', 'b', 'c', 'd'].includes(answer.answer.toLowerCase())
-                                                        ? OPTION_LABELS[answer.answer.toLowerCase() as keyof typeof OPTION_LABELS]
-                                                        : answer.answer)
-                                                    : '—'
-                                                }
+                                                {answerLetter(answer.answer, question) ?? (answer.answer ? '?' : '—')}
                                             </span>
                                             <span className="text-border">·</span>
                                             {answer.is_correct ? (

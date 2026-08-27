@@ -4,20 +4,25 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
-import { useCreateLesson } from '@/hooks/useLessons';
+import { useCreateLesson, useUpdateLesson } from '@/hooks/useLessons';
 import { resourceService } from '@/services/resourceService';
 import { assignmentService } from '@/services/assignmentService';
 import type { Course } from '@/services/courseService';
+import type { Lesson } from '@/services/lessonService';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     course: Course;
     topicId?: number;
+    /** Berilgan bo'lsa — oyna tahrirlash rejimida ochiladi. */
+    lesson?: Lesson | null;
 }
 
-export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
+export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: Props) {
     const createLesson = useCreateLesson();
+    const updateLesson = useUpdateLesson();
+    const isEditing = Boolean(lesson);
     // Группа берётся у курса. Выбор остаётся только для курса с несколькими
     // группами — там подставить её автоматически нельзя.
     const needsGroupChoice = course.groups.length > 1;
@@ -39,10 +44,14 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
 
     useEffect(() => {
         if (!isOpen) return;
-        setGroupId(course.groups.length === 1 ? String(course.groups[0].id) : '');
-        setTitle('');
-        setDescription('');
-        setYoutubeUrl('');
+        setGroupId(
+            lesson?.group_id
+                ? String(lesson.group_id)
+                : course.groups.length === 1 ? String(course.groups[0].id) : '',
+        );
+        setTitle(lesson?.topic ?? '');
+        setDescription(lesson?.description ?? '');
+        setYoutubeUrl(lesson?.resources?.find((r) => r.resource_type === 'video')?.link_url ?? '');
         setShowResources(false);
         setScript('');
         setExtraFiles([]);
@@ -55,7 +64,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
         deadline.setDate(deadline.getDate() + 7);
         setHomeworkDeadline(deadline.toISOString().slice(0, 16));
         setError('');
-    }, [isOpen, course.groups]);
+    }, [isOpen, course.groups, lesson]);
 
     const submit = async () => {
         if (!title.trim()) {
@@ -78,7 +87,33 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
         setSaving(true);
         setError('');
         try {
-            const lesson = await createLesson.mutateAsync({
+            if (lesson) {
+                await updateLesson.mutateAsync({
+                    id: lesson.id,
+                    data: {
+                        topic: title.trim(),
+                        description: description.trim() || null,
+                        group_id: groupId ? Number(groupId) : undefined,
+                    },
+                });
+                const video = lesson.resources?.find((r) => r.resource_type === 'video');
+                if (video && video.link_url !== youtubeUrl.trim()) {
+                    // Resurs yangilash yo'li yo'q — eskisini o'chirib, yangisini yozamiz.
+                    await resourceService.delete(video.id);
+                }
+                if (!video || video.link_url !== youtubeUrl.trim()) {
+                    await resourceService.create({
+                        lesson_id: lesson.id,
+                        resource_type: 'video',
+                        title: title.trim(),
+                        link_url: youtubeUrl.trim(),
+                    });
+                }
+                onClose();
+                return;
+            }
+
+            const created = await createLesson.mutateAsync({
                 course_id: course.id,
                 group_id: groupId ? Number(groupId) : undefined,
                 topic_id: topicId,
@@ -87,7 +122,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
             });
 
             await resourceService.create({
-                lesson_id: lesson.id,
+                lesson_id: created.id,
                 resource_type: 'video',
                 title: title.trim(),
                 link_url: youtubeUrl.trim(),
@@ -95,7 +130,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
 
             if (showResources && script.trim()) {
                 await resourceService.create({
-                    lesson_id: lesson.id,
+                    lesson_id: created.id,
                     resource_type: 'text',
                     title: 'Dars skripti',
                     text_content: script.trim(),
@@ -105,7 +140,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                 for (const file of extraFiles) {
                     const { url } = await resourceService.upload(file);
                     await resourceService.create({
-                        lesson_id: lesson.id,
+                        lesson_id: created.id,
                         resource_type: 'file',
                         title: file.name,
                         file_url: url,
@@ -113,7 +148,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                 }
                 if (extraUrl.trim()) {
                     await resourceService.create({
-                        lesson_id: lesson.id,
+                        lesson_id: created.id,
                         resource_type: 'link',
                         title: extraUrlTitle.trim() || "Qo'shimcha manba",
                         link_url: extraUrl.trim(),
@@ -123,7 +158,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
             if (showHomework && homeworkTitle.trim()) {
                 await assignmentService.create({
                     course_id: course.id,
-                    lesson_id: lesson.id,
+                    lesson_id: created.id,
                     title: homeworkTitle.trim(),
                     description: homeworkDescription.trim() || null,
                     deadline: new Date(homeworkDeadline).toISOString(),
@@ -139,7 +174,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Yangi dars" className="max-w-2xl">
+        <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? "Darsni tahrirlash" : "Yangi dars"} className="max-w-2xl">
             <div className="space-y-5">
                 <div>
                     <label className="mb-2 block text-sm font-medium">Dars nomi</label>
@@ -186,6 +221,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                     />
                 </div>
 
+                {!isEditing && (
                 <section className="rounded-xl border border-border/60 p-4">
                     <div className="flex items-center justify-between gap-3">
                         <div>
@@ -220,7 +256,9 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                         </div>
                     )}
                 </section>
+                )}
 
+                {!isEditing && (
                 <section className="rounded-xl border border-border/60 p-4">
                     <div className="flex items-center justify-between gap-3">
                         <div>
@@ -247,6 +285,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId }: Props) {
                         </div>
                     )}
                 </section>
+                )}
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="-mx-6 -mb-4 flex justify-end gap-2 border-t border-border/60 px-6 pt-4">

@@ -117,7 +117,18 @@ export function DataTable<T>({
                           <TableRow
                               key={rowKey(row)}
                               onClick={onRowClick ? () => onRowClick(row) : undefined}
-                              className={cn(onRowClick && 'cursor-pointer')}
+                              onKeyDown={onRowClick ? (e) => {
+                                  if (e.target !== e.currentTarget) return;
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      onRowClick(row);
+                                  }
+                              } : undefined}
+                              tabIndex={onRowClick ? 0 : undefined}
+                              role={onRowClick ? 'button' : undefined}
+                              className={cn(
+                                  onRowClick && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                              )}
                           >
                               {columns.map((col) => (
                                   <TableCell
@@ -151,7 +162,18 @@ export function DataTable<T>({
                           <div
                               key={rowKey(row)}
                               onClick={onRowClick ? () => onRowClick(row) : undefined}
-                              className={cn(onRowClick && 'cursor-pointer')}
+                              onKeyDown={onRowClick ? (e) => {
+                                  if (e.target !== e.currentTarget) return;
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      onRowClick(row);
+                                  }
+                              } : undefined}
+                              tabIndex={onRowClick ? 0 : undefined}
+                              role={onRowClick ? 'button' : undefined}
+                              className={cn(
+                                  onRowClick && 'cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              )}
                           >
                               {renderCard(row)}
                           </div>

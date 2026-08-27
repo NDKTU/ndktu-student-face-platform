@@ -71,7 +71,7 @@ export interface SubmissionUserInfo {
 
 export interface Submission {
     id: number;
-    assignment_id: number;
+    homework_id: number;
     user_id: number;
     submitted_text?: string | null;
     submitted_files: SubmissionFile[];
@@ -101,32 +101,32 @@ export interface SubmissionGradeRequest {
 
 export const assignmentService = {
     list: async (params?: { course_id?: number; lesson_id?: number; page?: number; limit?: number }) => {
-        const response = await api.get<AssignmentListResponse>('/assignment/', { params });
+        const response = await api.get<AssignmentListResponse>('/homework/', { params });
         return response.data;
     },
     getById: async (id: number) => {
-        const response = await api.get<Assignment>(`/assignment/${id}`);
+        const response = await api.get<Assignment>(`/homework/${id}`);
         return response.data;
     },
     create: async (data: AssignmentCreateRequest) => {
-        const response = await api.post<Assignment>('/assignment/', data);
+        const response = await api.post<Assignment>('/homework/', data);
         return response.data;
     },
     update: async (id: number, data: AssignmentUpdateRequest) => {
-        const response = await api.put<Assignment>(`/assignment/${id}`, data);
+        const response = await api.put<Assignment>(`/homework/${id}`, data);
         return response.data;
     },
     delete: async (id: number) => {
-        await api.delete(`/assignment/${id}`);
+        await api.delete(`/homework/${id}`);
     },
 
     submit: async (assignmentId: number, data: SubmissionSubmitRequest) => {
-        const response = await api.post<Submission>(`/assignment/${assignmentId}/submit`, data);
+        const response = await api.post<Submission>(`/homework/${assignmentId}/submit`, data);
         return response.data;
     },
     getMySubmission: async (assignmentId: number): Promise<Submission | null> => {
         try {
-            const response = await api.get<Submission>(`/assignment/${assignmentId}/my-submission`);
+            const response = await api.get<Submission>(`/homework/${assignmentId}/my-submission`);
             return response.data;
         } catch (e: unknown) {
             const status = (e as { response?: { status?: number } } | null)?.response?.status;
@@ -135,12 +135,12 @@ export const assignmentService = {
         }
     },
     listSubmissions: async (assignmentId: number) => {
-        const response = await api.get<SubmissionListResponse>(`/assignment/${assignmentId}/submissions`);
+        const response = await api.get<SubmissionListResponse>(`/homework/${assignmentId}/submissions`);
         return response.data;
     },
     grade: async (assignmentId: number, userId: number, data: SubmissionGradeRequest) => {
         const response = await api.put<Submission>(
-            `/assignment/${assignmentId}/submission/${userId}/grade`,
+            `/homework/${assignmentId}/submission/${userId}/grade`,
             data,
         );
         return response.data;

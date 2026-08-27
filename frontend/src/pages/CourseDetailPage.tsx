@@ -14,7 +14,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { useCourse } from '@/hooks/useCourses';
-import { useLessons } from '@/hooks/useLessons';
+import { useDeleteLesson, useLessons } from '@/hooks/useLessons';
 import { useCourseTopics, useDeleteCourseTopic } from '@/hooks/useCourseTopics';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
@@ -42,6 +42,8 @@ export default function CourseDetailPage() {
     const [selectedTopicId, setSelectedTopicId] = useState<number>();
     const [editingTopic, setEditingTopic] = useState<CourseTopic | null>(null);
     const [deletingTopic, setDeletingTopic] = useState<CourseTopic | null>(null);
+    const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+    const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
     const [expandedTopics, setExpandedTopics] = useState<Set<number>>(new Set());
 
     const courseQuery = useCourse(courseId);
@@ -51,6 +53,7 @@ export default function CourseDetailPage() {
         Boolean(courseId && canReadLessons),
     );
     const deleteTopic = useDeleteCourseTopic();
+    const deleteLesson = useDeleteLesson();
 
     const topics = useMemo(() => topicsQuery.data ?? [], [topicsQuery.data]);
     const lessons = lessonsQuery.data?.lessons ?? [];
@@ -93,8 +96,21 @@ export default function CourseDetailPage() {
     };
 
     const openNewLesson = (topicId: number) => {
+        setEditingLesson(null);
         setSelectedTopicId(topicId);
         setLessonModalOpen(true);
+    };
+
+    const confirmDeleteLesson = async () => {
+        if (!deletingLesson) return;
+        try {
+            await deleteLesson.mutateAsync(deletingLesson.id);
+            toast.success("Dars o'chirildi");
+            setDeletingLesson(null);
+        } catch (cause) {
+            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            toast.error(detail || "Darsni o'chirishda xatolik");
+        }
     };
 
     const confirmDeleteTopic = async () => {
@@ -115,13 +131,18 @@ export default function CourseDetailPage() {
         const video = lesson.resources?.find((resource) => resource.resource_type === 'video');
         const isYoutube = Boolean(video?.link_url && /youtu(?:\.be|be\.com)/i.test(video.link_url));
         return (
-            <button
+            // Qator <button> emas: ichida tahrirlash/o'chirish tugmalari bor,
+            // ichma-ich <button> esa yaroqsiz HTML.
+            <div
                 key={lesson.id}
-                type="button"
-                onClick={() => navigate(`/lessons/${lesson.id}`)}
                 className="group flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-primary/[0.02] sm:px-4"
             >
                 <GripVertical className="hidden h-4 w-4 shrink-0 text-muted-foreground/40 sm:block" />
+                <button
+                    type="button"
+                    onClick={() => navigate(`/lessons/${lesson.id}`)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
                     {index + 1}
                 </span>
@@ -140,7 +161,33 @@ export default function CourseDetailPage() {
                     </span>
                 )}
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-            </button>
+                </button>
+                {canUpdateLessons && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Darsni tahrirlash"
+                        onClick={() => {
+                            setEditingLesson(lesson);
+                            setSelectedTopicId(lesson.topic_id ?? undefined);
+                            setLessonModalOpen(true);
+                        }}
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                )}
+                {canDeleteLessons && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Darsni o'chirish"
+                        onClick={() => setDeletingLesson(lesson)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                )}
+            </div>
         );
     };
 
@@ -283,9 +330,19 @@ export default function CourseDetailPage() {
             />
             <CourseLessonModal
                 isOpen={lessonModalOpen}
-                onClose={() => setLessonModalOpen(false)}
+                onClose={() => { setLessonModalOpen(false); setEditingLesson(null); }}
                 course={course}
                 topicId={selectedTopicId}
+                lesson={editingLesson}
+            />
+            <ConfirmDialog
+                isOpen={Boolean(deletingLesson)}
+                onClose={() => setDeletingLesson(null)}
+                onConfirm={() => void confirmDeleteLesson()}
+                title="Darsni o'chirish"
+                description={`"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar ham yo'qoladi.`}
+                confirmText="O'chirish"
+                cancelText="Bekor qilish"
             />
             <ConfirmDialog
                 isOpen={Boolean(deletingTopic)}

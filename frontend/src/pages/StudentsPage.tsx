@@ -350,7 +350,10 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/results/answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`);
+                    }}
                 >
                     Javoblarni ko'rish
                 </Button>
@@ -438,6 +441,9 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                             columns={resultColumns}
                             data={results}
                             rowKey={(result) => result.id}
+                            onRowClick={(result) => navigate(
+                                `/results/answers?user_id=${student.user_id}&quiz_id=${result.quiz_id}`
+                            )}
                             isLoading={isResultsLoading}
                             isError={isResultsError}
                             onRetry={() => refetch()}
