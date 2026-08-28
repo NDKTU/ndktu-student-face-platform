@@ -28,6 +28,18 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         return buildSidebar(permissions, roleNames);
     }, [user, permissions, activeRole]);
 
+    // Faol bo'lim — yo'lga eng aniq mos keladigani. Oddiy «prefiks bilan
+    // boshlansa» tekshiruvi ikkitasini birdan yoqib yuborardi: `/psychology`
+    // ham `/psychology/results` ning boshlanishi hisoblanadi.
+    const activeHref = useMemo(() => {
+        const candidates = sections
+            .flatMap((section) => section.items)
+            .filter((item) =>
+                location.pathname === item.href || location.pathname.startsWith(item.href + '/'))
+            .sort((a, b) => b.href.length - a.href.length);
+        return candidates[0]?.href;
+    }, [sections, location.pathname]);
+
     return (
         <>
             {mobileOpen && (
@@ -73,7 +85,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                                 </p>
                                 <div className="flex flex-col gap-1">
                                     {section.items.map((item) => {
-                                        const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
+                                        const isActive = item.href === activeHref;
                                         return (
                                             <Link
                                                 key={item.href}
