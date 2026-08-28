@@ -13,6 +13,7 @@ import type { Course, CourseCreateRequest, CourseUpdateRequest } from '@/service
 import { logger } from '@/utils/logger';
 import { buildCourseName } from '@/utils/generatedNames';
 import { courseSchema, type CourseFormValues } from '@/schemas/course';
+import { SEMESTER_OPTIONS } from '@/utils/semester';
 
 interface CourseModalProps {
     isOpen: boolean;
@@ -208,8 +209,9 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                     <label className="text-sm font-medium">Semestr</label>
                     <select className={selectClassName} {...register('semester_number')}>
                         <option value="">Tanlanmagan</option>
-                        <option value="1">1-semestr</option>
-                        <option value="2">2-semestr</option>
+                        {SEMESTER_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                     </select>
                     {errors.semester_number && (
                         <p className="text-sm text-destructive">{errors.semester_number.message}</p>

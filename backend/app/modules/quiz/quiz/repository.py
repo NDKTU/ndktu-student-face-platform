@@ -7,6 +7,7 @@ from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.enums import semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
@@ -232,7 +233,7 @@ class QuizRepository:
         semester_number: int | None,
         created_at: datetime | None = None,
     ) -> str:
-        """Собирает название теста: «Фан — Гуруҳ — 21.08.2026 (1-semestr)».
+        """Собирает название теста: «Фан — Гуруҳ — 21.08.2026 (kuzgi semestr)».
 
         Организатор название больше не печатает: набранные вручную «Test 1» и
         «matem» невозможно было различить в списке из тысяч тестов. Дата берётся
@@ -258,8 +259,9 @@ class QuizRepository:
         parts = [part for part in (subject_name, group_name) if part]
         parts.append(moment.astimezone(TASHKENT_TZ).strftime("%d.%m.%Y"))
         title = " — ".join(parts)
-        if semester_number:
-            title = f"{title} ({semester_number}-semestr)"
+        label = semester_label(semester_number)
+        if label:
+            title = f"{title} ({label})"
         return title
 
     async def _fill_from_lesson(self, session: AsyncSession, data: QuizCreateRequest) -> QuizCreateRequest:

@@ -18,6 +18,7 @@ import { QUIZ_TYPE_LABELS } from '@/services/quizService';
 import type { Teacher } from '@/services/teacherService';
 import { logger } from '@/utils/logger';
 import { buildQuizTitle } from '@/utils/generatedNames';
+import { SEMESTER_OPTIONS } from '@/utils/semester';
 import { quizSchema, type QuizFormValues } from '@/schemas/quiz';
 
 interface QuizModalProps {
@@ -35,7 +36,18 @@ const selectClassName =
  * Semestr uchun test jadvalida ustun yo'q — u faqat sarlavhada yashaydi.
  * Tahrirlashda uni yo'qotmaslik uchun mavjud sarlavhadan o'qib olamiz.
  */
-const semesterFromTitle = (title?: string) => title?.match(/\((\d)-semestr\)/)?.[1] ?? '';
+const SEMESTER_BY_NAME: Record<string, string> = { kuzgi: '1', bahorgi: '2' };
+
+/**
+ * Eski sarlavhalarda semestr «(1-semestr)» ko'rinishida, yangilarida
+ * «(kuzgi semestr)». Ikkalasi ham tanilishi kerak, aks holda eski testni
+ * tahrirlaganda semestr yo'qolardi.
+ */
+const semesterFromTitle = (title?: string) => {
+    const named = title?.match(/\((kuzgi|bahorgi) semestr\)/i)?.[1];
+    if (named) return SEMESTER_BY_NAME[named.toLowerCase()] ?? '';
+    return title?.match(/\((\d)-semestr\)/)?.[1] ?? '';
+};
 
 export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizModalProps) => {
     const { user, hasPermission } = useAuth();
@@ -349,8 +361,9 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     <label className="text-sm font-medium">Semestr</label>
                     <select className={selectClassName} {...register('semester_number')}>
                         <option value="">Tanlanmagan</option>
-                        <option value="1">1-semestr</option>
-                        <option value="2">2-semestr</option>
+                        {SEMESTER_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                     </select>
                     {errors.semester_number && (
                         <p className="text-sm text-destructive">{errors.semester_number.message}</p>

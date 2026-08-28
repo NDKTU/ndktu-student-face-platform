@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.enums import semester_label
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
 from app.modules.organization_structure.model import Group, Kafedra
@@ -124,7 +125,7 @@ class CourseRepository:
         group_ids: list[int],
         semester_number: int | None,
     ) -> str:
-        """Собирает название курса: «Фан — 101-19, 102-19 (1-semestr)».
+        """Собирает название курса: «Фан — 101-19, 102-19 (kuzgi semestr)».
 
         Руками его больше не печатают: оно однозначно следует из предмета, групп
         и семестра, а расхождения в написании только мешали искать курс.
@@ -149,8 +150,9 @@ class CourseRepository:
             if len(group_names) > 3:
                 shown = f"{shown} +{len(group_names) - 3}"
             name = f"{name} — {shown}"
-        if semester_number:
-            name = f"{name} ({semester_number}-semestr)"
+        label = semester_label(semester_number)
+        if label:
+            name = f"{name} ({label})"
         return name[:255]
 
     async def _derive_org_fields(

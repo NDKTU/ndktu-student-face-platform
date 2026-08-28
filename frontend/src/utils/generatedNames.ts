@@ -5,13 +5,17 @@
  * saqlashdan oldin qanday nom hosil bo'lishini ko'rishi kerak.
  */
 
+import { semesterLabel } from '@/utils/semester';
+
 const formatDate = (date: Date) =>
     `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 
-const withSemester = (name: string, semesterNumber?: number) =>
-    semesterNumber ? `${name} (${semesterNumber}-semestr)` : name;
+const withSemester = (name: string, semesterNumber?: number) => {
+    const label = semesterLabel(semesterNumber);
+    return label ? `${name} (${label})` : name;
+};
 
-/** «Oliy matematika — 101-19 — 21.08.2026 (1-semestr)» */
+/** «Oliy matematika — 101-19 — 21.08.2026 (kuzgi semestr)» */
 export const buildQuizTitle = (
     subjectName?: string,
     groupName?: string,
@@ -23,7 +27,7 @@ export const buildQuizTitle = (
     return withSemester(parts.join(' — '), semesterNumber);
 };
 
-/** «Oliy matematika — 101-19, 102-19 (1-semestr)» */
+/** «Oliy matematika — 101-19, 102-19 (kuzgi semestr)» */
 export const buildCourseName = (
     subjectName?: string,
     groupNames: string[] = [],

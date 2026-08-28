@@ -6,6 +6,7 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { Teacher } from '@/services/teacherService';
+import { SEMESTER_OPTIONS } from '@/utils/semester';
 
 interface CourseFiltersProps {
     subjects: Subject[];
@@ -96,8 +97,9 @@ export const CourseFilters = ({
                             }}
                         >
                             <option value="all">Barchasi</option>
-                            <option value="1">1-semestr</option>
-                            <option value="2">2-semestr</option>
+                            {SEMESTER_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
                         </select>
                     </div>
                     {hasActiveFilters && (

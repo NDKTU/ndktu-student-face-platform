@@ -26,6 +26,7 @@ import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
 import { CourseTopicModal } from '@/components/courses/CourseTopicModal';
 import type { CourseTopic } from '@/services/courseTopicService';
 import type { Lesson } from '@/services/lessonService';
+import { semesterLabel } from '@/utils/semester';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -215,7 +216,7 @@ export default function CourseDetailPage() {
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                             <span className="inline-flex items-center gap-1.5"><UserRound className="h-4 w-4" />{course.teacher?.full_name || course.teacher?.username}</span>
                             {course.kafedra?.name && <><span>·</span><span>{course.kafedra.name}</span></>}
-                            {course.semester_number && <><span>·</span><span>{course.semester_number}-semestr</span></>}
+                            {course.semester_number && <><span>·</span><span className="capitalize">{semesterLabel(course.semester_number)}</span></>}
                             <><span>·</span><span>{lessons.length} ta dars</span></>
                         </div>
                     </div>

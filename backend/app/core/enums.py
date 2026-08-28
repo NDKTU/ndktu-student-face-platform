@@ -27,3 +27,17 @@ class QuizType(str, enum.Enum):
     SEMESTER_FINAL = "SEMESTER_FINAL"
     YEAR_PROMOTION = "YEAR_PROMOTION"
     PUBLIC_FREE = "PUBLIC_FREE"
+
+
+# Semestrlar nomi: universitetda ular «1/2» emas, «kuzgi» va «bahorgi» deb
+# ataladi. Nom test va kurs sarlavhasiga kiradi, shuning uchun bitta joyda
+# turadi — quiz va course repozitoriylari shu yerdan oladi.
+SEMESTER_LABELS = {1: "kuzgi", 2: "bahorgi"}
+
+
+def semester_label(semester_number: int | None) -> str | None:
+    """1 -> «kuzgi semestr», 2 -> «bahorgi semestr». Boshqa qiymat — o'zicha."""
+    if not semester_number:
+        return None
+    name = SEMESTER_LABELS.get(semester_number)
+    return f"{name} semestr" if name else f"{semester_number}-semestr"
