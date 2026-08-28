@@ -4,14 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { setLanguage } from '@/i18n';
-import { User, LogOut, Sun, Moon, Menu, ChevronDown, Check } from 'lucide-react';
+import { User, LogOut, Sun, Moon, Menu, ChevronDown, Check, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
     onMenuClick: () => void;
 }
 
-/* Полное покрытие всех маршрутов приложения — точные пути */
+/* To'liq barcha yo'llar xaritasi */
 const PATH_LABELS: Record<string, string> = {
     '/':                    'Bosh sahifa',
     '/dashboard':           'Boshqaruv paneli',
@@ -45,7 +45,7 @@ const PATH_LABELS: Record<string, string> = {
     '/results/answers':     'Javoblar tahlili',
 };
 
-/* Маршруты с динамическими сегментами */
+/* Dinamik yo'llar */
 const DYNAMIC_LABELS: Array<[RegExp, string]> = [
     [/^\/roles\/[^/]+\/permissions$/, 'Rol ruxsatlari'],
     [/^\/questions\/[^/]+\/edit$/, 'Savolni tahrirlash'],
@@ -91,139 +91,150 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
         : user?.username ?? 'User';
 
     return (
-        <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-sm shadow-[0_1px_0_0_var(--border)]">
-            {/* Left */}
-            <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-md transition-colors duration-200">
+            {/* Left: Sidebar Toggle & Breadcrumbs */}
+            <div className="flex items-center gap-3.5">
                 <button
                     onClick={onMenuClick}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors md:hidden"
-                    aria-label="Toggle sidebar"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-200 md:hidden"
+                    aria-label="Menyuni ochish"
                 >
-                    <Menu className="h-4 w-4" />
+                    <Menu className="h-5 w-5" />
                 </button>
 
+                {/* Breadcrumbs in Wowdash style */}
                 <nav className="flex items-center gap-2 text-sm">
-                    {!isHome ? (
+                    <Link
+                        to="/"
+                        className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-primary transition-colors py-1 font-semibold"
+                    >
+                        <Home className="h-4 w-4" />
+                        <span className="hidden sm:inline">{t('Bosh sahifa')}</span>
+                    </Link>
+                    {!isHome && (
                         <>
-                            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                                {t('Bosh sahifa')}
-                            </Link>
-                            <span className="text-border select-none">/</span>
-                            <span className="font-medium text-foreground">{pageLabel}</span>
+                            <span className="text-slate-400 select-none">/</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{pageLabel}</span>
                         </>
-                    ) : (
-                        <span className="font-semibold text-foreground font-display">{t('Bosh sahifa')}</span>
                     )}
                 </nav>
             </div>
 
-            {/* Right */}
-            <div className="flex items-center gap-1.5">
+            {/* Right: Actions & User Dropdown */}
+            <div className="flex items-center gap-2 sm:gap-3">
+                {/* Language Switcher */}
                 <button
                     onClick={toggleLang}
-                    className="flex h-8 items-center justify-center rounded-lg px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    className="flex h-10 items-center justify-center rounded-full bg-slate-200/70 dark:bg-muted/60 px-3 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     aria-label={currentLang === 'uz' ? 'Переключить на русский' : "O'zbek tiliga o'tish"}
                 >
                     {currentLang === 'uz' ? 'UZ' : 'RU'}
                 </button>
+
+                {/* Theme Toggle Button in Wowdash style */}
                 <button
                     onClick={toggleTheme}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/70 dark:bg-muted/60 text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     aria-label={theme === 'dark' ? t('Yorug\' rejim') : t('Qorong\'i rejim')}
                 >
                     {theme === 'dark'
-                        ? <Sun className="h-4 w-4" />
-                        : <Moon className="h-4 w-4" />
+                        ? <Sun className="h-[18px] w-[18px] text-amber-400" />
+                        : <Moon className="h-[18px] w-[18px]" />
                     }
                 </button>
 
-                {/* Profile */}
+                {/* Profile Widget */}
                 <div className="relative ml-1">
                     <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}
-                        className="flex items-center gap-2 rounded-xl border border-border bg-card px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                        className="flex items-center gap-2.5 rounded-full border border-border bg-card p-1.5 pl-1.5 pr-3 hover:border-primary/40 hover:bg-muted/40 transition-all duration-200 shadow-sm"
                         aria-expanded={isProfileOpen}
                         aria-haspopup="menu"
                     >
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-bold overflow-hidden">
+                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-bold overflow-hidden ring-2 ring-primary/20">
                             {user?.student?.image_path ? (
                                 <img src={user.student.image_path} alt={displayName} className="h-full w-full object-cover" />
                             ) : (
                                 <span>{initials}</span>
                             )}
+                            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-success ring-1 ring-card" />
                         </div>
-                        <span className="hidden text-sm font-medium md:block max-w-[128px] truncate text-foreground">
+                        <span className="hidden text-sm font-bold md:block max-w-[130px] truncate text-slate-900 dark:text-white">
                             {displayName}
                         </span>
                         <ChevronDown className={cn(
-                            'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
-                            isProfileOpen && 'rotate-180'
+                            'h-3.5 w-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200',
+                            isProfileOpen && 'rotate-180 text-primary'
                         )} />
                     </button>
 
+
+                    {/* Popover Dropdown */}
                     {isProfileOpen && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)} aria-hidden="true" />
                             <div
                                 role="menu"
-                                className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-border/60 bg-popover/95 backdrop-blur-md p-1.5 shadow-lg"
+                                className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-border bg-popover p-2 shadow-xl backdrop-blur-md animate-fade-in-up"
                             >
-                                <div className="px-2.5 py-2 mb-1">
-                                    <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                {/* Wowdash Style Header inside Popover */}
+                                <div className="rounded-xl bg-primary/10 p-3 mb-2">
+                                    <p className="text-sm font-bold text-primary truncate">{displayName}</p>
+                                    <p className="text-xs font-medium text-muted-foreground mt-0.5">
                                         {activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}
                                     </p>
                                 </div>
 
-                                {/* Bir nechta roli borlar uchun ko'rinish tanlash:
-                                    interfeys tanlangan rol huquqlariga qarab torayadi. */}
+                                {/* Multi-role switcher */}
                                 {availableRoles.length > 1 && (
                                     <>
-                                        <div className="h-px bg-border mb-1" />
-                                        <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                                             {t("Ko'rinishni tanlang")}
                                         </p>
-                                        {availableRoles.map((role) => (
-                                            <button
-                                                key={role.id}
-                                                role="menuitem"
-                                                onClick={() => {
-                                                    setActiveRole(role.id);
-                                                    setIsProfileOpen(false);
-                                                    // Joriy sahifa yangi ko'rinishda yopiq bo'lishi mumkin.
-                                                    navigate('/');
-                                                }}
-                                                className={cn(
-                                                    'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors',
-                                                    activeRole?.id === role.id
-                                                        ? 'bg-primary/10 text-primary font-medium'
-                                                        : 'text-foreground hover:bg-accent hover:text-accent-foreground',
-                                                )}
-                                            >
-                                                <span className="truncate">{role.name}</span>
-                                                {activeRole?.id === role.id && <Check className="h-3.5 w-3.5 shrink-0" />}
-                                            </button>
-                                        ))}
+                                        <div className="space-y-1 mb-2">
+                                            {availableRoles.map((role) => (
+                                                <button
+                                                    key={role.id}
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                        setActiveRole(role.id);
+                                                        setIsProfileOpen(false);
+                                                        navigate('/');
+                                                    }}
+                                                    className={cn(
+                                                        'flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                                                        activeRole?.id === role.id
+                                                            ? 'bg-primary text-white font-semibold shadow-sm'
+                                                            : 'text-foreground hover:bg-primary/10 hover:text-primary',
+                                                    )}
+                                                >
+                                                    <span className="truncate">{role.name}</span>
+                                                    {activeRole?.id === role.id && <Check className="h-4 w-4 shrink-0 text-white" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="h-px bg-border my-1.5" />
                                     </>
                                 )}
 
-                                <div className="h-px bg-border my-1" />
                                 <Link
                                     to="/profile"
                                     role="menuitem"
-                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-foreground hover:bg-primary/10 hover:text-primary transition-colors"
                                     onClick={() => setIsProfileOpen(false)}
                                 >
-                                    <User className="h-3.5 w-3.5" />
+                                    <User className="h-4 w-4 text-muted-foreground" />
                                     {t('Profil')}
                                 </Link>
-                                <div className="h-px bg-border my-1" />
+
+                                <div className="h-px bg-border my-1.5" />
+
                                 <button
                                     role="menuitem"
                                     onClick={handleLogout}
-                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-destructive hover:bg-destructive/8 transition-colors"
+                                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
                                 >
-                                    <LogOut className="h-3.5 w-3.5" />
+                                    <LogOut className="h-4 w-4" />
                                     {t('Chiqish')}
                                 </button>
                             </div>
@@ -236,3 +247,4 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
 };
 
 export default Navbar;
+

@@ -14,8 +14,9 @@ interface SidebarProps {
 }
 
 /**
- * Сайдбар в стиле референса: без сворачивания и аккордеонов — все разделы
- * и пункты видны сразу. На мобильных остаётся выдвижным ящиком.
+ * Wowdash uslubidagi zamonaviy yon panel (Sidebar).
+ * Yorug' mavzuda toza oq, qorong'i mavzuda nafis to'q slate (#273142).
+ * Faol sahifa yorqin moviy (#487FFF) pill bilan ajralib turadi.
  */
 const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     const location = useLocation();
@@ -28,9 +29,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         return buildSidebar(permissions, roleNames);
     }, [user, permissions, activeRole]);
 
-    // Faol bo'lim — yo'lga eng aniq mos keladigani. Oddiy «prefiks bilan
-    // boshlansa» tekshiruvi ikkitasini birdan yoqib yuborardi: `/psychology`
-    // ham `/psychology/results` ning boshlanishi hisoblanadi.
+    // Faol bo'lim — yo'lga eng aniq mos keladigani.
     const activeHref = useMemo(() => {
         const candidates = sections
             .flatMap((section) => section.items)
@@ -44,7 +43,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         <>
             {mobileOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity md:hidden"
                     onClick={() => setMobileOpen(false)}
                     aria-hidden="true"
                 />
@@ -52,23 +51,28 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
 
             <aside
                 className={cn(
-                    // Mobilda — ustma-ust (fixed, 100vh). Desktopda balandlik
-                    // ota-konteynerdan olinadi: qat'iy `h-screen` sahifa yuqoriroq
-                    // bo'lgan holatlarda yon panel yarim yo'lda uzilib qolardi.
-                    'fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col bg-sidebar transition-transform duration-300',
+                    'fixed inset-y-0 left-0 z-50 flex h-screen w-68 shrink-0 flex-col border-r border-border bg-card transition-transform duration-300 ease-in-out',
                     'md:static md:inset-auto md:h-auto md:self-stretch',
-                    mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+                    mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
                 )}
             >
-                <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <img src={logo} alt={BRAND.shortName} className="h-8 w-8 shrink-0 rounded-lg bg-white/90 object-contain p-0.5" />
-                        <span className="text-[12px] font-bold leading-tight text-sidebar-foreground line-clamp-2">
-                            {BRAND.appName}
-                        </span>
-                    </div>
+                {/* Brand Logo Header */}
+                <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border px-5">
+                    <Link to="/" className="flex items-center gap-3 overflow-hidden group">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 p-1.5 ring-1 ring-primary/20 transition-all duration-200 group-hover:scale-105">
+                            <img src={logo} alt={BRAND.shortName} className="h-full w-full object-contain" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[13px] font-bold leading-tight text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                                {BRAND.appName}
+                            </span>
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                                {BRAND.shortName} LMS
+                            </span>
+                        </div>
+                    </Link>
                     <button
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground md:hidden"
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 md:hidden"
                         onClick={() => setMobileOpen(false)}
                         aria-label="Yopish"
                     >
@@ -76,14 +80,15 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                     </button>
                 </div>
 
+                {/* Navigation Menu */}
                 <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
-                    <nav className="flex flex-col gap-5 px-2">
+                    <nav className="flex flex-col gap-6 px-3">
                         {sections.filter(s => s.items.length > 0).map((section) => (
                             <div key={section.label} className="flex flex-col">
-                                <p className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-sidebar-muted">
+                                <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                     {t(section.label)}
                                 </p>
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col gap-1.5">
                                     {section.items.map((item) => {
                                         const isActive = item.href === activeHref;
                                         return (
@@ -92,17 +97,20 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                                                 to={item.href}
                                                 onClick={() => setMobileOpen(false)}
                                                 className={cn(
-                                                    'relative flex h-10 items-center gap-3 rounded-lg px-3 mx-1 text-sm font-medium transition-all duration-200',
+                                                    'group relative flex h-11 items-center gap-3.5 rounded-xl px-3.5 text-sm transition-all duration-200',
                                                     isActive
-                                                        ? 'bg-sidebar-active text-sidebar-foreground font-semibold'
-                                                        : 'text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground'
+                                                        ? 'bg-primary text-white font-bold shadow-md shadow-primary/25 ring-1 ring-primary/50'
+                                                        : 'text-slate-700 dark:text-slate-300 font-semibold hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15'
                                                 )}
                                             >
-                                                {isActive && (
-                                                    <span className="absolute left-[-4px] top-2 bottom-2 w-1 rounded-r-full bg-sidebar-accent shadow-[0_0_8px_color-mix(in_srgb,var(--sidebar-accent)_60%,transparent)]" />
-                                                )}
-                                                <item.icon className={cn('h-[18px] w-[18px] shrink-0', isActive && 'text-sidebar-accent')} />
+                                                <item.icon className={cn(
+                                                    'h-[19px] w-[19px] shrink-0 transition-transform duration-200 group-hover:scale-110',
+                                                    isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-primary'
+                                                )} />
                                                 <span className="truncate">{t(item.name)}</span>
+                                                {isActive && (
+                                                    <span className="ml-auto h-2 w-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                                                )}
                                             </Link>
                                         );
                                     })}
@@ -112,20 +120,24 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                     </nav>
                 </div>
 
-                <div className="shrink-0 border-t border-white/10 p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 font-bold text-sidebar-accent">
+                {/* Footer User Profile Card */}
+                <div className="shrink-0 p-3">
+                    <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/30 p-2.5 transition-all duration-200 hover:bg-muted/50">
+                        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary">
                             {user?.username?.charAt(0).toUpperCase() || 'U'}
+                            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-card" />
                         </div>
-                        <div className="flex flex-col">
-                            <span className="max-w-[150px] truncate text-sm font-medium text-sidebar-foreground">{user?.username}</span>
-                            <span className="max-w-[150px] truncate text-xs text-sidebar-muted">{activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <span className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{user?.username}</span>
+                            <span className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">{activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
                         </div>
                     </div>
                 </div>
+
             </aside>
         </>
     );
 };
 
 export default Sidebar;
+

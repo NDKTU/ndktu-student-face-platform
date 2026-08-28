@@ -1,12 +1,7 @@
 /**
  * Button.tsx
  *
- * Design decisions:
- * - Clean, restrained style: no lift transforms, subtle shadow only on primary.
- * - Added `icon` size for square icon-only buttons (accessible with aria-label).
- * - Added `link` variant for text-style CTA actions.
- * - Loading state uses a spinner that does not shift layout (absolute positioned).
- * - `active:scale-95` gives tactile feedback without being heavy.
+ * Wowdash dashboard uslubidagi zamonaviy tugma komponenti.
  */
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -27,23 +22,23 @@ export const Button: React.FC<ButtonProps> = ({
     ...props
 }) => {
     const base =
-        'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium ' +
-        'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
-        'disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]';
+        'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ' +
+        'transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
+        'disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] cursor-pointer';
 
     const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
-        primary:   'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        outline:   'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-        ghost:     'hover:bg-accent hover:text-accent-foreground',
-        danger:    'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
-        link:      'text-primary underline-offset-4 hover:underline p-0 h-auto',
+        primary:   'bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30',
+        secondary: 'bg-muted text-foreground hover:bg-muted/80',
+        outline:   'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15',
+        ghost:     'text-muted-foreground hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15',
+        danger:    'bg-destructive text-destructive-foreground shadow-sm shadow-destructive/25 hover:bg-destructive/90',
+        link:      'text-primary underline-offset-4 hover:underline p-0 h-auto font-medium',
     };
 
     const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
         sm:   'h-9 px-3 text-xs',
         md:   'h-10 px-4 py-2',
-        lg:   'h-11 px-6',
+        lg:   'h-11 px-6 text-base',
         icon: 'h-9 w-9 p-0',
     };
 
@@ -60,3 +55,4 @@ export const Button: React.FC<ButtonProps> = ({
         </button>
     );
 };
+

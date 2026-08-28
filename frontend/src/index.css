@@ -5,7 +5,7 @@
 
 /* Tailwind v4: dark: variant follows the .dark class (toggled by ThemeContext),
    not the OS preference. Without this line dark: utilities ignore the toggle. */
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 @theme {
   --color-background: var(--background);
@@ -35,6 +35,7 @@
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-active: var(--sidebar-active);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -43,115 +44,122 @@
   --font-sans: 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit Variable', 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', 'Fira Code', monospace;
+
+  --animate-fade-in-up: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-pulse-glow: pulseGlow 2s ease-in-out infinite;
 }
+
 
 @layer base {
   :root {
-    /* Clean slate-blue background for LMS */
-    --background: hsl(220 20% 97%);
-    --foreground: hsl(224 71% 4%);
+    /* Wowdash Light Theme - High Contrast Dark Typography */
+    --background: #F4F6F9;
+    --foreground: #0F172A; /* Deep Dark Slate */
 
-    --card: hsl(0 0% 100%);
-    --card-foreground: hsl(224 71% 4%);
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
 
-    --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(224 71% 4%);
+    --popover: #FFFFFF;
+    --popover-foreground: #0F172A;
 
-    /* NDKTU brand blue #242CBB */
-    --primary: hsl(237 68% 44%);
-    --primary-foreground: hsl(0 0% 100%);
+    /* Wowdash signature primary blue #487FFF */
+    --primary: #487FFF;
+    --primary-foreground: #FFFFFF;
 
-    --secondary: hsl(220 14% 96%);
-    --secondary-foreground: hsl(224 71% 12%);
+    --secondary: #F1F5F9;
+    --secondary-foreground: #0F172A;
 
-    --muted: hsl(220 14% 94%);
-    --muted-foreground: hsl(220 9% 46%);
+    --muted: #E2E8F0;
+    --muted-foreground: #475569; /* Slate 600 instead of faint gray */
 
-    --accent: hsl(237 70% 96%);
-    --accent-foreground: hsl(237 68% 36%);
+    --accent: #E4F1FF;
+    --accent-foreground: #487FFF;
 
-    --destructive: hsl(346 80% 50%);
-    --destructive-foreground: hsl(0 0% 100%);
+    --destructive: #EF4A00;
+    --destructive-foreground: #FFFFFF;
 
-    --success: hsl(142 70% 45%);
-    --success-foreground: hsl(0 0% 100%);
+    --success: #16A34A;
+    --success-foreground: #FFFFFF;
 
-    --warning: hsl(42 84% 42%);
-    --warning-foreground: hsl(0 0% 100%);
+    --warning: #D97706;
+    --warning-foreground: #FFFFFF;
 
-    --border: hsl(220 13% 90%);
-    --input: hsl(220 13% 90%);
-    --ring: hsl(237 68% 44%);
+    --border: #E2E8F0;
+    --input: #CBD5E1;
+    --ring: #487FFF;
 
-    /* 12px radius for cards, 8px for inputs/buttons */
-    --radius: 0.75rem;
+    /* 14px radius for modern cards */
+    --radius: 0.875rem;
 
-    --sidebar-width: 15rem;
-    --sidebar-width-collapsed: 3.5rem;
-    --navbar-height: 3.5rem;
+    --sidebar-width: 16.5rem;
+    --sidebar-width-collapsed: 4.5rem;
+    --navbar-height: 4rem;
 
-    /* «Университетский премиум»: сайдбар в глубоком бренд-синем.
-       Одинаков в светлой и тёмной темах — это фирменная поверхность. */
-    --sidebar-bg: hsl(237 52% 15%);
-    --sidebar-fg: hsl(228 40% 96%);
-    --sidebar-muted: hsl(231 22% 68%);
-    --sidebar-active: hsl(237 55% 26%);
-    --sidebar-accent: hsl(237 95% 76%);
+    /* Wowdash Light Sidebar (Clean White with high contrast text) */
+    --sidebar-bg: #FFFFFF;
+    --sidebar-fg: #0F172A;
+    --sidebar-muted: #475569;
+    --sidebar-active: #487FFF;
+    --sidebar-accent: #487FFF;
+    --sidebar-border: #E2E8F0;
 
     /* Grade colors */
-    --grade-5: hsl(237 68% 44%);
-    --grade-4: hsl(224 85% 45%);
-    --grade-3: hsl(42 84% 38%);
-    --grade-low: hsl(346 80% 45%);
+    --grade-5: #487FFF;
+    --grade-4: #00B8F2;
+    --grade-3: #FF9F29;
+    --grade-low: #EF4A00;
   }
 
-  .dark {
-    /* Deep graphite background */
-    --background: hsl(224 71% 4%);
-    --foreground: hsl(220 20% 98%);
 
-    --card: hsl(224 71% 7%);
-    --card-foreground: hsl(220 20% 98%);
+  .dark,
+  [data-theme="dark"] {
+    /* Wowdash Dark Theme */
+    --background: #1B2431;
+    --foreground: #F5F6FA;
 
-    --popover: hsl(224 71% 7%);
-    --popover-foreground: hsl(220 20% 98%);
+    --card: #273142;
+    --card-foreground: #F5F6FA;
 
-    --primary: hsl(237 78% 70%);
-    --primary-foreground: hsl(224 71% 4%);
+    --popover: #273142;
+    --popover-foreground: #F5F6FA;
 
-    --secondary: hsl(224 30% 12%);
-    --secondary-foreground: hsl(220 20% 94%);
+    --primary: #487FFF;
+    --primary-foreground: #FFFFFF;
 
-    --muted: hsl(224 30% 10%);
-    --muted-foreground: hsl(220 10% 60%);
+    --secondary: #323D4E;
+    --secondary-foreground: #F3F4F6;
 
-    --accent: hsl(237 70% 18%);
-    --accent-foreground: hsl(237 75% 82%);
+    --muted: #323D4E;
+    --muted-foreground: #9CA3AF;
 
-    --destructive: hsl(346 80% 55%);
-    --destructive-foreground: hsl(0 0% 100%);
+    --accent: rgba(72, 127, 255, 0.15);
+    --accent-foreground: #70A0FF;
 
-    --success: hsl(142 70% 50%);
-    --success-foreground: hsl(0 0% 100%);
+    --destructive: #EF4A00;
+    --destructive-foreground: #FFFFFF;
 
-    --warning: hsl(42 80% 50%);
-    --warning-foreground: hsl(0 0% 100%);
+    --success: #45B369;
+    --success-foreground: #FFFFFF;
 
-    --border: hsl(224 30% 15%);
-    --input: hsl(224 30% 15%);
-    --ring: hsl(237 78% 70%);
+    --warning: #FF9F29;
+    --warning-foreground: #FFFFFF;
 
-    --grade-5: hsl(237 78% 70%);
-    --grade-4: hsl(224 85% 55%);
-    --grade-3: hsl(42 80% 50%);
-    --grade-low: hsl(346 80% 55%);
+    --border: #323D4E;
+    --input: #323D4E;
+    --ring: #487FFF;
 
-    /* В тёмной теме сайдбар чуть глубже фона контента */
-    --sidebar-bg: hsl(237 45% 10%);
-    --sidebar-fg: hsl(228 40% 96%);
-    --sidebar-muted: hsl(231 20% 62%);
-    --sidebar-active: hsl(237 50% 20%);
-    --sidebar-accent: hsl(237 95% 76%);
+    --grade-5: #487FFF;
+    --grade-4: #00B8F2;
+    --grade-3: #FF9F29;
+    --grade-low: #EF4A00;
+
+    /* Wowdash Dark Sidebar (Elevated Dark Slate) */
+    --sidebar-bg: #273142;
+    --sidebar-fg: #F5F6FA;
+    --sidebar-muted: #9CA3AF;
+    --sidebar-active: #487FFF;
+    --sidebar-accent: #487FFF;
+    --sidebar-border: #323D4E;
   }
 }
 
@@ -170,12 +178,11 @@
 
   body {
     @apply bg-background text-foreground;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     line-height: 1.6;
   }
 
   :focus-visible {
-    /* --ring already holds a complete hsl() value — no extra hsl() wrap */
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -188,18 +195,51 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--muted);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+    background: var(--muted-foreground);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
   }
 }
 
 @layer utilities {
-  .page-container {
-    @apply mx-auto w-full max-w-screen-xl space-y-6;
+  .animate-fade-in-up {
+    animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .page-container {
+    @apply w-full space-y-6;
+    animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+
 
   .page-header {
     @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
@@ -228,17 +268,25 @@
     scrollbar-color: var(--border) transparent;
   }
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 9999px;
   }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+
+  /* Wowdash Card Hover Lift */
+  .wow-card {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.35)];
+  }
 
   /* Badge helpers */
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 
   .badge-primary {
@@ -272,9 +320,7 @@
   }
 }
 
-/* ── Hide ugly native number-input spinners globally.
-   Our shared <Input type="number"> renders custom ChevronUp/ChevronDown
-   steppers instead. Raw <input type="number"> also gets a clean field. */
+/* ── Hide ugly native number-input spinners globally. */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
