@@ -18,7 +18,7 @@ export interface Question {
     updated_at?: string;
 }
 
-export type QuestionType = 'QUIZ' | 'TRUE_FALSE' | 'MULTI_SELECT';
+export type QuestionType = 'QUIZ' | 'TRUE_FALSE' | 'MULTI_SELECT' | 'TYPE_ANSWER' | 'PUZZLE';
 
 export interface QuestionCreateRequest {
     subject_id: number;
@@ -35,6 +35,8 @@ export interface QuestionCreateRequest {
      * Yangi turlar uchun ma'lumot:
      *   TRUE_FALSE   -> { correct: boolean }
      *   MULTI_SELECT -> { options: string[]; correct: number[] }
+     *   TYPE_ANSWER  -> { answers: string[] }
+     *   PUZZLE       -> { items: string[] }  // to'g'ri tartib
      */
     payload?: Record<string, unknown>;
 }

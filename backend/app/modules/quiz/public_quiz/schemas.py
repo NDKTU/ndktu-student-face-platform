@@ -35,8 +35,10 @@ class PublicStartResponse(BaseModel):
 class PublicAnswerRequest(BaseModel):
     question_id: int
     answer_index: int = Field(default=0, ge=0)
-    # Bir nechta to'g'ri javobli savol uchun.
+    # Bir nechta to'g'ri javobli savol va tartib savoli uchun.
     answer_indexes: Optional[List[int]] = None
+    # Javobni matn bilan yozadigan savol uchun.
+    text_answer: Optional[str] = None
 
 
 class PublicAnswerResponse(BaseModel):

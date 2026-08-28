@@ -24,13 +24,19 @@ class QuestionDTO(BaseModel):
     options: list[str] = []
     # Nechta javob kutilyapti: `MULTI_SELECT` da bittadan ko'p.
     multiple: bool = False
+    # `PUZZLE`: variantlarni to'g'ri tartibda joylashtirish kerak.
+    ordered: bool = False
+    # `TYPE_ANSWER`: variant yo'q, javob matn bilan yoziladi.
+    free_text: bool = False
 
 
 class SubmittedAnswerDTO(BaseModel):
     question_id: int
     answer_index: int
-    # `MULTI_SELECT` da bir nechta variant tanlanadi.
+    # `MULTI_SELECT` va `PUZZLE` da bir nechta o'rin.
     answer_indexes: list[int] = []
+    # `TYPE_ANSWER` da yozilgan matn.
+    text_answer: Optional[str] = None
 
 
 class StartQuizResponse(BaseModel):
@@ -72,7 +78,11 @@ class SubmitAnswerRequest(BaseModel):
 
     #: Несколько выбранных позиций — для вопросов с несколькими правильными
     #: ответами. Балл начисляется только при полном совпадении набора.
+    #: Для вопроса на порядок это упорядоченная последовательность.
     answer_indexes: Optional[list[int]] = None
+
+    #: Ответ текстом — для вопроса, где студент пишет ответ сам.
+    text_answer: Optional[str] = None
 
 
 class SubmitAnswerResponse(BaseModel):

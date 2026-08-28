@@ -166,12 +166,16 @@ class PublicQuizRepository:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu savol sizga berilmagan")
 
         question = reserved.question
-        positions = data.answer_indexes if data.answer_indexes else [data.answer_index]
-        option_count = len(question_options(question))
-        if not positions or any(position < 0 or position >= option_count for position in positions):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant noto'g'ri")
-
-        is_correct, chosen_text, correct_text = grade_answer(attempt.id, question, positions)
+        if data.text_answer is not None:
+            is_correct, chosen_text, correct_text = grade_answer(
+                attempt.id, question, [], text_answer=data.text_answer
+            )
+        else:
+            positions = data.answer_indexes if data.answer_indexes else [data.answer_index]
+            option_count = len(question_options(question))
+            if not positions or any(position < 0 or position >= option_count for position in positions):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant noto'g'ri")
+            is_correct, chosen_text, correct_text = grade_answer(attempt.id, question, positions)
         reserved.answer = chosen_text
         reserved.correct_answer = correct_text
         reserved.is_correct = is_correct

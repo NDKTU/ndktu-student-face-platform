@@ -6,6 +6,9 @@ bo'yicha tekshirishi kerak. Ilgari bu mantiq faqat `QUIZ` uchun bo'lgan va
 `repository.py` ichida yotgan edi.
 """
 
+import re
+import unicodedata
+
 from app.core.enums import QuestionType
 from app.modules.quiz.model import Question
 
@@ -16,6 +19,21 @@ from .schemas import QuestionDTO
 # mantiqiy qiymat turadi.
 TRUE_FALSE_OPTIONS = ("To'g'ri", "Noto'g'ri")
 
+# O'zbekchada bir xil ko'rinadigan, lekin turli belgilar: o'qituvchi va
+# talaba ularni turlicha yozadi, javob esa bir xil hisoblanishi kerak.
+_APOSTROPHES = dict.fromkeys(map(ord, "'\u02bb\u02bc\u2018\u2019\u0060\u00b4"), "'")
+
+
+def normalize_text_answer(value: str) -> str:
+    """Matnli javobni solishtirishga tayyorlaydi.
+
+    Registr, ortiqcha bo'sh joy va apostrof turi javobning mazmuniga
+    ta'sir qilmaydi — shuning uchun ular olib tashlanadi.
+    """
+    text = unicodedata.normalize("NFKC", value or "").strip().lower()
+    text = text.translate(_APOSTROPHES)
+    return re.sub(r"\s+", " ", text)
+
 
 def question_options(question: Question) -> list[str]:
     """Savolning variantlari — aralashtirilmagan, «tabiiy» tartibda."""
@@ -23,6 +41,12 @@ def question_options(question: Question) -> list[str]:
         return list(TRUE_FALSE_OPTIONS)
     if question.question_type == QuestionType.MULTI_SELECT.value:
         return list((question.payload or {}).get("options") or [])
+    if question.question_type == QuestionType.PUZZLE.value:
+        # To'g'ri tartib — aynan shu ro'yxat tartibi.
+        return list((question.payload or {}).get("items") or [])
+    if question.question_type == QuestionType.TYPE_ANSWER.value:
+        # Variant yo'q: talaba javobni o'zi yozadi.
+        return []
     return [question.option_a, question.option_b, question.option_c, question.option_d]
 
 
@@ -53,6 +77,8 @@ def to_dto(result_id: int, question: Question) -> QuestionDTO:
         question_type=question.question_type,
         options=options,
         multiple=question.question_type == QuestionType.MULTI_SELECT.value,
+        ordered=question.question_type == QuestionType.PUZZLE.value,
+        free_text=question.question_type == QuestionType.TYPE_ANSWER.value,
     )
 
 
@@ -60,6 +86,7 @@ def grade_answer(
     result_id: int,
     question: Question,
     positions: list[int],
+    text_answer: str | None = None,
 ) -> tuple[bool, str, str]:
     """(to'g'rimi, talaba javobi matni, to'g'ri javob matni).
 
@@ -68,6 +95,26 @@ def grade_answer(
     buzardi.
     """
     options = question_options(question)
+
+    if question.question_type == QuestionType.TYPE_ANSWER.value:
+        expected = (question.payload or {}).get("answers") or []
+        given = text_answer or ""
+        normalized = normalize_text_answer(given)
+        is_correct = any(normalize_text_answer(item) == normalized for item in expected) and bool(normalized)
+        # Kutilgan javob sifatida birinchisi ko'rsatiladi: hisobotda qaysi
+        # javob to'g'ri bo'lgani ko'rinib tursin.
+        return is_correct, given.strip(), expected[0] if expected else ""
+
+    if question.question_type == QuestionType.PUZZLE.value:
+        # `positions` — talaba tuzgan tartib: ko'rsatilgan ro'yxatdagi
+        # o'rinlar ketma-ketligi. Ular asl indekslarga o'giriladi va
+        # to'g'ri tartib (0, 1, 2, ...) bilan solishtiriladi.
+        order = order_for(result_id, question.id, len(options))
+        chosen = [order[position] for position in positions]
+        is_correct = chosen == list(range(len(options)))
+        chosen_text = " → ".join(options[index] for index in chosen)
+        correct_text = " → ".join(options)
+        return is_correct, chosen_text, correct_text
 
     if question.question_type == QuestionType.TRUE_FALSE.value:
         correct_bool = bool((question.payload or {}).get("correct"))

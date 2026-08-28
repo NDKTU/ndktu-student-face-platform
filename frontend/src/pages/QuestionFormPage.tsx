@@ -20,7 +20,7 @@ import { useLesson } from '@/hooks/useLessons';
 // boshqa shaklda (`payload`) saqlanadi.
 const questionSchema = z.object({
     subject_id: z.string().min(1, 'Fan tanlanishi shart'),
-    question_type: z.enum(['QUIZ', 'TRUE_FALSE', 'MULTI_SELECT']),
+    question_type: z.enum(['QUIZ', 'TRUE_FALSE', 'MULTI_SELECT', 'TYPE_ANSWER', 'PUZZLE']),
     text: z.string().min(1, 'Savol matni kiritilishi shart'),
     option_a: z.string(),
     option_b: z.string(),
@@ -50,6 +50,10 @@ const QuestionFormPage = () => {
         { text: '', correct: true },
         { text: '', correct: false },
     ]);
+    // Matnli javob: bir nechta to'g'ri yozilish bo'lishi mumkin.
+    const [textAnswers, setTextAnswers] = useState<string[]>(['']);
+    // Tartib savoli: ro'yxat aynan to'g'ri tartibda kiritiladi.
+    const [puzzleItems, setPuzzleItems] = useState<string[]>(['', '']);
     const presetSubjectId = searchParams.get('subject_id') ?? '';
     const lessonIdParam = searchParams.get('lesson_id');
     const returnTo = searchParams.get('return_to');
@@ -185,6 +189,28 @@ const QuestionFormPage = () => {
 
         if (data.question_type === 'TRUE_FALSE') {
             payload.payload = { correct: trueFalseAnswer };
+        }
+
+        if (data.question_type === 'TYPE_ANSWER') {
+            const filled = textAnswers.map((item) => item.trim()).filter(Boolean);
+            if (filled.length === 0) {
+                toast.error("Kamida bitta to'g'ri javob yozing");
+                return;
+            }
+            payload.payload = { answers: filled };
+        }
+
+        if (data.question_type === 'PUZZLE') {
+            const filled = puzzleItems.map((item) => item.trim()).filter(Boolean);
+            if (filled.length < 2) {
+                toast.error("Kamida ikkita bo'lak kerak");
+                return;
+            }
+            if (new Set(filled).size !== filled.length) {
+                toast.error("Bo'laklar takrorlanmasin");
+                return;
+            }
+            payload.payload = { items: filled };
         }
 
         if (data.question_type === 'MULTI_SELECT') {
@@ -341,6 +367,8 @@ const QuestionFormPage = () => {
                                 <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
                                 <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
                                 <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
+                                <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
+                                <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
                             </select>
                             {isEditMode && (
                                 <p className="text-xs text-muted-foreground">
@@ -419,6 +447,78 @@ const QuestionFormPage = () => {
                                         onClick={() => setMultiOptions((prev) => [...prev, { text: '', correct: false }])}
                                     >
                                         Variant qo'shish
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {questionType === 'TYPE_ANSWER' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm font-medium">To'g'ri javoblar</label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Bir xil ma'noning turli yozilishini qo'shing («H2O», «suv»). Katta-kichik
+                                        harf, ortiqcha bo'sh joy va apostrof turi hisobga olinmaydi.
+                                    </p>
+                                </div>
+                                {textAnswers.map((answer, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <input
+                                            value={answer}
+                                            onChange={(event) => setTextAnswers((prev) => prev.map((item, i) =>
+                                                i === index ? event.target.value : item))}
+                                            placeholder={`${index + 1}-variant`}
+                                            className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                        />
+                                        {textAnswers.length > 1 && (
+                                            <Button type="button" variant="ghost" size="sm" className="text-destructive"
+                                                onClick={() => setTextAnswers((prev) => prev.filter((_, i) => i !== index))}>
+                                                O'chirish
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                                {textAnswers.length < 10 && (
+                                    <Button type="button" variant="outline" size="sm"
+                                        onClick={() => setTextAnswers((prev) => [...prev, ''])}>
+                                        Yozilish qo'shish
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {questionType === 'PUZZLE' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm font-medium">Bo'laklar — to'g'ri tartibda</label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Shu tartib to'g'ri javob hisoblanadi. Talabaga ular aralashtirib ko'rsatiladi.
+                                    </p>
+                                </div>
+                                {puzzleItems.map((item, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
+                                            {index + 1}
+                                        </span>
+                                        <input
+                                            value={item}
+                                            onChange={(event) => setPuzzleItems((prev) => prev.map((value, i) =>
+                                                i === index ? event.target.value : value))}
+                                            placeholder={`${index + 1}-bo'lak`}
+                                            className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                        />
+                                        {puzzleItems.length > 2 && (
+                                            <Button type="button" variant="ghost" size="sm" className="text-destructive"
+                                                onClick={() => setPuzzleItems((prev) => prev.filter((_, i) => i !== index))}>
+                                                O'chirish
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                                {puzzleItems.length < 10 && (
+                                    <Button type="button" variant="outline" size="sm"
+                                        onClick={() => setPuzzleItems((prev) => [...prev, ''])}>
+                                        Bo'lak qo'shish
                                     </Button>
                                 )}
                             </div>

@@ -15,6 +15,10 @@ export interface QuestionDTO {
     options?: string[];
     /** Bir nechta javob kutilyaptimi. */
     multiple?: boolean;
+    /** Variantlarni to'g'ri tartibda joylashtirish kerakmi (PUZZLE). */
+    ordered?: boolean;
+    /** Javob matn bilan yoziladimi (TYPE_ANSWER). */
+    free_text?: boolean;
 }
 
 export interface StartQuizRequest {
@@ -25,8 +29,10 @@ export interface StartQuizRequest {
 export interface SubmittedAnswerDTO {
     question_id: number;
     answer_index: number;
-    /** Bir nechta tanlangan o'rin (MULTI_SELECT). */
+    /** Bir nechta tanlangan o'rin (MULTI_SELECT) yoki tartib (PUZZLE). */
     answer_indexes?: number[];
+    /** Yozilgan matn (TYPE_ANSWER). */
+    text_answer?: string;
 }
 
 export interface StartQuizResponse {
@@ -51,8 +57,11 @@ export interface SubmitAnswerRequest {
     question_id: number;
     /** Позиция выбранного варианта в показанном студенту порядке. */
     answer_index: number;
-    /** Bir nechta to'g'ri javobli savolda — barcha tanlangan o'rinlar. */
+    /** Bir nechta to'g'ri javobli savolda — barcha tanlangan o'rinlar;
+     *  tartib savolida — tanlangan ketma-ketlik. */
     answer_indexes?: number[];
+    /** Javob matni (TYPE_ANSWER). */
+    text_answer?: string;
 }
 
 export interface SubmitAnswerResponse {

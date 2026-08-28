@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { BookOpen, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +29,8 @@ export default function PublicQuizPage() {
     // Javoblar — tanlangan o'rinlar ro'yxati: bir nechta to'g'ri javobli
     // savolda bittadan ko'p bo'ladi.
     const [answers, setAnswers] = useState<Record<number, number[]>>({});
+    // Matnli javoblar alohida: ular o'rin emas, matn.
+    const [textAnswers, setTextAnswers] = useState<Record<number, string>>({});
     const [remaining, setRemaining] = useState(0);
     const [result, setResult] = useState<PublicFinishResponse | null>(null);
     const [busy, setBusy] = useState(false);
@@ -47,7 +49,13 @@ export default function PublicQuizPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [remaining]);
 
-    const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
+    const answeredCount = useMemo(
+        () => new Set([
+            ...Object.entries(answers).filter(([, positions]) => positions.length > 0).map(([id]) => id),
+            ...Object.entries(textAnswers).filter(([, text]) => text.trim()).map(([id]) => id),
+        ]).size,
+        [answers, textAnswers],
+    );
 
     const start = async () => {
         setBusy(true);
@@ -64,30 +72,68 @@ export default function PublicQuizPage() {
         }
     };
 
-    const choose = async (questionId: number, index: number, multiple: boolean) => {
-        if (!session || result) return;
-        const previous = answers[questionId] ?? [];
-        const positions = multiple
-            ? (previous.includes(index)
-                ? previous.filter((item) => item !== index)
-                : [...previous, index].sort((a, b) => a - b))
-            : [index];
-
-        // Javob darhol serverga ketadi: brauzer yopilib qolsa ham yo'qolmaydi.
-        setAnswers((prev) => ({ ...prev, [questionId]: positions }));
-        if (positions.length === 0) return;
+    const send = async (questionId: number, payload: { positions?: number[]; text?: string }) => {
+        if (!session) return;
         try {
-            await publicQuizService.answer(session.guest_token, questionId, positions);
+            await publicQuizService.answer(session.guest_token, questionId, payload);
         } catch (cause) {
             const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
             setError(detail || "Javobni saqlab bo'lmadi");
         }
     };
 
+    const choose = async (
+        questionId: number,
+        index: number,
+        mode: { multiple?: boolean; ordered?: boolean },
+    ) => {
+        if (!session || result) return;
+        const previous = answers[questionId] ?? [];
+
+        let positions: number[];
+        if (mode.ordered) {
+            // Tartib savoli: bosilgan bo'lak navbatga qo'shiladi, qayta
+            // bosilsa — navbatdan chiqadi.
+            positions = previous.includes(index)
+                ? previous.filter((item) => item !== index)
+                : [...previous, index];
+        } else if (mode.multiple) {
+            positions = previous.includes(index)
+                ? previous.filter((item) => item !== index)
+                : [...previous, index].sort((a, b) => a - b);
+        } else {
+            positions = [index];
+        }
+
+        // Javob darhol serverga ketadi: brauzer yopilib qolsa ham yo'qolmaydi.
+        setAnswers((prev) => ({ ...prev, [questionId]: positions }));
+        if (positions.length === 0) return;
+        await send(questionId, { positions });
+    };
+
+    // Matn yozilgach avtomatik yuboriladi: talaba javobni yozib, darhol
+    // «Yakunlash» ni bosishi mumkin — fokusni yo'qotishni kutib bo'lmaydi.
+    const typeTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+    const typeAnswer = (questionId: number, value: string) => {
+        setTextAnswers((prev) => ({ ...prev, [questionId]: value }));
+        clearTimeout(typeTimers.current[questionId]);
+        typeTimers.current[questionId] = setTimeout(() => {
+            void send(questionId, { text: value });
+        }, 800);
+    };
+
     const finish = async () => {
         if (!session || result) return;
         setBusy(true);
         try {
+            // Kutayotgan matnli javoblar yakunlashdan oldin yuboriladi.
+            for (const timer of Object.values(typeTimers.current)) clearTimeout(timer);
+            await Promise.all(
+                Object.entries(textAnswers)
+                    .filter(([, text]) => text.trim())
+                    .map(([id, text]) => send(Number(id), { text })),
+            );
             setResult(await publicQuizService.finish(session.guest_token));
         } catch (cause) {
             const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -154,6 +200,21 @@ export default function PublicQuizPage() {
                                         Bir nechta javob to'g'ri — hammasini belgilang.
                                     </p>
                                 )}
+                                {question.ordered && (
+                                    <p className="mb-2 text-xs text-muted-foreground">
+                                        Bo'laklarni to'g'ri tartibda bosing. Qayta bossangiz, navbatdan chiqadi.
+                                    </p>
+                                )}
+
+                                {question.free_text ? (
+                                    <input
+                                        value={textAnswers[question.id] ?? ''}
+                                        onChange={(event) => typeAnswer(question.id, event.target.value)}
+                                        onBlur={(event) => void send(question.id, { text: event.target.value })}
+                                        placeholder="Javobingizni yozing"
+                                        className="h-11 w-full rounded-xl border border-border/60 bg-background px-4 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring"
+                                    />
+                                ) : (
                                 <div className="grid gap-2">
                                     {(question.options?.length
                                         ? question.options
@@ -164,18 +225,28 @@ export default function PublicQuizPage() {
                                             <button
                                                 key={index}
                                                 type="button"
-                                                onClick={() => void choose(question.id, index, Boolean(question.multiple))}
+                                                onClick={() => void choose(question.id, index, {
+                                                    multiple: question.multiple,
+                                                    ordered: question.ordered,
+                                                })}
                                                 className={`rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
                                                     selected
                                                         ? 'border-primary bg-primary/[0.06] text-foreground'
                                                         : 'border-border/60 hover:border-primary/40 hover:bg-muted/40'
                                                 }`}
                                             >
+                                                {/* Tartib savolida bosilgan navbat raqami ko'rinadi. */}
+                                                {question.ordered && selected && (
+                                                    <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                                        {(answers[question.id] ?? []).indexOf(index) + 1}
+                                                    </span>
+                                                )}
                                                 <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option) }} />
                                             </button>
                                         );
                                     })}
                                 </div>
+                                )}
                             </div>
                         ))}
 

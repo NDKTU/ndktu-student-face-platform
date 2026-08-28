@@ -21,6 +21,10 @@ export interface PublicQuestion {
     options?: string[];
     /** Bir nechta javob kutilyaptimi (MULTI_SELECT). */
     multiple?: boolean;
+    /** To'g'ri tartibda joylashtirish kerakmi (PUZZLE). */
+    ordered?: boolean;
+    /** Javob matn bilan yoziladimi (TYPE_ANSWER). */
+    free_text?: boolean;
 }
 
 export interface PublicStartResponse {
@@ -51,14 +55,20 @@ export const publicQuizService = {
         return response.data;
     },
 
-    answer: async (token: string, questionId: number, positions: number[]) => {
+    answer: async (
+        token: string,
+        questionId: number,
+        payload: { positions?: number[]; text?: string },
+    ) => {
+        const positions = payload.positions ?? [];
         await publicApi.post(
             '/public/quiz/answer',
             {
                 question_id: questionId,
-                answer_index: positions[0],
-                // Bir nechta to'g'ri javobli savolda butun to'plam yuboriladi.
+                answer_index: positions[0] ?? 0,
+                // Bir nechta javob yoki tartib — butun ketma-ketlik yuboriladi.
                 answer_indexes: positions.length > 1 ? positions : undefined,
+                text_answer: payload.text,
             },
             { headers: { 'X-Guest-Token': token } },
         );

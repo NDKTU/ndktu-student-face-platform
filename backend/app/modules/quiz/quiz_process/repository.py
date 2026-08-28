@@ -228,16 +228,26 @@ class QuizProcessRepository:
                 # у двух вариантов подсветит не ту кнопку, но не изменит результат.
                 # Несколько ответов хранятся строкой «a; b» — тем же разделителем,
                 # каким их склеил grade_answer.
-                chosen = [part.strip() for part in row.answer.split(";")] if dto.multiple else [row.answer]
-                positions = [dto.options.index(text) for text in chosen if text in dto.options]
-                if positions:
+                if dto.free_text:
                     submitted.append(
-                        SubmittedAnswerDTO(
-                            question_id=question.id,
-                            answer_index=positions[0],
-                            answer_indexes=positions,
-                        )
+                        SubmittedAnswerDTO(question_id=question.id, answer_index=0, text_answer=row.answer)
                     )
+                else:
+                    separator = " → " if dto.ordered else ";"
+                    chosen = (
+                        [part.strip() for part in row.answer.split(separator)]
+                        if (dto.multiple or dto.ordered)
+                        else [row.answer]
+                    )
+                    positions = [dto.options.index(text) for text in chosen if text in dto.options]
+                    if positions:
+                        submitted.append(
+                            SubmittedAnswerDTO(
+                                question_id=question.id,
+                                answer_index=positions[0],
+                                answer_indexes=positions,
+                            )
+                        )
 
         student = (await session.execute(select(Student).where(Student.user_id == user.id))).scalar_one_or_none()
 
@@ -380,6 +390,17 @@ class QuizProcessRepository:
         positions = data.answer_indexes if data.answer_indexes else (
             [data.answer_index] if data.answer_index is not None else []
         )
+
+        # Matnli javob: variant yo'q, faqat yozilgan matn.
+        if data.text_answer is not None:
+            is_correct, chosen_text, correct_text = grade_answer(
+                data.result_id, question, [], text_answer=data.text_answer
+            )
+            reserved.answer = chosen_text
+            reserved.correct_answer = correct_text
+            reserved.is_correct = is_correct
+            await session.commit()
+            return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
 
         if positions:
             option_count = len(question_options(question))

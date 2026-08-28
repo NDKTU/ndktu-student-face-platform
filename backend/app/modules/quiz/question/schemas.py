@@ -48,10 +48,56 @@ class MultiSelectPayload(BaseModel):
         return self
 
 
+class TypeAnswerPayload(BaseModel):
+    """Javobni matn bilan yozadigan savol.
+
+    Bir nechta to'g'ri yozilish bo'lishi mumkin («H2O», «suv»), shuning
+    uchun ro'yxat. Solishtirish oldidan matn normallashtiriladi — aks
+    holda ortiqcha bo'sh joy yoki bosh harf javobni «xato» qilib qo'yardi.
+    """
+
+    answers: list[str]
+
+    @field_validator("answers")
+    @classmethod
+    def clean_answers(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        if not cleaned:
+            raise ValueError("Kamida bitta to'g'ri javob yozilishi kerak")
+        if len(cleaned) > 10:
+            raise ValueError("Javob variantlari 10 tadan oshmasin")
+        return cleaned
+
+
+class PuzzlePayload(BaseModel):
+    """Bo'laklarni to'g'ri tartibda joylashtirish.
+
+    `items` — aynan to'g'ri tartib. Talabaga ular aralashtirilgan holda
+    ko'rsatiladi.
+    """
+
+    items: list[str]
+
+    @field_validator("items")
+    @classmethod
+    def clean_items(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        if len(cleaned) < 2:
+            raise ValueError("Kamida ikkita bo'lak kerak")
+        if len(cleaned) > 10:
+            raise ValueError("Bo'laklar soni 10 tadan oshmasin")
+        if len(set(cleaned)) != len(cleaned):
+            # Bir xil bo'laklar bo'lsa, to'g'ri tartibni aniqlab bo'lmaydi.
+            raise ValueError("Bo'laklar takrorlanmasin")
+        return cleaned
+
+
 # Turlar uchun `payload` sxemasi. `QUIZ` eski ustunlarda qoladi.
 PAYLOAD_SCHEMA = {
     QuestionType.TRUE_FALSE: TrueFalsePayload,
     QuestionType.MULTI_SELECT: MultiSelectPayload,
+    QuestionType.TYPE_ANSWER: TypeAnswerPayload,
+    QuestionType.PUZZLE: PuzzlePayload,
 }
 
 

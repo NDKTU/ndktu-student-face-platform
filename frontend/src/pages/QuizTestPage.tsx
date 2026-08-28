@@ -72,6 +72,8 @@ const QuizTestPage = () => {
     // Javoblar — ko'rsatilgan variantlarning o'rinlari. Bir nechta to'g'ri
     // javobli savolda bir nechta o'rin bo'ladi, shuning uchun har doim ro'yxat.
     const [answers, setAnswers] = useState<Record<number, number[]>>({});
+    // Matnli javoblar alohida saqlanadi: ular o'rin emas, matn.
+    const [textAnswers, setTextAnswers] = useState<Record<number, string>>({});
     const [timeLeft, setTimeLeft] = useState(0);
 
     // Cheating detection
@@ -151,13 +153,19 @@ const QuizTestPage = () => {
                 // При возвращении в прерванную попытку восстанавливаем отметки,
                 // иначе студент увидит пустой бланк и станет отвечать заново.
                 const restored: Record<number, number[]> = {};
+                const restoredText: Record<number, string> = {};
                 for (const submitted of data.submitted_answers ?? []) {
+                    if (submitted.text_answer) {
+                        restoredText[submitted.question_id] = submitted.text_answer;
+                        continue;
+                    }
                     const positions = submitted.answer_indexes?.length
                         ? submitted.answer_indexes
                         : [submitted.answer_index];
                     restored[submitted.question_id] = positions;
                 }
                 setAnswers(restored);
+                setTextAnswers(restoredText);
                 setPhase('quiz');
                 handleCloseStartModal();
             },
@@ -168,19 +176,49 @@ const QuizTestPage = () => {
         });
     };
 
+    // Matn yozilgach avtomatik yuboriladi: talaba javobni yozib, darhol
+    // «Yakunlash» ni bosishi mumkin — fokusni yo'qotishni kutib bo'lmaydi.
+    const textTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+    const handleTextAnswer = (questionId: number, value: string) => {
+        setTextAnswers((prev) => ({ ...prev, [questionId]: value }));
+        clearTimeout(textTimers.current[questionId]);
+        textTimers.current[questionId] = setTimeout(() => {
+            submitTextAnswer(questionId, value);
+        }, 800);
+    };
+
+    const submitTextAnswer = (questionId: number, value: string) => {
+        if (!quizData) return;
+        submitAnswerMutation.mutate({
+            result_id: quizData.result_id,
+            question_id: questionId,
+            answer_index: 0,
+            text_answer: value,
+        }, {
+            onError: (error) => {
+                logger.error('Failed to submit answer', error);
+            },
+        });
+    };
+
     const handleSelectAnswer = (questionId: number, position: number) => {
         if (!quizData) return;
         const question = quizData.questions.find((q) => q.id === questionId);
         if (!question) return;
 
-        // Bir nechta to'g'ri javobli savolda tanlov almashib turadi, oddiy
-        // savolda esa bittasi ikkinchisini almashtiradi.
+        // Tanlov turi bo'yicha: tartib savolida navbat, bir nechta javobli
+        // savolda to'plam, oddiy savolda bittasi ikkinchisini almashtiradi.
         const previous = answers[questionId] ?? [];
-        const positions = question.multiple
+        const positions = question.ordered
             ? (previous.includes(position)
                 ? previous.filter((item) => item !== position)
-                : [...previous, position].sort((a, b) => a - b))
-            : [position];
+                : [...previous, position])
+            : question.multiple
+                ? (previous.includes(position)
+                    ? previous.filter((item) => item !== position)
+                    : [...previous, position].sort((a, b) => a - b))
+                : [position];
 
         setAnswers((prev) => ({ ...prev, [questionId]: positions }));
 
@@ -195,7 +233,7 @@ const QuizTestPage = () => {
             result_id: quizData.result_id,
             question_id: questionId,
             answer_index: positions[0],
-            answer_indexes: question.multiple ? positions : undefined,
+            answer_indexes: (question.multiple || question.ordered) ? positions : undefined,
         }, {
             onError: (error) => {
                 logger.error('Failed to submit answer', error);
@@ -205,6 +243,13 @@ const QuizTestPage = () => {
 
     const handleSubmit = useCallback((isCheatingOverride?: boolean, reasonOverride?: string, imageUrlOverride?: string) => {
         if (!quizData || endQuizMutation.isPending) return;
+
+        // Kutayotgan matnli javoblar yakunlashdan oldin yuboriladi.
+        for (const [questionId, timer] of Object.entries(textTimers.current)) {
+            clearTimeout(timer);
+            const value = textAnswers[Number(questionId)];
+            if (value?.trim()) submitTextAnswer(Number(questionId), value);
+        }
 
         const isCurrentlyCheating = isCheatingOverride ?? cheatingDetected;
         const currentReason = reasonOverride ?? (isCurrentlyCheating ? cheatingReason : undefined);
@@ -608,7 +653,10 @@ const QuizTestPage = () => {
 
     const currentQuestion = quizData.questions[currentQuestionIndex];
     const totalQuestions = quizData.questions.length;
-    const answeredCount = Object.keys(answers).length;
+    const answeredCount = new Set([
+        ...Object.entries(answers).filter(([, positions]) => positions.length > 0).map(([id]) => id),
+        ...Object.entries(textAnswers).filter(([, text]) => text.trim()).map(([id]) => id),
+    ]).size;
     const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
     const isFirstQuestion = currentQuestionIndex === 0;
     const selectedPositions = answers[currentQuestion.id] ?? [];
@@ -625,6 +673,8 @@ const QuizTestPage = () => {
         index,
     }));
     const isMultiple = Boolean(currentQuestion.multiple);
+    const isOrdered = Boolean(currentQuestion.ordered);
+    const isFreeText = Boolean(currentQuestion.free_text);
 
     const timeWarning = timeLeft < 60;
 
@@ -679,7 +729,7 @@ const QuizTestPage = () => {
             {/* Question navigation dots */}
             <div className="flex flex-wrap gap-2">
                 {quizData.questions.map((q, index) => {
-                    const isAnswered = (answers[q.id]?.length ?? 0) > 0;
+                    const isAnswered = (answers[q.id]?.length ?? 0) > 0 || Boolean(textAnswers[q.id]?.trim());
                     const isCurrent = index === currentQuestionIndex;
                     return (
                         <button
@@ -720,7 +770,21 @@ const QuizTestPage = () => {
                                 Bir nechta javob to'g'ri — hammasini belgilang. Ball to'liq mos kelganda beriladi.
                             </p>
                         )}
-                        {options.map((option) => {
+                        {isOrdered && (
+                            <p className="text-xs text-muted-foreground">
+                                Bo'laklarni to'g'ri tartibda bosing. Qayta bossangiz, navbatdan chiqadi.
+                            </p>
+                        )}
+                        {isFreeText && (
+                            <input
+                                value={textAnswers[currentQuestion.id] ?? ''}
+                                onChange={(event) => handleTextAnswer(currentQuestion.id, event.target.value)}
+                                onBlur={(event) => submitTextAnswer(currentQuestion.id, event.target.value)}
+                                placeholder="Javobingizni yozing"
+                                className="h-11 w-full rounded-xl border border-border/60 bg-background px-4 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring"
+                            />
+                        )}
+                        {!isFreeText && options.map((option) => {
                             const isSelected = selectedPositions.includes(option.index);
                             return (
                                 <button
@@ -739,7 +803,9 @@ const QuizTestPage = () => {
                                             ? "bg-primary text-primary-foreground"
                                             : "bg-muted text-muted-foreground"
                                     )}>
-                                        {option.key}
+                                        {isOrdered && isSelected
+                                            ? (selectedPositions.indexOf(option.index) + 1)
+                                            : option.key}
                                     </span>
                                     <span
                                         className="pt-0.5"
