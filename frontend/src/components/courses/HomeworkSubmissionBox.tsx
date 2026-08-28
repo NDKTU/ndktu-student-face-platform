@@ -154,7 +154,7 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                                 id={inputId}
                                 type="file"
                                 multiple
-                                className="sr-only"
+                                className="hidden"
                                 accept={exts.map((ext) => `.${ext}`).join(',')}
                                 disabled={busy}
                                 onChange={(event) => { void handleUpload(event.target.files); event.target.value = ''; }}

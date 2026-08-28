@@ -158,7 +158,7 @@ export const AssignmentFormModal = ({
                         id="assignment-files"
                         type="file"
                         multiple
-                        className="sr-only"
+                        className="hidden"
                         onChange={(event) => setNewFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                     />
                     {(attachments.length > 0 || newFiles.length > 0) && (

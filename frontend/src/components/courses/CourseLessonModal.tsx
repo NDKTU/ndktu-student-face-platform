@@ -442,7 +442,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                     id="lesson-files"
                                     type="file"
                                     multiple
-                                    className="sr-only"
+                                    className="hidden"
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
                                     onChange={(event) => setExtraFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                                 />
@@ -630,7 +630,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                     id="homework-files"
                                     type="file"
                                     multiple
-                                    className="sr-only"
+                                    className="hidden"
                                     onChange={(event) => setHomeworkFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                                 />
                                 {homeworkFiles.length > 0 && (
