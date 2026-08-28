@@ -44,6 +44,7 @@ const PsychologyResultsPage = lazy(() => import('@/pages/PsychologyResultsPage')
 const StudentPsychologyPage = lazy(() => import('@/pages/StudentPsychologyPage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
+const PublicQuizPage = lazy(() => import('@/pages/PublicQuizPage'));
 const HomeworksPage = lazy(() => import('@/pages/HomeworksPage'));
 const HomeworkSubmissionsPage = lazy(() => import('@/pages/HomeworkSubmissionsPage'));
 const RolesPage = lazy(() => import('@/pages/RolesPage'));
@@ -115,6 +116,10 @@ function App() {
                         <Suspense fallback={<PageSpinner />}>
                             <Routes>
                                 <Route path="/login" element={<Login />} />
+
+                                {/* Ochiq test: tizimga kirmasdan, PIN orqali. */}
+                                <Route path="/t" element={<PublicQuizPage />} />
+                                <Route path="/t/:pin" element={<PublicQuizPage />} />
 
                                 <Route element={<ProtectedRoute />}>
                                     {/* Фокус-режим: прохождение тестов без сайдбара */}

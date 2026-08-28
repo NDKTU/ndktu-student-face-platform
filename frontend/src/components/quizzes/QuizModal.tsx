@@ -86,6 +86,8 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     const selectedSubjectId = watch('subject_id');
     const selectedGroupId = watch('group_id');
     const selectedSemester = watch('semester_number');
+    // Ochiq test guruhga biriktirilmaydi — tegishli maydonlar yashiriladi.
+    const isPublicQuiz = watch('quiz_type') === 'PUBLIC_FREE';
     const questionNumber = watch('question_number');
 
     const effectiveUserId = isTeacher ? user?.id?.toString() : selectedLecturerId;
@@ -219,9 +221,10 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             duration: parseInt(data.duration, 10),
             pin: data.pin,
             lecturer_id: resolvedLecturerId,
-            group_id: parseInt(data.group_id, 10),
+            // Ochiq testda guruh yo'q: uni tashqi ishtirokchi yechadi.
+            group_id: data.group_id ? parseInt(data.group_id, 10) : null,
             subject_id: parseInt(data.subject_id, 10),
-            semester_number: parseInt(data.semester_number, 10),
+            semester_number: data.semester_number ? parseInt(data.semester_number, 10) : null,
             quiz_type: data.quiz_type,
             is_active: data.is_active,
             proctoring_mode: data.proctoring_mode,
@@ -323,7 +326,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     )}
                 </div>
 
-                <div className="space-y-2">
+                {!isPublicQuiz && <div className="space-y-2">
                     <label className="text-sm font-medium">Guruh</label>
                     <Controller
                         name="group_id"
@@ -345,7 +348,14 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         </p>
                     )}
                     {errors.group_id && <p className="text-sm text-destructive">{errors.group_id.message}</p>}
-                </div>
+                </div>}
+
+                {isPublicQuiz && (
+                    <p className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        Ochiq test guruhga biriktirilmaydi: uni havola va PIN orqali tizimda hisobi
+                        yo'q odam ham yechadi. Ishtirokchi boshlashdan oldin F.I.Sh. kiritadi.
+                    </p>
+                )}
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Nazorat turi</label>
@@ -357,7 +367,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     {errors.quiz_type && <p className="text-sm text-destructive">{errors.quiz_type.message}</p>}
                 </div>
 
-                <div className="space-y-2">
+                {!isPublicQuiz && <div className="space-y-2">
                     <label className="text-sm font-medium">Semestr</label>
                     <select className={selectClassName} {...register('semester_number')}>
                         <option value="">Tanlanmagan</option>
@@ -368,7 +378,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     {errors.semester_number && (
                         <p className="text-sm text-destructive">{errors.semester_number.message}</p>
                     )}
-                </div>
+                </div>}
 
                 <div className="space-y-1 rounded-md border border-dashed bg-muted/20 px-3 py-2">
                     <label className="text-xs font-medium text-muted-foreground">Test sarlavhasi (avtomatik)</label>

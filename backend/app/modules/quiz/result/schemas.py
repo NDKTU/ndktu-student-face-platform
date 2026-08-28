@@ -49,6 +49,8 @@ class ResultResponse(BaseModel):
     group: Optional[ResultGroupInfo] = None
     student_id: Optional[str] = None
     student_name: Optional[str] = None
+    # Ochiq testni yechgan mehmon ismi (hisobsiz ishtirokchi).
+    guest_name: Optional[str] = None
 
     cheating_detected: bool = False
     cheating_image_url: Optional[str] = None
@@ -76,6 +78,9 @@ class ResultResponse(BaseModel):
                     student = user.student
                     data.student_id = student.student_id_number
                     data.student_name = student.full_name
+            # Ochiq testda hisob yo'q: ism faqat urinishning o'zida.
+            if not getattr(data, "student_name", None) and getattr(data, "guest_name", None):
+                data.student_name = data.guest_name
         return data
 
 

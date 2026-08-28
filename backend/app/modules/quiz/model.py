@@ -238,6 +238,11 @@ class Result(Base, IdIntPk, TimestampMixin):
     subject_id: Mapped[int] = mapped_column(Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True)
     group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
+    # Ochiq testda ishtirokchi tizimda yo'q: `user_id` bo'sh qoladi, kim
+    # yechgani faqat shu ismdan ma'lum. Ismni tekshirib bo'lmaydi — ochiq
+    # testda bu muqarrar.
+    guest_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+
     # Lifecycle: created as "in_progress" at start_quiz time, finalized to
     # "completed" by end_quiz — created_at is therefore the attempt's start time.
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="in_progress")

@@ -21,6 +21,7 @@ from .question.schemas import (
     QuestionListRequest,
     QuestionListResponse,
 )
+from .public_quiz.router import router as public_quiz_router
 from .quiz.repository import get_quiz_repository
 from .quiz.schemas import (
     AvailableQuestionsResponse,
@@ -592,3 +593,5 @@ router.include_router(quiz_router)
 router.include_router(quiz_process_router)
 router.include_router(result_router)
 router.include_router(user_answers_router)
+# Ochiq test: autentifikatsiyasiz endpointlar alohida modulda.
+router.include_router(public_quiz_router)

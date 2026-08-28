@@ -5,9 +5,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
-import { BookOpen, Camera, Pencil, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
+import { BookOpen, Camera, Link as LinkIcon, Pencil, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
 import type { ProctoringMode, Quiz } from '@/services/quizService';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface QuizTableProps {
     quizzes: Quiz[];
@@ -113,8 +114,30 @@ export const QuizTable = ({
         </div>
     );
 
+    /** Ochiq testga havola: uni tizimda hisobi yo'q odam ham ochadi. */
+    const copyPublicLink = async (quiz: Quiz) => {
+        const link = `${window.location.origin}/t/${encodeURIComponent(quiz.pin)}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            toast.success('Havola nusxalandi');
+        } catch {
+            // Clipboard bloklangan bo'lsa ham havola ko'rinsin.
+            toast.info(link);
+        }
+    };
+
     const renderManageActions = (quiz: Quiz) => (
         <div className="flex gap-1">
+            {quiz.quiz_type === 'PUBLIC_FREE' && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Ochiq test havolasini nusxalash"
+                    onClick={() => void copyPublicLink(quiz)}
+                >
+                    <LinkIcon className="h-4 w-4 text-primary" />
+                </Button>
+            )}
             {showStart && (
                 <Button
                     variant="ghost"

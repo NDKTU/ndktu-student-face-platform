@@ -277,6 +277,24 @@ class QuizProcessRepository:
             submitted_answers=submitted,
         )
 
+    async def finalize_attempt(
+        self,
+        session: AsyncSession,
+        result_obj: Result,
+        *,
+        reason: str | None = None,
+        cheating_detected: bool = False,
+        cheating_image_url: str | None = None,
+    ) -> tuple[int, int, int, int]:
+        """Boshqa modullar uchun ochiq nom (ochiq test ham shu bilan yakunlanadi)."""
+        return await self._finalize_attempt(
+            session,
+            result_obj,
+            reason=reason,
+            cheating_detected=cheating_detected,
+            cheating_image_url=cheating_image_url,
+        )
+
     async def _finalize_attempt(
         self,
         session: AsyncSession,
