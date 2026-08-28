@@ -22,7 +22,10 @@ class SubmissionFile(BaseModel):
 class HomeworkCreateRequest(BaseModel):
     course_id: int
     lesson_id: Optional[int] = None
-    title: str = Field(min_length=1, max_length=255)
+    # Sarlavha ixtiyoriy: bo'sh qolsa, dars mavzusidan olinadi (darsga
+    # bog'lanmagan vazifada — «Uy vazifasi»). Aks holda o'qituvchi fayl
+    # biriktirib ham vazifani saqlay olmasdi.
+    title: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = None
     deadline: datetime
     max_grade: int = Field(default=GRADE_MAX, ge=GRADE_MIN, le=GRADE_MAX)
@@ -34,7 +37,7 @@ class HomeworkCreateRequest(BaseModel):
 
 class HomeworkUpdateRequest(BaseModel):
     lesson_id: Optional[int] = None
-    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    title: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = None
     deadline: Optional[datetime] = None
     max_grade: Optional[int] = Field(default=None, ge=GRADE_MIN, le=GRADE_MAX)

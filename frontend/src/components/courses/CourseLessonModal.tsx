@@ -190,22 +190,19 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
             setError('Guruhni tanlang');
             return;
         }
-        // Sarlavhasiz vazifa jimgina tashlab yuborilardi: o'qituvchi fayl
-        // biriktirib, tavsif yozib «Saqlash» bosardi va dars vazifasiz
-        // yaratilardi — hech qanday xabar chiqmasdan. Blokda biror narsa
-        // to'ldirilgan bo'lsa, sarlavha majburiy.
+        // Ilgari vazifa faqat sarlavha yozilganda saqlanardi: o'qituvchi fayl
+        // biriktirib, tavsif yozib «Saqlash» bossa ham dars vazifasiz
+        // yaratilardi — hech qanday xabarsiz. Endi sarlavha ixtiyoriy, blokda
+        // biror narsa to'ldirilgan bo'lsa vazifa yaratiladi (nomi bo'sh
+        // qolsa, bekend dars mavzusini qo'yadi).
         const homeworkFilled = Boolean(
             homeworkTitle.trim() || homeworkDescription.trim() || homeworkFiles.length > 0 || allowedTypes.length > 0,
         );
-        if (showHomework && homeworkFilled && !homeworkTitle.trim()) {
-            setError("Uy vazifasi sarlavhasini kiriting — aks holda vazifa saqlanmaydi");
-            return;
-        }
-        if (showHomework && homeworkTitle.trim() && !homeworkDeadline) {
+        if (showHomework && homeworkFilled && !homeworkDeadline) {
             setError("Uy vazifasi uchun topshirish muddatini kiriting");
             return;
         }
-        if (showHomework && homeworkTitle.trim() && !allowFile && !allowText) {
+        if (showHomework && homeworkFilled && !allowFile && !allowText) {
             setError("Talaba qanday topshirishini tanlang: fayl yoki matn");
             return;
         }
@@ -277,7 +274,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     });
                 }
             }
-            if (showHomework && homeworkTitle.trim()) {
+            if (showHomework && homeworkFilled) {
                 const attachments = [];
                 for (const file of homeworkFiles) {
                     const { url } = await resourceService.upload(file);
@@ -286,7 +283,8 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                 await assignmentService.create({
                     course_id: course.id,
                     lesson_id: lessonId,
-                    title: homeworkTitle.trim(),
+                    // Bo'sh sarlavha yuborilmaydi — bekend dars mavzusini qo'yadi.
+                    title: homeworkTitle.trim() || undefined,
                     description: homeworkDescription.trim() || null,
                     deadline: new Date(homeworkDeadline).toISOString(),
                     attachments,
@@ -606,7 +604,10 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     </div>
                     {showHomework && (
                         <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
-                            <Input value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} placeholder="Uy vazifasi sarlavhasi" />
+                            <div>
+                                <Input value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} placeholder="Uy vazifasi sarlavhasi (ixtiyoriy)" />
+                                <p className="mt-1 text-xs text-muted-foreground">Bo'sh qoldirsangiz, dars mavzusi nom bo'lib qo'yiladi.</p>
+                            </div>
                             <textarea
                                 className="min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
                                 value={homeworkDescription}

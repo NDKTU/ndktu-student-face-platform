@@ -50,7 +50,8 @@ export interface AssignmentListResponse {
 export interface AssignmentCreateRequest {
     course_id: number;
     lesson_id?: number | null;
-    title: string;
+    /** Ixtiyoriy: bo'sh bo'lsa, bekend dars mavzusini nom qilib qo'yadi. */
+    title?: string;
     description?: string | null;
     deadline: string;
     max_grade?: number;

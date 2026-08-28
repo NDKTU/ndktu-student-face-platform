@@ -237,6 +237,21 @@ class HomeworkRepository:
 
     # ── Homework CRUD ─────────────────────────────────────────────────────
 
+    async def _default_title(self, session: AsyncSession, lesson_id: int | None) -> str:
+        """Sarlavha kiritilmagan vazifa uchun nom.
+
+        Dars mavzusi eng tushunarli nom: talaba ro'yxatda vazifani qaysi
+        darsga tegishli ekani bo'yicha topadi. Darsga bog'lanmagan vazifa
+        uchun umumiy nom qoladi.
+        """
+        if lesson_id is not None:
+            topic = (
+                await session.execute(select(Lesson.topic).where(Lesson.id == lesson_id))
+            ).scalar_one_or_none()
+            if topic:
+                return topic[:255]
+        return "Uy vazifasi"
+
     async def _ensure_lesson_free(
         self, session: AsyncSession, lesson_id: int | None, exclude_homework_id: int | None = None
     ) -> None:
@@ -264,11 +279,13 @@ class HomeworkRepository:
         await self._check_course_owner(session, data.course_id, current_user)
         await self._ensure_lesson_free(session, data.lesson_id)
 
+        title = (data.title or "").strip() or await self._default_title(session, data.lesson_id)
+
         a = Homework(
             course_id=data.course_id,
             lesson_id=data.lesson_id,
             created_by_user_id=current_user.id,
-            title=data.title,
+            title=title,
             description=data.description,
             deadline=_to_naive_utc(data.deadline),
             max_grade=data.max_grade,
@@ -291,6 +308,10 @@ class HomeworkRepository:
         await self._check_course_owner(session, a.course_id, current_user)
         if data.lesson_id is not None and data.lesson_id != a.lesson_id:
             await self._ensure_lesson_free(session, data.lesson_id, exclude_homework_id=a.id)
+
+        # Bo'sh sarlavha yuborilsa, avvalgisi saqlanadi — vazifa nomsiz qolmasin.
+        if data.title is not None and not data.title.strip():
+            data = data.model_copy(update={"title": None})
 
         for field in (
             "lesson_id",

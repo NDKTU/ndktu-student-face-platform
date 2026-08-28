@@ -74,10 +74,7 @@ export const AssignmentFormModal = ({
     }, [isOpen, editing]);
 
     const handleSubmit = async () => {
-        if (!title.trim()) {
-            setError("Sarlavhani kiriting — vazifa sarlavhasiz saqlanmaydi");
-            return;
-        }
+        // Sarlavha ixtiyoriy: bo'sh qolsa, bekend dars mavzusini nom qilib qo'yadi.
         if (!deadline) {
             setError("Topshirish muddatini kiriting");
             return;
@@ -96,7 +93,7 @@ export const AssignmentFormModal = ({
                 uploaded.push({ name: file.name, url, size: file.size, type: file.type });
             }
             const base = {
-                title: title.trim(),
+                title: title.trim() || undefined,
                 description: description.trim() || null,
                 deadline: new Date(deadline).toISOString(),
                 // Baholash 5 ballik tizimda — o'qituvchi sozlamaydi.
@@ -132,8 +129,9 @@ export const AssignmentFormModal = ({
         >
             <div className="space-y-4">
                 <div>
-                    <label className="mb-1 block text-sm font-medium">Sarlavha</label>
+                    <label className="mb-1 block text-sm font-medium">Sarlavha <span className="font-normal text-muted-foreground">(ixtiyoriy)</span></label>
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Uy vazifasi sarlavhasi" />
+                    <p className="mt-1 text-xs text-muted-foreground">Bo'sh qoldirsangiz, dars mavzusi nom bo'lib qo'yiladi.</p>
                 </div>
                 <div>
                     <label className="mb-1 block text-sm font-medium">Tavsif</label>
