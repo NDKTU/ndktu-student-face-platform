@@ -8,22 +8,17 @@ import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { formatDateTime } from '@/utils/date';
 
 type Filter = 'all' | 'pending' | 'overdue';
+
+/** Sana formati butun ilovada bir xil — `utils/date.ts`. */
+const shortDeadline = formatDateTime;
 
 /** Muddat o'tgan-o'tmaganini bir joyda hisoblaymiz — jadvalda ham, filtrda ham kerak. */
 const isOverdue = (item: Assignment) => new Date(item.deadline).getTime() < Date.now();
 const pendingCount = (item: Assignment) =>
     item.stats ? item.stats.submitted - item.stats.graded : 0;
-/** Jadvalda to'liq sana ustunni cho'zib yuboradi — qisqa ko'rinish. */
-const shortDeadline = (value: string) =>
-    new Date(value).toLocaleString(undefined, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 
 export default function HomeworksPage() {
     const navigate = useNavigate();

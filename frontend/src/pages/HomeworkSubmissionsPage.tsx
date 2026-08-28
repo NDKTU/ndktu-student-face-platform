@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatCard } from '@/components/ui/StatCard';
+import { formatDateTime } from '@/utils/date';
 
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
     draft: 'Qoralama',
@@ -73,7 +74,7 @@ export default function HomeworkSubmissionsPage() {
                 </Button>
                 <PageHeader
                     title={homework.title}
-                    description={`Muddat: ${new Date(homework.deadline).toLocaleString()} · Baho: 1–${homework.max_grade}`}
+                    description={`Muddat: ${formatDateTime(homework.deadline)} · Baho: 1–${homework.max_grade}`}
                 />
             </div>
 
@@ -151,7 +152,7 @@ function SubmissionCard({
                     <div className="min-w-0">
                         <p className="font-semibold">{title}</p>
                         <p className="text-xs text-muted-foreground">
-                            {[student?.group, submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : null]
+                            {[student?.group, submission.submitted_at ? formatDateTime(submission.submitted_at) : null]
                                 .filter(Boolean)
                                 .join(' · ')}
                         </p>

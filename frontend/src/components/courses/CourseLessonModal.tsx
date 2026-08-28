@@ -10,6 +10,7 @@ import { assignmentService } from '@/services/assignmentService';
 import type { Course } from '@/services/courseService';
 import type { Lesson, LessonResourceInfo } from '@/services/lessonService';
 import type { Assignment } from '@/services/assignmentService';
+import { formatDate } from '@/utils/date';
 
 /** Vazifa uchun ruxsat etilgan fayl turlari — kengaytma bo'yicha. */
 const FILE_TYPE_OPTIONS = [
@@ -565,7 +566,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                         <div className="flex items-center gap-2">
                                             <span className="min-w-0 flex-1 truncate text-sm">{homework.title}</span>
                                             <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                {new Date(homework.deadline).toLocaleDateString()}
+                                                {formatDate(homework.deadline)}
                                             </span>
                                             <Button
                                                 type="button"

@@ -40,7 +40,11 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
 
             <aside
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col bg-sidebar transition-transform duration-300 md:static',
+                    // Mobilda — ustma-ust (fixed, 100vh). Desktopda balandlik
+                    // ota-konteynerdan olinadi: qat'iy `h-screen` sahifa yuqoriroq
+                    // bo'lgan holatlarda yon panel yarim yo'lda uzilib qolardi.
+                    'fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col bg-sidebar transition-transform duration-300',
+                    'md:static md:inset-auto md:h-auto md:self-stretch',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                 )}
             >
