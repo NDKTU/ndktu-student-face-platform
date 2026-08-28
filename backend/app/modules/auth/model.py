@@ -40,6 +40,10 @@ class User(Base, IdIntPk, TimestampMixin):
         default=True,
     )
 
+    # Parol qayerda tekshirilishi: `eduplan` bo'lsa, haqiqat manbai EPOS.
+    # Bo'sh — mahalliy hisob (bootstrap admin va qo'lda yaratilganlar).
+    auth_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     # Profil surati. HEMIS'dan kelgan talaba surati (`students.image_path`)
     # o'zgarmaydi va eskirgan bo'lishi mumkin, bu esa foydalanuvchi o'zi
     # yuklaydigan surat — yuz nazoratida etalon sifatida birinchi bo'lib

@@ -109,22 +109,37 @@ class UserService:
 
     async def login(self, session: AsyncSession, data: UserLoginRequest) -> UserLoginResponse:
         user = await self.get_user_by_username(session, data.username)
+        from app.modules.integration.eduplan.auth_service import eduplan_auth_service
+
+        # EPOS'dan kelgan hisob uchun haqiqat manbai — EPOS. Mahalliy xesh
+        # avval tekshirilganda, o'qituvchi EPOS'da parolini almashtirgach ham
+        # eski parol bizda ishlayverardi.
+        if user and user.auth_source == "eduplan":
+            try:
+                access_token = await eduplan_auth_service.login(session, data.username, data.password)
+                return UserLoginResponse(type="Bearer", access_token=access_token)
+            except HTTPException as exc:
+                # 401 — parol haqiqatan noto'g'ri, mahalliy xeshga o'tmaymiz.
+                if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                    raise
+                # EPOS javob bermayapti: dars vaqtida tizimni to'xtatib
+                # qo'ymaslik uchun oxirgi ma'lum parolga ruxsat beramiz.
+                logger.warning("EduPlan unavailable (%s), falling back to local hash for %s", exc.status_code, data.username)
+            except Exception as exc:  # noqa: BLE001 — kutilmagan nosozlik ham to'xtatmasin
+                logger.error("EduPlan login error for %s: %s", data.username, exc)
 
         if user and user.password:
             if verify_password(data.password, user.password):
                 ensure_user_active(user)
                 access_token = await self.create_session_token(user.id)
                 return UserLoginResponse(type="Bearer", access_token=access_token)
-            else:
-                logger.warning(
-                    "Local login failed for user %s (password mismatch), attempting EduPlan fallback.",
-                    data.username,
-                )
+            logger.warning(
+                "Local login failed for user %s (password mismatch), attempting EduPlan fallback.",
+                data.username,
+            )
 
-        # EduPlan SSO fallback for staff/teachers
+        # EduPlan SSO: hali bizda yo'q xodimlar shu yerdan kiradi.
         try:
-            from app.modules.integration.eduplan.auth_service import eduplan_auth_service
-
             access_token = await eduplan_auth_service.login(session, data.username, data.password)
             return UserLoginResponse(type="Bearer", access_token=access_token)
         except HTTPException:

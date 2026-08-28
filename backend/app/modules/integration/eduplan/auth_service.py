@@ -111,13 +111,17 @@ class EduPlanAuthService:
                 username=username,
                 password=hashed_password,
                 is_active=user_data.get("is_active", True),
+                auth_source="eduplan",
             )
             session.add(user)
             await session.flush()
             await session.refresh(user, attribute_names=["roles"])
             logger.info("EduPlan SSO: yaratildi yangi User(username=%s)", username)
         else:
+            # Parol EPOS'dagi bilan sinxron turadi: o'qituvchi u yerda
+            # almashtirsa, keyingi kirishda bizdagi xesh ham yangilanadi.
             user.password = hashed_password
+            user.auth_source = "eduplan"
             if "is_active" in user_data:
                 user.is_active = user_data["is_active"]
 
