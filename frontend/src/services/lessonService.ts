@@ -5,7 +5,7 @@ export interface LessonSubjectInfo {
     name: string;
 }
 
-export interface LessonSubjectTeacherInfo {
+export interface LessonTeacherSubjectInfo {
     id: number;
     subject_id: number;
     teacher_id: number;
@@ -36,7 +36,7 @@ export type LessonType = 'lecture' | 'seminar' | 'independent' | 'lab';
 
 export interface Lesson {
     id: number;
-    subject_teacher_id: number;
+    teacher_subject_id: number;
     group_id: number;
     course_id: number;
     sinf_id?: number | null;
@@ -48,7 +48,7 @@ export interface Lesson {
     description?: string | null;
     created_at: string;
     updated_at: string;
-    subject_teacher?: LessonSubjectTeacherInfo | null;
+    teacher_subject?: LessonTeacherSubjectInfo | null;
     group?: LessonGroupInfo | null;
     course_topic?: LessonTopicInfo | null;
     resources: LessonResourceInfo[];
@@ -62,7 +62,7 @@ export interface LessonListResponse {
 }
 
 export interface LessonCreateRequest {
-    subject_teacher_id?: number;
+    teacher_subject_id?: number;
     /** Не нужен для курса с одной группой — бэкенд подставит её сам. */
     group_id?: number;
     course_id?: number;
@@ -77,7 +77,7 @@ export interface LessonCreateRequest {
 }
 
 export interface LessonUpdateRequest {
-    subject_teacher_id?: number;
+    teacher_subject_id?: number;
     group_id?: number;
     course_id?: number;
     sinf_id?: number | null;
@@ -90,7 +90,7 @@ export interface LessonUpdateRequest {
 }
 
 export interface LessonListParams {
-    subject_teacher_id?: number;
+    teacher_subject_id?: number;
     group_id?: number;
     course_id?: number;
     sinf_id?: number;

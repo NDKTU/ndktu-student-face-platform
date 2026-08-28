@@ -99,7 +99,7 @@ export default function LessonsPage() {
 
     const openEdit = (lesson: Lesson) => {
         setEditing(lesson);
-        setFormSubjectTeacherId(lesson.subject_teacher_id.toString());
+        setFormSubjectTeacherId(lesson.teacher_subject_id.toString());
         setFormGroupId(lesson.group_id.toString());
         setFormTopic(lesson.topic);
         setFormDate(lesson.date);
@@ -126,7 +126,7 @@ export default function LessonsPage() {
         if (err) { setFormError(err); return; }
 
         const payload = {
-            subject_teacher_id: parseInt(formSubjectTeacherId, 10),
+            teacher_subject_id: parseInt(formSubjectTeacherId, 10),
             group_id: parseInt(formGroupId, 10),
             topic: formTopic.trim(),
             date: formDate,
@@ -216,7 +216,7 @@ export default function LessonsPage() {
                                 <div className="min-w-0 flex-1">
                                     <p className="font-display font-semibold leading-snug text-foreground line-clamp-2">{lesson.topic}</p>
                                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                        {lesson.subject_teacher?.subject?.name ?? `#${lesson.subject_teacher_id}`}
+                                        {lesson.teacher_subject?.subject?.name ?? `#${lesson.teacher_subject_id}`}
                                     </p>
                                 </div>
                                 {isAdmin ? (

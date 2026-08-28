@@ -71,13 +71,12 @@ export default function LessonDetailPage() {
     const canManageQuiz = hasPermission('create:quiz');
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
-    const lessonSubjectId = lesson.subject_teacher?.subject_id;
 
     return (
         <div className="space-y-6">
             <div className="space-y-2">
                 <Button variant="ghost" size="sm" onClick={() => navigate(`/courses/${lesson.course_id}`)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4" /> Kursga qaytish</Button>
-                <PageHeader title={lesson.topic} description={[lesson.date, lesson.subject_teacher?.subject?.name, lesson.group?.name].filter(Boolean).join(' · ')} actions={canManageContent ? <Button onClick={() => setContentOpen(true)}><Plus className="mr-2 h-4 w-4" /> Kontent qo'shish</Button> : undefined} />
+                <PageHeader title={lesson.topic} description={[lesson.date, lesson.teacher_subject?.subject?.name, lesson.group?.name].filter(Boolean).join(' · ')} actions={canManageContent ? <Button onClick={() => setContentOpen(true)}><Plus className="mr-2 h-4 w-4" /> Kontent qo'shish</Button> : undefined} />
                 {lesson.description && <p className="max-w-4xl text-sm leading-6 text-foreground/80">{lesson.description}</p>}
             </div>
 
@@ -103,7 +102,9 @@ export default function LessonDetailPage() {
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate(`/questions/create?subject_id=${lessonSubjectId ?? ''}&return_to=/lessons/${lesson.id}`)}
+                            // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
+                            // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
+                            onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
                         >
                             <FileQuestion className="mr-2 h-4 w-4" /> Savol qo'shish
                         </Button>

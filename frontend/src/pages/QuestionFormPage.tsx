@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
+import { useLesson } from '@/hooks/useLessons';
 
 const questionSchema = z.object({
     subject_id: z.string().min(1, 'Fan tanlanishi shart'),
@@ -34,12 +35,17 @@ const QuestionFormPage = () => {
     // o'sha darsga qaytiladi — o'qituvchi savolni test uchun shu yerda qo'shadi.
     const [searchParams] = useSearchParams();
     const presetSubjectId = searchParams.get('subject_id') ?? '';
+    const lessonIdParam = searchParams.get('lesson_id');
     const returnTo = searchParams.get('return_to');
     const { user } = useAuth();
     const isEditMode = !!id;
     const questionId = id ? parseInt(id, 10) : 0;
 
     const { data: subjectsData } = useSubjects(1, 100);
+    // Dars sahifasidan kelinganda fan darsdan olinadi va tanlash so'ralmaydi:
+    // dars allaqachon o'qituvchi-fan juftligiga bog'langan.
+    const { data: lessonData } = useLesson(lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined);
+    const lessonSubjectId = lessonData?.teacher_subject?.subject_id;
     const { data: question, isLoading: isQuestionLoading } = useQuestion(questionId);
 
     const createMutation = useCreateQuestion();
@@ -58,6 +64,7 @@ const QuestionFormPage = () => {
         handleSubmit,
         control,
         reset,
+        setValue,
         formState: { errors },
     } = useForm<QuestionFormValues>({
         resolver: zodResolver(questionSchema),
@@ -71,6 +78,12 @@ const QuestionFormPage = () => {
             correct_option: 'a',
         }
     });
+
+    useEffect(() => {
+        if (lessonSubjectId && !isEditMode) {
+            setValue('subject_id', lessonSubjectId.toString());
+        }
+    }, [lessonSubjectId, isEditMode, setValue]);
 
     useEffect(() => {
         if (question) {
@@ -248,15 +261,30 @@ const QuestionFormPage = () => {
                         <div className="grid grid-cols-1 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Fan</label>
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    {...register('subject_id')}
-                                >
-                                    <option value="">Fanni tanlang</option>
-                                    {subjects.map((s) => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                    ))}
-                                </select>
+                                {lessonSubjectId ? (
+                                    <>
+                                        {/* Dars fani — tanlanmaydi, shunchaki ko'rsatiladi. */}
+                                        <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm">
+                                            {subjects.find((s) => s.id === lessonSubjectId)?.name
+                                                ?? lessonData?.teacher_subject?.subject?.name
+                                                ?? `#${lessonSubjectId}`}
+                                        </p>
+                                        <input type="hidden" {...register('subject_id')} />
+                                        <p className="text-xs text-muted-foreground">
+                                            Fan darsdan olindi: «{lessonData?.topic}».
+                                        </p>
+                                    </>
+                                ) : (
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        {...register('subject_id')}
+                                    >
+                                        <option value="">Fanni tanlang</option>
+                                        {subjects.map((s) => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                                 {errors.subject_id && <p className="text-xs text-destructive">{errors.subject_id.message}</p>}
                             </div>
                         </div>
