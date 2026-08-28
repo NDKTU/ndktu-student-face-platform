@@ -217,6 +217,13 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                                     : 'Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.'}
                         </p>
                     </div>
+                    {/* Tekshiruv bu foydalanuvchiga tegishli emasligi ochiq aytiladi —
+                        aks holda «tekshirildi» degan taassurot qolardi. */}
+                    {faceCheckEnabled && faceCheck.notApplicable && (
+                        <p className="text-xs text-muted-foreground">
+                            Yuz nazorati faqat guruh talabalari uchun — sizga qo'llanmadi.
+                        </p>
+                    )}
                     {/* Tekshiruv natijasi: nima bo'lgani va nechanchi urinish. */}
                     {faceResult && faceResult.status !== 'ok' && state !== 'verifying' && (
                         <p className="text-xs text-amber-600">
@@ -256,7 +263,10 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                         </span>
                         {faceCheckEnabled && (
                             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <ScanFace className="h-3.5 w-3.5" /> Dars davomida shaxs tasodifiy tekshiriladi
+                                <ScanFace className="h-3.5 w-3.5" />
+                                {faceCheck.notApplicable
+                                    ? "Yuz nazorati sizga qo'llanmaydi (guruh talabasi emassiz)"
+                                    : 'Dars davomida shaxs tasodifiy tekshiriladi'}
                             </span>
                         )}
                     </div>

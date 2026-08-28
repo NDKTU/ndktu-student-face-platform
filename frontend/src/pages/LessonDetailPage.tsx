@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useRoleView } from '@/hooks/useRoleView';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useResources';
@@ -39,6 +40,7 @@ export default function LessonDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { hasPermission } = useAuth();
+    const { isStudent } = useRoleView();
     const lessonId = id ? Number.parseInt(id, 10) : undefined;
     const lessonQuery = useLesson(lessonId);
     const resourcesQuery = useResources(lessonId);
@@ -87,7 +89,9 @@ export default function LessonDetailPage() {
     const canGrade = hasPermission('update:submission');
     const canManageQuiz = hasPermission('create:quiz');
     // Yuz nazorati faqat talabaga: darsni o'qituvchining o'zi olib boradi.
-    const isStudentView = canSubmitHomework;
+    // Ko'rinish roli bo'yicha aniqlanadi — huquqlar to'plami emas: bir
+    // hisobda bir nechta rol bo'lishi mumkin.
+    const isStudentView = isStudent;
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
     // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,

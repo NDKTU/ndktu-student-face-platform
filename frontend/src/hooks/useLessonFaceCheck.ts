@@ -23,6 +23,8 @@ export function useLessonFaceCheck(lessonId: number) {
     const streamRef = useRef<MediaStream | null>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [lastResult, setLastResult] = useState<FaceCheckResult | null>(null);
+    // Tekshiruv bu foydalanuvchiga tegishli emas (talaba emas).
+    const [notApplicable, setNotApplicable] = useState(false);
 
     const stop = useCallback(() => {
         if (timerRef.current) clearTimeout(timerRef.current);
@@ -70,6 +72,10 @@ export function useLessonFaceCheck(lessonId: number) {
         return canvas.toDataURL('image/jpeg', 0.8);
     }, []);
 
+    /**
+     * `null` — tekshirib bo'lmadi (xizmat javob bermadi yoki foydalanuvchi
+     * bu guruhning talabasi emas). Bunday holatda dars to'xtatilmaydi.
+     */
     const runCheck = useCallback(async (stage: FaceCheckStage): Promise<FaceCheckResult | null> => {
         const cameraReady = await openCamera();
         if (!cameraReady) {
@@ -94,6 +100,13 @@ export function useLessonFaceCheck(lessonId: number) {
             setLastResult(result);
             return result;
         } catch (cause) {
+            const status = (cause as { response?: { status?: number } })?.response?.status;
+            // 403 — bu guruhning talabasi emas (masalan, admin yoki o'qituvchi
+            // talaba ko'rinishida): tekshiruv qo'llanmaydi, xato ham emas.
+            if (status === 403) {
+                setNotApplicable(true);
+                return null;
+            }
             logger.error('Face check failed', cause);
             return null;
         }
@@ -112,5 +125,5 @@ export function useLessonFaceCheck(lessonId: number) {
         tick();
     }, [runCheck]);
 
-    return { runCheck, startRandomChecks, stop, lastResult };
+    return { runCheck, startRandomChecks, stop, lastResult, notApplicable };
 }
