@@ -9,6 +9,7 @@ import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
+import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
 import { HomeworkSubmissionBox } from '@/components/courses/HomeworkSubmissionBox';
@@ -45,6 +46,7 @@ export default function LessonDetailPage() {
     const [homeworkOpen, setHomeworkOpen] = useState(false);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
     const [quizOpen, setQuizOpen] = useState(false);
+    const [excelOpen, setExcelOpen] = useState(false);
     const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
     const quizzesQuery = useQuizzes(lessonId ? { lesson_id: lessonId, limit: 20 } : {}, Boolean(lessonId));
     const deleteQuiz = useDeleteQuiz();
@@ -71,6 +73,10 @@ export default function LessonDetailPage() {
     const canManageQuiz = hasPermission('create:quiz');
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
+    // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,
+    // ro'yxat esa tanlanmagan holat uchun zaxira.
+    const lessonSubjectId = lesson.teacher_subject?.subject_id;
+    const lessonSubjectName = lesson.teacher_subject?.subject?.name;
 
     return (
         <div className="space-y-6">
@@ -99,15 +105,26 @@ export default function LessonDetailPage() {
             <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Testlar</CardTitle>
                 <div className="flex flex-wrap gap-2">
                     {canAddQuestion && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
-                            // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
-                            onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
-                        >
-                            <FileQuestion className="mr-2 h-4 w-4" /> Savol qo'shish
-                        </Button>
+                        <>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
+                                // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
+                                onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
+                            >
+                                <FileQuestion className="mr-2 h-4 w-4" /> Savol qo'shish
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setExcelOpen(true)}
+                                disabled={!lessonSubjectId}
+                                title={lessonSubjectId ? undefined : 'Darsning fani aniqlanmadi'}
+                            >
+                                <Upload className="mr-2 h-4 w-4" /> Excel'dan yuklash
+                            </Button>
+                        </>
                     )}
                     {canManageQuiz && (
                         <Button size="sm" onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}>
@@ -148,6 +165,14 @@ export default function LessonDetailPage() {
 
             <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />
             <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
+            <QuestionExcelUploadModal
+                isOpen={excelOpen}
+                onClose={() => setExcelOpen(false)}
+                subjects={[]}
+                defaultSubjectId={lessonSubjectId}
+                subjectName={lessonSubjectName}
+                lockSubject
+            />
             <AssignmentFormModal isOpen={homeworkOpen} onClose={() => setHomeworkOpen(false)} courseId={lesson.course_id} lessonId={lesson.id} editing={editingHomework} />
         </div>
     );

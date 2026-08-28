@@ -6,7 +6,7 @@ import type { Question, QuestionTeacherSummary } from '@/services/questionServic
 import type { Subject } from '@/services/subjectService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search, ArrowLeft, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, Search, ArrowLeft, Download } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { sanitizeHtml } from '@/utils/sanitize';
-import { useQuestions, useDeleteQuestion, useUploadQuestions, useBulkDeleteQuestions, useDownloadQuestionsExcel, useQuestionCatalog } from '@/hooks/useQuestions';
+import { useQuestions, useDeleteQuestion, useBulkDeleteQuestions, useDownloadQuestionsExcel, useQuestionCatalog } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useUsers } from '@/hooks/useUsers';
 import { Input } from '@/components/ui/Input';
@@ -23,6 +23,7 @@ import { useRoleView } from '@/hooks/useRoleView';
 import { Combobox } from '@/components/ui/Combobox';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
+import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { HierarchyHeader } from '@/components/catalog/HierarchyHeader';
 
 // ─── Questions Table (shared by admin and teacher) ───────────────────────────
@@ -244,7 +245,7 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName, owne
                 isLoading={isQuestionsLoading}
             />
 
-            <UploadModal
+            <QuestionExcelUploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
                 onSuccess={() => setIsUploadModalOpen(false)}
@@ -440,91 +441,6 @@ const QuestionDetailModal = ({
 
                 <div className="flex justify-end pt-2">
                     <Button onClick={onClose}>Yopish</Button>
-                </div>
-            </div>
-        </Modal>
-    );
-};
-
-const UploadModal = ({
-    isOpen,
-    onClose,
-    onSuccess,
-    subjects,
-    defaultSubjectId,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-    subjects: Subject[];
-    defaultSubjectId?: number;
-}) => {
-    const [file, setFile] = useState<File | null>(null);
-    const [subjectId, setSubjectId] = useState<string>(defaultSubjectId ? String(defaultSubjectId) : '');
-    const uploadMutation = useUploadQuestions();
-
-    // Sync defaultSubjectId when it changes (e.g., navigating between subjects)
-    useEffect(() => {
-        setSubjectId(defaultSubjectId ? String(defaultSubjectId) : '');
-    }, [defaultSubjectId]);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
-
-    const handleUpload = () => {
-        if (!file || !subjectId) return;
-        uploadMutation.mutate({ file, subject_id: parseInt(subjectId) }, {
-            onSuccess: () => {
-                toast.success('Savollar muvaffaqiyatli import qilindi');
-                onSuccess();
-            },
-            onError: () => toast.error("Faylni yuklashda xatolik yuz berdi"),
-        });
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Excel dan savollar import qilish">
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Fan</label>
-                    <Combobox
-                        options={subjects.map(s => ({ value: String(s.id), label: s.name }))}
-                        value={subjectId}
-                        onChange={(val) => setSubjectId(val)}
-                        placeholder="Fan tanlang"
-                        searchPlaceholder="Fanni qidirish..."
-                    />
-                </div>
-                <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-10">
-                    <FileUp className="h-10 w-10 text-muted-foreground mb-4" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                        Excel fayl (.xlsx) tanlang
-                    </p>
-                    <input
-                        type="file"
-                        accept=".xlsx, .xls"
-                        onChange={handleFileChange}
-                        className="block w-full text-sm text-muted-foreground
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-primary/10 file:text-primary
-                        hover:file:bg-primary/15"
-                    />
-                </div>
-                {file && (
-                    <div className="text-sm">
-                        Tanlangan fayl: <span className="font-medium">{file.name}</span>
-                    </div>
-                )}
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose}>Bekor qilish</Button>
-                    <Button onClick={handleUpload} isLoading={uploadMutation.isPending} disabled={!file || !subjectId}>
-                        Yuklash
-                    </Button>
                 </div>
             </div>
         </Modal>
