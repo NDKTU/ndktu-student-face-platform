@@ -263,8 +263,21 @@ class UserRepository:
                 detail="Database error while assigning roles",
             )
 
+    # Tashqi tizimdan kelgan hisoblar: parol o'sha yerda saqlanadi.
+    _EXTERNAL_SOURCE_LABEL = {"eduplan": "EPOS", "hemis": "HEMIS"}
+
     async def change_my_credentials(self, session: AsyncSession, current_user: User, data) -> User:
         from core.utils.password_hash import verify_password
+
+        # Parolni tashqi tizimdagi hisob uchun bu yerda almashtirib bo'lmaydi:
+        # keyingi kirishda u baribir tashqi tizimdagi parol bilan yangilanadi,
+        # ya'ni o'zgartirish jimgina yo'qolardi.
+        if current_user.auth_source:
+            label = self._EXTERNAL_SOURCE_LABEL.get(current_user.auth_source, current_user.auth_source)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Hisobingiz {label} tizimidan — login va parol o'sha yerda o'zgartiriladi",
+            )
 
         # Verify current password
         if not verify_password(data.current_password, current_user.password):
@@ -312,11 +325,13 @@ class UserRepository:
         hashed = hash_password(plain_password)
         user = await self.find_by_username(session, username)
         if not user:
-            user = User(username=username, password=hashed)
+            # Parolning egasi — HEMIS: bizda uni o'zgartirib bo'lmaydi.
+            user = User(username=username, password=hashed, auth_source="hemis")
             session.add(user)
             logger.info(f"Created new user {username} from Hemis data")
         else:
             user.password = hashed
+            user.auth_source = "hemis"
             logger.info(f"Updated password for user {username} from Hemis login")
         await session.flush()
         await session.refresh(user, attribute_names=["roles"])

@@ -77,6 +77,8 @@ export interface User {
     is_active: boolean;
     /** Foydalanuvchi o'zi yuklagan profil surati. Yuz nazoratida etalon. */
     avatar_path?: string | null;
+    /** `eduplan` / `hemis` — hisob tashqi tizimdan; parol u yerda boshqariladi. */
+    auth_source?: string | null;
     roles: UserRole[];
     teacher?: UserTeacher | null;
     student?: Student;

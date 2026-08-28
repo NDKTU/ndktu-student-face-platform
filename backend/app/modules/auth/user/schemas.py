@@ -167,6 +167,9 @@ class UserMeResponse(BaseModel):
     id: int
     username: str
     avatar_path: str | None = None
+    # `eduplan` / `hemis` — hisob tashqi tizimdan, parol shu yerda
+    # o'zgartirilmaydi. Bo'sh — mahalliy hisob.
+    auth_source: str | None = None
     roles: list[RoleWithPermissionsResponse]
     teacher: TeacherDetailResponse | None = None
     student: StudentDetailResponse | None = None

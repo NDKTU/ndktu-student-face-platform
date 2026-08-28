@@ -35,6 +35,14 @@ const ProfilePage = () => {
     // bo'lishi mumkin, foydalanuvchi esa o'zinikini yangilay oladi.
     const avatarUrl = user?.avatar_path || user?.student?.image_path || null;
 
+    // Tashqi tizimdan kelgan hisobda parolni bu yerda o'zgartirib bo'lmaydi:
+    // keyingi kirishda u o'sha tizimdagi parol bilan qayta yoziladi.
+    const externalSourceLabel = user?.auth_source === 'eduplan'
+        ? 'EPOS'
+        : user?.auth_source === 'hemis'
+            ? 'HEMIS'
+            : null;
+
     const changeAvatar = async (file: File | null) => {
         setAvatarBusy(true);
         try {
@@ -332,8 +340,24 @@ const ProfilePage = () => {
                 </CardContent>
             </Card>
 
-            {/* Change Credentials Form (Hidden for students) */}
-            {!isStudent && (
+            {/* Tashqi tizim hisobida forma o'rniga izoh: parol u yerda boshqariladi. */}
+            {!isStudent && externalSourceLabel && (
+                <Card className="w-full">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <KeyRound className="h-5 w-5" />
+                            Kirish ma'lumotlari
+                        </CardTitle>
+                        <CardDescription>
+                            Hisobingiz {externalSourceLabel} tizimidan. Login va parol o'sha yerda boshqariladi —
+                            {' '}{externalSourceLabel}'da parolni o'zgartirsangiz, bu platformaga ham yangi parol bilan kirasiz.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            )}
+
+            {/* Change Credentials Form (Hidden for students and external accounts) */}
+            {!isStudent && !externalSourceLabel && (
                 <Card className="w-full">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
