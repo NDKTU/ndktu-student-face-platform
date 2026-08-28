@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
+import { useRoleView } from '@/hooks/useRoleView';
 import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
@@ -37,7 +38,7 @@ const semesterFromTitle = (title?: string) => title?.match(/\((\d)-semestr\)/)?.
 
 export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizModalProps) => {
     const { user, hasPermission } = useAuth();
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
+    const { isTeacher } = useRoleView();
 
     const [teacherSearch, setTeacherSearch] = useState('');
     const [debouncedTeacherSearch, setDebouncedTeacherSearch] = useState('');

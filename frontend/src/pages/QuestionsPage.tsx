@@ -19,6 +19,7 @@ import { useSubjects } from '@/hooks/useSubjects';
 import { useUsers } from '@/hooks/useUsers';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/context/AuthContext';
+import { useRoleView } from '@/hooks/useRoleView';
 import { Combobox } from '@/components/ui/Combobox';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
@@ -37,7 +38,7 @@ interface QuestionsTableProps {
 const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName, ownerUserId }: QuestionsTableProps) => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
+    const { isTeacher } = useRoleView();
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -282,8 +283,7 @@ const QuestionsTable = ({ subjectId, subjects, onBack, selectedSubjectName, owne
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 const QuestionsPage = () => {
-    const { user } = useAuth();
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
+    const { isTeacher } = useRoleView();
 
     const [selectedTeacher, setSelectedTeacher] = useState<QuestionTeacherSummary | null>(null);
     const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);

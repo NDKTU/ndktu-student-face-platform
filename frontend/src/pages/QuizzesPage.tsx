@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRoleView } from '@/hooks/useRoleView';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -22,8 +23,8 @@ import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
 
 const QuizzesPage = () => {
-    const { user, hasPermission } = useAuth();
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
+    const { hasPermission } = useAuth();
+    const { isTeacher } = useRoleView();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);

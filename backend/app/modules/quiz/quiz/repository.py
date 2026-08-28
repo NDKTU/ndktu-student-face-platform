@@ -336,8 +336,12 @@ class QuizRepository:
     ) -> QuizListResponse:
         stmt = select(Quiz)
 
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_student = any(role.name.lower() == "student" for role in current_user.roles)
+        # Bootstrap-админ несёт сразу три роли (Admin + Teacher + Student), а строки
+        # в `students` у него нет. Без admin-гарда студенческая ветка ниже схлопывала
+        # его выдачу в пустой список, хотя тесты в базе есть.
+        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_teacher = not is_admin and any(role.name.lower() == "teacher" for role in current_user.roles)
+        is_student = not is_admin and any(role.name.lower() == "student" for role in current_user.roles)
         teacher_filter = None
         student_group_id = None
 
