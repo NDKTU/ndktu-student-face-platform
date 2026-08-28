@@ -3,16 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from app.core.schemas import TashkentDatetime
 
 
-class PermissionCreateRequest(BaseModel):
-    name: str
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        str_to_lower=True,
-    )
-
-
-class PermissionCreateResponse(BaseModel):
+class PermissionResponse(BaseModel):
     id: int
     name: str
     created_at: TashkentDatetime
@@ -35,4 +26,4 @@ class PermissionListResponse(BaseModel):
     total: int
     page: int
     limit: int
-    permissions: list[PermissionCreateResponse]
+    permissions: list[PermissionResponse]

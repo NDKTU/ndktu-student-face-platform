@@ -171,15 +171,6 @@ async def auth_client(async_client, access_token):
 
 
 @pytest_asyncio.fixture
-async def create_permission(async_client, access_token):
-    payload = {"name": "read:book"}
-
-    response = await async_client.post("/permission/", json=payload)
-
-    assert response.status_code == 201
-
-
-@pytest_asyncio.fixture
 async def test_subject(async_db):
     """Create a subject directly in DB since there is no API for it"""
     from app.modules.quiz.model import Subject

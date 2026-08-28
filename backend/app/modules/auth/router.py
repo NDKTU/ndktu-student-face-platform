@@ -18,10 +18,9 @@ from .hemis.schemas import (
 from .hemis.service import hemis_service
 from .permission.repository import get_permission_repository
 from .permission.schemas import (
-    PermissionCreateRequest,
-    PermissionCreateResponse,
     PermissionListRequest,
     PermissionListResponse,
+    PermissionResponse,
 )
 from .role.repository import get_role_repository
 from .role.schemas import (
@@ -324,22 +323,7 @@ permission_router = APIRouter(
 )
 
 
-@permission_router.post(
-    "/",
-    response_model=PermissionCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(5, 60))],
-)
-async def create_permission(
-    data: PermissionCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:permission")),
-):
-    result = await get_permission_repository.create_permission(session=session, data=data)
-    return result
-
-
-@permission_router.get("/{permission_id}", response_model=PermissionCreateResponse)
+@permission_router.get("/{permission_id}", response_model=PermissionResponse)
 async def get_permission(
     permission_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -355,34 +339,6 @@ async def list_permissions(
     _: PermissionRequired = Depends(PermissionRequired("read:permission")),
 ):
     return await get_permission_repository.list_permissions(session=session, request=data)
-
-
-@permission_router.put(
-    "/{permission_id}",
-    response_model=PermissionCreateResponse,
-    dependencies=[Depends(RateLimiter(5, 60))],
-)
-async def update_permission(
-    permission_id: int,
-    data: PermissionCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:permission")),
-):
-    result = await get_permission_repository.update_permission(session=session, permission_id=permission_id, data=data)
-    return result
-
-
-@permission_router.delete(
-    "/{permission_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(5, 60))],
-)
-async def delete_permission(
-    permission_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:permission")),
-):
-    await get_permission_repository.delete_permission(session=session, permission_id=permission_id)
 
 
 # ============================================================================

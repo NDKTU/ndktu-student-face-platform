@@ -14,6 +14,8 @@ export interface PermissionListResponse {
     permissions: Permission[];
 }
 
+// Ruxsatlar backend'da route'lardan topiladi va qo'lda o'zgartirilmaydi —
+// shuning uchun bu servisda faqat o'qish metodlari bor.
 export const permissionService = {
     getPermissions: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<PermissionListResponse>('/permission/', {
@@ -25,19 +27,5 @@ export const permissionService = {
     getPermissionById: async (id: number): Promise<Permission> => {
         const response = await api.get<Permission>(`/permission/${id}`);
         return response.data;
-    },
-
-    createPermission: async (data: { name: string }) => {
-        const response = await api.post('/permission/', data);
-        return response.data;
-    },
-
-    updatePermission: async (id: number, data: { name: string }) => {
-        const response = await api.put(`/permission/${id}`, data);
-        return response.data;
-    },
-
-    deletePermission: async (id: number) => {
-        await api.delete(`/permission/${id}`);
     },
 };
