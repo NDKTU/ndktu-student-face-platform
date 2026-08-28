@@ -23,6 +23,9 @@ class QuizCreateRequest(BaseModel):
     user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    # Dars sahifasidan tuzilgan test shu darsga biriktiriladi. Berilsa,
+    # guruh/fan/lektor bo'sh qolsa — darsdan olinadi.
+    lesson_id: Optional[int] = None
     # Своей колонки у семестра нет — он нужен только как часть названия.
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
@@ -69,6 +72,7 @@ class QuizCreateResponse(BaseModel):
     created_by_user_id: Optional[int] = None
     group_id: Optional[int]
     subject_id: Optional[int]
+    lesson_id: Optional[int] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
@@ -91,6 +95,7 @@ class QuizListRequest(BaseModel):
     created_by_user_id: Optional[int] = None
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
+    lesson_id: Optional[int] = None
     faculty_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None

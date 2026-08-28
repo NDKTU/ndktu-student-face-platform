@@ -17,6 +17,8 @@ export const quizSchema = z.object({
     subject_id: z.string().min(1, 'Fan tanlanishi shart'),
     group_id: z.string().min(1, 'Guruh tanlanishi shart'),
     semester_number: z.string().min(1, 'Semestr tanlanishi shart'),
+    // Nazorat turi: dars testi, semestr yakuni, kursdan kursga yoki ochiq test.
+    quiz_type: z.enum(['LESSON_QUIZ', 'SEMESTER_FINAL', 'YEAR_PROMOTION', 'PUBLIC_FREE']),
     is_active: z.boolean(),
     proctoring_mode: z.enum(['face', 'standard']),
 });

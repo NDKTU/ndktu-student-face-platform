@@ -13,7 +13,8 @@ import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/use
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
-import type { Quiz, QuizCreateRequest } from '@/services/quizService';
+import type { Quiz, QuizCreateRequest, QuizType } from '@/services/quizService';
+import { QUIZ_TYPE_LABELS } from '@/services/quizService';
 import type { Teacher } from '@/services/teacherService';
 import { logger } from '@/utils/logger';
 import { buildQuizTitle } from '@/utils/generatedNames';
@@ -60,7 +61,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         formState: { errors },
     } = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
-        defaultValues: { is_active: false, proctoring_mode: 'standard' },
+        defaultValues: { is_active: false, proctoring_mode: 'standard', quiz_type: 'LESSON_QUIZ' },
     });
 
     const createMutation = useCreateQuiz();
@@ -134,6 +135,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 group_id: quiz.group_id ? quiz.group_id.toString() : '',
                 subject_id: quiz.subject_id ? quiz.subject_id.toString() : '',
                 semester_number: semesterFromTitle(quiz.title),
+                quiz_type: quiz.quiz_type ?? 'LESSON_QUIZ',
                 is_active: quiz.is_active,
                 proctoring_mode: quiz.proctoring_mode ?? 'standard',
             });
@@ -146,6 +148,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 group_id: '',
                 subject_id: '',
                 semester_number: '',
+                quiz_type: 'LESSON_QUIZ',
                 is_active: false,
                 proctoring_mode: 'standard',
             });
@@ -207,6 +210,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             group_id: parseInt(data.group_id, 10),
             subject_id: parseInt(data.subject_id, 10),
             semester_number: parseInt(data.semester_number, 10),
+            quiz_type: data.quiz_type,
             is_active: data.is_active,
             proctoring_mode: data.proctoring_mode,
         };
@@ -329,6 +333,16 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         </p>
                     )}
                     {errors.group_id && <p className="text-sm text-destructive">{errors.group_id.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Nazorat turi</label>
+                    <select className={selectClassName} {...register('quiz_type')}>
+                        {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[]).map((value) => (
+                            <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
+                        ))}
+                    </select>
+                    {errors.quiz_type && <p className="text-sm text-destructive">{errors.quiz_type.message}</p>}
                 </div>
 
                 <div className="space-y-2">

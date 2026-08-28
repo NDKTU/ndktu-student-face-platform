@@ -2,6 +2,16 @@ import api from './api';
 
 export type ProctoringMode = 'face' | 'standard';
 
+/** Nazorat turi — bekenddagi `QuizType` bilan bir xil. */
+export type QuizType = 'LESSON_QUIZ' | 'SEMESTER_FINAL' | 'YEAR_PROMOTION' | 'PUBLIC_FREE';
+
+export const QUIZ_TYPE_LABELS: Record<QuizType, string> = {
+    LESSON_QUIZ: 'Dars testi',
+    SEMESTER_FINAL: 'Semestr yakuni',
+    YEAR_PROMOTION: 'Kursdan kursga',
+    PUBLIC_FREE: 'Ochiq test',
+};
+
 export interface Quiz {
     id: number;
     title: string;
@@ -16,8 +26,11 @@ export interface Quiz {
     user_id?: number;
     group_id?: number;
     subject_id?: number;
+    /** Test qaysi darsga biriktirilgani — dars sahifasidan tuzilgan bo'lsa. */
+    lesson_id?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
+    quiz_type?: QuizType;
     attempt?: number | null;
     created_at: string;
     updated_at: string;
@@ -33,10 +46,13 @@ export interface QuizCreateRequest {
     lecturer_id?: number | null;
     group_id?: number | null;
     subject_id?: number | null;
+    /** Berilsa, guruh/fan/ma'ruzachi darsdan to'ldiriladi. */
+    lesson_id?: number | null;
     /** Faqat sarlavhaga kiradi — quizzes jadvalida alohida ustun yo'q. */
     semester_number?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
+    quiz_type?: QuizType;
     attempt?: number | null;
 }
 
@@ -98,7 +114,9 @@ export interface QuizListParams {
     user_id?: number;
     group_id?: number;
     subject_id?: number;
+    lesson_id?: number;
     faculty_id?: number;
+    quiz_type?: QuizType;
     sort_dir?: string;
 }
 

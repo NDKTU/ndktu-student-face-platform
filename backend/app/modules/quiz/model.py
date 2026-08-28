@@ -147,6 +147,14 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         ForeignKey("subjects.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Dars bilan bog'liq test. Bo'sh bo'lishi mumkin: semestr yakuni yoki
+    # kurs darajasidagi testlar hech qaysi darsga biriktirilmaydi. Dars
+    # o'chirilsa, test qolaveradi — natijalar unga tayanadi.
+    lesson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Nazorat turi (QuizType). Ilgari bu ma'lumot hech qayerda saqlanmagan —
     # testlar faqat nomi bilan farqlangan, shuning uchun ro'yxatni turi

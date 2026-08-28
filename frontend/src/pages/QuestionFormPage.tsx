@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import type { QuestionCreateRequest } from '@/services/questionService';
 import { questionService } from '@/services/questionService';
@@ -30,6 +30,11 @@ type QuestionFormValues = z.infer<typeof questionSchema>;
 const QuestionFormPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    // Dars sahifasidan kelinganda fan oldindan tanlangan bo'ladi va saqlagach
+    // o'sha darsga qaytiladi — o'qituvchi savolni test uchun shu yerda qo'shadi.
+    const [searchParams] = useSearchParams();
+    const presetSubjectId = searchParams.get('subject_id') ?? '';
+    const returnTo = searchParams.get('return_to');
     const { user } = useAuth();
     const isEditMode = !!id;
     const questionId = id ? parseInt(id, 10) : 0;
@@ -57,7 +62,7 @@ const QuestionFormPage = () => {
     } = useForm<QuestionFormValues>({
         resolver: zodResolver(questionSchema),
         defaultValues: {
-            subject_id: '',
+            subject_id: presetSubjectId,
             text: '',
             option_a: '',
             option_b: '',
@@ -147,7 +152,7 @@ const QuestionFormPage = () => {
         // on this page, so there's no stale id left referencing the old version.
         const onSuccess = () => {
             toast.success(isEditMode ? 'Savol yangilandi' : 'Savol yaratildi');
-            navigate('/questions');
+            navigate(returnTo || '/questions');
         };
 
         const onError = (error: unknown) => {

@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.modules.course.model import Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
 
@@ -261,7 +262,38 @@ class QuizRepository:
             title = f"{title} ({semester_number}-semestr)"
         return title
 
+    async def _fill_from_lesson(self, session: AsyncSession, data: QuizCreateRequest) -> QuizCreateRequest:
+        """Darsdan guruh, fan va lektorni to'ldiradi.
+
+        O'qituvchi dars sahifasida test tuzganda bularni qayta tanlashi
+        mantiqsiz: dars allaqachon guruhga va o'qituvchi-fan juftligiga
+        bog'langan. Foydalanuvchi o'zi ko'rsatgan qiymat ustuvor qoladi.
+        """
+        if data.lesson_id is None:
+            return data
+        row = (
+            await session.execute(
+                select(Lesson.group_id, TeacherSubject.subject_id, Teacher.user_id)
+                .join(TeacherSubject, TeacherSubject.id == Lesson.teacher_subject_id)
+                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+                .where(Lesson.id == data.lesson_id)
+            )
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+        group_id, subject_id, lecturer_user_id = row
+        if data.group_id is None:
+            data.group_id = group_id
+        if data.subject_id is None:
+            data.subject_id = subject_id
+        if data.lecturer_id is None:
+            data.lecturer_id = lecturer_user_id
+            data.user_id = lecturer_user_id
+        return data
+
     async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int) -> Quiz:
+        data = await self._fill_from_lesson(session, data)
+
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
         # становится в момент включения — там же и проверяем.
@@ -297,6 +329,7 @@ class QuizRepository:
             created_by_user_id=created_by_user_id,
             group_id=data.group_id,
             subject_id=data.subject_id,
+            lesson_id=data.lesson_id,
         )
         session.add(new_quiz)
 
@@ -403,6 +436,9 @@ class QuizRepository:
         if request.subject_id:
             stmt = stmt.where(Quiz.subject_id == request.subject_id)
 
+        if request.lesson_id:
+            stmt = stmt.where(Quiz.lesson_id == request.lesson_id)
+
         if request.faculty_id:
             stmt = stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
 
@@ -443,6 +479,8 @@ class QuizRepository:
             count_stmt = count_stmt.where(Quiz.group_id == request.group_id)
         if request.subject_id:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
+        if request.lesson_id:
+            count_stmt = count_stmt.where(Quiz.lesson_id == request.lesson_id)
         if request.faculty_id:
             count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
         if request.is_active is not None:
@@ -517,6 +555,10 @@ class QuizRepository:
         quiz.quiz_type = data.quiz_type.value
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
+        # Darsga bog'lanish faqat aniq berilganda o'zgaradi: umumiy tahrirlash
+        # oynasida `lesson_id` yuborilmaydi va test darsdan uzilib qolmasligi kerak.
+        if data.lesson_id is not None:
+            quiz.lesson_id = data.lesson_id
 
         await session.commit()
         await session.refresh(quiz)
@@ -582,6 +624,8 @@ class QuizRepository:
             created_by_user_id=created_by_user_id,
             group_id=quiz.group_id,
             subject_id=quiz.subject_id,
+            # Qayta topshirish o'sha darsniki bo'lib qoladi.
+            lesson_id=quiz.lesson_id,
             attempt=2,
         )
         session.add(new_quiz)

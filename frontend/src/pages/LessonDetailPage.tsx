@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, Link as LinkIcon, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
@@ -8,6 +8,9 @@ import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useR
 import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
+import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
+import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
+import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
 import { HomeworkSubmissionBox } from '@/components/courses/HomeworkSubmissionBox';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -41,6 +44,10 @@ export default function LessonDetailPage() {
     const [contentOpen, setContentOpen] = useState(false);
     const [homeworkOpen, setHomeworkOpen] = useState(false);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
+    const [quizOpen, setQuizOpen] = useState(false);
+    const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+    const quizzesQuery = useQuizzes(lessonId ? { lesson_id: lessonId, limit: 20 } : {}, Boolean(lessonId));
+    const deleteQuiz = useDeleteQuiz();
 
     if (lessonQuery.isLoading) return <div className="space-y-6"><Skeleton className="h-10 w-2/3" /><Skeleton className="aspect-video w-full rounded-2xl" /></div>;
     if (lessonQuery.isError) return <ErrorState onRetry={() => lessonQuery.refetch()} />;
@@ -61,6 +68,10 @@ export default function LessonDetailPage() {
     // ham bor, lekin ular vazifani boshqaradi, topshirmaydi.
     const canSubmitHomework = hasPermission('create:submission') && !canManageHomework;
     const canGrade = hasPermission('update:submission');
+    const canManageQuiz = hasPermission('create:quiz');
+    const canAddQuestion = hasPermission('create:question');
+    const quizzes = quizzesQuery.data?.quizzes ?? [];
+    const lessonSubjectId = lesson.subject_teacher?.subject_id;
 
     return (
         <div className="space-y-6">
@@ -86,7 +97,56 @@ export default function LessonDetailPage() {
                 {!homework ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : (() => { const assignment = homework; return <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {new Date(assignment.deadline).toLocaleString()} · Baho: 1–{assignment.max_grade}</p><p className="mt-1 text-xs text-muted-foreground">Bergan: {assignment.created_by_name || "noma'lum"} · {new Date(assignment.created_at).toLocaleString()}</p>{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>; })()}
             </CardContent></Card>
 
+            <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Testlar</CardTitle>
+                <div className="flex flex-wrap gap-2">
+                    {canAddQuestion && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/questions/create?subject_id=${lessonSubjectId ?? ''}&return_to=/lessons/${lesson.id}`)}
+                        >
+                            <FileQuestion className="mr-2 h-4 w-4" /> Savol qo'shish
+                        </Button>
+                    )}
+                    {canManageQuiz && (
+                        <Button size="sm" onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}>
+                            <Plus className="mr-2 h-4 w-4" /> Test yaratish
+                        </Button>
+                    )}
+                </div>
+            </CardHeader><CardContent>
+                {/* Savollar ma'ruzachining bankidan yig'iladi, shuning uchun avval
+                    savol qo'shish, keyin test tuzish tabiiy tartib. */}
+                {quizzes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Bu dars uchun test tuzilmagan.</p>
+                ) : (
+                    <div className="space-y-3">
+                        {quizzes.map((quiz) => (
+                            <div key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 p-4">
+                                <ListChecks className="h-5 w-5 shrink-0 text-primary" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate font-semibold">{quiz.title}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {QUIZ_TYPE_LABELS[quiz.quiz_type ?? 'LESSON_QUIZ']} · {quiz.question_number} savol · {quiz.duration} daqiqa · PIN: {quiz.pin}
+                                    </p>
+                                </div>
+                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${quiz.is_active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+                                    {quiz.is_active ? 'Faol' : 'Faol emas'}
+                                </span>
+                                {canManageQuiz && (
+                                    <div className="flex shrink-0 gap-1">
+                                        <Button variant="ghost" size="sm" onClick={() => { setEditingQuiz(quiz); setQuizOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteQuiz.mutate({ id: quiz.id })}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent></Card>
+
             <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />
+            <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
             <AssignmentFormModal isOpen={homeworkOpen} onClose={() => setHomeworkOpen(false)} courseId={lesson.course_id} lessonId={lesson.id} editing={editingHomework} />
         </div>
     );
