@@ -50,11 +50,13 @@ for _extension, _mime in {
     mimetypes.add_type(_mime, _extension)
 
 
-# Legacy alias: uploads/ used to be nested one level deeper under uploads/questions/.
-# Already-stored URLs still reference /uploads/questions/..., so this mount (registered
-# before the main one, since Starlette matches mounts by prefix in order) keeps them
-# resolving from the same, now-flattened, directory.
-app.mount("/uploads/questions", StaticFiles(directory=settings.absolute_upload_dir), name="uploads_legacy")
+# Legacy alias: savol rasmlari `/uploads/questions/...` (ko'plik) havolasi bilan
+# saqlangan edi; b7d41e0c92aa migratsiyasi ularni `/uploads/question/...` ga
+# o'tkazdi. Bazada endi bunday havola qolmagan, lekin brauzer keshida va tashqi
+# havolalarda uchraydi, shuning uchun alias hali turadi — u asosiy mount'dan
+# oldin ro'yxatdan o'tadi, chunki Starlette prefikslarni tartib bo'yicha tekshiradi.
+# Bir-ikki relizdan keyin olib tashlash mumkin.
+app.mount("/uploads/questions", StaticFiles(directory=settings.question_upload_dir), name="uploads_legacy")
 app.mount("/uploads", StaticFiles(directory=settings.absolute_upload_dir), name="uploads")
 
 # Legacy alias: cheating evidence used to live outside uploads/ at a separate
