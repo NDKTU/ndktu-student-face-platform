@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -44,7 +44,10 @@ export default function LessonDetailPage() {
     const assignmentsQuery = useAssignments(lessonId ? { lesson_id: lessonId, limit: 1 } : undefined);
     const deleteResource = useDeleteResource(lessonId);
     const deleteAssignment = useDeleteAssignment();
-    const [contentOpen, setContentOpen] = useState(false);
+    // Kontent bitta umumiy oynada emas, har bir blokda alohida qo'shiladi:
+    // o'qituvchi «video qo'shaman» deb kirsa, unga fayl/konspekt tanlash
+    // kerak emas. `contentKinds` — o'sha blok uchun ruxsat etilgan turlar.
+    const [contentKinds, setContentKinds] = useState<ResourceType[] | null>(null);
     const [homeworkOpen, setHomeworkOpen] = useState(false);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
     const [quizOpen, setQuizOpen] = useState(false);
@@ -93,27 +96,43 @@ export default function LessonDetailPage() {
         <div className="space-y-6">
             <div className="space-y-2">
                 <Button variant="ghost" size="sm" onClick={() => navigate(`/courses/${lesson.course_id}`)} className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4" /> Kursga qaytish</Button>
-                <PageHeader title={lesson.topic} description={[lesson.date, lesson.teacher_subject?.subject?.name, lesson.group?.name].filter(Boolean).join(' · ')} actions={canManageContent ? <Button onClick={() => setContentOpen(true)}><Plus className="mr-2 h-4 w-4" /> Kontent qo'shish</Button> : undefined} />
+                <PageHeader title={lesson.topic} description={[lesson.date, lesson.teacher_subject?.subject?.name, lesson.group?.name].filter(Boolean).join(' · ')} />
                 {lesson.description && <p className="max-w-4xl text-sm leading-6 text-foreground/80">{lesson.description}</p>}
             </div>
 
-            {zoom?.link_url && (
+            {(zoom?.link_url || canManageContent) && (
                 <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Jonli dars (Zoom)</CardTitle>
-                    {canManageContent && <DeleteButton onClick={() => deleteResource.mutate(zoom.id)} />}
+                    {canManageContent && (
+                        zoom
+                            ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(zoom.id)}><Trash2 className="mr-2 h-4 w-4" /> Havolani olib tashlash</Button>
+                            : <Button size="sm" onClick={() => setContentKinds(['zoom'])}><Plus className="mr-2 h-4 w-4" /> Zoom havolasi</Button>
+                    )}
                 </CardHeader><CardContent>
-                    <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} />
+                    {zoom?.link_url
+                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} />
+                        : <p className="text-sm text-muted-foreground">Bu darsga jonli uchrashuv biriktirilmagan.</p>}
                 </CardContent></Card>
             )}
 
-            <Card><CardHeader><CardTitle>Dars videosi</CardTitle></CardHeader><CardContent>
+            <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Dars videosi</CardTitle>
+                {canManageContent && (
+                    video
+                        ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(video.id)}><Trash2 className="mr-2 h-4 w-4" /> Videoni olib tashlash</Button>
+                        : <Button size="sm" onClick={() => setContentKinds(['video'])}><Plus className="mr-2 h-4 w-4" /> YouTube havolasi</Button>
+                )}
+            </CardHeader><CardContent>
                 {embedUrl ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe className="h-full w-full" src={embedUrl} title={video?.title ?? lesson.topic} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
                     : video?.link_url ? <a href={video.link_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">{video.title || 'Video havolasi'} <ExternalLink className="h-4 w-4" /></a>
                     : <EmptyState icon={<BookOpen className="h-6 w-6" />} title="Video qo'shilmagan" description="Bu darsni video bo'lmasdan ham o'qish mumkin." />}
             </CardContent></Card>
 
-            {scripts.length > 0 && <Card><CardHeader><CardTitle>Dars skripti / konspekti</CardTitle></CardHeader><CardContent className="space-y-4">{scripts.map((item) => <div key={item.id} className="relative rounded-xl bg-muted/40 p-4"><p className="whitespace-pre-wrap text-sm leading-7">{item.text_content}</p>{canManageContent && <DeleteButton onClick={() => deleteResource.mutate(item.id)} />}</div>)}</CardContent></Card>}
+            {(scripts.length > 0 || canManageContent) && <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Dars skripti / konspekti</CardTitle>
+                {canManageContent && <Button size="sm" variant="outline" onClick={() => setContentKinds(['text'])}><Plus className="mr-2 h-4 w-4" /> Konspekt qo'shish</Button>}
+            </CardHeader><CardContent className="space-y-4">{scripts.length === 0 ? <p className="text-sm text-muted-foreground">Konspekt qo'shilmagan.</p> : scripts.map((item) => <div key={item.id} className="relative rounded-xl bg-muted/40 p-4"><p className="whitespace-pre-wrap text-sm leading-7">{item.text_content}</p>{canManageContent && <DeleteButton onClick={() => deleteResource.mutate(item.id)} />}</div>)}</CardContent></Card>}
 
-            <Card><CardHeader><CardTitle>Qo'shimcha materiallar</CardTitle></CardHeader><CardContent>
+            <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Qo'shimcha materiallar</CardTitle>
+                {canManageContent && <Button size="sm" variant="outline" onClick={() => setContentKinds(['file', 'link'])}><Plus className="mr-2 h-4 w-4" /> Material qo'shish</Button>}
+            </CardHeader><CardContent>
                 {extras.length === 0 ? <p className="text-sm text-muted-foreground">Hozircha kitob, hujjat yoki qo'shimcha havola yo'q.</p> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border/60 p-4">{item.resource_type === 'file' ? <FileText className="h-5 w-5 text-primary" /> : <LinkIcon className="h-5 w-5 text-primary" />}<a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: item.title } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-medium hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 text-muted-foreground" />{canManageContent && <button onClick={() => deleteResource.mutate(item.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
             </CardContent></Card>
 
@@ -182,7 +201,7 @@ export default function LessonDetailPage() {
                 )}
             </CardContent></Card>}
 
-            <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />
+            <ContentModal kinds={contentKinds} onClose={() => setContentKinds(null)} lessonId={lesson.id} />
             <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
             <QuestionExcelUploadModal
                 isOpen={excelOpen}
@@ -199,31 +218,52 @@ export default function LessonDetailPage() {
 
 function DeleteButton({ onClick }: { onClick: () => void }) { return <button onClick={onClick} className="absolute right-3 top-3 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>; }
 
-function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose: () => void; lessonId: number }) {
+/**
+ * Kontent qo'shish oynasi. Turlar ro'yxati chaqirgan blokdan keladi:
+ * video blokida faqat YouTube, materiallar blokida fayl va havola.
+ * Bitta umumiy oynada hammasi bo'lgani chalkash edi.
+ */
+function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | null; onClose: () => void; lessonId: number }) {
     const createResource = useCreateResource(lessonId);
-    const [kind, setKind] = useState<ResourceType>('file');
+    const [kind, setKind] = useState<ResourceType>(kinds?.[0] ?? 'file');
     const [title, setTitle] = useState('');
     const [url, setUrl] = useState('');
     const [text, setText] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'YouTube video' }, { value: 'zoom', label: 'Zoom (jonli dars)' }];
+    const ALL_OPTIONS: { value: ResourceType; label: string }[] = [
+        { value: 'file', label: 'Hujjat / kitob' },
+        { value: 'link', label: 'Havola' },
+        { value: 'text', label: 'Skript / konspekt' },
+        { value: 'video', label: 'YouTube video' },
+        { value: 'zoom', label: 'Zoom (jonli dars)' },
+    ];
+    const options = ALL_OPTIONS.filter((option) => (kinds ?? []).includes(option.value));
+
+    // Oyna ochilganda tur chaqirgan blokka moslanadi.
+    useEffect(() => {
+        if (kinds?.length) setKind(kinds[0]);
+    }, [kinds]);
 
     const submit = async () => {
         setSaving(true); setError('');
         try {
             let fileUrl: string | undefined;
             if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
-            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
             setTitle(''); setUrl(''); setText(''); setFile(null); onClose();
         } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
         finally { setSaving(false); }
     };
 
-    return <Modal isOpen={isOpen} onClose={onClose} title="Dars kontenti"><div className="space-y-4">
-        <div className="flex flex-wrap gap-2">{options.map((option) => <Button key={option.value} size="sm" variant={kind === option.value ? 'primary' : 'outline'} onClick={() => { setKind(option.value); setError(''); }}>{option.label}</Button>)}</div>
-        <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>
+    const modalTitle = options.length === 1 ? options[0].label : 'Dars materiali';
+
+    return <Modal isOpen={kinds !== null} onClose={onClose} title={modalTitle}><div className="space-y-4">
+        {/* Tanlov faqat bir nechta tur bo'lganda ko'rsatiladi. */}
+        {options.length > 1 && <div className="flex flex-wrap gap-2">{options.map((option) => <Button key={option.value} size="sm" variant={kind === option.value ? 'primary' : 'outline'} onClick={() => { setKind(option.value); setError(''); }}>{option.label}</Button>)}</div>}
+        {/* Zoom va video nomi avtomatik qo'yiladi — ortiqcha maydon so'ralmaydi. */}
+        {kind !== 'zoom' && kind !== 'video' && <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>}
         {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
         {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
