@@ -25,7 +25,13 @@ fi
 
 BACKUP_DIR_BASE="${BACKUP_DIR_BASE:-$PROJECT_DIR/backups}"
 BACKUP_DIR="$BACKUP_DIR_BASE/images"
-UPLOADS_DIR="$PROJECT_DIR/backend/uploads"
+# Uploads yo'li .env dagi UPLOADS_PATH bilan bir xil bo'lishi shart — aks holda
+# skript bo'sh papkani arxivlab, "muvaffaqiyatli" deb yolg'on xabar beradi.
+UPLOADS_PATH_ENV="$(grep -oP '^UPLOADS_PATH=\K.*' "$PROJECT_DIR/.env" 2>/dev/null || true)"
+UPLOADS_DIR="${UPLOADS_PATH_ENV:-$PROJECT_DIR/backend/uploads}"
+if [[ "$UPLOADS_DIR" != /* ]]; then
+    UPLOADS_DIR="$PROJECT_DIR/${UPLOADS_DIR#./}"
+fi
 MAX_BACKUPS=10
 
 # ─── Setup ───────────────────────────────────────────────
@@ -34,15 +40,23 @@ TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 BACKUP_FILE="$BACKUP_DIR/images_${TIMESTAMP}.tar.gz"
 
 # ─── Check uploads directory ────────────────────────────
-if [ ! -d "$UPLOADS_DIR" ] || [ -z "$(ls -A "$UPLOADS_DIR" 2>/dev/null)" ]; then
-    echo "⚠️  No uploads found in $UPLOADS_DIR"
-    exit 0
+# Faqat papka bor-yo'qligini emas, ichida fayl bor-yo'qligini tekshiramiz:
+# bo'sh papkalar skeleti `ls -A` ni aldab, bo'sh arxiv yaratilishiga olib kelgan.
+if [ ! -d "$UPLOADS_DIR" ]; then
+    echo "❌ Uploads directory not found: $UPLOADS_DIR"
+    exit 1
+fi
+
+FILE_COUNT=$(find "$UPLOADS_DIR" -type f | wc -l)
+if [ "$FILE_COUNT" -eq 0 ]; then
+    echo "❌ No files to back up in $UPLOADS_DIR"
+    exit 1
 fi
 
 # ─── Create backup ──────────────────────────────────────
-echo "📦 Creating images backup: $BACKUP_FILE"
+echo "📦 Creating images backup: $BACKUP_FILE ($FILE_COUNT files from $UPLOADS_DIR)"
 
-tar -czf "$BACKUP_FILE" -C "$PROJECT_DIR/backend" uploads/
+tar -czf "$BACKUP_FILE" -C "$(dirname "$UPLOADS_DIR")" "$(basename "$UPLOADS_DIR")/"
 
 SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 echo "✅ Images backup complete: $SIZE"

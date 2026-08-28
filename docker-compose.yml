@@ -21,7 +21,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - backend_uploads:/face/uploads:ro
+      - ${UPLOADS_PATH:-./backend/uploads}:/face/uploads:ro
     networks:
       - app_network
     healthcheck:
@@ -63,7 +63,7 @@ services:
       retries: 3
     volumes:
       - backend_logs:/face/logs
-      - backend_uploads:/face/uploads
+      - ${UPLOADS_PATH:-./backend/uploads}:/face/uploads
     networks:
       - app_network
     environment:
@@ -177,7 +177,6 @@ volumes:
   postgres_data_quiz:
   redis_data:
   backend_logs:
-  backend_uploads:
   loki_data:
   grafana_data:
   frontend_logs:
