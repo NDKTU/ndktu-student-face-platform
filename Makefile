@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +28,8 @@ help:
 	@echo "make backup-images    - Backup only uploaded images"
 	@echo "make restore FILE=path/to/backup.sql.gz - Restore (REPLACES all data) from backup"
 	@echo "make merge   FILE=path/to/backup.sql.gz - Merge backup into current DB (non-destructive)"
+	@echo "make fix-image-urls       - Show broken image URLs in the DB (dry run)"
+	@echo "make fix-image-urls-apply - Rewrite them (dumps affected tables first)"
 	@echo ""
 	@echo "EDUPLAN (EPOS) SYNC:"
 	@echo "────────────────────"
@@ -115,3 +117,10 @@ migrate:
 	docker exec nusmt_backend sh -c "cd /face/app && uv run alembic revision --autogenerate -m 'add_cheating_image_url'"
 	docker cp nusmt_backend:/face/app/migrations/versions/. ./backend/app/migrations/versions/
 	docker exec nusmt_backend sh -c "cd /face/app && uv run alembic upgrade head"
+# Show what would be fixed in image URLs (dry run — changes nothing)
+fix-image-urls:
+	@./scripts/fix_image_urls.sh
+
+# Actually rewrite image URLs (dumps questions + user_answers to backups/ first)
+fix-image-urls-apply:
+	@./scripts/fix_image_urls.sh --apply
