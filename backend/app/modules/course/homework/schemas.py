@@ -59,6 +59,8 @@ class HomeworkResponse(BaseModel):
     lesson_id: Optional[int] = None
     lesson_topic: Optional[str] = None
     created_by_user_id: Optional[int] = None
+    # Vazifani kim bergani ko'rinsin — ism topilmasa, `username`.
+    created_by_name: Optional[str] = None
     title: str
     description: Optional[str] = None
     deadline: TashkentDatetime

@@ -190,6 +190,17 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
             setError('Guruhni tanlang');
             return;
         }
+        // Sarlavhasiz vazifa jimgina tashlab yuborilardi: o'qituvchi fayl
+        // biriktirib, tavsif yozib «Saqlash» bosardi va dars vazifasiz
+        // yaratilardi — hech qanday xabar chiqmasdan. Blokda biror narsa
+        // to'ldirilgan bo'lsa, sarlavha majburiy.
+        const homeworkFilled = Boolean(
+            homeworkTitle.trim() || homeworkDescription.trim() || homeworkFiles.length > 0 || allowedTypes.length > 0,
+        );
+        if (showHomework && homeworkFilled && !homeworkTitle.trim()) {
+            setError("Uy vazifasi sarlavhasini kiriting — aks holda vazifa saqlanmaydi");
+            return;
+        }
         if (showHomework && homeworkTitle.trim() && !homeworkDeadline) {
             setError("Uy vazifasi uchun topshirish muddatini kiriting");
             return;

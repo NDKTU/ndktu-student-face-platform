@@ -173,12 +173,33 @@ class HomeworkRepository:
             lessons = {lid: topic for lid, topic in (await session.execute(lesson_stmt)).all()}
         return courses, lessons
 
+    async def _bulk_authors(self, session: AsyncSession, items: list[Homework]) -> dict[int, str]:
+        """user_id -> ko'rsatiladigan ism.
+
+        Vazifani kim bergani ko'rinishi kerak. `_resolve_names` talaba/o'qituvchi
+        jadvallariga qaraydi; ularda yozuvi yo'q (masalan, admin) foydalanuvchi
+        uchun `users.username` ga tushiladi, aks holda ustun bo'sh qolardi.
+        """
+        user_ids = [a.created_by_user_id for a in items if a.created_by_user_id is not None]
+        if not user_ids:
+            return {}
+        resolved = await self._resolve_names(session, list(set(user_ids)))
+        names = {uid: full_name for uid, (full_name, _) in resolved.items()}
+        missing = [uid for uid in set(user_ids) if uid not in names]
+        if missing:
+            stmt = select(User.id, User.username).where(User.id.in_(missing))
+            for uid, username in (await session.execute(stmt)).all():
+                if username:
+                    names[uid] = username
+        return names
+
     def _serialize_homework_row(
         self,
         a: Homework,
         stats: HomeworkStats | None,
         course_name: str | None,
         lesson_topic: str | None,
+        created_by_name: str | None = None,
     ) -> HomeworkResponse:
         return HomeworkResponse(
             id=a.id,
@@ -187,6 +208,7 @@ class HomeworkRepository:
             lesson_id=a.lesson_id,
             lesson_topic=lesson_topic,
             created_by_user_id=a.created_by_user_id,
+            created_by_name=created_by_name,
             title=a.title,
             description=a.description,
             deadline=a.deadline,
@@ -204,11 +226,13 @@ class HomeworkRepository:
         """Bitta vazifa uchun — ro'yxat uchun `_serialize_homework_row` ishlatiladi."""
         stats = (await self._bulk_stats(session, [a])).get(a.id)
         courses, lessons = await self._bulk_labels(session, [a])
+        authors = await self._bulk_authors(session, [a])
         return self._serialize_homework_row(
             a,
             stats,
             courses.get(a.course_id),
             lessons.get(a.lesson_id) if a.lesson_id is not None else None,
+            authors.get(a.created_by_user_id) if a.created_by_user_id is not None else None,
         )
 
     # ── Homework CRUD ─────────────────────────────────────────────────────
@@ -337,6 +361,7 @@ class HomeworkRepository:
 
         stats = await self._bulk_stats(session, items)
         courses, lessons = await self._bulk_labels(session, items)
+        authors = await self._bulk_authors(session, items)
         return HomeworkListResponse(
             total=total,
             page=request.page,
@@ -347,6 +372,7 @@ class HomeworkRepository:
                     stats.get(a.id),
                     courses.get(a.course_id),
                     lessons.get(a.lesson_id) if a.lesson_id is not None else None,
+                    authors.get(a.created_by_user_id) if a.created_by_user_id is not None else None,
                 )
                 for a in items
             ],

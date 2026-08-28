@@ -81,6 +81,17 @@ export default function HomeworksPage() {
             ),
         },
         {
+            key: 'author',
+            header: 'Bergan',
+            hideBelow: 'lg',
+            cell: (item) => (
+                <div className="min-w-0">
+                    <p className="truncate text-sm">{item.created_by_name || "noma'lum"}</p>
+                    <p className="truncate text-xs text-muted-foreground">{shortDeadline(item.created_at)}</p>
+                </div>
+            ),
+        },
+        {
             key: 'submitted',
             header: 'Topshirdi',
             hideBelow: 'lg',

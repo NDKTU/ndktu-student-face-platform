@@ -24,6 +24,8 @@ export interface Assignment {
     lesson_id?: number | null;
     lesson_topic?: string | null;
     created_by_user_id?: number | null;
+    /** Vazifani kim bergani — ism topilmasa, `username`. */
+    created_by_name?: string | null;
     title: string;
     description?: string | null;
     deadline: string;
