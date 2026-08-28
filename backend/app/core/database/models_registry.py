@@ -30,6 +30,7 @@ __all__ = [
     "Lesson",
     "Homework",
     "HomeworkSubmission",
+    "LessonFaceCheck",
     "Resource",
     "EduPlanCredential",
 ]
@@ -51,6 +52,7 @@ from app.modules.course.model import (
     Homework,
     HomeworkSubmission,
     Lesson,
+    LessonFaceCheck,
     Resource,
 )
 from app.modules.integration.eduplan.model import (

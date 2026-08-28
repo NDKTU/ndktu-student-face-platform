@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +32,8 @@ from .homework.schemas import (
     SubmissionResponse,
     SubmissionSubmitRequest,
 )
+from .face_check.repository import get_face_check_repository
+from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .lesson.repository import get_lesson_repository
 from .lesson.schemas import (
     LessonCreateRequest,
@@ -280,6 +283,45 @@ async def delete_lesson(
     await get_lesson_repository.delete_lesson(
         session=session, lesson_id=lesson_id, current_user=current_user, force=force
     )
+
+
+@lesson_router.post(
+    "/{lesson_id}/face-check",
+    response_model=FaceCheckResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def lesson_face_check(
+    lesson_id: int,
+    data: FaceCheckRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:lesson")),
+):
+    """Jonli darsda talabaning yuzini tekshiradi va natijani jurnalga yozadi."""
+    return await get_face_check_repository.run_check(
+        session=session, lesson_id=lesson_id, data=data, current_user=current_user
+    )
+
+
+@lesson_router.get("/{lesson_id}/face-checks", response_model=FaceCheckReportResponse)
+async def lesson_face_check_report(
+    lesson_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:lesson")),
+):
+    return await get_face_check_repository.report(session=session, lesson_id=lesson_id, current_user=current_user)
+
+
+@lesson_router.get("/face-check/{check_id}/image")
+async def lesson_face_check_image(
+    check_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:lesson")),
+):
+    """Muammoli kadr. Ochiq statikada emas — har so'rovda ruxsat tekshiriladi."""
+    path = await get_face_check_repository.image_path(
+        session=session, check_id=check_id, current_user=current_user
+    )
+    return FileResponse(path, media_type="image/jpeg")
 
 
 # ============================================================================

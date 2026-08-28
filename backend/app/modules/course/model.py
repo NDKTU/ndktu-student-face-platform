@@ -264,6 +264,38 @@ class HomeworkSubmission(Base, IdIntPk, TimestampMixin):
         return f"Submission {self.id} (homework={self.homework_id}, user={self.user_id})"
 
 
+class LessonFaceCheck(Base, IdIntPk, TimestampMixin):
+    """Jonli darsdagi yuz tekshiruvi.
+
+    Har bir tekshiruv alohida qator: darsga kirishdagi bittasi va dars
+    davomidagi tasodifiy vaqtdagilari. Rasm faqat muammoli holatda
+    saqlanadi — muvaffaqiyatli tekshiruvdan faqat fakt qoladi, aks holda
+    disk talabalarning biometrik suratlariga to'lib ketardi.
+    """
+
+    __tablename__ = "lesson_face_checks"
+
+    lesson_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # `join` — darsga kirishda, `random` — dars davomida tasodifiy vaqtda.
+    stage: Mapped[str] = mapped_column(String(10), nullable=False)
+    # ok | no_face | multiple_faces | different_person | no_reference | no_camera
+    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    # Faqat muammoli tekshiruvda to'ladi. Fayl nomi — himoyalangan endpoint
+    # orqali beriladi, `/uploads` ochiq statikasi orqali emas.
+    image_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    lesson: Mapped["Lesson"] = relationship("Lesson")
+    user: Mapped["User"] = relationship("User")
+
+    def __str__(self):
+        return f"FaceCheck {self.id} (lesson={self.lesson_id}, user={self.user_id}, {self.status})"
+
+
 class Resource(Base, IdIntPk, TimestampMixin):
     __tablename__ = "resources"
 

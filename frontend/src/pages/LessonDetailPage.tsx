@@ -10,6 +10,7 @@ import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
 import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
+import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
@@ -85,6 +86,8 @@ export default function LessonDetailPage() {
     const canSubmitHomework = hasPermission('create:submission') && !canManageHomework;
     const canGrade = hasPermission('update:submission');
     const canManageQuiz = hasPermission('create:quiz');
+    // Yuz nazorati faqat talabaga: darsni o'qituvchining o'zi olib boradi.
+    const isStudentView = canSubmitHomework;
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
     // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,
@@ -109,8 +112,15 @@ export default function LessonDetailPage() {
                     )}
                 </CardHeader><CardContent>
                     {zoom?.link_url
-                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} />
+                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView} />
                         : <p className="text-sm text-muted-foreground">Bu darsga jonli uchrashuv biriktirilmagan.</p>}
+                </CardContent></Card>
+            )}
+
+            {/* Yuz nazorati jurnali — faqat darsni boshqaradiganlarga. */}
+            {canManageContent && zoom?.link_url && (
+                <Card><CardHeader><CardTitle>Yuz nazorati</CardTitle></CardHeader><CardContent>
+                    <LessonFaceCheckReport lessonId={lesson.id} />
                 </CardContent></Card>
             )}
 

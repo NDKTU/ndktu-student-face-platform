@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, LogOut, Radio, Video } from 'lucide-react';
+import { Loader2, LogOut, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { zoomService } from '@/services/zoomService';
+import { useLessonFaceCheck } from '@/hooks/useLessonFaceCheck';
+import type { FaceCheckResult } from '@/services/faceCheckService';
 import { logger } from '@/utils/logger';
 
 /**
@@ -77,14 +79,24 @@ interface Props {
     lessonId: number;
     /** Dars sahifasida saqlangan havola — SDK ishlamasa shu ochiladi. */
     joinUrl: string;
+    /** Yuz nazorati faqat talabalar uchun yoqiladi. */
+    faceCheckEnabled?: boolean;
 }
 
-export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
+// Shaxs tasdiqlanmasa ham dars to'xtamaydi: uch urinishdan keyin talaba
+// darsga kiradi, jurnalda esa «tasdiqlanmadi» yozuvi qoladi. Qaror
+// o'qituvchida — yorug'lik yoki burilib turish begona odam degani emas.
+const MAX_JOIN_ATTEMPTS = 3;
+
+export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: Props) => {
     const { user } = useAuth();
     const containerRef = useRef<HTMLDivElement>(null);
     const clientRef = useRef<ZoomClient | null>(null);
-    const [state, setState] = useState<'idle' | 'joining' | 'joined'>('idle');
+    const [state, setState] = useState<'idle' | 'verifying' | 'joining' | 'joined'>('idle');
     const [error, setError] = useState('');
+    const [faceResult, setFaceResult] = useState<FaceCheckResult | null>(null);
+    const [attempts, setAttempts] = useState(0);
+    const faceCheck = useLessonFaceCheck(lessonId);
 
     // Sahifadan chiqilganda uchrashuvdan ham chiqamiz, aks holda mikrofon
     // va kamera ochiq qolib ketardi.
@@ -98,10 +110,30 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
     const leave = async () => {
         await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
         clientRef.current = null;
+        faceCheck.stop();
         setState('idle');
     };
 
+    /** Darsga kirishdan oldingi tekshiruv. `true` — ulanamiz. */
+    const verifyBeforeJoin = async (): Promise<boolean> => {
+        setState('verifying');
+        const result = await faceCheck.runCheck('join');
+        setFaceResult(result);
+        const nextAttempt = attempts + 1;
+        setAttempts(nextAttempt);
+        if (result?.status === 'ok') return true;
+        // Xizmat javob bermasa ham (result === null) darsni to'sib qo'ymaymiz.
+        return result === null || nextAttempt >= MAX_JOIN_ATTEMPTS;
+    };
+
     const join = async () => {
+        if (faceCheckEnabled) {
+            const allowed = await verifyBeforeJoin();
+            if (!allowed) {
+                setState('idle');
+                return;
+            }
+        }
         setState('joining');
         setError('');
         try {
@@ -148,6 +180,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
                 userName: user?.username ?? 'Talaba',
             });
             setState('joined');
+            if (faceCheckEnabled) faceCheck.startRandomChecks();
         } catch (cause) {
             logger.error('Zoom join failed', cause);
             // Bekend xatosi o'zbekcha keladi; Zoom SDK esa inglizcha sabab
@@ -170,18 +203,39 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
             {state !== 'joined' ? (
                 <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 py-8 text-center">
                     <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Video className="h-5 w-5" />
+                        {state === 'verifying' ? <ScanFace className="h-5 w-5" /> : <Video className="h-5 w-5" />}
                     </span>
                     <div className="space-y-1">
-                        <p className="text-sm font-semibold">Dars jonli efirda o'tadi</p>
+                        <p className="text-sm font-semibold">
+                            {state === 'verifying' ? 'Shaxsingiz tekshirilmoqda' : "Dars jonli efirda o'tadi"}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                            Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.
+                            {state === 'verifying'
+                                ? 'Kameraga qarab turing — bu bir necha soniya oladi.'
+                                : faceCheckEnabled
+                                    ? "Uchrashuv shu sahifada ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi."
+                                    : 'Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.'}
                         </p>
                     </div>
+                    {/* Tekshiruv natijasi: nima bo'lgani va nechanchi urinish. */}
+                    {faceResult && faceResult.status !== 'ok' && state !== 'verifying' && (
+                        <p className="text-xs text-amber-600">
+                            {faceResult.message}
+                            {attempts < MAX_JOIN_ATTEMPTS
+                                ? `. Qayta urinib ko'ring (${attempts}/${MAX_JOIN_ATTEMPTS})`
+                                : '. Darsga kirasiz, lekin jurnalda qayd qilindi'}
+                        </p>
+                    )}
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button onClick={() => void join()} disabled={state === 'joining'}>
-                            {state === 'joining' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
-                            {state === 'joining' ? 'Ulanmoqda...' : "Darsga qo'shilish"}
+                        <Button onClick={() => void join()} disabled={state === 'joining' || state === 'verifying'}>
+                            {state === 'joining' || state === 'verifying'
+                                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                : <Video className="mr-2 h-4 w-4" />}
+                            {state === 'verifying'
+                                ? 'Tekshirilmoqda...'
+                                : state === 'joining'
+                                    ? 'Ulanmoqda...'
+                                    : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
                         </Button>
                         {/* SDK ishlamaydigan brauzerlar uchun (ayniqsa mobil) zaxira yo'l. */}
                         <a
@@ -196,9 +250,16 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
                 </div>
             ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
-                        <Radio className="h-3.5 w-3.5 animate-pulse" /> Efirdasiz
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
+                            <Radio className="h-3.5 w-3.5 animate-pulse" /> Efirdasiz
+                        </span>
+                        {faceCheckEnabled && (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <ScanFace className="h-3.5 w-3.5" /> Dars davomida shaxs tasodifiy tekshiriladi
+                            </span>
+                        )}
+                    </div>
                     <Button variant="outline" size="sm" onClick={() => void leave()}>
                         <LogOut className="mr-2 h-4 w-4" /> Uchrashuvdan chiqish
                     </Button>

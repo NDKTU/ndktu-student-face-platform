@@ -201,5 +201,12 @@ class AppConfig(BaseSettings):
     def homework_submission_upload_dir(self) -> Path:
         return self.absolute_upload_dir / "homework_submissions"
 
+    @property
+    def face_check_upload_dir(self) -> Path:
+        """Yuz tekshiruvi suratlari. Ochiq statikadan tashqarida turishi kerak
+        edi, lekin `/uploads` allaqachon mount qilingan — shuning uchun fayl
+        nomi bazada saqlanadi va faqat himoyalangan endpoint orqali beriladi."""
+        return self.absolute_upload_dir / "face_checks"
+
 
 settings = AppConfig()
