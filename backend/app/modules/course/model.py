@@ -168,6 +168,12 @@ class Lesson(Base, IdIntPk, TimestampMixin):
 
     lesson_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
+    # Jonli darsda yuz nazorati. O'qituvchi o'zi yoqadi: har bir dars uchun
+    # kerak emas, kamera talab qilish esa talabaga yuk.
+    face_check_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
+    )
+
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     date: Mapped[date_type] = mapped_column(Date, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

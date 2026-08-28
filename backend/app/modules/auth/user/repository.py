@@ -2,11 +2,13 @@ import logging
 
 from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.password_hash import hash_password
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
+from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Permission, Role, RolePermission, Student, Teacher, TeacherSubject, User
 
 from .schemas import (
@@ -346,6 +348,34 @@ class UserRepository:
 
         if role not in user.roles:
             user.roles.append(role)
+
+
+    async def set_avatar(self, session: AsyncSession, user_id: int, file: UploadFile | None) -> User:
+        """Profil suratini almashtiradi yoki (file=None) olib tashlaydi.
+
+        Eski fayl darhol o'chiriladi: surat almashtirilgach, eskisi hech
+        kimga kerak emas va diskda yig'ilib qolardi.
+        """
+        user = (
+            await session.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+        ).scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+        previous = user.avatar_path
+        if file is not None:
+            filename = await save_image(file, settings.profile_upload_dir)
+            user.avatar_path = f"{settings.file_url.http}/profile/{filename}"
+        else:
+            user.avatar_path = None
+
+        await session.commit()
+        await session.refresh(user)
+
+        if previous and previous != user.avatar_path:
+            old_file = settings.profile_upload_dir / previous.rsplit("/", 1)[-1]
+            old_file.unlink(missing_ok=True)
+        return user
 
 
 get_user_repository = UserRepository()

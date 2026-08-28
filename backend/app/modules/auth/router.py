@@ -113,6 +113,28 @@ async def get_me(
     return await auth_service.get_current_user(session=session, token=authorization)
 
 
+@user_router.post(
+    "/me/avatar",
+    response_model=UserCreateResponse,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("user:me")),
+):
+    """Profil surati. Yuz nazoratida etalon sifatida birinchi shu ishlatiladi."""
+    return await get_user_repository.set_avatar(session=session, user_id=current_user.id, file=file)
+
+
+@user_router.delete("/me/avatar", response_model=UserCreateResponse)
+async def delete_my_avatar(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("user:me")),
+):
+    return await get_user_repository.set_avatar(session=session, user_id=current_user.id, file=None)
+
+
 @user_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     current_user=Depends(PermissionRequired("user:me")),

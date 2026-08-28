@@ -97,6 +97,13 @@ class FaceCheckRepository:
         self, session: AsyncSession, lesson_id: int, data: FaceCheckRequest, current_user: User
     ) -> FaceCheckResponse:
         lesson = await self._get_lesson(session, lesson_id)
+        if not lesson.face_check_enabled:
+            # O'qituvchi bu dars uchun nazoratni yoqmagan — kadr ham qabul
+            # qilinmaydi, jurnalga ham yozilmaydi.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bu darsda yuz nazorati yoqilmagan",
+            )
         student = await self._student_of_lesson(session, lesson, current_user)
         if student is None:
             # Tekshiruv faqat talabalar uchun: o'qituvchi darsni o'zi olib boradi.
@@ -109,7 +116,9 @@ class FaceCheckRepository:
         image_name: str | None = None
 
         if not data.camera_unavailable and data.image_base64:
-            reference_url = (student.image_path or "").strip()
+            # Etalon: avval foydalanuvchi o'zi yuklagan profil surati, so'ng
+            # HEMIS'dagi surat — u eskirgan bo'lishi mumkin.
+            reference_url = (current_user.avatar_path or student.image_path or "").strip()
             if not reference_url:
                 check_status = "no_reference"
             else:

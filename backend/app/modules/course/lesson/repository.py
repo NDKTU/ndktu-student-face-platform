@@ -102,6 +102,7 @@ class LessonRepository:
             # Форма дарса даты не спрашивает: занятие заводят в день проведения.
             date=data.date or datetime.now(TASHKENT_TZ).date(),
             description=data.description,
+            face_check_enabled=data.face_check_enabled,
         )
         session.add(new_lesson)
 
@@ -257,6 +258,8 @@ class LessonRepository:
             lesson.topic_id = data.topic_id
         if data.lesson_type is not None:
             lesson.lesson_type = data.lesson_type
+        if data.face_check_enabled is not None:
+            lesson.face_check_enabled = data.face_check_enabled
         if data.topic is not None:
             lesson.topic = data.topic
         if data.date is not None:

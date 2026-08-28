@@ -75,6 +75,8 @@ export interface User {
     id: number;
     username: string;
     is_active: boolean;
+    /** Foydalanuvchi o'zi yuklagan profil surati. Yuz nazoratida etalon. */
+    avatar_path?: string | null;
     roles: UserRole[];
     teacher?: UserTeacher | null;
     student?: Student;

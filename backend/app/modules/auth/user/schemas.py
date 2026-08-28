@@ -94,6 +94,8 @@ class UserRoleAssignRequest(BaseModel):
 class UserCreateResponse(BaseModel):
     id: int
     username: str
+    # Foydalanuvchi o'zi yuklagan profil surati (`/uploads/profile/...`).
+    avatar_path: str | None = None
     roles: list[RoleResponse]
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
@@ -164,6 +166,7 @@ class UserDetailResponse(UserCreateResponse):
 class UserMeResponse(BaseModel):
     id: int
     username: str
+    avatar_path: str | None = None
     roles: list[RoleWithPermissionsResponse]
     teacher: TeacherDetailResponse | None = None
     student: StudentDetailResponse | None = None

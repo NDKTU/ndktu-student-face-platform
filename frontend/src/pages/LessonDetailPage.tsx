@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, ScanFace, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useResources';
+import { useUpdateLesson } from '@/hooks/useLessons';
 import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
 import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
+import { Switch } from '@/components/ui/Switch';
+import { toast } from 'sonner';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
@@ -46,6 +49,7 @@ export default function LessonDetailPage() {
     const resourcesQuery = useResources(lessonId);
     const assignmentsQuery = useAssignments(lessonId ? { lesson_id: lessonId, limit: 1 } : undefined);
     const deleteResource = useDeleteResource(lessonId);
+    const updateLesson = useUpdateLesson();
     const deleteAssignment = useDeleteAssignment();
     // Kontent bitta umumiy oynada emas, har bir blokda alohida qo'shiladi:
     // o'qituvchi «video qo'shaman» deb kirsa, unga fayl/konspekt tanlash
@@ -114,15 +118,36 @@ export default function LessonDetailPage() {
                             ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(zoom.id)}><Trash2 className="mr-2 h-4 w-4" /> Havolani olib tashlash</Button>
                             : <Button size="sm" onClick={() => setContentKinds(['zoom'])}><Plus className="mr-2 h-4 w-4" /> Zoom havolasi</Button>
                     )}
-                </CardHeader><CardContent>
+                </CardHeader><CardContent className="space-y-4">
+                    {/* Nazorat har bir darsga kerak emas — o'qituvchi o'zi hal qiladi. */}
+                    {canManageContent && zoom?.link_url && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
+                            <div>
+                                <p className="flex items-center gap-2 text-sm font-medium"><ScanFace className="h-4 w-4" /> Yuz nazorati</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Talaba darsga kirishda va dars davomida tasodifiy vaqtlarda tekshiriladi.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={Boolean(lesson.face_check_enabled)}
+                                disabled={updateLesson.isPending}
+                                onCheckedChange={(checked) => {
+                                    updateLesson.mutate(
+                                        { id: lesson.id, data: { face_check_enabled: checked } },
+                                        { onError: () => toast.error("Sozlamani saqlab bo'lmadi") },
+                                    );
+                                }}
+                            />
+                        </div>
+                    )}
                     {zoom?.link_url
-                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView} />
+                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />
                         : <p className="text-sm text-muted-foreground">Bu darsga jonli uchrashuv biriktirilmagan.</p>}
                 </CardContent></Card>
             )}
 
             {/* Yuz nazorati jurnali — faqat darsni boshqaradiganlarga. */}
-            {canManageContent && zoom?.link_url && (
+            {canManageContent && zoom?.link_url && lesson.face_check_enabled && (
                 <Card><CardHeader><CardTitle>Yuz nazorati</CardTitle></CardHeader><CardContent>
                     <LessonFaceCheckReport lessonId={lesson.id} />
                 </CardContent></Card>

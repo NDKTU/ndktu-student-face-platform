@@ -9,6 +9,19 @@ export interface UserListResponse {
 }
 
 export const userService = {
+    /** Profil surati: yuz nazoratida etalon sifatida shu ishlatiladi. */
+    uploadAvatar: async (file: File) => {
+        const form = new FormData();
+        form.append('file', file);
+        const response = await api.post('/user/me/avatar', form);
+        return response.data;
+    },
+
+    deleteAvatar: async () => {
+        const response = await api.delete('/user/me/avatar');
+        return response.data;
+    },
+
     // Отзывает текущую сессию на сервере (удаляет jti из Redis).
     logout: async (): Promise<void> => {
         await api.post('/user/logout');

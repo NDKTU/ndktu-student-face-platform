@@ -42,6 +42,8 @@ export interface Lesson {
     sinf_id?: number | null;
     topic_id?: number | null;
     lesson_type?: LessonType | null;
+    /** Jonli darsda yuz nazorati — o'qituvchi yoqadi. */
+    face_check_enabled?: boolean;
     duration_minutes?: number | null;
     topic: string;
     date: string;
@@ -63,6 +65,7 @@ export interface LessonListResponse {
 
 export interface LessonCreateRequest {
     teacher_subject_id?: number;
+    face_check_enabled?: boolean;
     /** Не нужен для курса с одной группой — бэкенд подставит её сам. */
     group_id?: number;
     course_id?: number;
@@ -78,6 +81,7 @@ export interface LessonCreateRequest {
 
 export interface LessonUpdateRequest {
     teacher_subject_id?: number;
+    face_check_enabled?: boolean;
     group_id?: number;
     course_id?: number;
     sinf_id?: number | null;

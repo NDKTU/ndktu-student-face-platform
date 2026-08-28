@@ -40,6 +40,12 @@ class User(Base, IdIntPk, TimestampMixin):
         default=True,
     )
 
+    # Profil surati. HEMIS'dan kelgan talaba surati (`students.image_path`)
+    # o'zgarmaydi va eskirgan bo'lishi mumkin, bu esa foydalanuvchi o'zi
+    # yuklaydigan surat — yuz nazoratida etalon sifatida birinchi bo'lib
+    # shu ishlatiladi.
+    avatar_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     roles: Mapped[list["Role"]] = relationship(
         "Role", secondary="user_roles", back_populates="users", overlaps="user_roles"
     )

@@ -6,8 +6,9 @@ import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { User, Calendar, KeyRound, Save } from 'lucide-react';
+import { User, Calendar, KeyRound, Save, Camera, Loader2, Trash2 } from 'lucide-react';
 import { userService } from '@/services/userService';
+import { useRef, useState } from 'react';
 
 const credentialsSchema = z
     .object({
@@ -26,7 +27,27 @@ const credentialsSchema = z
 type CredentialsForm = z.infer<typeof credentialsSchema>;
 
 const ProfilePage = () => {
-    const { user } = useAuth();
+    const { user, refreshMe } = useAuth();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [avatarBusy, setAvatarBusy] = useState(false);
+
+    // Yuz nazorati uchun etalon shu surat: HEMIS'dagi surat eskirgan
+    // bo'lishi mumkin, foydalanuvchi esa o'zinikini yangilay oladi.
+    const avatarUrl = user?.avatar_path || user?.student?.image_path || null;
+
+    const changeAvatar = async (file: File | null) => {
+        setAvatarBusy(true);
+        try {
+            if (file) await userService.uploadAvatar(file);
+            else await userService.deleteAvatar();
+            await refreshMe();
+            toast.success(file ? 'Surat yangilandi' : 'Surat olib tashlandi');
+        } catch {
+            toast.error('Suratni saqlashda xatolik');
+        } finally {
+            setAvatarBusy(false);
+        }
+    };
     const isStudent = Boolean(user?.student) || user?.roles?.some(role => role.name.toLowerCase() === 'student');
 
     const {
@@ -70,16 +91,51 @@ const ProfilePage = () => {
                     <div className="w-full md:w-1/4 flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-r border-border md:pr-8 pb-6 md:pb-0 h-fit">
                          <div className="relative">
                             <div className="flex h-40 w-40 items-center justify-center rounded-full bg-primary/10 border-4 border-background shadow-xl overflow-hidden">
-                                {user.student?.image_path ? (
-                                    <img 
-                                        src={user.student.image_path} 
-                                        alt={user.username} 
+                                {avatarUrl ? (
+                                    <img
+                                        src={avatarUrl}
+                                        alt={user.username}
                                         className="h-full w-full object-cover"
                                     />
                                 ) : (
                                     <User className="h-20 w-20 text-primary" />
                                 )}
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={avatarBusy}
+                                aria-label="Suratni yuklash"
+                                className="absolute bottom-1 right-1 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 disabled:opacity-60"
+                            >
+                                {avatarBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className="hidden"
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = '';
+                                    if (file) void changeAvatar(file);
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">
+                                Surat jonli darsdagi yuz nazoratida solishtirish uchun ishlatiladi.
+                            </p>
+                            {user.avatar_path && (
+                                <button
+                                    type="button"
+                                    onClick={() => void changeAvatar(null)}
+                                    disabled={avatarBusy}
+                                    className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                                >
+                                    <Trash2 className="h-3 w-3" /> Suratni olib tashlash
+                                </button>
+                            )}
                         </div>
                         <div className="space-y-2">
                              <h2 className="text-xl font-bold break-words">

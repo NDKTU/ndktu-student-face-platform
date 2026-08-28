@@ -47,6 +47,8 @@ class LessonResourceInfo(BaseModel):
 
 class LessonCreateRequest(BaseModel):
     teacher_subject_id: Optional[int] = None
+    # Jonli darsda yuz nazorati. Standart holat — o'chiq.
+    face_check_enabled: bool = False
     # Группу можно не передавать: у курса она уже выбрана. Обязательна только
     # если курс ведётся сразу у нескольких групп — тогда угадывать нельзя.
     group_id: Optional[int] = None
@@ -61,6 +63,7 @@ class LessonCreateRequest(BaseModel):
 
 class LessonUpdateRequest(BaseModel):
     teacher_subject_id: Optional[int] = None
+    face_check_enabled: Optional[bool] = None
     group_id: Optional[int] = None
     course_id: Optional[int] = None
     topic_id: Optional[int] = None
@@ -73,6 +76,7 @@ class LessonUpdateRequest(BaseModel):
 class LessonResponse(BaseModel):
     id: int
     teacher_subject_id: int
+    face_check_enabled: bool = False
     group_id: int
     course_id: int
     topic_id: Optional[int] = None
