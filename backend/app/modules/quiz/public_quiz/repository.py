@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 from app.core.enums import QuizType
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 from app.modules.quiz.quiz_process.attempt import is_expired, remaining_seconds
-from app.modules.quiz.quiz_process.option_order import letter_at, option_order
+from app.modules.quiz.quiz_process.question_view import grade_answer, question_options, to_dto
 from app.modules.quiz.quiz_process.repository import get_quiz_process_repository
 from app.modules.quiz.quiz_process.schemas import QuestionDTO
 
@@ -118,19 +118,7 @@ class PublicQuizRepository:
             title=quiz.title,
             duration=quiz.duration,
             remaining_seconds=remaining_seconds(attempt, quiz),
-            questions=[self._question_dto(attempt.id, question) for question in questions],
-        )
-
-    def _question_dto(self, result_id: int, question: Question) -> QuestionDTO:
-        order = option_order(result_id, question.id)
-        shown = [getattr(question, f"option_{letter}") for letter in order]
-        return QuestionDTO(
-            id=question.id,
-            text=question.text,
-            option_a=shown[0],
-            option_b=shown[1],
-            option_c=shown[2],
-            option_d=shown[3],
+            questions=[to_dto(attempt.id, question) for question in questions],
         )
 
     async def _attempt_from_token(self, session: AsyncSession, token: str) -> tuple[Result, Quiz]:
@@ -177,14 +165,16 @@ class PublicQuizRepository:
         if reserved is None or reserved.question is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu savol sizga berilmagan")
 
-        chosen_letter = letter_at(attempt.id, data.question_id, data.answer_index)
-        if chosen_letter is None:
+        question = reserved.question
+        positions = data.answer_indexes if data.answer_indexes else [data.answer_index]
+        option_count = len(question_options(question))
+        if not positions or any(position < 0 or position >= option_count for position in positions):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant noto'g'ri")
 
-        question = reserved.question
-        reserved.answer = getattr(question, f"option_{chosen_letter}")
-        reserved.correct_answer = getattr(question, f"option_{question.correct_option}")
-        reserved.is_correct = chosen_letter == question.correct_option
+        is_correct, chosen_text, correct_text = grade_answer(attempt.id, question, positions)
+        reserved.answer = chosen_text
+        reserved.correct_answer = correct_text
+        reserved.is_correct = is_correct
         await session.commit()
 
         # Javob to'g'ri-noto'g'riligi qaytarilmaydi: ochiq testda uni bilib,

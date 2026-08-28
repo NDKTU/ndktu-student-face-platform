@@ -12,19 +12,31 @@ export interface Question {
     option_c: string;
     option_d: string;
     correct_option?: string; // Optional as not explicitly requested, but likely needed
+    question_type?: QuestionType;
+    payload?: Record<string, unknown> | null;
     created_at?: string;
     updated_at?: string;
 }
+
+export type QuestionType = 'QUIZ' | 'TRUE_FALSE' | 'MULTI_SELECT';
 
 export interface QuestionCreateRequest {
     subject_id: number;
     user_id: number;
     text: string;
+    /** Standart tur — to'rt variant, bitta to'g'ri javob. */
+    question_type?: QuestionType;
     option_a: string;
     option_b: string;
     option_c: string;
     option_d: string;
     correct_option?: string;
+    /**
+     * Yangi turlar uchun ma'lumot:
+     *   TRUE_FALSE   -> { correct: boolean }
+     *   MULTI_SELECT -> { options: string[]; correct: number[] }
+     */
+    payload?: Record<string, unknown>;
 }
 
 export interface QuestionListResponse {

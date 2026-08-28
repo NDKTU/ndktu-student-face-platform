@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
@@ -63,6 +64,14 @@ class Question(Base, IdIntPk, TimestampMixin):
         nullable=False,
         server_default=text(f"'{QuestionType.QUIZ.value}'"),
     )
+
+    # Yangi turlar uchun ma'lumot (variantlar, to'g'ri javob(lar)). Eski
+    # `QUIZ` turi o'z ustunlarida qoladi: bazada 64 mingdan ortiq savol bor
+    # va ularni ko'chirish versiyalash zanjirini buzardi.
+    #
+    #   TRUE_FALSE   -> {"correct": true}
+    #   MULTI_SELECT -> {"options": ["...", "..."], "correct": [0, 2]}
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     text: Mapped[str] = mapped_column(nullable=False)
     option_a: Mapped[str] = mapped_column(nullable=False)

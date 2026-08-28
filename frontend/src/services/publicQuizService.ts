@@ -17,6 +17,10 @@ export interface PublicQuestion {
     option_b: string;
     option_c: string;
     option_d: string;
+    /** Variantlar ko'rsatilgan tartibda — barcha turlar uchun umumiy shakl. */
+    options?: string[];
+    /** Bir nechta javob kutilyaptimi (MULTI_SELECT). */
+    multiple?: boolean;
 }
 
 export interface PublicStartResponse {
@@ -47,10 +51,15 @@ export const publicQuizService = {
         return response.data;
     },
 
-    answer: async (token: string, questionId: number, answerIndex: number) => {
+    answer: async (token: string, questionId: number, positions: number[]) => {
         await publicApi.post(
             '/public/quiz/answer',
-            { question_id: questionId, answer_index: answerIndex },
+            {
+                question_id: questionId,
+                answer_index: positions[0],
+                // Bir nechta to'g'ri javobli savolda butun to'plam yuboriladi.
+                answer_indexes: positions.length > 1 ? positions : undefined,
+            },
             { headers: { 'X-Guest-Token': token } },
         );
     },

@@ -15,6 +15,7 @@ from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAns
 
 from .attempt import grade_for, is_expired, remaining_seconds
 from .option_order import letter_at, option_order
+from .question_view import grade_answer, question_options, to_dto
 from .schemas import (
     EndQuizRequest,
     EndQuizResponse,
@@ -171,21 +172,7 @@ class QuizProcessRepository:
         # Перемешиваются буквы колонок, а не тексты: так порядок остаётся
         # восстановимым в submit_answer, и правильность проверяется по позиции,
         # а не сравнением строк.
-        question_dtos = []
-        for q in quiz_questions:
-            order = option_order(new_result.id, q.id)
-            shown = [getattr(q, f"option_{letter}") for letter in order]
-
-            question_dtos.append(
-                QuestionDTO(
-                    id=q.id,
-                    text=q.text,
-                    option_a=shown[0],
-                    option_b=shown[1],
-                    option_c=shown[2],
-                    option_d=shown[3],
-                )
-            )
+        question_dtos = [to_dto(new_result.id, q) for q in quiz_questions]
 
         await session.commit()
         await session.refresh(new_result)
@@ -232,25 +219,25 @@ class QuizProcessRepository:
             if not question:
                 continue
 
-            order = option_order(result_obj.id, question.id)
-            shown = [getattr(question, f"option_{letter}") for letter in order]
+            dto = to_dto(result_obj.id, question)
+            question_dtos.append(dto)
 
-            question_dtos.append(
-                QuestionDTO(
-                    id=question.id,
-                    text=question.text,
-                    option_a=shown[0],
-                    option_b=shown[1],
-                    option_c=shown[2],
-                    option_d=shown[3],
-                )
-            )
-
-            if row.answer is not None and row.answer in shown:
-                # Позиция нужна только чтобы подсветить выбранную кнопку. Оценка
+            if row.answer is not None:
+                # Позиции нужны только чтобы подсветить выбранные кнопки. Оценка
                 # уже посчитана и лежит в is_correct, так что совпадение текстов
                 # у двух вариантов подсветит не ту кнопку, но не изменит результат.
-                submitted.append(SubmittedAnswerDTO(question_id=question.id, answer_index=shown.index(row.answer)))
+                # Несколько ответов хранятся строкой «a; b» — тем же разделителем,
+                # каким их склеил grade_answer.
+                chosen = [part.strip() for part in row.answer.split(";")] if dto.multiple else [row.answer]
+                positions = [dto.options.index(text) for text in chosen if text in dto.options]
+                if positions:
+                    submitted.append(
+                        SubmittedAnswerDTO(
+                            question_id=question.id,
+                            answer_index=positions[0],
+                            answer_indexes=positions,
+                        )
+                    )
 
         student = (await session.execute(select(Student).where(Student.user_id == user.id))).scalar_one_or_none()
 
@@ -387,34 +374,39 @@ class QuizProcessRepository:
         if not question:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-        if data.answer_index is not None:
-            # Основной путь: клиент присылает позицию выбранного варианта, сервер
-            # восстанавливает букву колонки по той же расстановке, что показывал.
-            # Текст ответа в сравнении не участвует вообще.
-            chosen_letter = letter_at(data.result_id, data.question_id, data.answer_index)
-            if chosen_letter is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="answer_index must be between 0 and 3",
-                )
-            is_correct = chosen_letter == question.correct_option
-            # Текст берётся из базы, а не из запроса: в отчёте будет ровно то,
-            # что лежит в вопросе.
-            chosen_text = getattr(question, f"option_{chosen_letter}")
-        else:
-            # Совместимость на время выкатки: у студента, начавшего тест до неё,
-            # в браузере остаётся старый скрипт, который шлёт текст варианта.
-            # Обрывать ему ответы посреди экзамена нельзя. Путь удаляется, когда
-            # ни одна активная попытка не может быть старше выкатки.
-            if data.answer is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Either answer_index or answer must be provided",
-                )
-            chosen_text = data.answer
-            is_correct = data.answer == question.get_correct_text()
+        # Позиции: у обычного вопроса одна, у вопроса с несколькими
+        # правильными — набор. Проверка и тексты — в question_view, чтобы
+        # обычный тест и открытый считали одинаково.
+        positions = data.answer_indexes if data.answer_indexes else (
+            [data.answer_index] if data.answer_index is not None else []
+        )
 
-        reserved.answer = chosen_text
+        if positions:
+            option_count = len(question_options(question))
+            if any(position < 0 or position >= option_count for position in positions):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Variant raqami noto'g'ri",
+                )
+            is_correct, chosen_text, correct_text = grade_answer(data.result_id, question, positions)
+            reserved.answer = chosen_text
+            reserved.correct_answer = correct_text
+            reserved.is_correct = is_correct
+            await session.commit()
+            return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
+
+        # Совместимость на время выкатки: у студента, начавшего тест до неё,
+        # в браузере остаётся старый скрипт, который шлёт текст варианта.
+        # Обрывать ему ответы посреди экзамена нельзя. Путь удаляется, когда
+        # ни одна активная попытка не может быть старше выкатки.
+        if data.answer is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either answer_index or answer must be provided",
+            )
+
+        is_correct = data.answer == question.get_correct_text()
+        reserved.answer = data.answer
         reserved.correct_answer = question.get_correct_text()
         reserved.is_correct = is_correct
 

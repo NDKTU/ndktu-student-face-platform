@@ -106,6 +106,7 @@ class QuestionRepository:
             option_d=data.option_d,
             correct_option=data.correct_option,
             question_type=data.question_type.value,
+            payload=data.payload,
         )
         session.add(new_question)
 
@@ -241,6 +242,7 @@ class QuestionRepository:
             option_d=data.option_d,
             correct_option=data.correct_option,
             question_type=data.question_type.value,
+            payload=data.payload,
             original_question_id=question.original_question_id or question.id,
             version=question.version + 1,
             is_latest=True,

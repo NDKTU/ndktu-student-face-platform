@@ -4,10 +4,17 @@ import type { ProctoringMode } from './quizService';
 export interface QuestionDTO {
     id: number;
     text: string;
+    /** Eski shakl — faqat klassik savolda to'ladi. */
     option_a: string;
     option_b: string;
     option_c: string;
     option_d: string;
+    /** Savol turi: QUIZ | TRUE_FALSE | MULTI_SELECT. */
+    question_type?: string;
+    /** Variantlar ko'rsatilgan tartibda — barcha turlar uchun umumiy shakl. */
+    options?: string[];
+    /** Bir nechta javob kutilyaptimi. */
+    multiple?: boolean;
 }
 
 export interface StartQuizRequest {
@@ -18,6 +25,8 @@ export interface StartQuizRequest {
 export interface SubmittedAnswerDTO {
     question_id: number;
     answer_index: number;
+    /** Bir nechta tanlangan o'rin (MULTI_SELECT). */
+    answer_indexes?: number[];
 }
 
 export interface StartQuizResponse {
@@ -40,8 +49,10 @@ export interface StartQuizResponse {
 export interface SubmitAnswerRequest {
     result_id: number;
     question_id: number;
-    /** Позиция выбранного варианта (0–3) в показанном студенту порядке. */
+    /** Позиция выбранного варианта в показанном студенту порядке. */
     answer_index: number;
+    /** Bir nechta to'g'ri javobli savolda — barcha tanlangan o'rinlar. */
+    answer_indexes?: number[];
 }
 
 export interface SubmitAnswerResponse {

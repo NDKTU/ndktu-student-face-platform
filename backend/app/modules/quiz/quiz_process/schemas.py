@@ -13,15 +13,24 @@ class StartQuizRequest(BaseModel):
 class QuestionDTO(BaseModel):
     id: int
     text: str
-    option_a: str
-    option_b: str
-    option_c: str
-    option_d: str
+    # Eski mijozlar shu to'rt maydonni kutadi — `QUIZ` turida ular to'ladi.
+    option_a: str = ""
+    option_b: str = ""
+    option_c: str = ""
+    option_d: str = ""
+    # Yangi turlar uchun umumiy shakl: variantlar ro'yxati ko'rsatilgan
+    # tartibda. `QUIZ` da ham to'ladi, shunda mijoz bitta koddan foydalanadi.
+    question_type: str = "QUIZ"
+    options: list[str] = []
+    # Nechta javob kutilyapti: `MULTI_SELECT` da bittadan ko'p.
+    multiple: bool = False
 
 
 class SubmittedAnswerDTO(BaseModel):
     question_id: int
     answer_index: int
+    # `MULTI_SELECT` da bir nechta variant tanlanadi.
+    answer_indexes: list[int] = []
 
 
 class StartQuizResponse(BaseModel):
@@ -60,6 +69,10 @@ class SubmitAnswerRequest(BaseModel):
     #: Текст выбранного варианта — путь совместимости для вкладок, открытых
     #: до выкатки. Новый клиент его не отправляет.
     answer: Optional[str] = None
+
+    #: Несколько выбранных позиций — для вопросов с несколькими правильными
+    #: ответами. Балл начисляется только при полном совпадении набора.
+    answer_indexes: Optional[list[int]] = None
 
 
 class SubmitAnswerResponse(BaseModel):

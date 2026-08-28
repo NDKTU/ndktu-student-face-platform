@@ -69,7 +69,9 @@ const QuizTestPage = () => {
     // Quiz phase
     const [quizData, setQuizData] = useState<StartQuizResponse | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<number, string>>({});
+    // Javoblar — ko'rsatilgan variantlarning o'rinlari. Bir nechta to'g'ri
+    // javobli savolda bir nechta o'rin bo'ladi, shuning uchun har doim ro'yxat.
+    const [answers, setAnswers] = useState<Record<number, number[]>>({});
     const [timeLeft, setTimeLeft] = useState(0);
 
     // Cheating detection
@@ -148,10 +150,12 @@ const QuizTestPage = () => {
                 setCurrentQuestionIndex(0);
                 // При возвращении в прерванную попытку восстанавливаем отметки,
                 // иначе студент увидит пустой бланк и станет отвечать заново.
-                const restored: Record<number, string> = {};
+                const restored: Record<number, number[]> = {};
                 for (const submitted of data.submitted_answers ?? []) {
-                    const letter = ['A', 'B', 'C', 'D'][submitted.answer_index];
-                    if (letter) restored[submitted.question_id] = letter;
+                    const positions = submitted.answer_indexes?.length
+                        ? submitted.answer_indexes
+                        : [submitted.answer_index];
+                    restored[submitted.question_id] = positions;
                 }
                 setAnswers(restored);
                 setPhase('quiz');
@@ -164,25 +168,34 @@ const QuizTestPage = () => {
         });
     };
 
-    const handleSelectAnswer = (questionId: number, option: string) => {
-        setAnswers((prev: Record<number, string>) => ({ ...prev, [questionId]: option }));
-
+    const handleSelectAnswer = (questionId: number, position: number) => {
         if (!quizData) return;
         const question = quizData.questions.find((q) => q.id === questionId);
         if (!question) return;
 
+        // Bir nechta to'g'ri javobli savolda tanlov almashib turadi, oddiy
+        // savolda esa bittasi ikkinchisini almashtiradi.
+        const previous = answers[questionId] ?? [];
+        const positions = question.multiple
+            ? (previous.includes(position)
+                ? previous.filter((item) => item !== position)
+                : [...previous, position].sort((a, b) => a - b))
+            : [position];
+
+        setAnswers((prev) => ({ ...prev, [questionId]: positions }));
+
+        // Bo'sh tanlov serverga yuborilmaydi: javobni «olib tashlash» yo'li yo'q,
+        // keyingi bosishda to'g'ri to'plam ketadi.
+        if (positions.length === 0) return;
+
         // Отправляется позиция варианта, а не его текст: сервер сам знает, какой
         // порядок показал этому студенту, и сравнивает по позиции. Текст варианта
         // в проверку правильности больше не попадает.
-        const answerIndex = ['A', 'B', 'C', 'D'].indexOf(option);
-        if (answerIndex === -1) return;
-
-        // Sent immediately as the student picks — the backend already reserved
-        // this question for this attempt at start_quiz, and grades it right away.
         submitAnswerMutation.mutate({
             result_id: quizData.result_id,
             question_id: questionId,
-            answer_index: answerIndex,
+            answer_index: positions[0],
+            answer_indexes: question.multiple ? positions : undefined,
         }, {
             onError: (error) => {
                 logger.error('Failed to submit answer', error);
@@ -598,14 +611,20 @@ const QuizTestPage = () => {
     const answeredCount = Object.keys(answers).length;
     const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
     const isFirstQuestion = currentQuestionIndex === 0;
-    const selectedAnswer = answers[currentQuestion.id];
+    const selectedPositions = answers[currentQuestion.id] ?? [];
 
-    const options = [
-        { key: 'A', value: currentQuestion.option_a },
-        { key: 'B', value: currentQuestion.option_b },
-        { key: 'C', value: currentQuestion.option_c },
-        { key: 'D', value: currentQuestion.option_d },
-    ];
+    // Variantlar serverdan ko'rsatilgan tartibda keladi. Eski javob shakli
+    // (`option_a..d`) zaxira sifatida qoladi: test yangilanishdan oldin
+    // boshlangan bo'lishi mumkin.
+    const optionTexts = currentQuestion.options?.length
+        ? currentQuestion.options
+        : [currentQuestion.option_a, currentQuestion.option_b, currentQuestion.option_c, currentQuestion.option_d];
+    const options = optionTexts.map((value, index) => ({
+        key: String.fromCharCode(65 + index),
+        value,
+        index,
+    }));
+    const isMultiple = Boolean(currentQuestion.multiple);
 
     const timeWarning = timeLeft < 60;
 
@@ -660,7 +679,7 @@ const QuizTestPage = () => {
             {/* Question navigation dots */}
             <div className="flex flex-wrap gap-2">
                 {quizData.questions.map((q, index) => {
-                    const isAnswered = !!answers[q.id];
+                    const isAnswered = (answers[q.id]?.length ?? 0) > 0;
                     const isCurrent = index === currentQuestionIndex;
                     return (
                         <button
@@ -696,12 +715,17 @@ const QuizTestPage = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 gap-3">
+                        {isMultiple && (
+                            <p className="text-xs text-muted-foreground">
+                                Bir nechta javob to'g'ri — hammasini belgilang. Ball to'liq mos kelganda beriladi.
+                            </p>
+                        )}
                         {options.map((option) => {
-                            const isSelected = selectedAnswer === option.key;
+                            const isSelected = selectedPositions.includes(option.index);
                             return (
                                 <button
                                     key={option.key}
-                                    onClick={() => handleSelectAnswer(currentQuestion.id, option.key)}
+                                    onClick={() => handleSelectAnswer(currentQuestion.id, option.index)}
                                     className={cn(
                                         "flex items-start gap-3 rounded-xl border border-border/80 p-4 text-left transition-all duration-200",
                                         isSelected

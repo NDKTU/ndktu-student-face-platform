@@ -34,7 +34,9 @@ class PublicStartResponse(BaseModel):
 
 class PublicAnswerRequest(BaseModel):
     question_id: int
-    answer_index: int = Field(ge=0, le=3)
+    answer_index: int = Field(default=0, ge=0)
+    # Bir nechta to'g'ri javobli savol uchun.
+    answer_indexes: Optional[List[int]] = None
 
 
 class PublicAnswerResponse(BaseModel):

@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import type { QuestionCreateRequest } from '@/services/questionService';
@@ -16,14 +16,24 @@ import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQu
 import { useSubjects } from '@/hooks/useSubjects';
 import { useLesson } from '@/hooks/useLessons';
 
+// Variantlar faqat klassik savolda majburiy: boshqa turlarda ular umuman
+// boshqa shaklda (`payload`) saqlanadi.
 const questionSchema = z.object({
     subject_id: z.string().min(1, 'Fan tanlanishi shart'),
+    question_type: z.enum(['QUIZ', 'TRUE_FALSE', 'MULTI_SELECT']),
     text: z.string().min(1, 'Savol matni kiritilishi shart'),
-    option_a: z.string().min(1, 'A varianti kiritilishi shart'),
-    option_b: z.string().min(1, 'B varianti kiritilishi shart'),
-    option_c: z.string().min(1, 'C varianti kiritilishi shart'),
-    option_d: z.string().min(1, 'D varianti kiritilishi shart'),
+    option_a: z.string(),
+    option_b: z.string(),
+    option_c: z.string(),
+    option_d: z.string(),
     correct_option: z.enum(['a', 'b', 'c', 'd']),
+}).superRefine((values, ctx) => {
+    if (values.question_type !== 'QUIZ') return;
+    for (const [field, label] of [['option_a', 'A'], ['option_b', 'B'], ['option_c', 'C'], ['option_d', 'D']] as const) {
+        if (!values[field]?.trim()) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `${label} varianti kiritilishi shart` });
+        }
+    }
 });
 
 type QuestionFormValues = z.infer<typeof questionSchema>;
@@ -34,6 +44,12 @@ const QuestionFormPage = () => {
     // Dars sahifasidan kelinganda fan oldindan tanlangan bo'ladi va saqlagach
     // o'sha darsga qaytiladi — o'qituvchi savolni test uchun shu yerda qo'shadi.
     const [searchParams] = useSearchParams();
+    // Yangi turlar uchun holat: to'g'ri/noto'g'ri javobi va variantlar ro'yxati.
+    const [trueFalseAnswer, setTrueFalseAnswer] = useState(true);
+    const [multiOptions, setMultiOptions] = useState<{ text: string; correct: boolean }[]>([
+        { text: '', correct: true },
+        { text: '', correct: false },
+    ]);
     const presetSubjectId = searchParams.get('subject_id') ?? '';
     const lessonIdParam = searchParams.get('lesson_id');
     const returnTo = searchParams.get('return_to');
@@ -65,10 +81,12 @@ const QuestionFormPage = () => {
         control,
         reset,
         setValue,
+        watch,
         formState: { errors },
     } = useForm<QuestionFormValues>({
         resolver: zodResolver(questionSchema),
         defaultValues: {
+            question_type: 'QUIZ',
             subject_id: presetSubjectId,
             text: '',
             option_a: '',
@@ -78,6 +96,10 @@ const QuestionFormPage = () => {
             correct_option: 'a',
         }
     });
+
+    // Tur bo'yicha forma o'zgaradi: klassik savolda to'rt variant,
+    // boshqalarida — o'z tahrirlagichi.
+    const questionType = watch('question_type');
 
     useEffect(() => {
         if (lessonSubjectId && !isEditMode) {
@@ -153,12 +175,32 @@ const QuestionFormPage = () => {
             subject_id: parseInt(data.subject_id, 10),
             user_id: user.id,
             text: data.text,
+            question_type: data.question_type,
             option_a: data.option_a,
             option_b: data.option_b,
             option_c: data.option_c,
             option_d: data.option_d,
             correct_option: data.correct_option,
         };
+
+        if (data.question_type === 'TRUE_FALSE') {
+            payload.payload = { correct: trueFalseAnswer };
+        }
+
+        if (data.question_type === 'MULTI_SELECT') {
+            const filled = multiOptions.filter((option) => option.text.trim());
+            const correct = filled.map((option, index) => (option.correct ? index : -1)).filter((index) => index >= 0);
+            // Serverda ham tekshiriladi, lekin xatoni shu yerda aytish tezroq.
+            if (filled.length < 2) {
+                toast.error("Kamida ikkita variant kerak");
+                return;
+            }
+            if (correct.length === 0 || correct.length === filled.length) {
+                toast.error("Kamida bitta, lekin hammasi emas — to'g'ri javoblarni belgilang");
+                return;
+            }
+            payload.payload = { options: filled.map((option) => option.text.trim()), correct };
+        }
 
         // Editing creates a new version with a new id (see backend Question
         // versioning) — we always navigate away on success rather than staying
@@ -289,13 +331,100 @@ const QuestionFormPage = () => {
                             </div>
                         </div>
 
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Savol turi</label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                {...register('question_type')}
+                                disabled={isEditMode}
+                            >
+                                <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
+                                <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
+                                <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
+                            </select>
+                            {isEditMode && (
+                                <p className="text-xs text-muted-foreground">
+                                    Mavjud savolning turi o'zgartirilmaydi — yangi savol yarating.
+                                </p>
+                            )}
+                        </div>
+
                         <Controller
                             name="text"
                             control={control}
                             render={({ field }) => renderEditorWithUpload('Savol matni', field, errors.text?.message)}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {questionType === 'TRUE_FALSE' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">To'g'ri javob</label>
+                                <div className="flex gap-2">
+                                    {[true, false].map((value) => (
+                                        <Button
+                                            key={String(value)}
+                                            type="button"
+                                            variant={trueFalseAnswer === value ? 'primary' : 'outline'}
+                                            onClick={() => setTrueFalseAnswer(value)}
+                                        >
+                                            {value ? "To'g'ri" : "Noto'g'ri"}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {questionType === 'MULTI_SELECT' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm font-medium">Variantlar</label>
+                                    <p className="text-xs text-muted-foreground">
+                                        To'g'ri javoblarni belgilang. Ball faqat hammasi to'g'ri belgilanganda beriladi.
+                                    </p>
+                                </div>
+                                {multiOptions.map((option, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={option.correct}
+                                            onChange={(event) => setMultiOptions((prev) => prev.map((item, i) =>
+                                                i === index ? { ...item, correct: event.target.checked } : item))}
+                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                            aria-label={`${index + 1}-variant to'g'ri`}
+                                        />
+                                        <input
+                                            value={option.text}
+                                            onChange={(event) => setMultiOptions((prev) => prev.map((item, i) =>
+                                                i === index ? { ...item, text: event.target.value } : item))}
+                                            placeholder={`${index + 1}-variant`}
+                                            className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                        />
+                                        {multiOptions.length > 2 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive"
+                                                onClick={() => setMultiOptions((prev) => prev.filter((_, i) => i !== index))}
+                                            >
+                                                O'chirish
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                                {multiOptions.length < 10 && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setMultiOptions((prev) => [...prev, { text: '', correct: false }])}
+                                    >
+                                        Variant qo'shish
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {questionType === 'QUIZ' && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Controller
                                 name="option_a"
                                 control={control}
@@ -316,7 +445,7 @@ const QuestionFormPage = () => {
                                 control={control}
                                 render={({ field }) => renderEditorWithUpload('D varianti', field, errors.option_d?.message, 'd')}
                             />
-                        </div>
+                        </div>}
 
                         <div className="flex justify-end gap-2 pt-4">
                             <Button type="button" variant="outline" onClick={() => navigate('/questions')}>Bekor qilish</Button>

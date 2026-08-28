@@ -26,7 +26,9 @@ export default function PublicQuizPage() {
     const [pin, setPin] = useState(pinFromUrl ?? searchParams.get('pin') ?? '');
     const [fullName, setFullName] = useState('');
     const [session, setSession] = useState<PublicStartResponse | null>(null);
-    const [answers, setAnswers] = useState<Record<number, number>>({});
+    // Javoblar — tanlangan o'rinlar ro'yxati: bir nechta to'g'ri javobli
+    // savolda bittadan ko'p bo'ladi.
+    const [answers, setAnswers] = useState<Record<number, number[]>>({});
     const [remaining, setRemaining] = useState(0);
     const [result, setResult] = useState<PublicFinishResponse | null>(null);
     const [busy, setBusy] = useState(false);
@@ -62,12 +64,20 @@ export default function PublicQuizPage() {
         }
     };
 
-    const choose = async (questionId: number, index: number) => {
+    const choose = async (questionId: number, index: number, multiple: boolean) => {
         if (!session || result) return;
+        const previous = answers[questionId] ?? [];
+        const positions = multiple
+            ? (previous.includes(index)
+                ? previous.filter((item) => item !== index)
+                : [...previous, index].sort((a, b) => a - b))
+            : [index];
+
         // Javob darhol serverga ketadi: brauzer yopilib qolsa ham yo'qolmaydi.
-        setAnswers((prev) => ({ ...prev, [questionId]: index }));
+        setAnswers((prev) => ({ ...prev, [questionId]: positions }));
+        if (positions.length === 0) return;
         try {
-            await publicQuizService.answer(session.guest_token, questionId, index);
+            await publicQuizService.answer(session.guest_token, questionId, positions);
         } catch (cause) {
             const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
             setError(detail || "Javobni saqlab bo'lmadi");
@@ -139,14 +149,22 @@ export default function PublicQuizPage() {
                                     <span className="mr-2 text-muted-foreground">{questionIndex + 1}.</span>
                                     <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text) }} />
                                 </p>
+                                {question.multiple && (
+                                    <p className="mb-2 text-xs text-muted-foreground">
+                                        Bir nechta javob to'g'ri — hammasini belgilang.
+                                    </p>
+                                )}
                                 <div className="grid gap-2">
-                                    {[question.option_a, question.option_b, question.option_c, question.option_d].map((option, index) => {
-                                        const selected = answers[question.id] === index;
+                                    {(question.options?.length
+                                        ? question.options
+                                        : [question.option_a, question.option_b, question.option_c, question.option_d]
+                                    ).map((option, index) => {
+                                        const selected = (answers[question.id] ?? []).includes(index);
                                         return (
                                             <button
                                                 key={index}
                                                 type="button"
-                                                onClick={() => void choose(question.id, index)}
+                                                onClick={() => void choose(question.id, index, Boolean(question.multiple))}
                                                 className={`rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
                                                     selected
                                                         ? 'border-primary bg-primary/[0.06] text-foreground'

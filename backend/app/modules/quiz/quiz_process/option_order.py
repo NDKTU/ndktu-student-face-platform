@@ -53,3 +53,20 @@ def letter_at(result_id: int, question_id: int, position: int) -> str | None:
     if not 0 <= position < len(LETTERS):
         return None
     return option_order(result_id, question_id)[position]
+
+
+def order_for(result_id: int, question_id: int, count: int) -> list[int]:
+    """Variantlar o'rinlari, ixtiyoriy soni uchun.
+
+    `option_order` faqat to'rtta ustunli eski savolga mo'ljallangan; yangi
+    turlarda variantlar soni har xil. Zerno bir xil usulda yig'iladi,
+    shuning uchun tartib urinish davomida o'zgarmaydi.
+    """
+    if count <= 0:
+        return []
+    seed = hashlib.sha256(
+        f"{settings.jwt.access_token_secret}:{result_id}:{question_id}:{count}".encode()
+    ).hexdigest()
+    positions = list(range(count))
+    random.Random(seed).shuffle(positions)
+    return positions
