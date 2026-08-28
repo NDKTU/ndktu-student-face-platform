@@ -27,7 +27,6 @@ export const AssignmentFormModal = ({
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
-    const [maxGrade, setMaxGrade] = useState('100');
     const [allowFile, setAllowFile] = useState(true);
     const [allowText, setAllowText] = useState(true);
     const [error, setError] = useState('');
@@ -38,7 +37,6 @@ export const AssignmentFormModal = ({
             setTitle(editing.title);
             setDescription(editing.description ?? '');
             setDeadline(editing.deadline.slice(0, 16));
-            setMaxGrade(editing.max_grade.toString());
             setAllowFile(editing.allow_file);
             setAllowText(editing.allow_text);
         } else {
@@ -47,7 +45,6 @@ export const AssignmentFormModal = ({
             setTitle('');
             setDescription('');
             setDeadline(future.toISOString().slice(0, 16));
-            setMaxGrade('100');
             setAllowFile(true);
             setAllowText(true);
         }
@@ -63,7 +60,8 @@ export const AssignmentFormModal = ({
             title: title.trim(),
             description: description.trim() || null,
             deadline: new Date(deadline).toISOString(),
-            max_grade: parseInt(maxGrade, 10) || 100,
+            // Baholash 5 ballik tizimda — o'qituvchi sozlamaydi.
+            max_grade: 5,
             allow_file: allowFile,
             allow_text: allowText,
             allowed_file_types: [],
@@ -108,16 +106,6 @@ export const AssignmentFormModal = ({
                         type="datetime-local"
                         value={deadline}
                         onChange={(e) => setDeadline(e.target.value)}
-                    />
-                </div>
-                <div>
-                    <label className="text-sm font-medium block mb-1">Maksimal ball</label>
-                    <Input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={maxGrade}
-                        onChange={(e) => setMaxGrade(e.target.value)}
                     />
                 </div>
                 <div className="flex gap-4">

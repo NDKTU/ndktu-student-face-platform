@@ -10,6 +10,7 @@ import api from '@/services/api';
 import { hemisService } from '@/services/hemisService';
 import { BookOpen, GraduationCap, Users, ShieldCheck, Camera } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { clearLogoutReason, readLogoutReason } from '@/services/tokenStorage';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
 
@@ -36,10 +37,15 @@ export const Login: React.FC = () => {
     const from = location.state?.from?.pathname || '/';
 
     // Сообщение о причине выхода (выставляется useIdleTimeout / интерсептором api).
+    // Query может не доехать: ProtectedRoute делает свой <Navigate to="/login">
+    // без параметров и затирает его — поэтому есть запасной канал в sessionStorage.
     const params = new URLSearchParams(location.search);
+    const [storedReason] = React.useState<string | null>(() => readLogoutReason());
+    React.useEffect(() => clearLogoutReason(), []);
+    const reason = params.get('reason') ?? storedReason;
     const notice = params.get('idle') === '1'
         ? 'Faolligingiz bo\'lmagani uchun tizimdan chiqdingiz. Iltimos, qaytadan kiring.'
-        : params.get('reason') === 'session'
+        : reason === 'session'
             ? 'Boshqa qurilmadan profilga kirilgani uchun joriy sessiya yakunlandi.'
             : null;
 

@@ -31,3 +31,34 @@ export const clearToken = (): void => {
         // no-op
     }
 };
+
+// Причина выхода переживает гонку двух редиректов: интерсептор ставит
+// window.location.href='/login?reason=session', но ProtectedRoute почти сразу
+// делает client-side <Navigate to="/login"> без query — и объяснение терялось,
+// пользователь оказывался на голой форме входа без единого слова о том, что
+// его вытеснили. sessionStorage доносит причину при любом порядке редиректов.
+const LOGOUT_REASON_KEY = 'logoutReason';
+
+export const setLogoutReason = (reason: string): void => {
+    try {
+        sessionStorage.setItem(LOGOUT_REASON_KEY, reason);
+    } catch {
+        // no-op
+    }
+};
+
+export const readLogoutReason = (): string | null => {
+    try {
+        return sessionStorage.getItem(LOGOUT_REASON_KEY);
+    } catch {
+        return null;
+    }
+};
+
+export const clearLogoutReason = (): void => {
+    try {
+        sessionStorage.removeItem(LOGOUT_REASON_KEY);
+    } catch {
+        // no-op
+    }
+};

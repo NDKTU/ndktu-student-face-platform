@@ -19,7 +19,10 @@ export interface AssignmentStats {
 export interface Assignment {
     id: number;
     course_id: number;
+    /** Umumiy ro'yxatda vazifani ajratish uchun — qaysi kurs, qaysi dars. */
+    course_name?: string | null;
     lesson_id?: number | null;
+    lesson_topic?: string | null;
     created_by_user_id?: number | null;
     title: string;
     description?: string | null;
@@ -71,6 +74,8 @@ export interface SubmissionUserInfo {
     id: number;
     username: string;
     full_name?: string | null;
+    /** Talaba guruhi — bitta kursda bir nechta guruh bo'ladi. */
+    group?: string | null;
 }
 
 export interface Submission {
@@ -124,6 +129,14 @@ export const assignmentService = {
         await api.delete(`/homework/${id}`);
     },
 
+    /** Talaba javob faylini yuklaydi. `/resource/upload` unga yopiq — u yerda
+     *  `create:resource` huquqi talab qilinadi. */
+    uploadSubmissionFile: async (assignmentId: number, file: File) => {
+        const form = new FormData();
+        form.append('file', file);
+        const response = await api.post<SubmissionFile>(`/homework/${assignmentId}/upload`, form);
+        return response.data;
+    },
     submit: async (assignmentId: number, data: SubmissionSubmitRequest) => {
         const response = await api.post<Submission>(`/homework/${assignmentId}/submit`, data);
         return response.data;

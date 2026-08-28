@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ExternalLink, FileText, Link as LinkIcon, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, Link as LinkIcon, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
@@ -8,6 +8,7 @@ import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useR
 import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
+import { HomeworkSubmissionBox } from '@/components/courses/HomeworkSubmissionBox';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -53,7 +54,11 @@ export default function LessonDetailPage() {
     const assignments = assignmentsQuery.data?.homeworks ?? [];
     const embedUrl = youtubeEmbedUrl(video?.link_url);
     const canManageContent = hasPermission('create:resource');
-    const canManageHomework = hasPermission('create:assignment');
+    const canManageHomework = hasPermission('create:homework');
+    // Javob topshirish faqat talabaga: admin/o'qituvchida `create:submission`
+    // ham bor, lekin ular vazifani boshqaradi, topshirmaydi.
+    const canSubmitHomework = hasPermission('create:submission') && !canManageHomework;
+    const canGrade = hasPermission('update:submission');
 
     return (
         <div className="space-y-6">
@@ -76,7 +81,7 @@ export default function LessonDetailPage() {
             </CardContent></Card>
 
             <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Uy vazifasi</CardTitle>{canManageHomework && <Button size="sm" onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Uy vazifasi</Button>}</CardHeader><CardContent>
-                {assignments.length === 0 ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : <div className="space-y-3">{assignments.map((assignment) => <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {new Date(assignment.deadline).toLocaleString()} · Maksimal ball: {assignment.max_grade}</p>{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div></div>)}</div>}
+                {assignments.length === 0 ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : <div className="space-y-3">{assignments.map((assignment) => <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {new Date(assignment.deadline).toLocaleString()} · Baho: 1–{assignment.max_grade}</p>{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>)}</div>}
             </CardContent></Card>
 
             <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />

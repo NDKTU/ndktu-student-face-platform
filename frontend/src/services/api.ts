@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/config/env';
-import { getToken, clearToken } from '@/services/tokenStorage';
+import { getToken, clearToken, setLogoutReason } from '@/services/tokenStorage';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -48,6 +48,7 @@ api.interceptors.response.use(
             // Различаем вытеснение другой сессией, чтобы показать понятное сообщение.
             const detail: string = error.response?.data?.detail ?? '';
             const kickedBySession = detail.includes('Joriy sessiya yakunlandi');
+            if (kickedBySession) setLogoutReason('session');
             window.location.href = kickedBySession ? '/login?reason=session' : '/login';
             return Promise.reject(error);
         }

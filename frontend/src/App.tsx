@@ -44,6 +44,8 @@ const PsychologyResultsPage = lazy(() => import('@/pages/PsychologyResultsPage')
 const StudentPsychologyPage = lazy(() => import('@/pages/StudentPsychologyPage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
+const HomeworksPage = lazy(() => import('@/pages/HomeworksPage'));
+const HomeworkSubmissionsPage = lazy(() => import('@/pages/HomeworkSubmissionsPage'));
 const RolesPage = lazy(() => import('@/pages/RolesPage'));
 const RolePermissionsPage = lazy(() => import('@/pages/RolePermissionsPage'));
 const PermissionsPage = lazy(() => import('@/pages/PermissionsPage'));
@@ -142,6 +144,10 @@ function App() {
 
                                         <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                                         <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />
+                                        <Route path="/homework" element={<PermissionRoute permission="read:homework"><HomeworksPage /></PermissionRoute>} />
+                                        {/* Ishlarni tekshirish — `update:submission` faqat o'qituvchi/adminda:
+                                            talabada `read:submission` bor, lekin bu sahifa unga emas. */}
+                                        <Route path="/homework/:id/submissions" element={<PermissionRoute permission="update:submission"><HomeworkSubmissionsPage /></PermissionRoute>} />
                                         <Route path="/psychology" element={<PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute>} />
                                         <Route path="/psychology/results" element={<PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute>} />
                                         <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />

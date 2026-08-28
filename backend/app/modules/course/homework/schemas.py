@@ -7,6 +7,10 @@ from app.core.schemas import TashkentDatetime
 
 SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned"]
 
+# Baholash 5 ballik tizimda: 1 — eng past, 5 — eng yuqori.
+GRADE_MIN = 1
+GRADE_MAX = 5
+
 
 class SubmissionFile(BaseModel):
     name: str
@@ -21,7 +25,7 @@ class HomeworkCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: Optional[str] = None
     deadline: datetime
-    max_grade: int = Field(default=100, ge=1, le=1000)
+    max_grade: int = Field(default=GRADE_MAX, ge=GRADE_MIN, le=GRADE_MAX)
     allow_file: bool = True
     allow_text: bool = True
     allowed_file_types: List[str] = []
@@ -33,7 +37,7 @@ class HomeworkUpdateRequest(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = None
     deadline: Optional[datetime] = None
-    max_grade: Optional[int] = Field(default=None, ge=1, le=1000)
+    max_grade: Optional[int] = Field(default=None, ge=GRADE_MIN, le=GRADE_MAX)
     allow_file: Optional[bool] = None
     allow_text: Optional[bool] = None
     allowed_file_types: Optional[List[str]] = None
@@ -50,7 +54,10 @@ class HomeworkStats(BaseModel):
 class HomeworkResponse(BaseModel):
     id: int
     course_id: int
+    # Umumiy ro'yxatda vazifa qaysi kurs va darsga tegishli ekani ko'rinsin.
+    course_name: Optional[str] = None
     lesson_id: Optional[int] = None
+    lesson_topic: Optional[str] = None
     created_by_user_id: Optional[int] = None
     title: str
     description: Optional[str] = None
@@ -94,6 +101,9 @@ class SubmissionUserInfo(BaseModel):
     id: int
     username: str
     full_name: Optional[str] = None
+    # O'qituvchi ishlarni tekshirayotganda guruhni ham ko'rsin: bitta kursda
+    # bir nechta guruh bo'ladi, faqat ism bilan farqlash qiyin.
+    group: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -103,7 +113,7 @@ class SubmissionSubmitRequest(BaseModel):
 
 
 class SubmissionGradeRequest(BaseModel):
-    grade: int = Field(ge=0, le=1000)
+    grade: int = Field(ge=GRADE_MIN, le=GRADE_MAX)
     feedback: Optional[str] = None
 
 

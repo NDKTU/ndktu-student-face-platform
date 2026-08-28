@@ -40,6 +40,7 @@ const PATH_LABELS: Record<string, string> = {
     '/quizzes':             'Testlar',
     '/active-quizzes':      'Faol testlar',
     '/quiz-test':           'Test ishlash',
+    '/homework':            'Uy vazifalari',
     '/results':             'Natijalar',
     '/results/answers':     'Javoblar tahlili',
 };
@@ -49,6 +50,7 @@ const DYNAMIC_LABELS: Array<[RegExp, string]> = [
     [/^\/roles\/[^/]+\/permissions$/, 'Rol ruxsatlari'],
     [/^\/questions\/[^/]+\/edit$/, 'Savolni tahrirlash'],
     [/^\/lessons\/[^/]+$/, 'Dars tafsilotlari'],
+    [/^\/homework\/[^/]+\/submissions$/, 'Ishlarni tekshirish'],
     [/^\/psychology\/test\/[^/]+$/, 'Psixologik test'],
 ];
 

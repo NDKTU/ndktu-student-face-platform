@@ -177,5 +177,9 @@ class AppConfig(BaseSettings):
     def course_resource_upload_dir(self) -> Path:
         return self.absolute_upload_dir / "course_resources"
 
+    @property
+    def homework_submission_upload_dir(self) -> Path:
+        return self.absolute_upload_dir / "homework_submissions"
+
 
 settings = AppConfig()

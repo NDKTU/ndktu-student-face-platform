@@ -25,6 +25,7 @@ from .homework.schemas import (
     HomeworkListResponse,
     HomeworkResponse,
     HomeworkUpdateRequest,
+    SubmissionFile,
     SubmissionGradeRequest,
     SubmissionListResponse,
     SubmissionResponse,
@@ -340,6 +341,23 @@ async def delete_homework(
 
 
 # ── Submissions ────────────────────────────────────────────────────────────
+
+
+@homework_router.post(
+    "/{homework_id}/upload",
+    response_model=SubmissionFile,
+    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+)
+async def upload_submission_file(
+    homework_id: int,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("create:submission")),
+):
+    """Talaba javob faylini yuklaydi — `/resource/upload` unga yopiq."""
+    return await get_homework_repository.upload_submission_file(
+        session=session, homework_id=homework_id, file=file, current_user=current_user
+    )
 
 
 @homework_router.post(

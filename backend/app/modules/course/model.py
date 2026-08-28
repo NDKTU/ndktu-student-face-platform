@@ -198,7 +198,9 @@ class Homework(Base, IdIntPk, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    max_grade: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    # Baholash 5 ballik tizimda (1–5). Ustun saqlanadi, chunki eski
+    # yozuvlar unga tayanadi, lekin qiymat endi doim 5.
+    max_grade: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     allow_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allowed_file_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
