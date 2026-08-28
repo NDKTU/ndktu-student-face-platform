@@ -213,10 +213,32 @@ class HomeworkRepository:
 
     # ── Homework CRUD ─────────────────────────────────────────────────────
 
+    async def _ensure_lesson_free(
+        self, session: AsyncSession, lesson_id: int | None, exclude_homework_id: int | None = None
+    ) -> None:
+        """Bir darsga — bitta uy vazifasi.
+
+        Bazadagi qisman unikal indeks (`uq_homework_per_lesson`) oxirgi to'siq,
+        bu tekshiruv esa foydalanuvchiga IntegrityError o'rniga tushunarli
+        xabar qaytaradi.
+        """
+        if lesson_id is None:
+            return
+        stmt = select(Homework.id).where(Homework.lesson_id == lesson_id)
+        if exclude_homework_id is not None:
+            stmt = stmt.where(Homework.id != exclude_homework_id)
+        existing = (await session.execute(stmt.limit(1))).scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bu dars uchun uy vazifasi allaqachon mavjud — uni tahrirlang yoki o'chiring",
+            )
+
     async def create_homework(
         self, session: AsyncSession, data: HomeworkCreateRequest, current_user: User
     ) -> HomeworkResponse:
         await self._check_course_owner(session, data.course_id, current_user)
+        await self._ensure_lesson_free(session, data.lesson_id)
 
         a = Homework(
             course_id=data.course_id,
@@ -243,6 +265,8 @@ class HomeworkRepository:
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
+        if data.lesson_id is not None and data.lesson_id != a.lesson_id:
+            await self._ensure_lesson_free(session, data.lesson_id, exclude_homework_id=a.id)
 
         for field in (
             "lesson_id",

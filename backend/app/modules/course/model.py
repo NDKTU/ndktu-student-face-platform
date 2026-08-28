@@ -2,7 +2,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -186,6 +186,17 @@ class Lesson(Base, IdIntPk, TimestampMixin):
 
 class Homework(Base, IdIntPk, TimestampMixin):
     __tablename__ = "homeworks"
+    # Bir darsga — bitta uy vazifasi. Qisman indeks: darsga bog'lanmagan
+    # (kurs darajasidagi) vazifalar bir nechta bo'lishi mumkin, chunki
+    # NULL qiymatlar indeksdan tashqarida qoladi.
+    __table_args__ = (
+        Index(
+            "uq_homework_per_lesson",
+            "lesson_id",
+            unique=True,
+            postgresql_where=text("lesson_id IS NOT NULL"),
+        ),
+    )
 
     course_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
