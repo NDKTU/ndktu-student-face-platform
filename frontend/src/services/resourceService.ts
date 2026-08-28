@@ -1,6 +1,7 @@
 import api from './api';
 
-export type ResourceType = 'file' | 'link' | 'text' | 'video';
+/** `zoom` — jonli dars havolasi (Meeting SDK orqali saytda ochiladi). */
+export type ResourceType = 'file' | 'link' | 'text' | 'video' | 'zoom';
 
 export interface Resource {
     id: number;

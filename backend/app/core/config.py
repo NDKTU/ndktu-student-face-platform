@@ -120,6 +120,25 @@ class CorsConfig(BaseModel):
     origins: list[str] = []
 
 
+class ZoomConfig(BaseModel):
+    """Zoom Meeting SDK (General App).
+
+    Bu kalitlar bilan bekend faqat imzo (signature) yasaydi — sir brauzerga
+    hech qachon chiqmaydi. Bo'sh bo'lsa, integratsiya o'chiq hisoblanadi va
+    dars sahifasi Zoom bloki bo'lmasdan ishlayveradi.
+    """
+
+    client_id: str = ""
+    client_secret: str = ""
+    # Imzo amal qilish muddati. Zoom 48 soatgacha ruxsat beradi; bizga
+    # qo'shilish uchun qisqa muddat yetarli.
+    signature_ttl_seconds: int = 60 * 60 * 2
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.client_id and self.client_secret)
+
+
 class AdminConfig(BaseModel):
     """Bootstrap admin account, created once by init_db on first boot.
 
@@ -151,6 +170,7 @@ class AppConfig(BaseSettings):
     redis: RedisConfig
     cors: CorsConfig = CorsConfig()
     admin: AdminConfig = AdminConfig()
+    zoom: ZoomConfig = ZoomConfig()
 
     # Add derived absolute paths
     @property

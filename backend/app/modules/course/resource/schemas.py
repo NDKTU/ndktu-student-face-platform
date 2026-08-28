@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.schemas import TashkentDatetime
 
-RESOURCE_TYPES = Literal["file", "link", "text", "video"]
+RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom"]
 
 
 class ResourceCreateRequest(BaseModel):
@@ -23,14 +23,22 @@ class ResourceCreateRequest(BaseModel):
             raise ValueError("Exactly one of lesson_id or course_id must be set")
 
         # Видео принимается только ссылкой (YouTube): загрузка видеофайлов отключена.
+        # Zoom — тоже ссылка, но с проверкой формата: по ней собирается номер
+        # встречи для Meeting SDK, и мусор здесь сломал бы подключение уже в
+        # аудитории, а не при сохранении урока.
         field_by_type = {
             "file": self.file_url,
             "link": self.link_url,
             "text": self.text_content,
             "video": self.link_url,
+            "zoom": self.link_url,
         }
         if not field_by_type[self.resource_type]:
             raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
+        if self.resource_type == "zoom":
+            from app.core.utils.zoom_link import parse_zoom_link
+
+            parse_zoom_link(self.link_url or "")
         return self
 
 

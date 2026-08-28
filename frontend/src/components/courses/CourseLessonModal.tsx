@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, FilePlus2, FileText, Loader2, Pencil, Plus, Trash2, UploadCloud, X, Youtube } from 'lucide-react';
+import { ClipboardList, FilePlus2, FileText, Loader2, Pencil, Plus, Trash2, UploadCloud, Video, X, Youtube } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -42,6 +42,9 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [youtubeUrl, setYoutubeUrl] = useState('');
+    // Jonli dars havolasi. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi,
+    // talabalar esa dars sahifasida qo'shiladi.
+    const [zoomUrl, setZoomUrl] = useState('');
     const [showResources, setShowResources] = useState(false);
     const [extraFiles, setExtraFiles] = useState<File[]>([]);
     // Bitta havola o'rniga ro'yxat: darsga bir nechta manba biriktirish kerak.
@@ -79,6 +82,7 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
         setTitle(lesson?.topic ?? '');
         setDescription(lesson?.description ?? '');
         setYoutubeUrl(lesson?.resources?.find((r) => r.resource_type === 'video')?.link_url ?? '');
+        setZoomUrl(lesson?.resources?.find((r) => r.resource_type === 'zoom')?.link_url ?? '');
         setShowResources(false);
         setExtraFiles([]);
         setLinks([]);
@@ -235,6 +239,21 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         link_url: youtubeUrl.trim(),
                     });
                 }
+
+                // Zoom havolasi ham xuddi video kabi: resursni yangilash yo'li
+                // yo'q, shuning uchun eskisi o'chiriladi va yangisi yoziladi.
+                const zoom = lesson.resources?.find((r) => r.resource_type === 'zoom');
+                if (zoom && zoom.link_url !== zoomUrl.trim()) {
+                    await resourceService.delete(zoom.id);
+                }
+                if (zoomUrl.trim() && (!zoom || zoom.link_url !== zoomUrl.trim())) {
+                    await resourceService.create({
+                        lesson_id: lesson.id,
+                        resource_type: 'zoom',
+                        title: 'Jonli dars',
+                        link_url: zoomUrl.trim(),
+                    });
+                }
             } else {
                 const created = await createLesson.mutateAsync({
                     course_id: course.id,
@@ -251,6 +270,15 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         resource_type: 'video',
                         title: title.trim(),
                         link_url: youtubeUrl.trim(),
+                    });
+                }
+
+                if (zoomUrl.trim()) {
+                    await resourceService.create({
+                        lesson_id: lessonId,
+                        resource_type: 'zoom',
+                        title: 'Jonli dars',
+                        link_url: zoomUrl.trim(),
                     });
                 }
             }
@@ -327,6 +355,22 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         placeholder="https://www.youtube.com/watch?v=..."
                     />
                     <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi qabul qilinadi.</p>
+                </div>
+
+                <div>
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Video className="h-4 w-4 text-primary" /> Jonli dars (Zoom havolasi)
+                        <span className="font-normal text-muted-foreground">(ixtiyoriy)</span>
+                    </label>
+                    <Input
+                        value={zoomUrl}
+                        onChange={(event) => setZoomUrl(event.target.value)}
+                        placeholder="https://us05web.zoom.us/j/89012345678?pwd=..."
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                        Zoom'da «Copy Invite Link» orqali olingan havola. Uchrashuvni siz Zoom ilovasida
+                        boshlaysiz, talabalar esa dars sahifasidan qo'shiladi.
+                    </p>
                 </div>
 
                 {needsGroupChoice && (

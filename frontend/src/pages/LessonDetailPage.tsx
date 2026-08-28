@@ -9,6 +9,7 @@ import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
+import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
@@ -49,7 +50,13 @@ export default function LessonDetailPage() {
     const [quizOpen, setQuizOpen] = useState(false);
     const [excelOpen, setExcelOpen] = useState(false);
     const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
-    const quizzesQuery = useQuizzes(lessonId ? { lesson_id: lessonId, limit: 20 } : {}, Boolean(lessonId));
+    // Talabada `read:quiz` yo'q — so'rov yuborilsa 403 qaytadi va konsol
+    // xatolarga to'ladi. Huquq bo'lmasa, blok umuman ko'rsatilmaydi.
+    const canSeeQuizzes = hasPermission('read:quiz');
+    const quizzesQuery = useQuizzes(
+        lessonId ? { lesson_id: lessonId, limit: 20 } : {},
+        Boolean(lessonId) && canSeeQuizzes,
+    );
     const deleteQuiz = useDeleteQuiz();
 
     if (lessonQuery.isLoading) return <div className="space-y-6"><Skeleton className="h-10 w-2/3" /><Skeleton className="aspect-video w-full rounded-2xl" /></div>;
@@ -59,6 +66,9 @@ export default function LessonDetailPage() {
 
     const resources = resourcesQuery.data?.resources ?? [];
     const video = resources.find((item) => item.resource_type === 'video');
+    // Jonli dars — Zoom havolasi. Oxirgisi olinadi: o'qituvchi havolani
+    // yangilaganda eskisi qolib ketmasin.
+    const zoom = [...resources].reverse().find((item) => item.resource_type === 'zoom');
     const scripts = resources.filter((item) => item.resource_type === 'text');
     const extras = resources.filter((item) => item.resource_type === 'file' || item.resource_type === 'link');
     // Bir darsga — bitta uy vazifasi (bazada `uq_homework_per_lesson` bilan
@@ -87,6 +97,14 @@ export default function LessonDetailPage() {
                 {lesson.description && <p className="max-w-4xl text-sm leading-6 text-foreground/80">{lesson.description}</p>}
             </div>
 
+            {zoom?.link_url && (
+                <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Jonli dars (Zoom)</CardTitle>
+                    {canManageContent && <DeleteButton onClick={() => deleteResource.mutate(zoom.id)} />}
+                </CardHeader><CardContent>
+                    <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} />
+                </CardContent></Card>
+            )}
+
             <Card><CardHeader><CardTitle>Dars videosi</CardTitle></CardHeader><CardContent>
                 {embedUrl ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe className="h-full w-full" src={embedUrl} title={video?.title ?? lesson.topic} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
                     : video?.link_url ? <a href={video.link_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">{video.title || 'Video havolasi'} <ExternalLink className="h-4 w-4" /></a>
@@ -103,7 +121,7 @@ export default function LessonDetailPage() {
                 {!homework ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : (() => { const assignment = homework; return <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {formatDateTime(assignment.deadline)}</p>{/* Kim bergani faqat vazifani boshqaradiganlarga: talabaga muddat muhim, xizmat ma'lumoti emas. */}{canManageHomework && <p className="mt-1 text-xs text-muted-foreground">Bergan: {assignment.created_by_name || "noma'lum"} · {formatDateTime(assignment.created_at)}</p>}{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>; })()}
             </CardContent></Card>
 
-            <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Testlar</CardTitle>
+            {canSeeQuizzes && <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Testlar</CardTitle>
                 <div className="flex flex-wrap gap-2">
                     {canAddQuestion && (
                         <>
@@ -162,7 +180,7 @@ export default function LessonDetailPage() {
                         ))}
                     </div>
                 )}
-            </CardContent></Card>
+            </CardContent></Card>}
 
             <ContentModal isOpen={contentOpen} onClose={() => setContentOpen(false)} lessonId={lesson.id} />
             <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
@@ -190,14 +208,14 @@ function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose:
     const [file, setFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'YouTube video' }];
+    const options: { value: ResourceType; label: string }[] = [{ value: 'file', label: 'Hujjat / kitob' }, { value: 'link', label: 'Havola' }, { value: 'text', label: 'Skript / konspekt' }, { value: 'video', label: 'YouTube video' }, { value: 'zoom', label: 'Zoom (jonli dars)' }];
 
     const submit = async () => {
         setSaving(true); setError('');
         try {
             let fileUrl: string | undefined;
             if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
-            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
             setTitle(''); setUrl(''); setText(''); setFile(null); onClose();
         } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
         finally { setSaving(false); }
@@ -209,6 +227,7 @@ function ContentModal({ isOpen, onClose, lessonId }: { isOpen: boolean; onClose:
         {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
         {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
+        {kind === 'zoom' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://us05web.zoom.us/j/89012345678?pwd=..." /><p className="mt-1.5 text-xs text-muted-foreground">Zoom'da «Copy Invite Link» orqali olingan havolani qo'ying. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi, talabalar shu sahifada qo'shiladi.</p></div>}
         {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></div>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button><Button onClick={submit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button></div>
