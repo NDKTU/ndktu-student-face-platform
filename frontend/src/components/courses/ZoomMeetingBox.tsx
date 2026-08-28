@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Video } from 'lucide-react';
+import { Loader2, LogOut, Radio, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { zoomService } from '@/services/zoomService';
@@ -31,6 +31,7 @@ type ZoomClient = {
     init: (options: Record<string, unknown>) => Promise<void>;
     join: (options: Record<string, unknown>) => Promise<void>;
     leaveMeeting: () => Promise<void>;
+    on?: (event: string, callback: (payload: unknown) => void) => void;
 };
 
 declare global {
@@ -94,6 +95,12 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
         };
     }, []);
 
+    const leave = async () => {
+        await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
+        clientRef.current = null;
+        setState('idle');
+    };
+
     const join = async () => {
         setState('joining');
         setError('');
@@ -102,6 +109,13 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
             await loadZoomSdk();
             if (!window.ZoomMtgEmbedded || !containerRef.current) throw new Error('Zoom SDK topilmadi');
 
+            // O'lcham konteyner kengligidan olinadi: qat'iy 1000×600 da video
+            // kartochkadan chiqib ketar yoki yon tomonlarda qora chiziq qolardi.
+            const width = Math.round(containerRef.current.clientWidth) || 960;
+            // Bo'yi ekranga ham qarab olinadi: 16:9 keng monitorda balandlikni
+            // sahifadan tashqariga chiqarib yuborardi.
+            const height = Math.min(Math.round((width * 9) / 16), Math.round(window.innerHeight * 0.62));
+
             const client = window.ZoomMtgEmbedded.createClient();
             clientRef.current = client;
             await client.init({
@@ -109,8 +123,22 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
                 language: 'en-US',
                 patchJsMedia: true,
                 customize: {
-                    video: { isResizable: true, viewSizes: { default: { width: 1000, height: 600 } } },
+                    video: {
+                        isResizable: false,
+                        // Ikkala ko'rinish uchun bir xil o'lcham: SDK «ribbon»
+                        // rejimiga o'tganda blok bo'yiga cho'zilib, kartochkadan
+                        // chiqib ketardi.
+                        viewSizes: { default: { width, height }, ribbon: { width, height } },
+                    },
                 },
+            });
+            // Uchrashuv tugaganda yoki uzilib qolganda tugma qaytib kelsin.
+            client.on?.('connection-change', (payload) => {
+                const stateName = (payload as { state?: string })?.state;
+                if (stateName === 'Closed' || stateName === 'Fail') {
+                    clientRef.current = null;
+                    setState('idle');
+                }
             });
             await client.join({
                 signature: payload.signature,
@@ -139,26 +167,59 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl }: Props) => {
 
     return (
         <div className="space-y-3">
-            {state !== 'joined' && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={() => void join()} disabled={state === 'joining'}>
-                        {state === 'joining' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
-                        {state === 'joining' ? "Ulanmoqda..." : "Darsga qo'shilish"}
+            {state !== 'joined' ? (
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 py-8 text-center">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Video className="h-5 w-5" />
+                    </span>
+                    <div className="space-y-1">
+                        <p className="text-sm font-semibold">Dars jonli efirda o'tadi</p>
+                        <p className="text-xs text-muted-foreground">
+                            Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <Button onClick={() => void join()} disabled={state === 'joining'}>
+                            {state === 'joining' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
+                            {state === 'joining' ? 'Ulanmoqda...' : "Darsga qo'shilish"}
+                        </Button>
+                        {/* SDK ishlamaydigan brauzerlar uchun (ayniqsa mobil) zaxira yo'l. */}
+                        <a
+                            href={joinUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                        >
+                            Zoom ilovasida ochish
+                        </a>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
+                        <Radio className="h-3.5 w-3.5 animate-pulse" /> Efirdasiz
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => void leave()}>
+                        <LogOut className="mr-2 h-4 w-4" /> Uchrashuvdan chiqish
                     </Button>
-                    {/* SDK ishlamaydigan brauzerlar uchun (ayniqsa mobil) zaxira yo'l. */}
-                    <a
-                        href={joinUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                    >
-                        Zoom ilovasida ochish
-                    </a>
                 </div>
             )}
+
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {/* SDK shu konteynerga chiziladi; u doim DOM'da turishi kerak. */}
-            <div ref={containerRef} className={state === 'joined' ? 'min-h-[600px]' : 'hidden'} />
+
+            {/* SDK shu konteynerga chiziladi; u doim DOM'da turishi kerak,
+                shuning uchun yashirilganda ham o'chirilmaydi. */}
+            <div
+                ref={containerRef}
+                className={
+                    state === 'joined'
+                        // Zoom o'z tartibini o'zi chizadi (galereya, ribbon) va
+                        // balandligi kutilganidan katta chiqishi mumkin — blok
+                        // sahifani cho'zmasligi uchun cheklab, ichida skroll beramiz.
+                        ? 'max-h-[78vh] overflow-auto rounded-xl border border-border/60 bg-black'
+                        : 'h-0 w-full overflow-hidden'
+                }
+            />
         </div>
     );
 };
