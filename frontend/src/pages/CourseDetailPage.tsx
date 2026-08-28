@@ -45,6 +45,9 @@ export default function CourseDetailPage() {
     const [deletingTopic, setDeletingTopic] = useState<CourseTopic | null>(null);
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
+    // Bekend 409 bilan «nima yo'qoladi» ro'yxatini qaytaradi — uni ko'rsatib,
+    // ikkinchi bosishda `force` bilan yuboramiz.
+    const [lessonCascadeWarnings, setLessonCascadeWarnings] = useState<string[]>([]);
     const [expandedTopics, setExpandedTopics] = useState<Set<number>>(new Set());
 
     const courseQuery = useCourse(courseId);
@@ -105,12 +108,26 @@ export default function CourseDetailPage() {
     const confirmDeleteLesson = async () => {
         if (!deletingLesson) return;
         try {
-            await deleteLesson.mutateAsync(deletingLesson.id);
+            await deleteLesson.mutateAsync({
+                id: deletingLesson.id,
+                force: lessonCascadeWarnings.length > 0,
+            });
             toast.success("Dars o'chirildi");
             setDeletingLesson(null);
+            setLessonCascadeWarnings([]);
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            toast.error(detail || "Darsni o'chirishda xatolik");
+            const response = (cause as { response?: { status?: number; data?: { detail?: unknown } } })?.response;
+            const detail = response?.data?.detail;
+            if (
+                response?.status === 409
+                && detail
+                && typeof detail === 'object'
+                && (detail as { requires_confirmation?: boolean }).requires_confirmation
+            ) {
+                setLessonCascadeWarnings((detail as { warnings?: string[] }).warnings ?? []);
+                return;
+            }
+            toast.error(typeof detail === 'string' ? detail : "Darsni o'chirishda xatolik");
         }
     };
 
@@ -338,11 +355,15 @@ export default function CourseDetailPage() {
             />
             <ConfirmDialog
                 isOpen={Boolean(deletingLesson)}
-                onClose={() => setDeletingLesson(null)}
+                onClose={() => { setDeletingLesson(null); setLessonCascadeWarnings([]); }}
                 onConfirm={() => void confirmDeleteLesson()}
                 title="Darsni o'chirish"
-                description={`"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar ham yo'qoladi.`}
-                confirmText="O'chirish"
+                description={
+                    lessonCascadeWarnings.length > 0
+                        ? `${lessonCascadeWarnings.join('; ')}. Baribir o'chirilsinmi?`
+                        : `"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar va uy vazifasi ham yo'qoladi.`
+                }
+                confirmText={lessonCascadeWarnings.length > 0 ? "Ha, o'chirilsin" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
             <ConfirmDialog

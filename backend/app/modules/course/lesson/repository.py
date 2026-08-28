@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
-from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
+from app.modules.course.model import Course, CourseGroup, CourseTopic, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import TeacherGroup
 
 from .schemas import (
@@ -282,6 +282,7 @@ class LessonRepository:
         session: AsyncSession,
         lesson_id: int,
         current_user: User,
+        force: bool = False,
     ) -> None:
         lesson = await self.get_lesson(session=session, lesson_id=lesson_id)
 
@@ -294,6 +295,33 @@ class LessonRepository:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Teacher is not the owner of this Course",
             )
+
+        # Vazifalar dars bilan birga o'chadi (FK CASCADE). Talabalar ish
+        # topshirgan bo'lsa, baholar ham yo'qoladi — bu haqda oldindan
+        # ogohlantiramiz va tasdiqni so'raymiz.
+        if not force:
+            homework_count = (
+                await session.execute(select(func.count(Homework.id)).where(Homework.lesson_id == lesson_id))
+            ).scalar() or 0
+            if homework_count:
+                submission_count = (
+                    await session.execute(
+                        select(func.count(HomeworkSubmission.id))
+                        .join(Homework, Homework.id == HomeworkSubmission.homework_id)
+                        .where(Homework.lesson_id == lesson_id)
+                    )
+                ).scalar() or 0
+                warnings = [f"{homework_count} ta uy vazifasi o'chib ketadi"]
+                if submission_count:
+                    warnings.append(f"{submission_count} ta topshirilgan ish va ularning baholari o'chadi")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "requires_confirmation": True,
+                        "message": "Ushbu darsni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                        "warnings": warnings,
+                    },
+                )
 
         await session.delete(lesson)
         await session.commit()

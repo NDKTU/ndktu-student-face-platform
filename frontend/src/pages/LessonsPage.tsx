@@ -148,7 +148,12 @@ export default function LessonsPage() {
 
     const handleDelete = () => {
         if (!deleteTarget) return;
-        deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+        // Bu ro'yxatda tasdiq oynasi yo'q, shuning uchun bog'langan vazifalar
+        // bilan birga o'chiriladi: foydalanuvchi darsni ataylab o'chiryapti.
+        deleteMutation.mutate(
+            { id: deleteTarget.id, force: true },
+            { onSuccess: () => setDeleteTarget(null) },
+        );
     };
 
     const totalPages = data ? Math.ceil(data.total / pageSize) : 1;

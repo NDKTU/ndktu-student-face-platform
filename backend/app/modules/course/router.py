@@ -273,10 +273,13 @@ async def update_lesson(
 )
 async def delete_lesson(
     lesson_id: int,
+    force: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: "User" = Depends(PermissionRequired("delete:lesson")),
 ):
-    await get_lesson_repository.delete_lesson(session=session, lesson_id=lesson_id, current_user=current_user)
+    await get_lesson_repository.delete_lesson(
+        session=session, lesson_id=lesson_id, current_user=current_user, force=force
+    )
 
 
 # ============================================================================

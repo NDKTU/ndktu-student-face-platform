@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, ClipboardCheck, ClipboardList, Search } from 'lucide-react';
+import { BookOpen, ClipboardCheck, ClipboardList, Search, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useAssignments } from '@/hooks/useAssignments';
+import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import type { Assignment } from '@/services/assignmentService';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from 'sonner';
 import { formatDateTime } from '@/utils/date';
 
 type Filter = 'all' | 'pending' | 'overdue';
@@ -24,6 +26,9 @@ export default function HomeworksPage() {
     const navigate = useNavigate();
     const { hasPermission } = useAuth();
     const canGrade = hasPermission('update:submission');
+    const canDelete = hasPermission('delete:homework');
+    const [deleting, setDeleting] = useState<Assignment | null>(null);
+    const deleteAssignment = useDeleteAssignment();
 
     const query = useAssignments({ page: 1, limit: 200 });
     const [search, setSearch] = useState('');
@@ -113,10 +118,25 @@ export default function HomeworksPage() {
             header: '',
             className: 'text-right',
             cell: (item) => (
-                <Button variant="outline" size="sm" className="whitespace-nowrap" onClick={(event) => { event.stopPropagation(); openHomework(item); }}>
-                    {canGrade ? <ClipboardCheck className="mr-2 h-4 w-4" /> : <BookOpen className="mr-2 h-4 w-4" />}
-                    {canGrade ? 'Tekshirish' : 'Darsga o\'tish'}
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                    <Button variant="outline" size="sm" className="whitespace-nowrap" onClick={(event) => { event.stopPropagation(); openHomework(item); }}>
+                        {canGrade ? <ClipboardCheck className="mr-2 h-4 w-4" /> : <BookOpen className="mr-2 h-4 w-4" />}
+                        {canGrade ? 'Tekshirish' : 'Darsga o\'tish'}
+                    </Button>
+                    {/* Darsi o'chirilgan eski vazifalarni ham shu yerdan olib
+                        tashlash mumkin — avval ular ro'yxatda qolib ketardi. */}
+                    {canDelete && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            aria-label="Vazifani o'chirish"
+                            onClick={(event) => { event.stopPropagation(); setDeleting(item); }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    )}
+                </div>
             ),
         },
     ];
@@ -208,6 +228,25 @@ export default function HomeworksPage() {
                             ? "Darsga kirib «Uy vazifasi» qo'shing."
                             : 'Hozircha sizga vazifa berilmagan.'
                 }
+            />
+
+            <ConfirmDialog
+                isOpen={Boolean(deleting)}
+                onClose={() => setDeleting(null)}
+                onConfirm={() => {
+                    if (!deleting) return;
+                    deleteAssignment.mutate(deleting.id, {
+                        onSuccess: () => {
+                            toast.success("Vazifa o'chirildi");
+                            setDeleting(null);
+                        },
+                        onError: () => toast.error("Vazifani o'chirishda xatolik"),
+                    });
+                }}
+                title="Vazifani o'chirish"
+                description={`"${deleting?.title ?? ''}" vazifasi va unga topshirilgan ishlar o'chiriladi.`}
+                confirmText="O'chirish"
+                cancelText="Bekor qilish"
             />
         </div>
     );

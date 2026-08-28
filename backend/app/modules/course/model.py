@@ -201,8 +201,11 @@ class Homework(Base, IdIntPk, TimestampMixin):
     course_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Dars o'chirilsa, vazifa ham ketadi: darsisiz vazifa ro'yxatda «egasiz»
+    # bo'lib qolardi. Kurs darajasidagi vazifalar `lesson_id` NULL bilan
+    # yashaydi va bunga tegishli emas.
     lesson_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=True, index=True
     )
     created_by_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 

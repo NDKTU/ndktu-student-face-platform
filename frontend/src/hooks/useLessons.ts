@@ -52,11 +52,13 @@ export const useUpdateLesson = () => {
 export const useDeleteLesson = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (id: number) => lessonService.delete(id),
+        mutationFn: ({ id, force }: { id: number; force?: boolean }) => lessonService.delete(id, force),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['lessons'] });
             queryClient.invalidateQueries({ queryKey: ['course-topics'] });
             queryClient.invalidateQueries({ queryKey: ['courses'] });
+            // Vazifalar dars bilan birga o'chadi — ro'yxat eskirmasin.
+            queryClient.invalidateQueries({ queryKey: ['assignments'] });
         },
     });
 };

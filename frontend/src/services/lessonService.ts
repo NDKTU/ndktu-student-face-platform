@@ -149,8 +149,9 @@ export const lessonService = {
         const response = await api.put<Lesson>(`/lesson/${id}`, data);
         return response.data;
     },
-    delete: async (id: number) => {
-        await api.delete(`/lesson/${id}`);
+    /** `force` — bog'langan vazifalar bilan birga o'chirishga rozilik. */
+    delete: async (id: number, force?: boolean) => {
+        await api.delete(force ? `/lesson/${id}?force=true` : `/lesson/${id}`);
     },
     listResults: async (lessonId: number) => {
         const response = await api.get<LessonResultListResponse>(`/lesson/${lessonId}/results`);
