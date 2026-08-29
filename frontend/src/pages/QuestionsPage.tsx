@@ -78,7 +78,11 @@ export const QuestionsPage = () => {
     const parsedSubjectId = selectedSubject !== 'all' && selectedSubject ? Number(selectedSubject) : undefined;
     const parsedTeacherId = selectedTeacher !== 'all' && selectedTeacher ? Number(selectedTeacher) : undefined;
 
-    const effectiveOwnerUserId = isTeacher ? user?.id : parsedTeacherId;
+    // O'qituvchi uchun muallif filtri YUBORILMAYDI: server endi savollarni
+    // biriktirilgan fan bo'yicha beradi. Bu yerda o'z user_id'sini yuborish
+    // o'sha kengaytmani bekor qilardi va sahifa bo'sh ko'rinardi — fanda
+    // 602 ta savol bo'lsa ham.
+    const effectiveOwnerUserId = isTeacher ? undefined : parsedTeacherId;
 
     const {
         data: questionsData,
