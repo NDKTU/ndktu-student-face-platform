@@ -181,9 +181,11 @@ async def download_questions_excel(
 async def create_question(
     data: QuestionCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:question")),
+    current_user: User = Depends(PermissionRequired("create:question")),
 ):
-    result = await get_question_repository.create_question(session=session, data=data)
+    result = await get_question_repository.create_question(
+        session=session, data=data, current_user=current_user
+    )
     return result
 
 

@@ -344,7 +344,11 @@ export const QuestionsPage = () => {
                         description={
                             searchTerm || selectedSubject !== 'all'
                                 ? "Tanlangan filtrlarga mos savol topilmadi."
-                                : "Hozircha savollar bazasi bo'sh."
+                                // "Bazasi bo'sh" degan xabar noto'g'ri edi: bazada
+                                // o'n minglab savol bor, shunchaki bu o'qituvchining
+                                // fanlarida yo'q. Foydalanuvchi buni tizim buzilgan
+                                // deb tushunardi.
+                                : "Fanlaringiz bo'yicha hali savol qo'shilmagan."
                         }
                     />
                 </div>
