@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply
 
 .DEFAULT_GOAL := help
 
@@ -30,6 +30,8 @@ help:
 	@echo "make merge   FILE=path/to/backup.sql.gz - Merge backup into current DB (non-destructive)"
 	@echo "make fix-image-urls       - Show broken image URLs in the DB (dry run)"
 	@echo "make fix-image-urls-apply - Rewrite them (dumps affected tables first)"
+	@echo "make import-files         - Show files to move into the file library (dry run)"
+	@echo "make import-files-apply   - Move them (dumps library tables first)"
 	@echo ""
 	@echo "EDUPLAN (EPOS) SYNC:"
 	@echo "────────────────────"
@@ -124,3 +126,10 @@ fix-image-urls:
 # Actually rewrite image URLs (dumps questions + user_answers to backups/ first)
 fix-image-urls-apply:
 	@./scripts/fix_image_urls.sh --apply
+
+# Mavjud fayllarni fayl kutubxonasiga koʻchirish (bir martalik)
+import-files:
+	@./scripts/import_files.sh
+
+import-files-apply:
+	@./scripts/import_files.sh --apply
