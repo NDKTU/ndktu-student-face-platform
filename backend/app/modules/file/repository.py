@@ -11,10 +11,11 @@ import re
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import User
 from app.modules.course.model import Homework, Resource
 from app.modules.quiz.model import Question
@@ -60,6 +61,62 @@ def _is_admin(user: User) -> bool:
 
 class FileRepository:
     # ─── Yordamchi ────────────────────────────────────────────────────
+
+    async def _visible_filter(self, session: AsyncSession, user: User):
+        """Oʻqituvchiga koʻrinadigan fayllar sharti.
+
+        Savollar bilan bir xil qoida: oʻzi yuklagan fayllar HAM, oʻzi dars
+        beradigan fanning savollarida ishlatilayotgan fayllar HAM koʻrinadi.
+        Ilgari faqat oʻzi yuklaganini koʻrardi — natijada hech nima
+        yuklamagan oʻqituvchiga kutubxona boʻsh koʻrinardi va u hamkasbi
+        allaqachon yuklagan rasmni qaytadan yuklardi.
+        """
+        own = StoredFile.owner_user_id == user.id
+        subject_ids = await assigned_subject_ids(session, user)
+        if not subject_ids:
+            return own
+
+        used_in_my_subjects = (
+            select(FileUsage.file_id)
+            .join(
+                Question,
+                and_(Question.id == FileUsage.entity_id, FileUsage.entity_type == "question"),
+            )
+            .where(Question.subject_id.in_(subject_ids))
+        )
+        return or_(own, StoredFile.id.in_(used_in_my_subjects))
+
+    async def _get_visible(self, session: AsyncSession, file_id: int, user: User) -> StoredFile:
+        """Koʻrish va ishlatish uchun. Oʻzgartirish uchun ``_get_owned``."""
+        stored = await session.scalar(
+            select(StoredFile)
+            .where(StoredFile.id == file_id, StoredFile.is_active.is_(True))
+            .options(selectinload(StoredFile.blob), selectinload(StoredFile.usages))
+        )
+        if not stored:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+
+        if _is_admin(user) or stored.owner_user_id == user.id:
+            return stored
+
+        subject_ids = await assigned_subject_ids(session, user)
+        if subject_ids:
+            in_my_subjects = await session.scalar(
+                select(func.count())
+                .select_from(FileUsage)
+                .join(
+                    Question,
+                    and_(Question.id == FileUsage.entity_id, FileUsage.entity_type == "question"),
+                )
+                .where(FileUsage.file_id == stored.id, Question.subject_id.in_(subject_ids))
+            )
+            if in_my_subjects:
+                return stored
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu fayl sizning fanlaringizga tegishli emas",
+        )
 
     async def _get_owned(self, session: AsyncSession, file_id: int, user: User) -> StoredFile:
         stored = await session.scalar(
@@ -130,7 +187,7 @@ class FileRepository:
         stmt = select(StoredFile).where(StoredFile.is_active.is_(True))
 
         if not _is_admin(user):
-            stmt = stmt.where(StoredFile.owner_user_id == user.id)
+            stmt = stmt.where(await self._visible_filter(session, user))
 
         if request.root_only:
             stmt = stmt.where(StoredFile.folder_id.is_(None))
@@ -177,7 +234,7 @@ class FileRepository:
         )
 
     async def get_file(self, session: AsyncSession, file_id: int, user: User) -> FileDetailResponse:
-        stored = await self._get_owned(session, file_id, user)
+        stored = await self._get_visible(session, file_id, user)
         usages = await self._describe_usages(session, stored)
         base = self._to_response(stored, len(usages))
         return FileDetailResponse(**base.model_dump(), usages=usages)
@@ -265,7 +322,9 @@ class FileRepository:
     async def attach(
         self, session: AsyncSession, file_id: int, data: FileAttachRequest, user: User
     ) -> FileResponse:
-        stored = await self._get_owned(session, file_id, user)
+        # Koʻra oladigan faylni ishlatsa ham boʻladi — almashishning butun
+        # maʼnosi shunda. Faylning oʻzini oʻzgartirish esa egasida qoladi.
+        stored = await self._get_visible(session, file_id, user)
 
         existing = await session.scalar(
             select(FileUsage).where(
@@ -290,7 +349,7 @@ class FileRepository:
     async def detach(
         self, session: AsyncSession, file_id: int, data: FileAttachRequest, user: User
     ) -> None:
-        stored = await self._get_owned(session, file_id, user)
+        stored = await self._get_visible(session, file_id, user)
         await session.execute(
             delete(FileUsage).where(
                 FileUsage.file_id == stored.id,

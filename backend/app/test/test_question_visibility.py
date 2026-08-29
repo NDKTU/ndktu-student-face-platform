@@ -1,4 +1,4 @@
-"""Oʻqituvchi qaysi savollarni koʻradi va qaysilariga tegishi mumkin.
+"""Oʻqituvchi nimani koʻradi va nimaga tegishi mumkin — savollar va fayllar.
 
 Qoida: **koʻrish** biriktirma boʻyicha (oʻzi dars beradigan fanning barcha
 savollari), **oʻzgartirish** esa mualliflik boʻyicha (faqat oʻzi yozgani).
@@ -39,7 +39,16 @@ async def teacher_setup(async_db, auth_client, test_subject):
 
     # Test bazasi boʻsh koʻtariladi: ruxsatlarsiz har bir soʻrov 403 qaytaradi
     # va testlar "toʻgʻri sabab bilan emas" oʻtib ketardi.
-    for name in ("read:question", "create:question", "update:question", "delete:question"):
+    for name in (
+        "read:question",
+        "create:question",
+        "update:question",
+        "delete:question",
+        "read:file",
+        "create:file",
+        "update:file",
+        "delete:file",
+    ):
         permission = Permission(name=name)
         async_db.add(permission)
         await async_db.flush()
@@ -182,4 +191,71 @@ async def test_teacher_cannot_add_question_to_a_foreign_subject(teacher_client, 
             "correct_option": "a",
         },
     )
+    assert response.status_code == 403
+
+
+# ─── Fayl kutubxonasi ham xuddi shu qoida boʻyicha ────────────────────
+# Ilgari oʻqituvchi faqat oʻzi yuklagan faylni koʻrardi. Natijada hech nima
+# yuklamagan odamga kutubxona boʻsh koʻrinardi va u hamkasbi allaqachon
+# yuklagan rasmni qaytadan yuklardi — diskdagi 8087 rasmdan 4715 tasi
+# aynan shu sababdan nusxa boʻlib qolgan.
+
+
+@pytest_asyncio.fixture
+async def foreign_file(async_db, teacher_setup):
+    """Boshqa odam yuklagan, lekin oʻqituvchining fanidagi savolda ishlatilgan fayl."""
+    from app.modules.file.model import FileBlob, FileUsage, StoredFile
+
+    blob = FileBlob(
+        sha256="a" * 64,
+        stored_path="question/hamkasb-rasmi.png",
+        size_bytes=123,
+        mime_type="image/png",
+    )
+    async_db.add(blob)
+    await async_db.flush()
+
+    stored = StoredFile(
+        blob_id=blob.id,
+        owner_user_id=1,
+        title="Hamkasb yuklagan rasm",
+        original_name="rasm.png",
+    )
+    async_db.add(stored)
+    await async_db.flush()
+
+    async_db.add(
+        FileUsage(
+            file_id=stored.id,
+            entity_type="question",
+            entity_id=teacher_setup["foreign_question_id"],
+        )
+    )
+    await async_db.commit()
+    return stored.id
+
+
+@pytest.mark.asyncio
+async def test_teacher_sees_files_used_in_their_subject(teacher_client, foreign_file):
+    """Faylni hamkasbi yuklagan boʻlsa ham, oʻz fanida ishlatilsa — koʻrinadi."""
+    response = await teacher_client.get("/file/")
+    assert response.status_code == 200
+    assert foreign_file in [item["id"] for item in response.json()["items"]]
+
+
+@pytest.mark.asyncio
+async def test_teacher_can_use_but_not_rename_a_foreign_file(teacher_client, foreign_file):
+    """Ishlatish mumkin, oʻzgartirish — yoʻq: almashishning maʼnosi shunda."""
+    used = await teacher_client.post(
+        f"/file/{foreign_file}/attach", json={"entity_type": "resource", "entity_id": 1}
+    )
+    assert used.status_code == 200
+
+    renamed = await teacher_client.patch(f"/file/{foreign_file}", json={"title": "Meniki"})
+    assert renamed.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_teacher_cannot_delete_a_foreign_file(teacher_client, foreign_file):
+    response = await teacher_client.delete(f"/file/{foreign_file}")
     assert response.status_code == 403

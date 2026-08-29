@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.modules.auth.model import Teacher, TeacherSubject, User
+from app.core.utils.teacher_scope import assigned_subject_ids
+from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Subject
@@ -25,20 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class QuestionRepository:
-    async def _assigned_subject_ids(self, session: AsyncSession, user: User) -> list[int]:
-        """Oʻqituvchi biriktirilgan fanlar roʻyxati.
-
-        Savollar bazasi shu boʻyicha koʻrsatiladi: oʻqituvchi oʻzi dars
-        beradigan fanning savollarini koʻrishi kerak, garchi ularni hamkasbi
-        yozgan boʻlsa ham. Tahrirlash esa faqat oʻz savolida qoladi.
-        """
-        rows = await session.scalars(
-            select(TeacherSubject.subject_id)
-            .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
-            .where(Teacher.user_id == user.id)
-        )
-        return list(rows)
-
     def _visible_questions_filter(self, user: User, subject_ids: list[int]):
         """Oʻqituvchiga koʻrinadigan savollar sharti.
 
@@ -73,7 +60,7 @@ class QuestionRepository:
         )
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         if not is_admin:
-            subject_ids = await self._assigned_subject_ids(session, current_user)
+            subject_ids = await assigned_subject_ids(session, current_user)
             stmt = stmt.where(self._visible_questions_filter(current_user, subject_ids))
         if search:
             pattern = f"%{search}%"
@@ -135,7 +122,7 @@ class QuestionRepository:
             # Oʻz fanidan tashqariga savol qoʻshib boʻlmaydi. Biriktirmasi
             # umuman yoʻq oʻqituvchini bloklamaymiz — EduPlan sinxronizatsiyasi
             # kechikkan boʻlishi mumkin, bu esa ishlashni butunlay toʻxtatardi.
-            subject_ids = await self._assigned_subject_ids(session, current_user)
+            subject_ids = await assigned_subject_ids(session, current_user)
             if subject_ids and data.subject_id not in subject_ids:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -185,7 +172,7 @@ class QuestionRepository:
         # Koʻrish — oʻz savoli yoki oʻzi dars beradigan fanning savoli.
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         if not is_admin and question.user_id != current_user.id:
-            subject_ids = await self._assigned_subject_ids(session, current_user)
+            subject_ids = await assigned_subject_ids(session, current_user)
             if question.subject_id not in subject_ids:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -215,7 +202,7 @@ class QuestionRepository:
             # Oʻqituvchi biriktirilgan fanlarining savollarini koʻradi —
             # ilgari faqat oʻzi yozganini koʻrardi va oʻz fanining bazasi
             # unga boʻsh koʻrinardi.
-            subject_ids = await self._assigned_subject_ids(session, current_user)
+            subject_ids = await assigned_subject_ids(session, current_user)
             stmt = stmt.where(self._visible_questions_filter(current_user, subject_ids))
 
         if request.text:
