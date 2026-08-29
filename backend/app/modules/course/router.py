@@ -507,9 +507,12 @@ async def list_resources(
 )
 async def upload_resource_file(
     file: UploadFile = File(...),
-    _: "User" = Depends(PermissionRequired("create:resource")),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("create:resource")),
 ):
-    url = await get_resource_repository.upload_file(file=file)
+    url = await get_resource_repository.upload_file(
+        session=session, file=file, current_user=current_user
+    )
     return {"url": url}
 
 

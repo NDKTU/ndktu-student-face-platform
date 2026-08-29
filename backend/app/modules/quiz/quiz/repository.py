@@ -9,10 +9,10 @@ from sqlalchemy.orm import selectinload
 
 from app.core.enums import semester_label
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
+from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
@@ -651,9 +651,17 @@ class QuizRepository:
             )
         return new_quiz
 
-    async def upload_image(self, file) -> str:
-        filename = await save_image(file, settings.question_upload_dir)
-        return f"{settings.file_url.http}/question/{filename}"
+    async def upload_image(self, session: AsyncSession, file, current_user) -> str:
+        """Test rasmini yuklaydi — savol rasmlari bilan bir papkada."""
+        stored = await store_upload(
+            session,
+            file,
+            owner_user_id=current_user.id if current_user else None,
+            subdir="question",
+        )
+        await session.commit()
+        await session.refresh(stored, ["blob"])
+        return public_url(stored.blob.stored_path)
 
 
 get_quiz_repository = QuizRepository()

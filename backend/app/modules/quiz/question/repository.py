@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.utils.image_upload import save_image
 from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Kafedra
+from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Subject
 
 from .schemas import (
@@ -319,9 +319,20 @@ class QuestionRepository:
 
         return result.rowcount
 
-    async def upload_image(self, file) -> str:
-        filename = await save_image(file, settings.question_upload_dir)
-        return f"{settings.file_url.http}/question/{filename}"
+    async def upload_image(self, session: AsyncSession, file, current_user) -> str:
+        """Savol rasmini yuklaydi va fayl kutubxonasiga qayd etadi.
+
+        Papka avvalgidek `question/` — bazadagi mavjud havolalar shu yerga
+        ishora qiladi va ularni buzib boʻlmaydi."""
+        stored = await store_upload(
+            session,
+            file,
+            owner_user_id=current_user.id if current_user else None,
+            subdir="question",
+        )
+        await session.commit()
+        await session.refresh(stored, ["blob"])
+        return public_url(stored.blob.stored_path)
 
     async def upload_questions_excel(
         self, session: AsyncSession, file, subject_id: int, user_id: int

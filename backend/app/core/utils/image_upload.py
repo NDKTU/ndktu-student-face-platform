@@ -34,7 +34,7 @@ _MAGIC = {
 }
 
 
-def _looks_like_image(content: bytes, ext: str) -> bool:
+def looks_like_image(content: bytes, ext: str) -> bool:
     if ext == "webp":
         return content[:4] == b"RIFF" and content[8:12] == b"WEBP"
     return any(content.startswith(prefix) for prefix in _MAGIC[ext])
@@ -70,7 +70,7 @@ async def save_image(file: UploadFile, upload_dir: Path) -> str:
             detail=f"Image must not exceed {IMAGE_MAX_BYTES // (1024 * 1024)}MB",
         )
 
-    if not _looks_like_image(content, ext):
+    if not looks_like_image(content, ext):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File content does not match its extension — this is not a valid image",

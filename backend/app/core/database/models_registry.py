@@ -33,6 +33,10 @@ __all__ = [
     "LessonFaceCheck",
     "Resource",
     "EduPlanCredential",
+    "FileBlob",
+    "FileFolder",
+    "StoredFile",
+    "FileUsage",
 ]
 
 from app.modules.auth.model import (
@@ -54,6 +58,12 @@ from app.modules.course.model import (
     Lesson,
     LessonFaceCheck,
     Resource,
+)
+from app.modules.file.model import (
+    FileBlob,
+    FileFolder,
+    FileUsage,
+    StoredFile,
 )
 from app.modules.integration.eduplan.model import (
     EduPlanCredential,

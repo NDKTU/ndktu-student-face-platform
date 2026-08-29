@@ -202,6 +202,19 @@ class AppConfig(BaseSettings):
         return self.absolute_upload_dir / "homework_submissions"
 
     @property
+    def file_library_upload_dir(self) -> Path:
+        """Fayl kutubxonasi orqali yuklangan fayllar. Eski papkalar (question/,
+        course_resources/) oʻz joyida qoladi — ulardagi havolalar bazada."""
+        return self.absolute_upload_dir / "files"
+
+    @property
+    def upload_tmp_dir(self) -> Path:
+        """Yuklash tugaguncha fayl shu yerda yotadi. sha256 faqat toʻliq fayl
+        yozilgach maʼlum boʻladi, shuning uchun yakuniy nomni oldindan bilib
+        boʻlmaydi. Bir bo'limda turishi shart — koʻchirish atomik boʻlishi uchun."""
+        return self.absolute_upload_dir / "tmp"
+
+    @property
     def face_check_upload_dir(self) -> Path:
         """Yuz tekshiruvi suratlari. Ochiq statikadan tashqarida turishi kerak
         edi, lekin `/uploads` allaqachon mount qilingan — shuning uchun fayl

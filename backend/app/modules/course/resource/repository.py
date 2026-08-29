@@ -1,8 +1,5 @@
 import logging
-import os
-import uuid
 
-from core.config import settings
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,32 +7,11 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import User
 from app.modules.course.model import Course, Lesson, Resource
+from app.modules.file.storage import public_url, store_upload
 
 from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
 
 logger = logging.getLogger(__name__)
-
-# Видео файлом больше не принимаем: видеоурок хранится ссылкой (YouTube),
-# поэтому видеорасширения намеренно отсутствуют в списке разрешённых.
-_ALLOWED_EXTS = {
-    "jpg",
-    "jpeg",
-    "png",
-    "gif",
-    "webp",
-    "pdf",
-    "doc",
-    "docx",
-    "xls",
-    "xlsx",
-    "ppt",
-    "pptx",
-    "txt",
-    "zip",
-}
-_IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
-_IMAGE_MAX = 5 * 1024 * 1024
-_DOC_MAX = 20 * 1024 * 1024
 
 
 class ResourceRepository:
@@ -61,35 +37,23 @@ class ResourceRepository:
                 detail="Only Course owner or admin can manage resources",
             )
 
-    async def upload_file(self, file: UploadFile) -> str:
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="File name is empty")
-        ext = file.filename.rsplit(".", 1)[-1].lower()
-        if ext not in _ALLOWED_EXTS:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
+    async def upload_file(self, session: AsyncSession, file: UploadFile, current_user: User) -> str:
+        """Kurs materialini yuklaydi va uni fayl kutubxonasiga ham yozadi.
 
-        max_size = _IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX
-
-        upload_dir = settings.course_resource_upload_dir
-        os.makedirs(upload_dir, exist_ok=True)
-        filename = f"{uuid.uuid4()}.{ext}"
-        file_path = upload_dir / filename
-        size = 0
-        try:
-            with open(file_path, "wb") as buffer:
-                while chunk := await file.read(1024 * 1024):
-                    size += len(chunk)
-                    if size > max_size:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"File must not exceed {max_size // (1024 * 1024)}MB",
-                        )
-                    buffer.write(chunk)
-        except Exception:
-            file_path.unlink(missing_ok=True)
-            raise
-
-        return f"{settings.file_url.http}/course_resources/{filename}"
+        Javob avvalgidek havola satri — mavjud ekranlar oʻzgarishsiz ishlayveradi.
+        Farqi shundaki, endi fayl bazada qayd etiladi: oʻqituvchi uni keyin
+        qayta yuklamasdan boshqa kursga qoʻsha oladi. Papka ham oʻsha
+        (``course_resources/``), aks holda bazadagi eski havolalar buzilardi.
+        """
+        stored = await store_upload(
+            session,
+            file,
+            owner_user_id=current_user.id,
+            subdir="course_resources",
+        )
+        await session.commit()
+        await session.refresh(stored, ["blob"])
+        return public_url(stored.blob.stored_path)
 
     async def create_resource(self, session: AsyncSession, data: ResourceCreateRequest, current_user: User) -> Resource:
         course_id = await self._resolve_course_id(session, data.course_id, data.lesson_id)

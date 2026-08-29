@@ -266,9 +266,12 @@ async def bulk_delete_questions(
 )
 async def upload_question_image(
     file: UploadFile = File(...),
-    _: PermissionRequired = Depends(PermissionRequired("create:question")),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("create:question")),
 ):
-    url = await get_question_repository.upload_image(file=file)
+    url = await get_question_repository.upload_image(
+        session=session, file=file, current_user=current_user
+    )
     return {"url": url}
 
 
@@ -453,9 +456,12 @@ async def repeat_quiz(
 )
 async def upload_quiz_image(
     file: UploadFile = File(...),
-    _: PermissionRequired = Depends(PermissionRequired("create:quiz")),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("create:quiz")),
 ):
-    url = await get_quiz_repository.upload_image(file=file)
+    url = await get_quiz_repository.upload_image(
+        session=session, file=file, current_user=current_user
+    )
     return {"url": url}
 
 
