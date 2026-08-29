@@ -27,6 +27,7 @@ const EduPlanSyncPage = lazy(() => import('@/pages/EduPlanSyncPage'));
 const FacultyPage = lazy(() => import('@/pages/FacultyPage'));
 const KafedraPage = lazy(() => import('@/pages/KafedraPage'));
 const SpecialitiesPage = lazy(() => import('@/pages/SpecialitiesPage'));
+const FilesPage = lazy(() => import('@/pages/FilesPage'));
 const GroupsPage = lazy(() => import('@/pages/GroupsPage'));
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'));
 const CoursesPage = lazy(() => import('@/pages/CoursesPage'));
@@ -54,8 +55,8 @@ const PermissionsPage = lazy(() => import('@/pages/PermissionsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
 const PageSpinner = () => (
-    <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    <div className="flex h-screen items-center justify-center animate-fade-scale">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent shadow-sm" />
     </div>
 );
 
@@ -144,6 +145,7 @@ function App() {
                                         <Route path="/faculties/*" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/kafedras" element={<PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute>} />
+                                        <Route path="/files" element={<PermissionRoute permission="read:file"><FilesPage /></PermissionRoute>} />
                                         <Route path="/specialities" element={<PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
                                         <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />

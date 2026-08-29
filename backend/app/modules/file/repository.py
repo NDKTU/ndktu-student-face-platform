@@ -5,8 +5,9 @@ koʻradi va boshqaradi, admin hammasini koʻradi. Talaba bu yerga umuman
 kirmaydi — u fayllarni faqat vazifa topshirish orqali yuklaydi.
 """
 
+import html
 import logging
-import os
+import re
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
@@ -15,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import User
-from app.modules.course.model import Course, Homework, Lesson, Resource
+from app.modules.course.model import Homework, Resource
+from app.modules.quiz.model import Question
 from app.modules.file.model import FileBlob, FileFolder, FileUsage, StoredFile
 from app.modules.file.schemas import (
     FileAttachRequest,
@@ -32,6 +34,24 @@ from app.modules.file.schemas import (
 from app.modules.file.storage import DOCUMENT_EXTS, IMAGE_EXTS, public_url, store_upload
 
 logger = logging.getLogger(__name__)
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _plain_text(raw: str | None, limit: int = 80) -> str | None:
+    """Savol matnidan teglarni olib tashlaydi va qisqartiradi.
+
+    Savol matni HTML boʻlib saqlanadi (rasm ham oʻsha yerda). Roʻyxatda uni
+    xom holda koʻrsatib boʻlmaydi, lekin "#32834" ham hech nima demaydi."""
+    if not raw:
+        return None
+    text = _TAG_RE.sub(" ", raw)
+    # &nbsp; va boshqa mnemonikalar teglar olib tashlangach koʻrinib qoladi.
+    text = html.unescape(text)
+    text = " ".join(text.split())
+    if not text:
+        return None
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def _is_admin(user: User) -> bool:
@@ -185,6 +205,19 @@ class FileRepository:
             elif usage.entity_type == "homework":
                 homework = await session.get(Homework, usage.entity_id)
                 label = homework.title if homework else None
+            elif usage.entity_type == "question":
+                question = await session.scalar(
+                    select(Question)
+                    .where(Question.id == usage.entity_id)
+                    .options(selectinload(Question.subject))
+                )
+                if question:
+                    # Savollarning aksariyati sof rasmli — matni umuman yoʻq
+                    # (lokal bazada 7234 tadan 7008 tasi). Bunda fan nomi
+                    # koʻrsatiladi: "#33807" dan koʻra foydaliroq.
+                    label = _plain_text(question.text)
+                    if not label and question.subject:
+                        label = question.subject.name
             result.append(
                 FileUsageInfo(entity_type=usage.entity_type, entity_id=usage.entity_id, label=label)
             )

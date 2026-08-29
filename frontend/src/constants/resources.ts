@@ -1,5 +1,6 @@
 import {
     Users,
+    FolderOpen,
     GraduationCap,
     Shield,
     Key,
@@ -64,6 +65,7 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     question:      { label: 'Savollar',         href: '/questions',   icon: FileQuestion,  section: 'Testlar' },
     result:        { label: 'Natijalar',        href: '/results',     icon: FileText,      section: 'Testlar' },
     lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen },
+    file:          { label: 'Fayl kutubxonasi', href: '/files',       icon: FolderOpen,    section: 'Testlar' },
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: 'Testlar' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Psixologiya' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Psixologiya' },
@@ -146,6 +148,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'homework',
     'active_quiz',
     'lesson',
+    'file',
 
     // Psixologiya
     'psychology',
