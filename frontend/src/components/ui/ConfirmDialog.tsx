@@ -17,8 +17,7 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Radix AlertDialog underneath. Confirm does NOT auto-close: the caller
- * closes via isOpen after its mutation settles (same contract as before).
+ * Radix AlertDialog with backdrop-blur, spring scale entrance, and animated danger badge.
  */
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     isOpen,
@@ -33,11 +32,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => (
     <AlertDialogPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open && !isLoading) onClose(); }}>
         <AlertDialogPrimitive.Portal>
-            <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+            <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-md transition-opacity duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
             <AlertDialogPrimitive.Content
                 className={cn(
                     'fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2',
-                    'rounded-lg border bg-background p-6 shadow-lg duration-200',
+                    'rounded-2xl border border-border/80 bg-background p-6 shadow-2xl shadow-black/15 duration-200 outline-none',
                     'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
                     'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95'
                 )}
@@ -45,25 +44,27 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 <div className="flex items-start gap-4">
                     <div
                         className={cn(
-                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12',
-                            variant === 'danger' ? 'bg-destructive/15' : 'bg-primary/15'
+                            'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-xs transition-transform duration-200 hover:scale-105',
+                            variant === 'danger'
+                                ? 'bg-destructive/15 text-destructive ring-4 ring-destructive/10'
+                                : 'bg-primary/15 text-primary ring-4 ring-primary/10'
                         )}
                     >
                         <AlertTriangle
-                            className={cn('h-5 w-5', variant === 'danger' ? 'text-destructive' : 'text-primary')}
+                            className="h-5 w-5 animate-pulse"
                             aria-hidden="true"
                         />
                     </div>
-                    <div className="min-w-0">
-                        <AlertDialogPrimitive.Title className="text-lg font-semibold leading-tight tracking-tight">
+                    <div className="min-w-0 flex-1">
+                        <AlertDialogPrimitive.Title className="text-lg font-bold leading-tight tracking-tight text-foreground">
                             {title}
                         </AlertDialogPrimitive.Title>
                         <AlertDialogPrimitive.Description asChild>
-                            <div className="mt-2 text-sm text-muted-foreground">{description}</div>
+                            <div className="mt-2 text-sm text-muted-foreground leading-relaxed">{description}</div>
                         </AlertDialogPrimitive.Description>
                     </div>
                 </div>
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="mt-6 flex justify-end gap-2.5">
                     <AlertDialogPrimitive.Cancel asChild>
                         <Button type="button" variant="outline" disabled={isLoading}>
                             {cancelText}
@@ -77,3 +78,5 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </AlertDialogPrimitive.Portal>
     </AlertDialogPrimitive.Root>
 );
+
+export default ConfirmDialog;

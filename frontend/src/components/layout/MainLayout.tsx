@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import { Outlet } from 'react-router-dom';
+import { PageTransition } from './PageTransition';
 
 const MainLayout = () => {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,15 +14,14 @@ const MainLayout = () => {
                 <Navbar onMenuClick={() => setMobileOpen(!mobileOpen)} />
                 <main className="flex-1 overflow-y-auto custom-scrollbar">
                     <div className="w-full p-4 sm:p-6 lg:p-7">
-                        <Outlet />
+                        <PageTransition>
+                            <Outlet />
+                        </PageTransition>
                     </div>
                 </main>
-
             </div>
         </div>
     );
 };
 
 export default MainLayout;
-
-

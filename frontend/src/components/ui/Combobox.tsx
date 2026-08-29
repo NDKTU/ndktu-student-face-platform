@@ -18,8 +18,8 @@ export function Combobox({
     value,
     onChange,
     onSearchChange,
-    placeholder = "Select option...",
-    searchPlaceholder = "Search...",
+    placeholder = "Tanlang...",
+    searchPlaceholder = "Qidirish...",
     disabled = false,
     className,
 }: ComboboxProps) {
@@ -41,7 +41,7 @@ export function Combobox({
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setOpen(false);
-                setSearchQuery(""); // Optional: reset search on close
+                setSearchQuery("");
             }
         };
 
@@ -73,22 +73,23 @@ export function Combobox({
                 type="button"
                 onClick={() => !disabled && setOpen(!open)}
                 className={cn(
-                    "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    "flex h-9 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-2xs transition-all duration-150 hover:border-primary/40 hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    open && "border-primary ring-2 ring-primary/20",
                     className
                 )}
                 disabled={disabled}
             >
-                <span className="truncate">{selectedLabel}</span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <span className="truncate text-xs font-medium">{selectedLabel}</span>
+                <ChevronsUpDown className={cn("ml-2 h-3.5 w-3.5 shrink-0 opacity-50 transition-transform duration-150", open && "rotate-180")} />
             </button>
 
             {open && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-                    <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border/80 bg-popover/98 p-1 text-popover-foreground shadow-xl backdrop-blur-md outline-none animate-fade-scale">
+                    <div className="flex items-center border-b border-border/60 px-2.5 pb-1 pt-0.5">
+                        <Search className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70" />
                         <input
                             ref={inputRef}
-                            className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex h-8 w-full rounded-lg bg-transparent text-xs outline-none placeholder:text-muted-foreground"
                             placeholder={searchPlaceholder}
                             value={searchQuery}
                             onChange={(e) => {
@@ -98,26 +99,25 @@ export function Combobox({
                             }}
                         />
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto p-1">
+                    <div className="max-h-60 overflow-auto p-1 custom-scrollbar">
                         {filteredOptions.length === 0 ? (
-                            <div className="py-6 text-center text-sm">No results found.</div>
+                            <div className="py-4 text-center text-xs text-muted-foreground">
+                                Ma'lumot topilmadi
+                            </div>
                         ) : (
                             filteredOptions.map((option) => (
                                 <div
                                     key={option.value}
-                                    className={cn(
-                                        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                                        value === option.value && "bg-accent text-accent-foreground"
-                                    )}
                                     onClick={() => handleSelect(option.value)}
+                                    className={cn(
+                                        "relative flex cursor-pointer select-none items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors duration-150 hover:bg-primary/10 hover:text-primary",
+                                        value === option.value && "bg-primary/10 text-primary font-semibold"
+                                    )}
                                 >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            value === option.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    {option.label}
+                                    <span className="truncate">{option.label}</span>
+                                    {value === option.value && (
+                                        <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                    )}
                                 </div>
                             ))
                         )}
@@ -127,3 +127,5 @@ export function Combobox({
         </div>
     );
 }
+
+export default Combobox;

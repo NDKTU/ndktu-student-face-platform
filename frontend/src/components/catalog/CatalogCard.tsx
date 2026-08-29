@@ -36,17 +36,17 @@ export const CatalogCard = ({ id, title, subtitle, metrics, footer, actions, onC
                 }
             }}
             className={cn(
-                'group flex min-h-44 flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all',
-                interactive && 'cursor-pointer hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'grid-stagger-card group flex min-h-44 flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all duration-200',
+                interactive && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 className,
             )}
         >
             <div className="flex items-start gap-3">
-                <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold', tileFor(id))}>
+                <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-transform duration-200 group-hover:scale-105', tileFor(id))}>
                     {initialsOf(title)}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h2 className="font-display font-semibold leading-snug text-foreground">{title}</h2>
+                    <h2 className="font-display font-semibold leading-snug text-foreground group-hover:text-primary transition-colors">{title}</h2>
                     {subtitle && <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>}
                 </div>
                 {actions && <div onClick={(event) => event.stopPropagation()}>{actions}</div>}
@@ -69,5 +69,5 @@ export const CatalogCard = ({ id, title, subtitle, metrics, footer, actions, onC
 };
 
 export const CatalogGrid = ({ children }: { children: ReactNode }) => (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</section>
+    <section className="grid-stagger-container grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</section>
 );

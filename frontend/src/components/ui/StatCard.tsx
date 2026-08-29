@@ -35,14 +35,17 @@ export const StatCard: React.FC<StatCardProps> = ({
     isLoading,
     color = 'blue',
 }) => (
-    <div className={cn('wow-card rounded-2xl border border-border bg-card p-5 shadow-sm', className)}>
+    <div className={cn(
+        'group wow-card grid-stagger-card rounded-2xl border border-border/70 bg-card p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30',
+        className
+    )}>
         <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
                 {isLoading ? (
                     <div className="mt-1 h-8 w-24 animate-pulse rounded-lg bg-muted" />
                 ) : (
-                    <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 font-display">{value}</p>
+                    <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 font-display transition-colors group-hover:text-primary">{value}</p>
                 )}
                 {description && (
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 pt-0.5">
@@ -52,7 +55,10 @@ export const StatCard: React.FC<StatCardProps> = ({
                 )}
             </div>
 
-            <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 shadow-sm', colorMap[color])}>
+            <div className={cn(
+                'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-xs transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3',
+                colorMap[color]
+            )}>
                 <Icon className="h-6 w-6" />
             </div>
         </div>
@@ -60,4 +66,3 @@ export const StatCard: React.FC<StatCardProps> = ({
 );
 
 export default StatCard;
-

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { UserCheck, UserX, UserSearch, AlertTriangle } from 'lucide-react';
 import { useVideoMonitoring } from '@/hooks/useVideoMonitoring';
+import { cn } from '@/lib/utils';
 
 export interface QuizVideoMonitoringProps {
     active: boolean;
@@ -80,6 +81,14 @@ export function QuizVideoMonitoring({
             <video ref={videoRef} className="hidden" playsInline muted autoPlay />
 
             <div className={`relative transition-all duration-500 ease-in-out transform ${(state.isActive || hasError) ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
+
+                {/* Radar pulse ring */}
+                {state.isConnected && !hasError && (
+                    <div className={cn(
+                        "absolute -inset-1.5 rounded-full border-2 transition-all duration-500 pointer-events-none",
+                        isIssue ? "border-destructive/40 animate-ping" : isOk ? "border-success/30 animate-pulse" : "border-primary/20 animate-pulse"
+                    )} />
+                )}
 
                 {/* Futuristic HUD Scanner Circle */}
                 <div className={`relative w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all duration-500 backdrop-blur-md ${hasError ? 'border-destructive text-destructive bg-destructive/10 shadow-lg shadow-destructive/40' :

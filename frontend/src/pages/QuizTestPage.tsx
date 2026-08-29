@@ -791,24 +791,24 @@ const QuizTestPage = () => {
                                     key={option.key}
                                     onClick={() => handleSelectAnswer(currentQuestion.id, option.index)}
                                     className={cn(
-                                        "flex items-start gap-3 rounded-xl border border-border/80 p-4 text-left transition-all duration-200",
+                                        "group flex items-start gap-3 rounded-2xl border p-4 text-left cursor-pointer transition-all duration-150 active:scale-[0.99]",
                                         isSelected
-                                            ? "border-primary bg-primary/5 shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_8%,transparent)]"
-                                            : "border-border/60 hover:border-primary/30 hover:bg-accent/20"
+                                            ? "border-primary bg-primary/10 shadow-sm shadow-primary/20 scale-[1.005] ring-2 ring-primary/20"
+                                            : "border-border/70 bg-card hover:border-primary/40 hover:bg-primary/[0.03]"
                                     )}
                                 >
                                     <span className={cn(
-                                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200",
+                                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-transform duration-150",
                                         isSelected
-                                            ? "bg-primary text-primary-foreground"
-                                            : "bg-muted text-muted-foreground"
+                                            ? "bg-primary text-primary-foreground scale-110 shadow-xs"
+                                            : "bg-muted text-muted-foreground group-hover:bg-muted/80"
                                     )}>
                                         {isOrdered && isSelected
                                             ? (selectedPositions.indexOf(option.index) + 1)
                                             : option.key}
                                     </span>
                                     <span
-                                        className="pt-0.5"
+                                        className="pt-0.5 text-foreground leading-relaxed"
                                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.value) }}
                                     />
                                 </button>

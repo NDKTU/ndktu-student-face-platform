@@ -5,6 +5,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
 
+import { PageTransition } from './PageTransition';
+
 /**
  * Минимальный лейаут для прохождения тестов: без сайдбара и лишней навигации,
  * чтобы студент сосредоточился на тесте. Выход — только «Bosh sahifa».
@@ -39,7 +41,9 @@ const FocusLayout = () => {
             </header>
             <main className="flex-1">
                 <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
-                    <Outlet />
+                    <PageTransition>
+                        <Outlet />
+                    </PageTransition>
                 </div>
             </main>
         </div>
