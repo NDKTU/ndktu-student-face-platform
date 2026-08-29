@@ -26,6 +26,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { FilePickerModal } from '@/components/file/FilePickerModal';
+import type { LibraryFile } from '@/services/fileService';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 
@@ -269,6 +271,9 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
     const [url, setUrl] = useState('');
     const [text, setText] = useState('');
     const [file, setFile] = useState<File | null>(null);
+    // Kutubxonadan tanlangan fayl allaqachon serverda — yuklanmaydi.
+    const [libraryFile, setLibraryFile] = useState<LibraryFile | null>(null);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const ALL_OPTIONS: { value: ResourceType; label: string }[] = [
@@ -290,8 +295,9 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         try {
             let fileUrl: string | undefined;
             if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
-            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
-            setTitle(''); setUrl(''); setText(''); setFile(null); onClose();
+            else if (kind === 'file' && libraryFile) fileUrl = libraryFile.url;
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || libraryFile?.title || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
+            setTitle(''); setUrl(''); setText(''); setFile(null); setLibraryFile(null); onClose();
         } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
         finally { setSaving(false); }
     };
@@ -307,8 +313,18 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
         {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
         {kind === 'zoom' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://us05web.zoom.us/j/89012345678?pwd=..." /><p className="mt-1.5 text-xs text-muted-foreground">Zoom'da «Copy Invite Link» orqali olingan havolani qo'ying. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi, talabalar shu sahifada qo'shiladi.</p></div>}
-        {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></div>}
+        {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setLibraryFile(null); }} />
+            <button type="button" onClick={() => setIsPickerOpen(true)} className="mt-2 text-xs font-medium text-primary hover:underline">yoki kutubxonadan tanlash</button>
+            {libraryFile && <p className="mt-1.5 text-xs text-muted-foreground">Kutubxonadan: {libraryFile.title}</p>}
+        </div>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button><Button onClick={submit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button></div>
+        <FilePickerModal
+            isOpen={isPickerOpen}
+            onClose={() => setIsPickerOpen(false)}
+            multiple={false}
+            title="Dars materialini tanlash"
+            onSelect={(files) => { const picked = files[0]; if (picked) { setLibraryFile(picked); setFile(null); } }}
+        />
     </div></Modal>;
 }

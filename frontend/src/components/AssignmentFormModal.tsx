@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { Input } from '@/components/ui/Input';
 import { FileText, Loader2, UploadCloud, X } from 'lucide-react';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/useAssignments';
@@ -45,6 +46,7 @@ export const AssignmentFormModal = ({
     // birinchisi allaqachon serverda, ikkinchisi saqlashda yuklanadi.
     const [attachments, setAttachments] = useState<SubmissionFile[]>([]);
     const [newFiles, setNewFiles] = useState<File[]>([]);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
 
@@ -161,6 +163,14 @@ export const AssignmentFormModal = ({
                         className="hidden"
                         onChange={(event) => setNewFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                     />
+                    {/* Ilgari yuklangan faylni qayta yuklamasdan qoʻshish. */}
+                    <button
+                        type="button"
+                        onClick={() => setIsPickerOpen(true)}
+                        className="mt-2 text-xs font-medium text-primary hover:underline"
+                    >
+                        yoki kutubxonadan tanlash
+                    </button>
                     {(attachments.length > 0 || newFiles.length > 0) && (
                         <ul className="mt-2 space-y-1.5">
                             {attachments.map((file, index) => (
@@ -273,6 +283,26 @@ export const AssignmentFormModal = ({
                     </Button>
                 </div>
             </div>
+
+            <FilePickerModal
+                isOpen={isPickerOpen}
+                onClose={() => setIsPickerOpen(false)}
+                onSelect={(files) =>
+                    setAttachments((prev) => [
+                        ...prev,
+                        // Kutubxonadagi fayl allaqachon serverda — qayta
+                        // yuklanmaydi, faqat havolasi qoʻshiladi.
+                        ...files
+                            .filter((file) => !prev.some((item) => item.url === file.url))
+                            .map((file) => ({
+                                name: file.title,
+                                url: file.url,
+                                size: file.size_bytes,
+                                type: file.mime_type ?? undefined,
+                            })),
+                    ])
+                }
+            />
         </Modal>
     );
 };

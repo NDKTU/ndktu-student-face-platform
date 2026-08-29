@@ -9,8 +9,9 @@
  * "Rasm URL" text inputs.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Upload, X } from 'lucide-react';
+import { FolderOpen, Loader2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { uploadService } from '@/services/uploadService';
 
 export interface ImageUploadFieldProps {
@@ -23,6 +24,8 @@ export interface ImageUploadFieldProps {
     previewSize?: number;
     /** Defaults to `uploadService.uploadImage` (question images folder). */
     uploadFn?: (file: File) => Promise<{ url: string }>;
+    /** Kutubxonadan tanlash tugmasi. Profil surati kabi joylarda keraksiz. */
+    allowLibrary?: boolean;
 }
 
 export function ImageUploadField({
@@ -33,11 +36,13 @@ export function ImageUploadField({
     disabled,
     previewSize = 80,
     uploadFn = uploadService.uploadImage,
+    allowLibrary = true,
 }: ImageUploadFieldProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [localPreview, setLocalPreview] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
 
     // Clean up blob URLs on unmount / when swapped out
     useEffect(() => {
@@ -140,10 +145,42 @@ export function ImageUploadField({
                         <Upload className="mr-2 h-4 w-4" />
                         {displayedSrc ? "Boshqa rasm tanlash" : "Rasm tanlash"}
                     </Button>
+                    {allowLibrary && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsPickerOpen(true)}
+                            disabled={disabled || isUploading}
+                        >
+                            <FolderOpen className="mr-2 h-4 w-4" />
+                            Kutubxonadan
+                        </Button>
+                    )}
                     {helperText && <p className="text-xs text-muted-foreground">{helperText}</p>}
                     {error && <p className="text-xs text-destructive">{error}</p>}
                 </div>
             </div>
+
+            {allowLibrary && (
+                <FilePickerModal
+                    isOpen={isPickerOpen}
+                    onClose={() => setIsPickerOpen(false)}
+                    multiple={false}
+                    kind="image"
+                    title="Kutubxonadan rasm tanlash"
+                    onSelect={(files) => {
+                        const picked = files[0];
+                        if (!picked) return;
+                        // Kutubxonadagi rasm allaqachon serverda: mahalliy
+                        // koʻrinishni tozalab, tayyor havolani beramiz.
+                        if (localPreview) URL.revokeObjectURL(localPreview);
+                        setLocalPreview(null);
+                        setError(null);
+                        onChange(picked.url);
+                    }}
+                />
+            )}
         </div>
     );
 }

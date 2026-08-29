@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ClipboardList, FilePlus2, FileText, Loader2, Pencil, Plus, Trash2, UploadCloud, Video, X, Youtube } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { FilePickerModal } from '@/components/file/FilePickerModal';
+import type { LibraryFile } from '@/services/fileService';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { useCreateLesson, useUpdateLesson } from '@/hooks/useLessons';
@@ -47,6 +49,9 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     const [zoomUrl, setZoomUrl] = useState('');
     const [showResources, setShowResources] = useState(false);
     const [extraFiles, setExtraFiles] = useState<File[]>([]);
+    // Kutubxonadan tanlanganlar allaqachon serverda — ularni yuklash shart emas.
+    const [libraryResources, setLibraryResources] = useState<LibraryFile[]>([]);
+    const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
     // Bitta havola o'rniga ro'yxat: darsga bir nechta manba biriktirish kerak.
     const [links, setLinks] = useState<{ url: string; title: string }[]>([]);
     const [showHomework, setShowHomework] = useState(false);
@@ -55,6 +60,8 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     const [homeworkDeadline, setHomeworkDeadline] = useState('');
     // O'qituvchi vazifaga ilova qiladigan fayllar (shart, namuna, tarqatma).
     const [homeworkFiles, setHomeworkFiles] = useState<File[]>([]);
+    const [libraryHomeworkFiles, setLibraryHomeworkFiles] = useState<LibraryFile[]>([]);
+    const [homeworkPickerOpen, setHomeworkPickerOpen] = useState(false);
     // Talaba qanday topshirishi mumkinligi: bekendda `allow_file`, `allow_text`
     // va `allowed_file_types` bor edi, lekin formada ko'rsatilmagan — vazifa
     // doim standart sozlama bilan yaratilardi.
@@ -293,6 +300,14 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                         file_url: url,
                     });
                 }
+                for (const file of libraryResources) {
+                    await resourceService.create({
+                        lesson_id: lessonId,
+                        resource_type: 'file',
+                        title: file.title,
+                        file_url: file.url,
+                    });
+                }
                 for (const link of links) {
                     if (!link.url.trim()) continue;
                     await resourceService.create({
@@ -308,6 +323,14 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                 for (const file of homeworkFiles) {
                     const { url } = await resourceService.upload(file);
                     attachments.push({ name: file.name, url, size: file.size, type: file.type });
+                }
+                for (const file of libraryHomeworkFiles) {
+                    attachments.push({
+                        name: file.title,
+                        url: file.url,
+                        size: file.size_bytes,
+                        type: file.mime_type ?? undefined,
+                    });
                 }
                 await assignmentService.create({
                     course_id: course.id,
@@ -490,6 +513,43 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
                                     onChange={(event) => setExtraFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setResourcePickerOpen(true)}
+                                    className="mt-2 text-xs font-medium text-primary hover:underline"
+                                >
+                                    yoki kutubxonadan tanlash
+                                </button>
+                                {libraryResources.length > 0 && (
+                                    <ul className="mt-2 space-y-1.5">
+                                        {libraryResources.map((file) => (
+                                            <li
+                                                key={file.id}
+                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                            >
+                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
+                                                <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                    kutubxonadan
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Olib tashlash"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                    onClick={() =>
+                                                        setLibraryResources((prev) =>
+                                                            prev.filter((item) => item.id !== file.id),
+                                                        )
+                                                    }
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                                 {extraFiles.length > 0 && (
                                     <ul className="mt-2 space-y-1.5">
                                         {extraFiles.map((file, index) => (
@@ -677,6 +737,43 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                     className="hidden"
                                     onChange={(event) => setHomeworkFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setHomeworkPickerOpen(true)}
+                                    className="mt-2 text-xs font-medium text-primary hover:underline"
+                                >
+                                    yoki kutubxonadan tanlash
+                                </button>
+                                {libraryHomeworkFiles.length > 0 && (
+                                    <ul className="mt-2 space-y-1.5">
+                                        {libraryHomeworkFiles.map((file) => (
+                                            <li
+                                                key={file.id}
+                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                            >
+                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
+                                                <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                    kutubxonadan
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Olib tashlash"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                    onClick={() =>
+                                                        setLibraryHomeworkFiles((prev) =>
+                                                            prev.filter((item) => item.id !== file.id),
+                                                        )
+                                                    }
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                                 {homeworkFiles.length > 0 && (
                                     <ul className="mt-2 space-y-1.5">
                                         {homeworkFiles.map((file, index) => (
@@ -775,6 +872,30 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     </Button>
                 </div>
             </div>
+
+            <FilePickerModal
+                isOpen={resourcePickerOpen}
+                onClose={() => setResourcePickerOpen(false)}
+                title="Dars materialini tanlash"
+                onSelect={(files) =>
+                    setLibraryResources((prev) => [
+                        ...prev,
+                        ...files.filter((file) => !prev.some((item) => item.id === file.id)),
+                    ])
+                }
+            />
+
+            <FilePickerModal
+                isOpen={homeworkPickerOpen}
+                onClose={() => setHomeworkPickerOpen(false)}
+                title="Vazifa faylini tanlash"
+                onSelect={(files) =>
+                    setLibraryHomeworkFiles((prev) => [
+                        ...prev,
+                        ...files.filter((file) => !prev.some((item) => item.id === file.id)),
+                    ])
+                }
+            />
         </Modal>
     );
 }
