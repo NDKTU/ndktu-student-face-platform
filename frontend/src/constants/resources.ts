@@ -41,8 +41,8 @@ export const SIDEBAR_SECTION_ORDER = [
 
 export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
-    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap },
-    student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap },
+    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: 'Foydalanuvchilar' },
+    student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap, section: 'Foydalanuvchilar' },
 
     role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
     permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Ruxsatlar tizimi' },
@@ -52,9 +52,10 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     // Живёт в «Sozlamalar» — как системная настройка, а не ежедневный раздел.
     eduplan:       { label: 'EduPlan sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Sozlamalar' },
 
-    faculty:       { label: 'Fakultetlarni boshqarish', href: '/faculties', icon: Building2, section: 'Boshqaruv' },
-    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers },
-    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound },
+    faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: 'Boshqaruv' },
+    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: 'Boshqaruv' },
+    speciality:    { label: 'Mutaxassisliklar', href: '/specialities', icon: GraduationCap, section: 'Boshqaruv' },
+    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound,    section: 'Boshqaruv' },
     subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Testlar' },
     course:        { label: 'Kurslar',          href: '/courses',     icon: Library,       section: 'Testlar' },
 
@@ -124,6 +125,40 @@ interface StudentSidebarItem extends SidebarItem {
     permission: string;
 }
 
+export const SIDEBAR_RESOURCE_ORDER: string[] = [
+    // Boshqaruv
+    'faculty',
+    'kafedra',
+    'speciality',
+    'group',
+
+    // Foydalanuvchilar
+    'user',
+    'teacher',
+    'student',
+
+    // Testlar
+    'subject',
+    'question',
+    'quiz',
+    'result',
+    'course',
+    'homework',
+    'active_quiz',
+    'lesson',
+
+    // Psixologiya
+    'psychology',
+    'psychology_results',
+
+    // Ruxsatlar tizimi
+    'role',
+    'permission',
+
+    // Sozlamalar
+    'eduplan',
+];
+
 // Student-only destinations that don't follow the generic read:<resource> ->
 // RESOURCES[resource] convention (their route/permission differs from the
 // admin/staff page for the same concept, e.g. quiz-taking vs quiz management).
@@ -144,9 +179,8 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
     const sections: SidebarSection[] = [STUDENT_ALWAYS_VISIBLE];
     const grouped: Record<string, SidebarItem[]> = {};
 
-    for (const perm of permissions) {
-        if (!perm.startsWith('read:')) continue;
-        const resource = perm.slice('read:'.length);
+    for (const resource of SIDEBAR_RESOURCE_ORDER) {
+        if (!permissions.has(`read:${resource}`)) continue;
         if (STUDENT_HIDDEN_RESOURCES.has(resource)) continue;
         const meta = RESOURCES[resource];
         if (!meta?.href || !meta.icon || !meta.section) continue;
@@ -183,9 +217,8 @@ export const buildSidebar = (
 
     const grouped: Record<string, SidebarItem[]> = {};
 
-    for (const perm of permissions) {
-        if (!perm.startsWith('read:')) continue;
-        const resource = perm.slice('read:'.length);
+    for (const resource of SIDEBAR_RESOURCE_ORDER) {
+        if (!permissions.has(`read:${resource}`)) continue;
         const meta = RESOURCES[resource];
         if (!meta?.href || !meta.icon || !meta.section) continue;
 

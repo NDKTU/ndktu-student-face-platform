@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Pencil, Plus, Trash2, ArrowRight, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle, GraduationCap } from 'lucide-react';
-import type { Faculty } from '@/services/facultyService';
-import type { Kafedra } from '@/services/kafedraService';
+import {
+    Pencil,
+    Plus,
+    Trash2,
+    ArrowRight,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    CheckCircle2,
+    XCircle,
+    GraduationCap,
+} from 'lucide-react';
 import { specialityService, type Speciality, type SpecialityStats } from '@/services/specialityService';
-import { useDeleteSpeciality } from '@/hooks/useReferenceData';
-import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
-import { OrganizationToolbar, FilterChipGroup } from './OrganizationToolbar';
+import { useDeleteSpeciality, useFaculties, useKafedras } from '@/hooks/useReferenceData';
+import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { SpecialityModal } from '@/components/speciality/SpecialityModal';
@@ -14,6 +24,7 @@ import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/com
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
+import { Combobox } from '@/components/ui/Combobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -22,17 +33,17 @@ type DegreeFilter = 'all' | 'Bakalavr' | 'Magistr';
 type SortField = 'name' | 'code' | 'group_count' | 'student_count';
 type SortOrder = 'asc' | 'desc';
 
-interface Props {
-    faculty: Faculty;
-    kafedra: Kafedra;
-    onBack: () => void;
-    onOpenSpeciality: (speciality: Speciality) => void;
-}
+export const SpecialitiesPage = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
 
-export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpeciality }: Props) => {
-    const [specialities, setSpecialities] = useState<Speciality[]>([]);
-    const [stats, setStats] = useState<Map<number, SpecialityStats>>(new Map());
+    const facultyIdParam = searchParams.get('faculty_id');
+    const kafedraIdParam = searchParams.get('kafedra_id');
+
+    const [selectedFaculty, setSelectedFaculty] = useState<string>(facultyIdParam || 'all');
+    const [selectedKafedra, setSelectedKafedra] = useState<string>(kafedraIdParam || 'all');
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [degreeFilter, setDegreeFilter] = useState<DegreeFilter>('all');
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [sortField, setSortField] = useState<SortField>('name');
@@ -40,6 +51,8 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
+    const [specialities, setSpecialities] = useState<Speciality[]>([]);
+    const [stats, setStats] = useState<Map<number, SpecialityStats>>(new Map());
     const pageSize = 15;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,15 +60,44 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     const [toDelete, setToDelete] = useState<Speciality | null>(null);
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
+    const { data: facultiesData } = useFaculties();
+    const { data: kafedrasData } = useKafedras(
+        1,
+        200,
+        undefined,
+        selectedFaculty !== 'all' ? Number(selectedFaculty) : undefined
+    );
     const deleteSpeciality = useDeleteSpeciality();
 
-    const load = async () => {
+    const faculties = facultiesData?.faculties || [];
+    const kafedras = kafedrasData?.kafedras || [];
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setCurrentPage(1);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Synchronize URL query params
+    useEffect(() => {
+        if (facultyIdParam && facultyIdParam !== selectedFaculty) {
+            setSelectedFaculty(facultyIdParam);
+        }
+        if (kafedraIdParam && kafedraIdParam !== selectedKafedra) {
+            setSelectedKafedra(kafedraIdParam);
+        }
+    }, [facultyIdParam, kafedraIdParam]);
+
+    const loadData = async () => {
         setIsLoading(true);
         setIsError(false);
         try {
+            const kafedraIdNum = selectedKafedra !== 'all' ? Number(selectedKafedra) : undefined;
             const [list, counters] = await Promise.all([
-                specialityService.getSpecialities(1, 1000, undefined, kafedra.id),
-                specialityService.getSpecialityStats(kafedra.id),
+                specialityService.getSpecialities(1, 1000, debouncedSearch, kafedraIdNum),
+                specialityService.getSpecialityStats(kafedraIdNum),
             ]);
             setSpecialities(list.specialities);
             setStats(new Map(counters.map((item) => [item.speciality_id, item])));
@@ -67,8 +109,46 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     };
 
     useEffect(() => {
-        void load();
-    }, [kafedra.id]);
+        void loadData();
+    }, [selectedKafedra, debouncedSearch]);
+
+    // Handle faculty change
+    const handleFacultyChange = (fId: string) => {
+        setSelectedFaculty(fId);
+        setSelectedKafedra('all');
+        setCurrentPage(1);
+        const nextParams = new URLSearchParams(searchParams);
+        if (fId === 'all') {
+            nextParams.delete('faculty_id');
+        } else {
+            nextParams.set('faculty_id', fId);
+        }
+        nextParams.delete('kafedra_id');
+        setSearchParams(nextParams);
+    };
+
+    // Handle kafedra change
+    const handleKafedraChange = (kId: string) => {
+        setSelectedKafedra(kId);
+        setCurrentPage(1);
+        const nextParams = new URLSearchParams(searchParams);
+        if (kId === 'all') {
+            nextParams.delete('kafedra_id');
+        } else {
+            nextParams.set('kafedra_id', kId);
+        }
+        setSearchParams(nextParams);
+    };
+
+    const facultyOptions = useMemo(() => {
+        const list = faculties.map((f) => ({ value: String(f.id), label: f.name }));
+        return [{ value: 'all', label: 'Barcha fakultetlar' }, ...list];
+    }, [faculties]);
+
+    const kafedraOptions = useMemo(() => {
+        const list = kafedras.map((k) => ({ value: String(k.id), label: k.name }));
+        return [{ value: 'all', label: 'Barcha kafedralar' }, ...list];
+    }, [kafedras]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -79,22 +159,31 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
         }
     };
 
-    const filtered = useMemo(() => {
-        const query = search.trim().toLocaleLowerCase('uz');
-        return specialities.filter((item) => {
-            const matchesSearch =
-                !query ||
-                item.name.toLocaleLowerCase('uz').includes(query) ||
-                (item.external_id && item.external_id.toLowerCase().includes(query));
+    // Find names for badges / breadcrumbs
+    const currentFacultyObj = useMemo(
+        () => faculties.find((f) => String(f.id) === selectedFaculty),
+        [faculties, selectedFaculty]
+    );
+    const currentKafedraObj = useMemo(
+        () => kafedras.find((k) => String(k.id) === selectedKafedra),
+        [kafedras, selectedKafedra]
+    );
 
+    const getKafedraName = (kId: number) => {
+        const k = kafedras.find((item) => item.id === kId);
+        return k ? k.name : `Kafedra #${kId}`;
+    };
+
+    const filtered = useMemo(() => {
+        return specialities.filter((item) => {
             const matchesDegree =
                 degreeFilter === 'all' ||
                 (degreeFilter === 'Bakalavr' && item.education_type?.toLowerCase() === 'bakalavr') ||
                 (degreeFilter === 'Magistr' && item.education_type?.toLowerCase() === 'magistr');
 
-            return matchesSearch && matchesDegree;
+            return matchesDegree;
         });
-    }, [search, degreeFilter, specialities]);
+    }, [degreeFilter, specialities]);
 
     const sorted = useMemo(() => {
         return [...filtered].sort((a, b) => {
@@ -142,7 +231,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                 onSuccess: () => {
                     toast.success("Mutaxassislik o'chirildi");
                     closeDeleteDialog();
-                    void load();
+                    void loadData();
                 },
                 onError: (error: any) => {
                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
@@ -165,6 +254,23 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
             <ArrowUp className="ml-1.5 h-3.5 w-3.5 text-primary" />
         ) : (
             <ArrowDown className="ml-1.5 h-3.5 w-3.5 text-primary" />
+        );
+    };
+
+    const renderDegreeBadge = (degree?: string | null) => {
+        if (!degree) return <span className="text-muted-foreground text-xs">—</span>;
+        const isMagistr = degree.toLowerCase() === 'magistr';
+        return (
+            <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    isMagistr
+                        ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                        : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                }`}
+            >
+                <GraduationCap className="h-3 w-3" />
+                <span>{degree}</span>
+            </span>
         );
     };
 
@@ -208,7 +314,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                 variant="ghost"
                 size="sm"
                 className="h-8 px-2 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary gap-1"
-                onClick={() => onOpenSpeciality(speciality)}
+                onClick={() => navigate(`/groups?speciality_id=${speciality.id}`)}
             >
                 <span>Guruhlar</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -216,49 +322,62 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
         </div>
     );
 
-    const renderDegreeBadge = (degree?: string | null) => {
-        if (!degree) return <span className="text-muted-foreground text-xs">—</span>;
-        const isMagistr = degree.toLowerCase() === 'magistr';
-        return (
-            <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    isMagistr
-                        ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                        : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                }`}
-            >
-                <GraduationCap className="h-3 w-3" />
-                <span>{degree}</span>
-            </span>
-        );
-    };
+    // Breadcrumb items
+    const breadcrumbItems = useMemo(() => {
+        const items = [{ label: 'Mutaxassisliklar', onClick: () => navigate('/specialities') }];
+        if (currentFacultyObj) {
+            items.unshift({
+                label: `Fakultet: ${currentFacultyObj.name}`,
+                onClick: () => navigate(`/kafedras?faculty_id=${currentFacultyObj.id}`),
+            });
+        }
+        if (currentKafedraObj) {
+            items.splice(items.length - 1, 0, {
+                label: currentKafedraObj.name,
+                onClick: () => navigate(`/specialities?kafedra_id=${currentKafedraObj.id}`),
+            });
+        }
+        return items;
+    }, [currentFacultyObj, currentKafedraObj, navigate]);
 
     return (
         <div className="space-y-5">
             {/* Unified Dynamic Breadcrumbs */}
             <OrganizationBreadcrumbs
-                items={[
-                    { label: 'Fakultetlar', onClick: onBack },
-                    { label: faculty.name, onClick: onBack },
-                    { label: kafedra.name },
-                ]}
-                onBack={onBack}
-                title={`${kafedra.name} — mutaxassisliklar`}
-                description={`${faculty.name} · Kafedraga qarashli mutaxassisliklar va ta'lim yo'nalishlari`}
+                items={breadcrumbItems}
+                title="Mutaxassisliklar"
+                description="Universitet barcha ta'lim yo'nalishlari va mutaxassisliklari ro'yxati"
             />
 
-            {/* Toolbar & Filter Chips */}
+            {/* Toolbar */}
             <OrganizationToolbar
                 search={search}
-                onSearchChange={(val) => {
-                    setSearch(val);
-                    setCurrentPage(1);
-                }}
+                onSearchChange={setSearch}
                 searchPlaceholder="Mutaxassislik nomi yoki kodi bo'yicha..."
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
+                extraFilters={
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="w-[180px] sm:w-[220px]">
+                            <Combobox
+                                options={facultyOptions}
+                                value={selectedFaculty}
+                                onChange={handleFacultyChange}
+                                placeholder="Fakultetni tanlang"
+                            />
+                        </div>
+                        <div className="w-[180px] sm:w-[220px]">
+                            <Combobox
+                                options={kafedraOptions}
+                                value={selectedKafedra}
+                                onChange={handleKafedraChange}
+                                placeholder="Kafedrani tanlang"
+                            />
+                        </div>
+                    </div>
+                }
                 chips={
                     <FilterChipGroup<DegreeFilter>
                         label="Ta'lim darajasi"
@@ -293,7 +412,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
 
             {/* Content */}
             {isError ? (
-                <ErrorState onRetry={load} />
+                <ErrorState onRetry={loadData} />
             ) : isLoading ? (
                 viewMode === 'table' ? (
                     <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
@@ -314,9 +433,9 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                         colSpan={8}
                         title="Mutaxassisliklar topilmadi"
                         description={
-                            search
-                                ? `"${search}" qidiruviga mos mutaxassislik topilmadi.`
-                                : "Ushbu kafedrada mutaxassislik mavjud emas."
+                            search || selectedFaculty !== 'all' || selectedKafedra !== 'all'
+                                ? "Tanlangan filtrlarga mos mutaxassislik topilmadi."
+                                : "Hozircha mutaxassisliklar qo'shilmagan."
                         }
                     />
                 </div>
@@ -344,6 +463,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
+                            <TableHead className="font-bold text-xs hidden md:table-cell">Kafedra</TableHead>
                             <TableHead className="text-center font-bold text-xs">Ta'lim Darajasi</TableHead>
                             <TableHead
                                 onClick={() => handleSort('group_count')}
@@ -376,7 +496,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                             return (
                                 <TableRow
                                     key={speciality.id}
-                                    onClick={() => onOpenSpeciality(speciality)}
+                                    onClick={() => navigate(`/groups?speciality_id=${speciality.id}`)}
                                     className="group cursor-pointer transition-colors duration-150 hover:bg-primary/[0.04] dark:hover:bg-primary/10 border-b border-border/50"
                                 >
                                     {/* # Row Index */}
@@ -406,6 +526,13 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                                 <InactiveBadge row={speciality} />
                                             </div>
                                         </div>
+                                    </TableCell>
+
+                                    {/* Kafedra */}
+                                    <TableCell className="hidden md:table-cell">
+                                        <span className="badge badge-primary text-xs">
+                                            {getKafedraName(speciality.kafedra_id)}
+                                        </span>
                                     </TableCell>
 
                                     {/* Ta'lim Darajasi */}
@@ -473,7 +600,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                         <InactiveBadge row={speciality} />
                                     </span>
                                 }
-                                onClick={() => onOpenSpeciality(speciality)}
+                                onClick={() => navigate(`/groups?speciality_id=${speciality.id}`)}
                                 actions={renderActions(speciality)}
                                 metrics={[
                                     { label: 'Guruh', value: item?.group_count ?? '—' },
@@ -501,11 +628,11 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     speciality={selected}
-                    kafedras={[kafedra]}
-                    defaultKafedraId={kafedra.id}
+                    kafedras={kafedras}
+                    defaultKafedraId={selectedKafedra !== 'all' ? Number(selectedKafedra) : undefined}
                     onSuccess={() => {
                         setIsModalOpen(false);
-                        void load();
+                        void loadData();
                     }}
                 />
             )}
@@ -540,3 +667,5 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
         </div>
     );
 };
+
+export default SpecialitiesPage;

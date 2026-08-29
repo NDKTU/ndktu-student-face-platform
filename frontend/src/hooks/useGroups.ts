@@ -7,11 +7,15 @@ export const useGroups = (
     search: string,
     teacherId?: number,
     facultyId?: number,
-    enabled: boolean = true,
+    specialityIdOrEnabled?: number | boolean,
+    enabledParam: boolean = true,
 ) => {
+    const specialityId = typeof specialityIdOrEnabled === 'number' ? specialityIdOrEnabled : undefined;
+    const enabled = typeof specialityIdOrEnabled === 'boolean' ? specialityIdOrEnabled : enabledParam;
+
     return useQuery({
-        queryKey: ['groups', page, limit, search, teacherId, facultyId],
-        queryFn: () => groupService.getGroups(page, limit, search, teacherId, facultyId),
+        queryKey: ['groups', page, limit, search, teacherId, facultyId, specialityId],
+        queryFn: () => groupService.getGroups(page, limit, search, teacherId, facultyId, specialityId),
         placeholderData: (previousData) => previousData,
         enabled,
     });

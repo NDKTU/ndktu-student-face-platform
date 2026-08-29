@@ -1,30 +1,40 @@
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Plus, Search, Library } from 'lucide-react';
+import {
+    Plus,
+    Pencil,
+    Trash2,
+    BookOpen,
+    ArrowRight,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+} from 'lucide-react';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { useCourses, useCourseTeacherSummaries, useDeleteCourse } from '@/hooks/useCourses';
+import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers } from '@/hooks/useTeachers';
-import type { Course, CourseTeacherSummary } from '@/services/courseService';
-import { logger } from '@/utils/logger';
-import { CourseFilters } from '@/components/courses/CourseFilters';
-import { CourseTable } from '@/components/courses/CourseTable';
+import type { Course } from '@/services/courseService';
 import { CourseModal } from '@/components/courses/CourseModal';
-import { Input } from '@/components/ui/Input';
-import { CatalogCard } from '@/components/catalog/CatalogCard';
-import { HierarchyHeader } from '@/components/catalog/HierarchyHeader';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
+import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
+import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Combobox } from '@/components/ui/Combobox';
 
-const CoursesPage = () => {
+type SortField = 'subject' | 'teacher' | 'semester';
+type SortOrder = 'asc' | 'desc';
+
+export const CoursesPage = () => {
+    const navigate = useNavigate();
     const { user, hasPermission } = useAuth();
     const isAdmin = user?.roles?.some((role) => role.name.toLowerCase() === 'admin') ?? false;
 
@@ -33,264 +43,465 @@ const CoursesPage = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 10;
-    const [selectedTeacher, setSelectedTeacher] = useState<CourseTeacherSummary | null>(null);
-    const [teacherSearch, setTeacherSearch] = useState('');
-    const [debouncedTeacherSearch, setDebouncedTeacherSearch] = useState('');
-    const [teacherFacultyId, setTeacherFacultyId] = useState<number | undefined>();
-    const [teacherKafedraId, setTeacherKafedraId] = useState<number | undefined>();
+    const pageSize = 15;
 
-    const [filterSubjectId, setFilterSubjectId] = useState<number | undefined>(undefined);
-    const [filterGroupId, setFilterGroupId] = useState<number | undefined>(undefined);
-    const [filterTeacherId, setFilterTeacherId] = useState<number | undefined>(undefined);
-    const [filterSemesterNumber, setFilterSemesterNumber] = useState<number | undefined>(undefined);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    const [filterSubjectId, setFilterSubjectId] = useState<string>('all');
+    const [filterGroupId, setFilterGroupId] = useState<string>('all');
+    const [filterTeacherId, setFilterTeacherId] = useState<string>('all');
+    const [sortField, setSortField] = useState<SortField>('subject');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
     useEffect(() => {
-        const timer = window.setTimeout(() => setDebouncedTeacherSearch(teacherSearch), 350);
-        return () => window.clearTimeout(timer);
-    }, [teacherSearch]);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    const teacherSummaries = useCourseTeacherSummaries(
-        debouncedTeacherSearch || undefined,
-        teacherFacultyId,
-        teacherKafedraId,
-        isAdmin && selectedTeacher === null,
-    );
+    const parsedSubjectId = filterSubjectId !== 'all' && filterSubjectId ? Number(filterSubjectId) : undefined;
+    const parsedGroupId = filterGroupId !== 'all' && filterGroupId ? Number(filterGroupId) : undefined;
+    const parsedTeacherId = filterTeacherId !== 'all' && filterTeacherId ? Number(filterTeacherId) : undefined;
 
-    const facultiesQuery = useFaculties(1, 1000, undefined, isAdmin && hasPermission('read:faculty'));
-    const kafedrasQuery = useKafedras(
-        1,
-        1000,
-        undefined,
-        teacherFacultyId,
-        isAdmin && hasPermission('read:kafedra'),
-    );
+    const {
+        data: coursesData,
+        isLoading: isCoursesLoading,
+        isError: isCoursesError,
+        refetch,
+    } = useCourses(currentPage, pageSize, parsedTeacherId, parsedSubjectId, parsedGroupId);
 
-    const { data: coursesData, isLoading: isCoursesLoading, isError: isCoursesError, refetch } = useCourses(
-        currentPage,
-        pageSize,
-        filterTeacherId,
-        filterSubjectId,
-        filterGroupId,
-        filterSemesterNumber,
-    );
-
-    const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
-    const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
-    const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
+    const { data: allSubjectsData } = useSubjects(1, 500, '', undefined, hasPermission('read:subject'));
+    const { data: allGroupsData } = useGroups(1, 500, '', undefined, undefined, hasPermission('read:group'));
+    const { data: allTeachersData } = useTeachers(1, 500, undefined, isAdmin && hasPermission('read:teacher'));
 
     const deleteCourseMutation = useDeleteCourse();
 
-    const courses = coursesData?.courses || [];
+    const rawCourses = coursesData?.courses || [];
     const totalPages = coursesData ? Math.ceil(coursesData.total / pageSize) : 1;
+    const totalCount = coursesData?.total ?? rawCourses.length;
+
     const allSubjects = allSubjectsData?.subjects || [];
     const allGroups = allGroupsData?.groups || [];
     const allTeachers = allTeachersData?.teachers || [];
+
+    const subjectOptions = useMemo(() => {
+        const list = allSubjects.map((s) => ({ value: String(s.id), label: s.name }));
+        return [{ value: 'all', label: 'Barcha fanlar' }, ...list];
+    }, [allSubjects]);
+
+    const groupOptions = useMemo(() => {
+        const list = allGroups.map((g) => ({ value: String(g.id), label: g.name }));
+        return [{ value: 'all', label: 'Barcha guruhlar' }, ...list];
+    }, [allGroups]);
+
+    const teacherOptions = useMemo(() => {
+        const list = allTeachers.map((t) => ({
+            value: String(t.user_id),
+            label: t.full_name || t.user?.username || `ID: ${t.id}`,
+        }));
+        return [{ value: 'all', label: "Barcha o'qituvchilar" }, ...list];
+    }, [allTeachers]);
+
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            setSortOrder('asc');
+        }
+    };
+
+    const filteredCourses = useMemo(() => {
+        if (!debouncedSearch) return rawCourses;
+        const q = debouncedSearch.toLowerCase();
+        return rawCourses.filter((c) => {
+            const subjectName = (c.subject?.name || '').toLowerCase();
+            const teacherName = (c.teacher?.full_name || c.teacher?.username || '').toLowerCase();
+            const groupNames = (c.groups || []).map((g) => g.name.toLowerCase()).join(' ');
+            return subjectName.includes(q) || teacherName.includes(q) || groupNames.includes(q);
+        });
+    }, [rawCourses, debouncedSearch]);
+
+    const sortedCourses = useMemo(() => {
+        return [...filteredCourses].sort((a, b) => {
+            let valA: string | number = '';
+            let valB: string | number = '';
+
+            if (sortField === 'subject') {
+                valA = (a.subject?.name || '').toLowerCase();
+                valB = (b.subject?.name || '').toLowerCase();
+            } else if (sortField === 'teacher') {
+                valA = (a.teacher?.full_name || a.teacher?.username || '').toLowerCase();
+                valB = (b.teacher?.full_name || b.teacher?.username || '').toLowerCase();
+            } else if (sortField === 'semester') {
+                valA = a.semester_number ?? 0;
+                valB = b.semester_number ?? 0;
+            }
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredCourses, sortField, sortOrder]);
 
     const handleCreateCourse = () => {
         setSelectedCourse(null);
         setIsModalOpen(true);
     };
 
-    const handleEditCourse = (course: Course) => {
+    const handleEditCourse = (course: Course, e: React.MouseEvent) => {
+        e.stopPropagation();
         setSelectedCourse(course);
         setIsModalOpen(true);
     };
 
-    const handleDeleteClick = (course: Course) => {
+    const handleDeleteClick = (course: Course, e: React.MouseEvent) => {
+        e.stopPropagation();
         setCourseToDelete(course);
         setIsDeleteModalOpen(true);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (!courseToDelete) return;
         deleteCourseMutation.mutate(courseToDelete.id, {
             onSuccess: () => {
                 toast.success("Kurs o'chirildi");
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
+                refetch();
             },
-            onError: (error: unknown) => {
-                logger.error('Failed to delete course', error);
-                toast.error("O'chirishda xatolik yuz berdi");
+            onError: () => {
+                toast.error("Kursni o'chirishda xatolik yuz berdi");
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
             },
         });
     };
 
-    const handleSuccess = () => {
-        setIsModalOpen(false);
-    };
-
-    if (isAdmin && selectedTeacher === null) {
-        return (
-            <div className="space-y-6">
-                <PageHeader
-                    title="Kurslar"
-                    description="O'qituvchilar bo'yicha kurslar"
-                    actions={
-                        <PermissionGate permission="create:course">
-                            <Button onClick={handleCreateCourse}><Plus className="mr-2 h-4 w-4" />Kurs yaratish</Button>
-                        </PermissionGate>
-                    }
-                />
-
-                <div className="grid gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(220px,265px)_minmax(220px,280px)]">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            value={teacherSearch}
-                            onChange={(event) => setTeacherSearch(event.target.value)}
-                            placeholder="O'qituvchini qidirish..."
-                            className="pl-9"
-                        />
-                    </div>
-                    <select
-                        value={teacherFacultyId ?? ''}
-                        onChange={(event) => {
-                            setTeacherFacultyId(event.target.value ? Number(event.target.value) : undefined);
-                            setTeacherKafedraId(undefined);
-                        }}
-                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                        <option value="">Barcha fakultetlar</option>
-                        {facultiesQuery.data?.faculties.map((faculty) => (
-                            <option key={faculty.id} value={faculty.id}>{faculty.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={teacherKafedraId ?? ''}
-                        onChange={(event) => setTeacherKafedraId(event.target.value ? Number(event.target.value) : undefined)}
-                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                        <option value="">Barcha kafedralar</option>
-                        {kafedrasQuery.data?.kafedras.map((kafedra) => (
-                            <option key={kafedra.id} value={kafedra.id}>{kafedra.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {teacherSummaries.isError ? (
-                    <ErrorState onRetry={() => teacherSummaries.refetch()} />
-                ) : teacherSummaries.isLoading ? (
-                    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
-                    </section>
-                ) : (teacherSummaries.data?.length ?? 0) === 0 ? (
-                    <EmptyState icon={<Library className="h-6 w-6" />} title="Kurslar topilmadi" description="Hozircha kurs biriktirilgan o'qituvchi yo'q." />
-                ) : (
-                    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        {teacherSummaries.data?.map((teacher) => (
-                            <CatalogCard
-                                key={teacher.teacher_id}
-                                id={teacher.teacher_id}
-                                title={teacher.full_name || teacher.username}
-                                subtitle={teacher.kafedra_name || teacher.username}
-                                metrics={[
-                                    { label: 'Kurs', value: teacher.course_count },
-                                    { label: 'Dars', value: teacher.lesson_count, accent: true },
-                                ]}
-                                onClick={() => {
-                                    setSelectedTeacher(teacher);
-                                    setFilterTeacherId(teacher.teacher_id);
-                                    setCurrentPage(1);
-                                }}
-                            />
-                        ))}
-                    </section>
-                )}
-
-                <CourseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} course={selectedCourse} onSuccess={handleSuccess} />
-            </div>
+    const renderSortIcon = (field: SortField) => {
+        if (sortField !== field) {
+            return <ArrowUpDown className="ml-1.5 h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-foreground" />;
+        }
+        return sortOrder === 'asc' ? (
+            <ArrowUp className="ml-1.5 h-3.5 w-3.5 text-primary" />
+        ) : (
+            <ArrowDown className="ml-1.5 h-3.5 w-3.5 text-primary" />
         );
-    }
-
-    const clearFilters = () => {
-        setFilterSubjectId(undefined);
-        setFilterGroupId(undefined);
-        setFilterTeacherId(selectedTeacher?.teacher_id);
-        setFilterSemesterNumber(undefined);
     };
 
-    const hasActiveFilters =
-        filterSubjectId !== undefined ||
-        filterGroupId !== undefined ||
-        (!selectedTeacher && filterTeacherId !== undefined) ||
-        filterSemesterNumber !== undefined;
+    const renderActions = (course: Course) => (
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs font-semibold text-primary hover:bg-primary/10 gap-1"
+                title="Darslarni ko'rish"
+                onClick={() => navigate(`/courses/${course.id}`)}
+            >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Darslar</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+            <PermissionGate permission="update:course">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    title="Tahrirlash"
+                    onClick={(e) => handleEditCourse(course, e)}
+                >
+                    <Pencil className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+            <PermissionGate permission="delete:course">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
+                    title="O'chirish"
+                    onClick={(e) => handleDeleteClick(course, e)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </PermissionGate>
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
-            {selectedTeacher ? (
-                <HierarchyHeader
-                    title={selectedTeacher.full_name || selectedTeacher.username}
-                    description={`${selectedTeacher.kafedra_name || "O'qituvchi"} · ${selectedTeacher.course_count} kurs · ${selectedTeacher.lesson_count} dars`}
-                    onBack={() => { setSelectedTeacher(null); setFilterTeacherId(undefined); setCurrentPage(1); }}
-                    actions={
-                        <PermissionGate permission="create:course">
-                            <Button onClick={handleCreateCourse}><Plus className="mr-2 h-4 w-4" />Kurs yaratish</Button>
-                        </PermissionGate>
-                    }
-                />
-            ) : <PageHeader
-                title="Kurslar"
-                description="Kurslarni boshqarish"
+        <div className="space-y-5">
+            {/* Unified Breadcrumbs Header */}
+            <OrganizationBreadcrumbs
+                items={[{ label: 'Kurslar', onClick: () => {} }]}
+                title="O'quv Kurslari"
+                description="Fanlar, o'qituvchilar, guruhlar va semestrlar bo'yicha o'quv kurslari"
+            />
+
+            {/* Controls Toolbar */}
+            <OrganizationToolbar
+                search={searchTerm}
+                onSearchChange={setSearchTerm}
+                searchPlaceholder="Kurs, fan yoki o'qituvchi bo'yicha..."
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                totalCount={totalCount}
+                totalLabel="Kurslar"
+                extraFilters={
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="w-[180px] sm:w-[220px]">
+                            <Combobox
+                                options={subjectOptions}
+                                value={filterSubjectId}
+                                onChange={(val) => {
+                                    setFilterSubjectId(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Fan bo'yicha"
+                            />
+                        </div>
+                        <div className="w-[180px] sm:w-[220px]">
+                            <Combobox
+                                options={groupOptions}
+                                value={filterGroupId}
+                                onChange={(val) => {
+                                    setFilterGroupId(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Guruh bo'yicha"
+                            />
+                        </div>
+                        {isAdmin && (
+                            <div className="w-[180px] sm:w-[220px]">
+                                <Combobox
+                                    options={teacherOptions}
+                                    value={filterTeacherId}
+                                    onChange={(val) => {
+                                        setFilterTeacherId(val);
+                                        setCurrentPage(1);
+                                    }}
+                                    placeholder="O'qituvchi bo'yicha"
+                                />
+                            </div>
+                        )}
+                    </div>
+                }
                 actions={
                     <PermissionGate permission="create:course">
-                        <Button onClick={handleCreateCourse}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Qo'shish
+                        <Button
+                            size="sm"
+                            onClick={handleCreateCourse}
+                            className="h-9 gap-1.5 font-semibold shadow-sm"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span>Qo'shish</span>
                         </Button>
                     </PermissionGate>
                 }
-            />}
-
-            <CourseFilters
-                subjects={allSubjects}
-                groups={allGroups}
-                teachers={allTeachers}
-                filterSubjectId={filterSubjectId}
-                onSubjectChange={setFilterSubjectId}
-                filterGroupId={filterGroupId}
-                onGroupChange={setFilterGroupId}
-                filterTeacherId={filterTeacherId}
-                onTeacherChange={setFilterTeacherId}
-                filterSemesterNumber={filterSemesterNumber}
-                onSemesterChange={setFilterSemesterNumber}
-                hasActiveFilters={hasActiveFilters}
-                onClearFilters={clearFilters}
-                showTeacherFilter={!selectedTeacher}
             />
 
-            <CourseTable
-                courses={courses}
-                isLoading={isCoursesLoading}
-                isError={isCoursesError}
-                onRetry={() => refetch()}
-                onEdit={handleEditCourse}
-                onDelete={handleDeleteClick}
-            />
+            {/* Content */}
+            {isCoursesError ? (
+                <ErrorState onRetry={() => refetch()} />
+            ) : isCoursesLoading ? (
+                viewMode === 'table' ? (
+                    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                        ))}
+                    </div>
+                ) : (
+                    <CatalogGrid>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+                        ))}
+                    </CatalogGrid>
+                )
+            ) : sortedCourses.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-card p-8">
+                    <TableEmpty
+                        colSpan={6}
+                        title="Kurslar topilmadi"
+                        description={
+                            searchTerm || filterSubjectId !== 'all' || filterGroupId !== 'all'
+                                ? "Tanlangan filtrlarga mos kurs topilmadi."
+                                : "Hozircha kurslar qo'shilmagan."
+                        }
+                    />
+                </div>
+            ) : viewMode === 'table' ? (
+                /* High-Density Optimized Table View */
+                <Table className="min-w-full border-separate border-spacing-0">
+                    <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
+                        <TableRow className="border-b border-border/80">
+                            <TableHead className="w-[50px] text-center font-bold font-mono text-xs">#</TableHead>
+                            <TableHead
+                                onClick={() => handleSort('subject')}
+                                className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
+                            >
+                                <div className="flex items-center">
+                                    <span>Fan Nomi</span>
+                                    {renderSortIcon('subject')}
+                                </div>
+                            </TableHead>
+                            <TableHead className="font-bold text-xs">Biriktirilgan Guruhlar</TableHead>
+                            <TableHead
+                                onClick={() => handleSort('teacher')}
+                                className="group cursor-pointer select-none font-bold text-xs hidden md:table-cell hover:text-foreground"
+                            >
+                                <div className="flex items-center">
+                                    <span>O'qituvchi</span>
+                                    {renderSortIcon('teacher')}
+                                </div>
+                            </TableHead>
+                            <TableHead
+                                onClick={() => handleSort('semester')}
+                                className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
+                            >
+                                <div className="flex items-center justify-center">
+                                    <span>Semestr</span>
+                                    {renderSortIcon('semester')}
+                                </div>
+                            </TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {sortedCourses.map((course, index) => {
+                            const rowNumber = (currentPage - 1) * pageSize + index + 1;
+                            const subjectName = course.subject?.name || `Fan #${course.subject_id}`;
+                            const teacherName =
+                                course.teacher?.full_name ||
+                                course.teacher?.username ||
+                                'Biriktirilmagan';
+                            const groups = course.groups || [];
 
-            <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                isLoading={isCoursesLoading}
-            />
+                            return (
+                                <TableRow
+                                    key={course.id}
+                                    onClick={() => navigate(`/courses/${course.id}`)}
+                                    className="group cursor-pointer transition-colors duration-150 hover:bg-primary/[0.04] dark:hover:bg-primary/10 border-b border-border/50"
+                                >
+                                    {/* # Row Index */}
+                                    <TableCell className="text-center font-mono text-xs font-semibold text-muted-foreground w-[50px]">
+                                        {rowNumber}
+                                    </TableCell>
 
+                                    {/* Fan Nomi */}
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
+                                                {subjectName}
+                                            </span>
+                                        </div>
+                                    </TableCell>
+
+                                    {/* Biriktirilgan Guruhlar */}
+                                    <TableCell>
+                                        <div className="flex flex-wrap items-center gap-1 max-w-[280px]">
+                                            {groups.length > 0 ? (
+                                                groups.map((g) => (
+                                                    <span key={g.id} className="badge badge-primary text-xs">
+                                                        {g.name}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground italic">Guruh yo'q</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+
+                                    {/* O'qituvchi */}
+                                    <TableCell className="hidden md:table-cell">
+                                        <span className="text-sm font-medium text-foreground">
+                                            {teacherName}
+                                        </span>
+                                    </TableCell>
+
+                                    {/* Semestr */}
+                                    <TableCell className="text-center">
+                                        <span className="inline-flex items-center justify-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground border border-border/80">
+                                            {course.semester_number ? `${course.semester_number}-semestr` : '—'}
+                                        </span>
+                                    </TableCell>
+
+                                    {/* Amallar */}
+                                    <TableCell className="text-right pr-4">
+                                        {renderActions(course)}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            ) : (
+                /* Grid / Card View */
+                <CatalogGrid>
+                    {sortedCourses.map((course) => {
+                        const subjectName = course.subject?.name || `Fan #${course.subject_id}`;
+                        const teacherName = course.teacher?.full_name || course.teacher?.username || '—';
+                        return (
+                            <CatalogCard
+                                key={course.id}
+                                id={course.id}
+                                title={subjectName}
+                                subtitle={
+                                    <div className="flex flex-col gap-1 mt-0.5">
+                                        <span className="text-xs text-muted-foreground">{teacherName}</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {(course.groups || []).map((g) => (
+                                                <span key={g.id} className="badge badge-primary text-[10px]">
+                                                    {g.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                }
+                                metrics={[
+                                    { label: 'Semestr', value: course.semester_number ? `${course.semester_number}` : '—' },
+                                    { label: 'Guruh', value: `${(course.groups || []).length} ta` },
+                                ]}
+                                actions={renderActions(course)}
+                                onClick={() => navigate(`/courses/${course.id}`)}
+                            />
+                        );
+                    })}
+                </CatalogGrid>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    isLoading={isCoursesLoading}
+                />
+            )}
+
+            {/* Course Modal */}
             <CourseModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 course={selectedCourse}
-                onSuccess={handleSuccess}
+                onSuccess={() => {
+                    setIsModalOpen(false);
+                    refetch();
+                }}
             />
 
+            {/* Delete Confirmation Dialog */}
             <ConfirmDialog
                 isOpen={isDeleteModalOpen}
-                onClose={() => { setIsDeleteModalOpen(false); setCourseToDelete(null); }}
+                onClose={() => {
+                    setIsDeleteModalOpen(false);
+                    setCourseToDelete(null);
+                }}
                 onConfirm={handleConfirmDelete}
                 title="Kursni o'chirish"
-                description={`Siz haqiqatan ham "${courseToDelete?.name}" kursini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`}
+                description="Ushbu kursni o'chirishni tasdiqlaysizmi? Kursga tegishli darslar ham o'chirilishi mumkin."
                 confirmText="O'chirish"
                 cancelText="Bekor qilish"
             />
