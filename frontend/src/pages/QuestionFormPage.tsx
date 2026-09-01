@@ -6,8 +6,9 @@ import type { QuestionCreateRequest } from '@/services/questionService';
 import { questionService } from '@/services/questionService';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
+import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { Card, CardContent } from '@/components/ui/Card';
-import { ArrowLeft, Loader2, ImagePlus } from 'lucide-react';
+import { ArrowLeft, FolderOpen, ImagePlus, Loader2 } from 'lucide-react';
 import JoditEditor from 'jodit-react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -77,6 +78,7 @@ const QuestionFormPage = () => {
 
     // Refs to track which editor is "active" for image insertion
     const activeEditorRef = useRef<any>(null);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const {
@@ -135,14 +137,19 @@ const QuestionFormPage = () => {
         } as any;
     }, []);
 
+    /** Havolani muharrirga rasm sifatida qoʻyadi. Yuklash ham, kutubxonadan
+     *  tanlash ham shu yerga tushadi — ikki joyda takrorlanmasligi uchun. */
+    const insertImage = (url: string, editorInstance: any) => {
+        if (!url || !editorInstance) return;
+        editorInstance.selection.insertHTML(
+            `<img src="${url}" alt="uploaded" style="max-width: 100%;" />`
+        );
+    };
+
     const handleImageUpload = async (file: File, editorInstance: any) => {
         try {
             const result = await questionService.uploadImage(file);
-            if (result.url && editorInstance) {
-                editorInstance.selection.insertHTML(
-                    `<img src="${result.url}" alt="uploaded" style="max-width: 100%;" />`
-                );
-            }
+            insertImage(result.url, editorInstance);
         } catch (error) {
             logger.error('Image upload failed', error);
             // Бэкенд отклоняет файл с понятной причиной (тип, размер, битое содержимое) —
@@ -156,6 +163,12 @@ const QuestionFormPage = () => {
     const handleUploadButtonClick = (editorInstance: any) => {
         activeEditorRef.current = editorInstance;
         fileInputRef.current?.click();
+    };
+
+    // Kutubxonadan tanlash: fayl allaqachon serverda, qayta yuklanmaydi.
+    const handleLibraryButtonClick = (editorInstance: any) => {
+        activeEditorRef.current = editorInstance;
+        setIsPickerOpen(true);
     };
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,6 +300,17 @@ const QuestionFormPage = () => {
                 >
                     <ImagePlus className="h-3.5 w-3.5" />
                     Rasm yuklash
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleLibraryButtonClick(field.ref)}
+                    className="flex items-center gap-1 text-xs"
+                    title="Ilgari yuklangan rasmni qayta yuklamasdan qoʻshish"
+                >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Kutubxonadan
                 </Button>
             </div>
             <JoditEditor
@@ -556,6 +580,15 @@ const QuestionFormPage = () => {
                     </form>
                 </CardContent>
             </Card>
+
+            <FilePickerModal
+                isOpen={isPickerOpen}
+                onClose={() => setIsPickerOpen(false)}
+                multiple={false}
+                kind="image"
+                title="Kutubxonadan rasm tanlash"
+                onSelect={(files) => insertImage(files[0]?.url ?? '', activeEditorRef.current)}
+            />
         </div>
     );
 };
