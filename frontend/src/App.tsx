@@ -1,3 +1,4 @@
+import { AccessDenied } from '@/components/auth/AccessDenied';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -80,7 +81,10 @@ const PermissionRoute = ({ permission, children }: { permission: string | string
 
     const required = Array.isArray(permission) ? permission : [permission];
     if (!hasAnyPermission(...required)) {
-        return <Navigate to="/" replace />;
+        // Bosh sahifaga jim otib yuborish chalkash edi: oʻqituvchi uchun bosh
+        // sahifa /questions, shuning uchun natijadagi «Koʻrish» tugmasi
+        // buzilgandek tuyulardi. Endi sabab aytiladi.
+        return <AccessDenied required={required} />;
     }
     return children;
 };
