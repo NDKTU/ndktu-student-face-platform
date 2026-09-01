@@ -10,6 +10,8 @@ export interface Kafedra {
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;
+    /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
+    is_hidden?: boolean;
 }
 
 export interface KafedraListResponse {
@@ -26,9 +28,9 @@ export interface KafedraStats {
 }
 
 export const kafedraService = {
-    getKafedras: async (page = 1, limit = 100, name?: string, faculty_id?: number) => {
+    getKafedras: async (page = 1, limit = 100, name?: string, faculty_id?: number, includeHidden?: boolean) => {
         const response = await api.get<KafedraListResponse>('/kafedra/', {
-            params: { page, limit, name, faculty_id },
+            params: { page, limit, name, faculty_id, include_hidden: includeHidden || undefined },
         });
         return response.data;
     },

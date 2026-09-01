@@ -28,6 +28,10 @@ class FacultyCreateResponse(ExternalRefFields):
 
 
 class FacultyListRequest(BaseModel):
+    # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
+    # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
+    include_hidden: bool = False
+
     name: Optional[str] = None
 
     page: int = 1

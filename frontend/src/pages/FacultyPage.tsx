@@ -15,6 +15,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
+import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { facultyService, type Faculty, type FacultyStats } from '@/services/facultyService';
 import { kafedraService, type Kafedra } from '@/services/kafedraService';
@@ -49,6 +50,8 @@ export const FacultyPage = () => {
     const [faculties, setFaculties] = useState<Faculty[]>([]);
     const [stats, setStats] = useState<Map<number, FacultyStats>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
+    // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
+    const [showHidden, setShowHidden] = useState(false);
     const [isError, setIsError] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
@@ -194,7 +197,7 @@ export const FacultyPage = () => {
             setIsLoading(true);
             setIsError(false);
             const [data, statsList] = await Promise.all([
-                facultyService.getFaculties(currentPage, pageSize, debouncedSearch),
+                facultyService.getFaculties(currentPage, pageSize, debouncedSearch, showHidden),
                 facultyService.getFacultyStats().catch(() => [] as FacultyStats[]),
             ]);
             setFaculties(data.faculties);
@@ -220,7 +223,7 @@ export const FacultyPage = () => {
         if (hierarchyLevel === 'faculties') {
             void fetchData();
         }
-    }, [currentPage, debouncedSearch, hierarchyLevel]);
+    }, [currentPage, debouncedSearch, hierarchyLevel, showHidden]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -507,6 +510,13 @@ export const FacultyPage = () => {
                     </PermissionGate>
                 </>
             )}
+            <VisibilityButton
+                entity="faculty"
+                row={faculty}
+                label={faculty.name}
+                onDone={fetchData}
+                className="h-8 w-8 p-0"
+            />
             <Button
                 variant="ghost"
                 size="sm"
@@ -537,6 +547,7 @@ export const FacultyPage = () => {
                 onViewModeChange={setViewMode}
                 totalCount={faculties.length}
                 totalLabel="Fakultetlar"
+                extraFilters={<ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />}
                 actions={
                     <PermissionGate permission="create:faculty">
                         <Button
@@ -664,6 +675,7 @@ export const FacultyPage = () => {
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <ExternalSourceBadge row={faculty} />
                                                     <InactiveBadge row={faculty} />
+                                                    <HiddenBadge row={faculty} />
                                                 </div>
                                             </div>
                                         </div>
@@ -729,6 +741,7 @@ export const FacultyPage = () => {
                                         <span>Fakultet</span>
                                         <ExternalSourceBadge row={faculty} />
                                         <InactiveBadge row={faculty} />
+                                        <HiddenBadge row={faculty} />
                                     </span>
                                 }
                                 metrics={[

@@ -8,6 +8,8 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.schemas import VisibilityRequest
+from app.core.utils.visibility import set_hidden
 from app.modules.auth.model import User
 
 from .model import Result
@@ -595,6 +597,24 @@ async def get_user_answers(
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
+@subject_router.patch("/{subject_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_subject_visibility(
+    subject_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:subject")),
+):
+    """Fanni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+
+    Yashirilgan fan yangi test yoki kurs yaratishda taklif qilinmaydi, lekin
+    undagi savollar va eski natijalar joyida qoladi.
+    """
+    from app.modules.quiz.model import Subject
+
+    row = await set_hidden(session, Subject, subject_id, data.is_hidden, current_user, "Fan")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
 router.include_router(subject_router)
 router.include_router(question_router)
 router.include_router(quiz_router)

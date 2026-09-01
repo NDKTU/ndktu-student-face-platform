@@ -15,6 +15,7 @@ import {
 import { kafedraService, type Kafedra, type KafedraStats } from '@/services/kafedraService';
 import { useKafedras, useDeleteKafedra, useFaculties } from '@/hooks/useReferenceData';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { PermissionGate } from '@/components/auth/PermissionGate';
@@ -45,6 +46,8 @@ export const KafedraPage = () => {
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
+    // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
+    const [showHidden, setShowHidden] = useState(false);
     const pageSize = 15;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,7 +82,7 @@ export const KafedraPage = () => {
         isLoading: isKafedrasLoading,
         isError: isKafedrasError,
         refetch,
-    } = useKafedras(currentPage, pageSize, debouncedSearch, facultyIdNum);
+    } = useKafedras(currentPage, pageSize, debouncedSearch, facultyIdNum, true, showHidden);
 
     const rawKafedras = kafedrasData?.kafedras || [];
     const totalPages = kafedrasData ? Math.ceil(kafedrasData.total / pageSize) : 1;
@@ -235,6 +238,12 @@ export const KafedraPage = () => {
                     </PermissionGate>
                 </>
             )}
+            <VisibilityButton
+                entity="kafedra"
+                row={kafedra}
+                label={kafedra.name}
+                className="h-8 w-8 p-0"
+            />
             <Button
                 variant="ghost"
                 size="sm"
@@ -282,6 +291,7 @@ export const KafedraPage = () => {
                 totalCount={totalCount}
                 totalLabel="Kafedralar"
                 extraFilters={
+                    <>
                     <div className="w-[200px] sm:w-[260px]">
                         <Combobox
                             options={facultyOptions}
@@ -290,6 +300,8 @@ export const KafedraPage = () => {
                             placeholder="Fakultet bo'yicha saralash"
                         />
                     </div>
+                        <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
+                    </>
                 }
                 actions={
                     <PermissionGate permission="create:kafedra">
@@ -410,6 +422,7 @@ export const KafedraPage = () => {
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <ExternalSourceBadge row={kafedra} />
                                                     <InactiveBadge row={kafedra} />
+                                                    <HiddenBadge row={kafedra} />
                                                 </div>
                                             </div>
                                         </div>
@@ -477,6 +490,7 @@ export const KafedraPage = () => {
                                         </span>
                                         <ExternalSourceBadge row={kafedra} />
                                         <InactiveBadge row={kafedra} />
+                                        <HiddenBadge row={kafedra} />
                                     </span>
                                 }
                                 metrics={[

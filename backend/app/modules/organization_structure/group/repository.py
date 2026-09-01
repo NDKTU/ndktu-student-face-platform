@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Result
@@ -69,6 +70,7 @@ class GroupRepository:
         self, session: AsyncSession, request: GroupListRequest, current_user: User
     ) -> GroupListResponse:
         stmt = select(Group)
+        stmt = apply_visibility(stmt, Group, current_user, request.include_hidden)
 
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
@@ -123,6 +125,7 @@ class GroupRepository:
 
         # --- Count query ---
         count_stmt = select(func.count()).select_from(Group)
+        count_stmt = apply_visibility(count_stmt, Group, current_user, request.include_hidden)
 
         if is_admin:
             pass

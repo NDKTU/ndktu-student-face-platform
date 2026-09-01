@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
@@ -44,6 +45,8 @@ type SortOrder = 'asc' | 'desc';
 export const SubjectsPage = () => {
     const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
+    const [showHidden, setShowHidden] = useState(false);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
@@ -69,7 +72,7 @@ export const SubjectsPage = () => {
         isLoading: isSubjectsLoading,
         isError: isSubjectsError,
         refetch,
-    } = useSubjects(currentPage, pageSize, debouncedSearch);
+    } = useSubjects(currentPage, pageSize, debouncedSearch, undefined, true, showHidden);
 
     const deleteSubjectMutation = useDeleteSubject();
 
@@ -192,6 +195,12 @@ export const SubjectsPage = () => {
                     </PermissionGate>
                 </>
             )}
+            <VisibilityButton
+                entity="subject"
+                row={subject}
+                label={subject.name}
+                className="h-8 w-8 p-0"
+            />
             <Button
                 variant="ghost"
                 size="sm"
@@ -223,6 +232,7 @@ export const SubjectsPage = () => {
                 onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Fanlar"
+                extraFilters={<ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />}
                 actions={
                     <PermissionGate permission="create:subject">
                         <Button
@@ -332,6 +342,7 @@ export const SubjectsPage = () => {
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <ExternalSourceBadge row={subject} />
                                                     <InactiveBadge row={subject} />
+                                                    <HiddenBadge row={subject} />
                                                 </div>
                                             </div>
                                         </div>
@@ -387,6 +398,7 @@ export const SubjectsPage = () => {
                                 <span className="flex flex-wrap items-center gap-1.5">
                                     <ExternalSourceBadge row={subject} />
                                     <InactiveBadge row={subject} />
+                                    <HiddenBadge row={subject} />
                                 </span>
                             }
                             metrics={[

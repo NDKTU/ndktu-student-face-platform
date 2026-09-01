@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Teacher, TeacherSubject, User
 from app.modules.quiz.model import Subject
 
@@ -58,6 +59,7 @@ class SubjectRepository:
         self, session: AsyncSession, request: SubjectListRequest, current_user: User
     ) -> SubjectListResponse:
         stmt = select(Subject)
+        stmt = apply_visibility(stmt, Subject, current_user, request.include_hidden)
 
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
@@ -97,6 +99,7 @@ class SubjectRepository:
         subjects = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Subject)
+        count_stmt = apply_visibility(count_stmt, Subject, current_user, request.include_hidden)
 
         if is_admin:
             pass

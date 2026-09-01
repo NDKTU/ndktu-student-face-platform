@@ -7,10 +7,11 @@ export const useSubjects = (
     search = '',
     teacher_id?: number,
     enabled: boolean = true,
+    includeHidden = false,
 ) => {
     return useQuery({
-        queryKey: ['subjects', page, limit, search, teacher_id],
-        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id),
+        queryKey: ['subjects', page, limit, search, teacher_id, includeHidden],
+        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id, includeHidden),
         placeholderData: (previousData) => previousData,
         enabled,
     });

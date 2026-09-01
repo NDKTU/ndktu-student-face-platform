@@ -16,6 +16,7 @@ import {
 import { specialityService, type Speciality, type SpecialityStats } from '@/services/specialityService';
 import { useDeleteSpeciality, useFaculties, useKafedras } from '@/hooks/useReferenceData';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { PermissionGate } from '@/components/auth/PermissionGate';
@@ -35,6 +36,8 @@ type SortOrder = 'asc' | 'desc';
 
 export const SpecialitiesPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
+    const [showHidden, setShowHidden] = useState(false);
     const navigate = useNavigate();
 
     const facultyIdParam = searchParams.get('faculty_id');
@@ -96,7 +99,7 @@ export const SpecialitiesPage = () => {
         try {
             const kafedraIdNum = selectedKafedra !== 'all' ? Number(selectedKafedra) : undefined;
             const [list, counters] = await Promise.all([
-                specialityService.getSpecialities(1, 1000, debouncedSearch, kafedraIdNum),
+                specialityService.getSpecialities(1, 1000, debouncedSearch, kafedraIdNum, showHidden),
                 specialityService.getSpecialityStats(kafedraIdNum),
             ]);
             setSpecialities(list.specialities);
@@ -110,7 +113,7 @@ export const SpecialitiesPage = () => {
 
     useEffect(() => {
         void loadData();
-    }, [selectedKafedra, debouncedSearch]);
+    }, [selectedKafedra, debouncedSearch, showHidden]);
 
     // Handle faculty change
     const handleFacultyChange = (fId: string) => {
@@ -310,6 +313,13 @@ export const SpecialitiesPage = () => {
                     </PermissionGate>
                 </>
             )}
+            <VisibilityButton
+                entity="speciality"
+                row={speciality}
+                label={speciality.name}
+                onDone={loadData}
+                className="h-8 w-8 p-0"
+            />
             <Button
                 variant="ghost"
                 size="sm"
@@ -359,6 +369,7 @@ export const SpecialitiesPage = () => {
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
                 extraFilters={
+                    <>
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="w-[180px] sm:w-[220px]">
                             <Combobox
@@ -377,6 +388,8 @@ export const SpecialitiesPage = () => {
                             />
                         </div>
                     </div>
+                        <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
+                    </>
                 }
                 chips={
                     <FilterChipGroup<DegreeFilter>
@@ -524,6 +537,7 @@ export const SpecialitiesPage = () => {
                                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                 <ExternalSourceBadge row={speciality} />
                                                 <InactiveBadge row={speciality} />
+                                                <HiddenBadge row={speciality} />
                                             </div>
                                         </div>
                                     </TableCell>
@@ -598,6 +612,7 @@ export const SpecialitiesPage = () => {
                                         {subtitleParts.length > 0 ? subtitleParts.join(' · ') : 'Mutaxassislik'}
                                         <ExternalSourceBadge row={speciality} />
                                         <InactiveBadge row={speciality} />
+                                        <HiddenBadge row={speciality} />
                                     </span>
                                 }
                                 onClick={() => navigate(`/groups?speciality_id=${speciality.id}`)}

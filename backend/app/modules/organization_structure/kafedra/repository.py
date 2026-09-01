@@ -7,6 +7,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.visibility import apply_visibility
+from app.modules.auth.model import User
 from app.modules.organization_structure.model import Kafedra
 
 from .schemas import (
@@ -104,8 +106,11 @@ class KafedraRepository:
 
         return kafedra
 
-    async def list_kafedras(self, session: AsyncSession, request: KafedraListRequest) -> KafedraListResponse:
+    async def list_kafedras(
+        self, session: AsyncSession, request: KafedraListRequest, current_user: User
+    ) -> KafedraListResponse:
         stmt = select(Kafedra)
+        stmt = apply_visibility(stmt, Kafedra, current_user, request.include_hidden)
 
         if request.name:
             stmt = stmt.where(Kafedra.name.ilike(f"%{request.name}%"))
@@ -120,6 +125,7 @@ class KafedraRepository:
         kafedras = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Kafedra)
+        count_stmt = apply_visibility(count_stmt, Kafedra, current_user, request.include_hidden)
         if request.name:
             count_stmt = count_stmt.where(Kafedra.name.ilike(f"%{request.name}%"))
         if request.faculty_id:

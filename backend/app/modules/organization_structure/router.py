@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.schemas import VisibilityRequest
+from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
+from app.core.utils.visibility import set_hidden
 from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
@@ -92,9 +95,9 @@ async def get_faculty(
 async def list_faculties(
     data: FacultyListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:faculty")),
+    current_user: User = Depends(PermissionRequired("read:faculty")),
 ):
-    return await get_faculty_repository.list_faculties(session=session, request=data)
+    return await get_faculty_repository.list_faculties(session=session, request=data, current_user=current_user)
 
 
 @faculty_router.put(
@@ -172,9 +175,9 @@ async def get_kafedra(
 async def list_kafedras(
     data: KafedraListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:kafedra")),
+    current_user: User = Depends(PermissionRequired("read:kafedra")),
 ):
-    return await get_kafedra_repository.list_kafedras(session=session, request=data)
+    return await get_kafedra_repository.list_kafedras(session=session, request=data, current_user=current_user)
 
 
 @kafedra_router.put(
@@ -348,9 +351,9 @@ async def get_speciality_stats(
 async def list_specialities(
     data: SpecialityListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:speciality")),
+    current_user: User = Depends(PermissionRequired("read:speciality")),
 ):
-    return await get_speciality_repository.list_specialities(session=session, request=data)
+    return await get_speciality_repository.list_specialities(session=session, request=data, current_user=current_user)
 
 
 @speciality_router.get("/{speciality_id}", response_model=SpecialityResponse)
@@ -394,6 +397,74 @@ async def delete_speciality(
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
+@faculty_router.patch("/{faculty_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_faculty_visibility(
+    faculty_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:faculty")),
+):
+    """Fakultetni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+
+    Yashirilgan yozuv roʻyxatlarda ham, tanlov oynalarida ham koʻrinmaydi,
+    lekin unga bogʻlangan eski maʼlumot ishlayveradi: oʻtgan natijalar
+    ochiladi, boshlangan test toʻxtamaydi.
+    """
+    row = await set_hidden(session, Faculty, faculty_id, data.is_hidden, current_user, "Fakultet")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
+@kafedra_router.patch("/{kafedra_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_kafedra_visibility(
+    kafedra_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:kafedra")),
+):
+    """Kafedrani boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+
+    Yashirilgan yozuv roʻyxatlarda ham, tanlov oynalarida ham koʻrinmaydi,
+    lekin unga bogʻlangan eski maʼlumot ishlayveradi: oʻtgan natijalar
+    ochiladi, boshlangan test toʻxtamaydi.
+    """
+    row = await set_hidden(session, Kafedra, kafedra_id, data.is_hidden, current_user, "Kafedra")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
+@group_router.patch("/{group_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_group_visibility(
+    group_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:group")),
+):
+    """Guruhni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+
+    Yashirilgan yozuv roʻyxatlarda ham, tanlov oynalarida ham koʻrinmaydi,
+    lekin unga bogʻlangan eski maʼlumot ishlayveradi: oʻtgan natijalar
+    ochiladi, boshlangan test toʻxtamaydi.
+    """
+    row = await set_hidden(session, Group, group_id, data.is_hidden, current_user, "Guruh")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
+@speciality_router.patch("/{speciality_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_speciality_visibility(
+    speciality_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:speciality")),
+):
+    """Mutaxassislikni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+
+    Yashirilgan yozuv roʻyxatlarda ham, tanlov oynalarida ham koʻrinmaydi,
+    lekin unga bogʻlangan eski maʼlumot ishlayveradi: oʻtgan natijalar
+    ochiladi, boshlangan test toʻxtamaydi.
+    """
+    row = await set_hidden(session, Speciality, speciality_id, data.is_hidden, current_user, "Mutaxassislik")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
 router.include_router(faculty_router)
 router.include_router(kafedra_router)
 router.include_router(group_router)

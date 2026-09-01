@@ -30,6 +30,10 @@ class KafedraCreateResponse(ExternalRefFields):
 
 
 class KafedraListRequest(BaseModel):
+    # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
+    # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
+    include_hidden: bool = False
+
     name: Optional[str] = None
     faculty_id: Optional[int] = None
 

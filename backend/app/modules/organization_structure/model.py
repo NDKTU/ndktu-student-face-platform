@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
 from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
+from app.core.mixins.hideable import HideableMixin
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from app.modules.quiz.model import Quiz, Result
 
 
-class Faculty(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+class Faculty(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "faculties"
     __table_args__ = (external_ref_index("faculties"),)
 
@@ -28,7 +29,7 @@ class Faculty(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     groups: Mapped[list["Group"]] = relationship("Group", back_populates="faculty")
 
 
-class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "kafedras"
     # Уникальность в пределах факультета, а не глобальная: одноимённые кафедры
     # на разных факультетах — норма.
@@ -49,7 +50,7 @@ class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         return self.name
 
 
-class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "groups"
     __table_args__ = (
         UniqueConstraint("faculty_id", "name", name="uq_groups_faculty_id_name"),
@@ -122,7 +123,7 @@ class TeacherGroup(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         return f"TeacherGroup teacher={self.teacher_id} group={self.group_id}"
 
 
-class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "specialities"
     __table_args__ = (
         UniqueConstraint("kafedra_id", "name", name="uq_specialities_kafedra_id_name"),

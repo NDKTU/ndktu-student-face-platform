@@ -6,6 +6,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.visibility import apply_visibility
+from app.modules.auth.model import User
 from app.modules.organization_structure.model import Speciality
 
 from .schemas import (
@@ -109,11 +111,16 @@ class SpecialityRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speciality not found")
         return speciality
 
-    async def list_specialities(self, session: AsyncSession, request: SpecialityListRequest) -> SpecialityListResponse:
+    async def list_specialities(
+        self, session: AsyncSession, request: SpecialityListRequest, current_user: User
+    ) -> SpecialityListResponse:
         from app.modules.organization_structure.model import Kafedra
 
         stmt = select(Speciality)
         count_stmt = select(func.count()).select_from(Speciality)
+
+        stmt = apply_visibility(stmt, Speciality, current_user, request.include_hidden)
+        count_stmt = apply_visibility(count_stmt, Speciality, current_user, request.include_hidden)
 
         if request.name:
             stmt = stmt.where(Speciality.name.ilike(f"%{request.name}%"))

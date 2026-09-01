@@ -32,3 +32,17 @@ class ExternalRefFields(BaseModel):
     external_source: str | None = None
     synced_at: TashkentDatetime | None = None
     is_active: bool = True
+
+    # Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki
+    # («manbada hali bormi»), bu esa adminning qarori.
+    is_hidden: bool = False
+
+
+class VisibilityRequest(BaseModel):
+    """Spravochnik yozuvini yashirish yoki qaytarish.
+
+    Faqat admin uchun. `is_active` dan farqli — u sinxronizatsiyaniki, bu esa
+    adminning qaroridir; ikkalasidan biri yoqilgan boʻlsa yozuv koʻrinmaydi.
+    """
+
+    is_hidden: bool

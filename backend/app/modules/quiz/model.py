@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database.base import Base
 from app.core.enums import QuestionType, QuizType
 from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
+from app.core.mixins.hideable import HideableMixin
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from app.modules.organization_structure.model import Group
 
 
-class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "subjects"
     # Уникальность в пределах кафедры: одноимённые предметы на разных кафедрах
     # в EPOS встречаются и являются разными предметами.

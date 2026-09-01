@@ -9,6 +9,8 @@ export interface Faculty {
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;
+    /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
+    is_hidden?: boolean;
 }
 
 export interface FacultyListResponse {
@@ -26,9 +28,10 @@ export interface FacultyStats {
 }
 
 export const facultyService = {
-    getFaculties: async (page = 1, limit = 100, name?: string) => {
+    getFaculties: async (page = 1, limit = 100, name?: string, includeHidden?: boolean) => {
         const response = await api.get<FacultyListResponse>('/faculty/', {
-            params: { page, limit, name },
+            // include_hidden faqat adminda ishlaydi — serverda tekshiriladi.
+            params: { page, limit, name, include_hidden: includeHidden || undefined },
         });
         return response.data;
     },

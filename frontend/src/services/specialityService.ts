@@ -15,6 +15,8 @@ export interface Speciality {
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;
+    /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
+    is_hidden?: boolean;
 }
 
 export interface SpecialityPayload {
@@ -37,9 +39,9 @@ export interface SpecialityStats {
 }
 
 export const specialityService = {
-    getSpecialities: async (page = 1, limit = 100, name?: string, kafedra_id?: number) => {
+    getSpecialities: async (page = 1, limit = 100, name?: string, kafedra_id?: number, includeHidden?: boolean) => {
         const response = await api.get<SpecialityListResponse>('/speciality/', {
-            params: { page, limit, name, kafedra_id },
+            params: { page, limit, name, kafedra_id, include_hidden: includeHidden || undefined },
         });
         return response.data;
     },

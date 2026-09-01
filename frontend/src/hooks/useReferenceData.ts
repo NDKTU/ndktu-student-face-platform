@@ -6,10 +6,17 @@ import { permissionService } from '@/services/permissionService';
 import { specialityService, type SpecialityPayload } from '@/services/specialityService';
 
 // Faculties
-export const useFaculties = (page = 1, limit = 100, name?: string, enabled: boolean = true) => {
+export const useFaculties = (
+    page = 1,
+    limit = 100,
+    name?: string,
+    enabled: boolean = true,
+    // Yashirilganlarni ham koʻrsatish — faqat adminda ishlaydi.
+    includeHidden = false,
+) => {
     return useQuery({
-        queryKey: ['faculties', page, limit, name],
-        queryFn: () => facultyService.getFaculties(page, limit, name),
+        queryKey: ['faculties', page, limit, name, includeHidden],
+        queryFn: () => facultyService.getFaculties(page, limit, name, includeHidden),
         enabled,
     });
 };
@@ -51,10 +58,11 @@ export const useKafedras = (
     name?: string,
     faculty_id?: number,
     enabled: boolean = true,
+    includeHidden = false,
 ) => {
     return useQuery({
-        queryKey: ['kafedras', page, limit, name, faculty_id],
-        queryFn: () => kafedraService.getKafedras(page, limit, name, faculty_id),
+        queryKey: ['kafedras', page, limit, name, faculty_id, includeHidden],
+        queryFn: () => kafedraService.getKafedras(page, limit, name, faculty_id, includeHidden),
         enabled,
     });
 };
@@ -90,10 +98,17 @@ export const useDeleteKafedra = () => {
 };
 
 // Specialities
-export const useSpecialities = (page = 1, limit = 100, name?: string, kafedra_id?: number, enabled: boolean = true) => {
+export const useSpecialities = (
+    page = 1,
+    limit = 100,
+    name?: string,
+    kafedra_id?: number,
+    enabled: boolean = true,
+    includeHidden = false,
+) => {
     return useQuery({
-        queryKey: ['specialities', page, limit, name, kafedra_id],
-        queryFn: () => specialityService.getSpecialities(page, limit, name, kafedra_id),
+        queryKey: ['specialities', page, limit, name, kafedra_id, includeHidden],
+        queryFn: () => specialityService.getSpecialities(page, limit, name, kafedra_id, includeHidden),
         enabled,
     });
 };

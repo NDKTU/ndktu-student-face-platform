@@ -14,6 +14,8 @@ export interface Group {
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;
+    /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
+    is_hidden?: boolean;
 }
 
 export interface GroupListResponse {
@@ -41,8 +43,9 @@ export interface GroupStudentListResponse {
 }
 
 export const groupService = {
-    getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number, speciality_id?: number) => {
+    getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number, speciality_id?: number, includeHidden?: boolean) => {
         const params: any = { page, limit };
+        if (includeHidden) params.include_hidden = true;
         if (search) params.name = search;
         if (teacher_id) params.teacher_id = teacher_id;
         if (faculty_id) params.faculty_id = faculty_id;

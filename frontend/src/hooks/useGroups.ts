@@ -9,13 +9,15 @@ export const useGroups = (
     facultyId?: number,
     specialityIdOrEnabled?: number | boolean,
     enabledParam: boolean = true,
+    includeHidden = false,
 ) => {
     const specialityId = typeof specialityIdOrEnabled === 'number' ? specialityIdOrEnabled : undefined;
     const enabled = typeof specialityIdOrEnabled === 'boolean' ? specialityIdOrEnabled : enabledParam;
 
     return useQuery({
-        queryKey: ['groups', page, limit, search, teacherId, facultyId, specialityId],
-        queryFn: () => groupService.getGroups(page, limit, search, teacherId, facultyId, specialityId),
+        queryKey: ['groups', page, limit, search, teacherId, facultyId, specialityId, includeHidden],
+        queryFn: () =>
+            groupService.getGroups(page, limit, search, teacherId, facultyId, specialityId, includeHidden),
         placeholderData: (previousData) => previousData,
         enabled,
     });

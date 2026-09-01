@@ -22,6 +22,7 @@ import { useFaculties, useSpecialities } from '@/hooks/useReferenceData';
 import { Combobox } from '@/components/ui/Combobox';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
+import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { GroupModal } from '@/components/group/GroupModal';
@@ -36,6 +37,8 @@ type SortOrder = 'asc' | 'desc';
 
 export const GroupsPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
+    const [showHidden, setShowHidden] = useState(false);
     const navigate = useNavigate();
 
     const facultyIdParam = searchParams.get('faculty_id');
@@ -84,7 +87,7 @@ export const GroupsPage = () => {
         isLoading: isGroupsLoading,
         isError: isGroupsError,
         refetch,
-    } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdNum, specialityIdNum);
+    } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdNum, specialityIdNum, true, showHidden);
 
     const { data: facultiesData } = useFaculties();
     const { data: specialitiesData } = useSpecialities(1, 200);
@@ -305,6 +308,12 @@ export const GroupsPage = () => {
                     </PermissionGate>
                 </>
             )}
+            <VisibilityButton
+                entity="group"
+                row={group}
+                label={group.name}
+                className="h-8 w-8 p-0"
+            />
             <Button
                 variant="ghost"
                 size="sm"
@@ -360,6 +369,7 @@ export const GroupsPage = () => {
                 totalCount={totalCount}
                 totalLabel="Guruhlar"
                 extraFilters={
+                    <>
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="w-[180px] sm:w-[220px]">
                             <Combobox
@@ -378,6 +388,8 @@ export const GroupsPage = () => {
                             />
                         </div>
                     </div>
+                        <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
+                    </>
                 }
                 chips={
                     <div className="flex flex-wrap items-center gap-4 w-full">
@@ -527,6 +539,7 @@ export const GroupsPage = () => {
                                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                 <ExternalSourceBadge row={group} />
                                                 <InactiveBadge row={group} />
+                                                <HiddenBadge row={group} />
                                             </div>
                                         </div>
                                     </TableCell>
@@ -610,6 +623,7 @@ export const GroupsPage = () => {
                                         <span>{group.education_shape || 'Guruh'}</span>
                                         <ExternalSourceBadge row={group} />
                                         <InactiveBadge row={group} />
+                                        <HiddenBadge row={group} />
                                     </span>
                                 </div>
                             }
