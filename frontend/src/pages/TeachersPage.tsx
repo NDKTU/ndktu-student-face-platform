@@ -23,7 +23,6 @@ import { TeacherModal } from '@/components/teachers/TeacherModal';
 import { TeacherGroupModal } from '@/components/teachers/TeacherGroupModal';
 import { TeacherSubjectModal } from '@/components/teachers/TeacherSubjectModal';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-import { PageTabs } from '@/components/ui/PageTabs';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
@@ -34,12 +33,6 @@ import { Combobox } from '@/components/ui/Combobox';
 import { ExternalSourceBadge, InactiveBadge } from '@/components/common/ExternalSourceBadge';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
-
-const USER_TABS = [
-    { label: 'Tizim foydalanuvchilari', href: '/users' },
-    { label: "O'qituvchilar", href: '/teachers' },
-    { label: 'Talabalar', href: '/students' },
-];
 
 type SortField = 'name' | 'kafedra' | 'created_at';
 type SortOrder = 'asc' | 'desc';
@@ -269,7 +262,6 @@ export const TeachersPage = () => {
     return (
         <div className="space-y-5">
             {/* Top Sub-Navigation Tabs */}
-            <PageTabs tabs={USER_TABS} />
 
             {/* Breadcrumbs Header */}
             <OrganizationBreadcrumbs

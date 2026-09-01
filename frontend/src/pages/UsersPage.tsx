@@ -24,7 +24,6 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useAssignRoles }
 import { useRoles } from '@/hooks/useReferenceData';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-import { PageTabs } from '@/components/ui/PageTabs';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
@@ -41,12 +40,6 @@ const userSchema = z.object({
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
-
-const USER_TABS = [
-    { label: 'Tizim foydalanuvchilari', href: '/users' },
-    { label: "O'qituvchilar", href: '/teachers' },
-    { label: 'Talabalar', href: '/students' },
-];
 
 type SortField = 'id' | 'username' | 'created_at';
 type SortOrder = 'asc' | 'desc';
@@ -222,7 +215,6 @@ export const UsersPage = () => {
     return (
         <div className="space-y-5">
             {/* Top Sub-Navigation Tabs */}
-            <PageTabs tabs={USER_TABS} />
 
             {/* Breadcrumb Header */}
             <OrganizationBreadcrumbs

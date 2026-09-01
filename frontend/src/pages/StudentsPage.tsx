@@ -29,7 +29,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HemisImportModal } from '@/components/HemisImportModal';
 import { ChangeGroupModal } from '@/components/ChangeGroupModal';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-import { PageTabs } from '@/components/ui/PageTabs';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
@@ -39,12 +38,6 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
 import type { Result } from '@/services/resultService';
-
-const USER_TABS = [
-    { label: 'Tizim foydalanuvchilari', href: '/users' },
-    { label: "O'qituvchilar", href: '/teachers' },
-    { label: 'Talabalar', href: '/students' },
-];
 
 type SortField = 'name' | 'user_id' | 'created_at';
 type SortOrder = 'asc' | 'desc';
@@ -236,7 +229,6 @@ export const StudentsPage = () => {
     return (
         <div className="space-y-5">
             {/* Top Sub-Navigation Tabs */}
-            <PageTabs tabs={USER_TABS} />
 
             {/* Breadcrumb Header */}
             <OrganizationBreadcrumbs

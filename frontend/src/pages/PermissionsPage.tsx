@@ -9,13 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { labelFor, parsePermission } from '@/constants/resources';
-import { PageTabs } from '@/components/ui/PageTabs';
 import { PageHeader } from '@/components/ui/PageHeader';
-
-const ACCESS_TABS = [
-    { label: 'Rollar', href: '/roles' },
-    { label: 'Ruxsatlar', href: '/permissions' },
-];
 
 // Ruxsatlar ro'yxati faqat ko'rish uchun: ular backend route'laridagi
 // `PermissionRequired(...)` dan ilova ishga tushganda avtomatik yaratiladi,
@@ -63,7 +57,6 @@ const PermissionsPage = () => {
 
     return (
         <div className="space-y-6">
-            <PageTabs tabs={ACCESS_TABS} />
             <PageHeader
                 title="Ruxsatlar"
                 description="Tizim ruxsatlari tizim tomonidan belgilanadi va faqat ko'rish uchun"

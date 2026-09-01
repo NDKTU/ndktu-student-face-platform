@@ -15,7 +15,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { PermissionGate } from '@/components/auth/PermissionGate';
-import { PageTabs } from '@/components/ui/PageTabs';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 
@@ -24,11 +23,6 @@ const roleSchema = z.object({
 });
 
 type RoleFormValues = z.infer<typeof roleSchema>;
-
-const ACCESS_TABS = [
-    { label: 'Rollar', href: '/roles' },
-    { label: 'Ruxsatlar', href: '/permissions' },
-];
 
 const RolesPage = () => {
     const [roles, setRoles] = useState<Role[]>([]);
@@ -161,7 +155,6 @@ const RolesPage = () => {
 
     return (
         <div className="space-y-6">
-            <PageTabs tabs={ACCESS_TABS} />
             <PageHeader
                 title="Rollar"
                 description="Tizim rollarini va ruxsatlarni boshqarish"
