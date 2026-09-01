@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply restore-dates restore-dates-apply
 
 .DEFAULT_GOAL := help
 
@@ -34,6 +34,8 @@ help:
 	@echo "make import-files-apply   - Move them (dumps library tables first)"
 	@echo "make link-answers         - Show answers to link to their attempts (dry run)"
 	@echo "make link-answers-apply   - Link them (dumps user_answers first)"
+	@echo "make restore-dates        - Show result dates recoverable from answers (dry run)"
+	@echo "make restore-dates-apply  - Restore them (dumps results first)"
 	@echo ""
 	@echo "EDUPLAN (EPOS) SYNC:"
 	@echo "────────────────────"
@@ -142,3 +144,10 @@ link-answers:
 
 link-answers-apply:
 	@./scripts/link_answers.sh --apply
+
+# Natijalar sanasini javoblardan tiklash (link-answers dan keyin)
+restore-dates:
+	@./scripts/restore_result_dates.sh
+
+restore-dates-apply:
+	@./scripts/restore_result_dates.sh --apply
