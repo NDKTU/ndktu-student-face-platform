@@ -29,6 +29,7 @@ const FacultyPage = lazy(() => import('@/pages/FacultyPage'));
 const KafedraPage = lazy(() => import('@/pages/KafedraPage'));
 const SpecialitiesPage = lazy(() => import('@/pages/SpecialitiesPage'));
 const FilesPage = lazy(() => import('@/pages/FilesPage'));
+const TeacherAssignmentsPage = lazy(() => import('@/pages/TeacherAssignmentsPage'));
 const GroupsPage = lazy(() => import('@/pages/GroupsPage'));
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'));
 const CoursesPage = lazy(() => import('@/pages/CoursesPage'));
@@ -149,6 +150,7 @@ function App() {
                                         <Route path="/faculties/*" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/kafedras" element={<PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute>} />
+                                        <Route path="/teacher-assignments" element={<PermissionRoute permission="read:teacher"><TeacherAssignmentsPage /></PermissionRoute>} />
                                         <Route path="/files" element={<PermissionRoute permission="read:file"><FilesPage /></PermissionRoute>} />
                                         <Route path="/specialities" element={<PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />

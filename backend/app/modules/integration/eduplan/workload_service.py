@@ -27,7 +27,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.auth.model import Teacher, TeacherSubject
+from app.modules.auth.model import Teacher, TeacherAssignment, TeacherSubject
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Subject
 
@@ -120,11 +120,12 @@ class EduPlanWorkloadService:
                 if wl.semester_type:
                     bucket["semester_types"].add(wl.semester_type)
 
-        created, updated = await self._persist(session, collapsed)
+        created, updated = await self._persist(session, collapsed, academic_year_id)
         deactivated = await self._deactivate_missing(
             session,
             {(teacher_id, subject_id) for teacher_id, subject_id, _ in collapsed},
             {(teacher_id, group_id) for teacher_id, _, group_id in collapsed},
+            set(collapsed),
         )
 
         await session.commit()
@@ -164,9 +165,21 @@ class EduPlanWorkloadService:
     #  Запись
     # ------------------------------------------------------------------ #
     @staticmethod
-    async def _persist(session: AsyncSession, collapsed: dict[tuple[int, int, int], dict]):
+    async def _persist(
+        session: AsyncSession,
+        collapsed: dict[tuple[int, int, int], dict],
+        academic_year_id: int | None = None,
+    ):
         if not collapsed:
             return 0, 0
+
+        # Uchlikni oʻz jadvaliga yozamiz. Eski ikkita jadval ham avvalgidek
+        # toʻldiriladi: ularga savollarning koʻrinishi, fayl kutubxonasi va
+        # natijalar filtri tayanadi.
+        existing_ta = {
+            (r.teacher_id, r.subject_id, r.group_id): r
+            for r in (await session.execute(select(TeacherAssignment))).scalars().all()
+        }
 
         # (teacher, subject) va (teacher, group) juftliklariga yoyamiz.
         by_subject: dict[tuple[int, int], dict] = defaultdict(lambda: {"load_types": set(), "semester_types": set()})
@@ -179,6 +192,25 @@ class EduPlanWorkloadService:
 
         created = updated = 0
         now = utcnow_naive()
+
+        for (teacher_id, subject_id, group_id), bucket in collapsed.items():
+            row = existing_ta.get((teacher_id, subject_id, group_id))
+            if row is None:
+                row = TeacherAssignment(
+                    teacher_id=teacher_id, subject_id=subject_id, group_id=group_id
+                )
+                created += 1
+            else:
+                updated += 1
+            row.load_types = sorted(bucket["load_types"])
+            row.semester_type = ", ".join(sorted(bucket["semester_types"])) or None
+            row.academic_year_id = academic_year_id
+            # external_id boʻsh: bitta biriktirma bir nechta yuklama satridan
+            # yigʻiladi va yagona tashqi id'ga ega emas.
+            row.external_source = SOURCE_EDUPLAN
+            row.synced_at = now
+            row.is_active = True
+            session.add(row)
 
         existing_ts = {
             (r.teacher_id, r.subject_id): r for r in (await session.execute(select(TeacherSubject))).scalars().all()
@@ -223,6 +255,7 @@ class EduPlanWorkloadService:
         session: AsyncSession,
         present_subjects: set[tuple[int, int]],
         present_groups: set[tuple[int, int]],
+        present_triples: set[tuple[int, int, int]] | None = None,
     ) -> int:
         """Связки, пропавшие из нагрузки, гасим, но не удаляем.
 
@@ -231,6 +264,31 @@ class EduPlanWorkloadService:
         """
         deactivated = 0
         now = utcnow_naive()
+
+        # Uchlik boʻyicha alohida: juftlik saqlanib qolib, uchlik oʻzgargan
+        # holat mavjud — oʻqituvchi bitta guruhdan boʻshab boshqasiga oʻtsa,
+        # (oʻqituvchi, fan) juftligi joyida qoladi. Faqat juftliklarni
+        # tekshirsak, eski uchlik faol boʻlib qolar va yuklamada mavjud
+        # boʻlmagan dars koʻrinardi.
+        if present_triples is not None:
+            ta_rows = (
+                (
+                    await session.execute(
+                        select(TeacherAssignment).where(
+                            TeacherAssignment.external_source == SOURCE_EDUPLAN,
+                            TeacherAssignment.is_active.is_(True),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for row in ta_rows:
+                if (row.teacher_id, row.subject_id, row.group_id) not in present_triples:
+                    row.is_active = False
+                    row.synced_at = now
+                    session.add(row)
+                    deactivated += 1
 
         ts_rows = (
             (

@@ -38,6 +38,8 @@ from .student.schemas import (
     StudentUpdateRequest,
     StudentWithUserListResponse,
 )
+from .teacher_assignment.repository import get_teacher_assignment_repository
+from .teacher_assignment.schemas import AssignmentListRequest, AssignmentListResponse
 from .teacher.repository import get_teacher_repository
 from .teacher.schemas import (
     FacultyRankingResponse,
@@ -673,9 +675,35 @@ async def sync_hemis_data(
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
+# ============================================================================
+#  TEACHER ASSIGNMENT (EPOS yuklamasi)
+# ============================================================================
+teacher_assignment_router = APIRouter(
+    tags=["Teacher assignment"],
+    prefix="/teacher-assignment",
+)
+
+
+@teacher_assignment_router.get("/", response_model=AssignmentListResponse)
+async def list_teacher_assignments(
+    data: AssignmentListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:teacher")),
+):
+    """EPOS yuklamasi: kim, qaysi guruhga, qaysi fandan dars beradi.
+
+    Faqat oʻqish. Yozish sinxronizatsiyaning ishi — bu yerdan qoʻlda
+    oʻzgartirish keyingi progn tomonidan jimgina qaytarilardi.
+    """
+    return await get_teacher_assignment_repository.list_assignments(
+        session=session, request=data, current_user=current_user
+    )
+
+
 router.include_router(user_router)
 router.include_router(role_router)
 router.include_router(permission_router)
 router.include_router(student_router)
 router.include_router(teacher_router)
+router.include_router(teacher_assignment_router)
 router.include_router(hemis_router)

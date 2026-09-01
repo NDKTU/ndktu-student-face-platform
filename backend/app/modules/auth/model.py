@@ -218,6 +218,58 @@ class Teacher(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         return self.full_name
 
 
+class TeacherAssignment(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+    """EPOS yuklamasi: kim, qaysi guruhga, qaysi fandan dars beradi.
+
+    Nega alohida jadval. Sinxronizatsiya EPOS'dan aynan shu uchlikni hisoblaydi
+    (``workload_service`` dagi ``collapsed``), lekin uni ikkiga boʻlib
+    saqlardi — ``teacher_subject`` va ``teacher_group``. Ikkovidan uchlikni
+    tiklab boʻlmaydi: bir oʻqituvchi ikki fandan ikki guruhga dars bersa,
+    kesishma toʻrtta kombinatsiya beradi va ulardan ikkitasi yolgʻon. Bazada
+    162 ta fanga bir nechta oʻqituvchi biriktirilgan — bu chekka holat emas.
+
+    Eski ikkita jadval oʻz joyida qoladi: ularga savollarning koʻrinishi,
+    fayl kutubxonasi va natijalar filtri tayanadi. Bu jadval ularning ustiga
+    qoʻshiladi, oʻrnini bosmaydi.
+    """
+
+    __tablename__ = "teacher_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "teacher_id", "subject_id", "group_id", name="uq_teacher_assignment"
+        ),
+        external_ref_index("teacher_assignments"),
+    )
+
+    teacher_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    subject_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    #: Mashgʻulot turlari (maʼruza, amaliyot, laboratoriya). Bitta biriktirma
+    #: EPOS'ning bir nechta yuklama satridan yigʻiladi, shuning uchun roʻyxat.
+    load_types: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    semester_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    #: EPOS'dagi oʻquv yili. Keyingi yil boshlanganda eski biriktirmalar
+    #: yangilari bilan aralashib ketmasligi uchun hozirdan yozib boramiz.
+    academic_year_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+    teacher: Mapped["Teacher"] = relationship("Teacher")
+    subject: Mapped["Subject"] = relationship("Subject")
+
+    def __str__(self):
+        return (
+            f"TeacherAssignment teacher={self.teacher_id} "
+            f"subject={self.subject_id} group={self.group_id}"
+        )
+
+
 class TeacherSubject(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
     __tablename__ = "teacher_subject"
     __table_args__ = (

@@ -66,6 +66,7 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     result:        { label: 'Natijalar',        href: '/results',     icon: FileText,      section: 'Testlar' },
     lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen },
     file:          { label: 'Fayl kutubxonasi', href: '/files',       icon: FolderOpen,    section: 'Testlar' },
+    teacher_assignment: { label: 'Oʻquv yuklamasi', href: '/teacher-assignments', icon: ClipboardList, section: 'Boshqaruv' },
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: 'Testlar' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Psixologiya' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Psixologiya' },
@@ -133,6 +134,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'kafedra',
     'speciality',
     'group',
+    'teacher_assignment',
 
     // Foydalanuvchilar
     'user',

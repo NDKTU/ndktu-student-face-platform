@@ -16,10 +16,22 @@ if TYPE_CHECKING:
 
 class Faculty(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "faculties"
-    __table_args__ = (external_ref_index("faculties"),)
+    __table_args__ = (
+        # Nom boʻyicha unikallik faqat qoʻlda kiritilgan satrlarga (c5f30ab71d92):
+        # EduPlan'da bir xil nomli ikki yozuv boʻlishi mumkin va cheklov butun
+        # sinxronizatsiyani toʻxtatardi. Koʻzgu satrining oʻziga xosligini
+        # external_ref indeksi taʼminlaydi.
+        Index(
+            "faculties_name_key",
+            "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
+        external_ref_index("faculties"),
+    )
 
     # 255, а не 50: названия факультетов в EPOS длиннее прежнего лимита.
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
 
     def __str__(self):
         return self.name
@@ -34,7 +46,16 @@ class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     # Уникальность в пределах факультета, а не глобальная: одноимённые кафедры
     # на разных факультетах — норма.
     __table_args__ = (
-        UniqueConstraint("faculty_id", "name", name="uq_kafedras_faculty_id_name"),
+        # Nom boʻyicha unikallik faqat qoʻlda kiritilgan satrlarga (c5f30ab71d92):
+        # EduPlan'da bir xil nomli ikki yozuv boʻlishi mumkin va cheklov butun
+        # sinxronizatsiyani toʻxtatardi. Koʻzgu satrining oʻziga xosligini
+        # external_ref indeksi taʼminlaydi.
+        Index(
+            "uq_kafedras_faculty_id_name",
+            "faculty_id", "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
         external_ref_index("kafedras"),
     )
 
@@ -53,7 +74,16 @@ class Kafedra(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
 class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "groups"
     __table_args__ = (
-        UniqueConstraint("faculty_id", "name", name="uq_groups_faculty_id_name"),
+        # Nom boʻyicha unikallik faqat qoʻlda kiritilgan satrlarga (c5f30ab71d92):
+        # EduPlan'da bir xil nomli ikki yozuv boʻlishi mumkin va cheklov butun
+        # sinxronizatsiyani toʻxtatardi. Koʻzgu satrining oʻziga xosligini
+        # external_ref indeksi taʼminlaydi.
+        Index(
+            "uq_groups_faculty_id_name",
+            "faculty_id", "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
         external_ref_index("groups"),
         # Частичный, а не обычный UNIQUE: у групп, до которых студент ещё не
         # доходил, поле пустое, и таких строк в таблице сколько угодно.
@@ -126,7 +156,16 @@ class TeacherGroup(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     __tablename__ = "specialities"
     __table_args__ = (
-        UniqueConstraint("kafedra_id", "name", name="uq_specialities_kafedra_id_name"),
+        # Nom boʻyicha unikallik faqat qoʻlda kiritilgan satrlarga (c5f30ab71d92):
+        # EduPlan'da bir xil nomli ikki yozuv boʻlishi mumkin va cheklov butun
+        # sinxronizatsiyani toʻxtatardi. Koʻzgu satrining oʻziga xosligini
+        # external_ref indeksi taʼminlaydi.
+        Index(
+            "uq_specialities_kafedra_id_name",
+            "kafedra_id", "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
         external_ref_index("specialities"),
     )
 

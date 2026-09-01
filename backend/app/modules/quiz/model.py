@@ -2,7 +2,7 @@ import random
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,7 +23,16 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     # Уникальность в пределах кафедры: одноимённые предметы на разных кафедрах
     # в EPOS встречаются и являются разными предметами.
     __table_args__ = (
-        UniqueConstraint("kafedra_id", "name", name="uq_subjects_kafedra_id_name"),
+        # Nom boʻyicha unikallik faqat qoʻlda kiritilgan satrlarga (c5f30ab71d92):
+        # EduPlan'da bir xil nomli ikki yozuv boʻlishi mumkin va cheklov butun
+        # sinxronizatsiyani toʻxtatardi. Koʻzgu satrining oʻziga xosligini
+        # external_ref indeksi taʼminlaydi.
+        Index(
+            "uq_subjects_kafedra_id_name",
+            "kafedra_id", "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
         external_ref_index("subjects"),
     )
 
