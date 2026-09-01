@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply
 
 .DEFAULT_GOAL := help
 
@@ -32,6 +32,8 @@ help:
 	@echo "make fix-image-urls-apply - Rewrite them (dumps affected tables first)"
 	@echo "make import-files         - Show files to move into the file library (dry run)"
 	@echo "make import-files-apply   - Move them (dumps library tables first)"
+	@echo "make link-answers         - Show answers to link to their attempts (dry run)"
+	@echo "make link-answers-apply   - Link them (dumps user_answers first)"
 	@echo ""
 	@echo "EDUPLAN (EPOS) SYNC:"
 	@echo "────────────────────"
@@ -133,3 +135,10 @@ import-files:
 
 import-files-apply:
 	@./scripts/import_files.sh --apply
+
+# Javoblarni urinishlarga bogʻlash (bir martalik)
+link-answers:
+	@./scripts/link_answers.sh
+
+link-answers-apply:
+	@./scripts/link_answers.sh --apply
