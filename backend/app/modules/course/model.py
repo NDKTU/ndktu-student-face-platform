@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database.base import Base
+from app.core.mixins.external_ref import ExternalRefMixin, external_ref_index
 from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
@@ -16,8 +17,17 @@ if TYPE_CHECKING:
     from app.modules.quiz.model import Subject
 
 
-class Course(Base, IdIntPk, TimestampMixin):
+class Course(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
+    """Kurs.
+
+    ``ExternalRefMixin`` avtomatik yaratilgan kurslarni qoʻlda tuzilganidan
+    ajratish uchun: EPOS'da kurs degan obyekt yoʻq, shuning uchun
+    ``external_id`` ni oʻzimiz yigʻamiz — ``{oʻquv_yili}:{fan}:{oʻqituvchi}``.
+    Usiz takroriy progn oʻsha kurslarni qaytadan yaratardi.
+    """
+
     __tablename__ = "courses"
+    __table_args__ = (external_ref_index("courses"),)
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -57,6 +67,9 @@ class Course(Base, IdIntPk, TimestampMixin):
 
     subject: Mapped["Subject"] = relationship("Subject")
     teacher: Mapped["User"] = relationship("User")
+    teachers: Mapped[list["CourseTeacher"]] = relationship(
+        "CourseTeacher", back_populates="course", cascade="all, delete-orphan"
+    )
     faculty: Mapped["Faculty | None"] = relationship("Faculty")
     kafedra: Mapped["Kafedra | None"] = relationship("Kafedra")
     speciality: Mapped["Speciality | None"] = relationship("Speciality")
@@ -91,6 +104,45 @@ class Course(Base, IdIntPk, TimestampMixin):
 
     def __str__(self):
         return f"Course {self.id} ({self.name})"
+
+
+class CourseTeacher(Base, IdIntPk, TimestampMixin):
+    """Kursning oʻqituvchilari: bitta asosiy va ixtiyoriy assistentlar.
+
+    Nega ``Course.teacher_id`` qolgan. U oltita joyda ruxsat kaliti sifatida
+    ishlatiladi (dars, material, mavzu, uy vazifasi va kursning oʻzida), va
+    uni bir vaqtda olib tashlash hammasini bir zumda buzardi. Endi u «asosiy
+    oʻqituvchi» maʼnosini oladi, bu jadval esa toʻliq roʻyxatni saqlaydi.
+    Asosiy oʻqituvchi bu yerda ham ``role="main"`` bilan turadi — roʻyxat
+    toʻliq boʻlishi kerak, aks holda uni ikki manbadan yigʻishga toʻgʻri
+    kelardi.
+
+    Huquqlar teng emas. Assistent dars, material va uy vazifasi qoʻsha oladi,
+    baholay oladi; kursni oʻchira olmaydi va oʻqituvchilar roʻyxatini
+    oʻzgartira olmaydi. Aks holda «asosiy» soʻzining maʼnosi qolmasdi.
+    """
+
+    __tablename__ = "course_teachers"
+    __table_args__ = (
+        UniqueConstraint("course_id", "user_id", name="uq_course_teacher"),
+    )
+
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    #: "main" yoki "assistant". Enum emas, satr: yangi rol qoʻshish
+    #: migratsiyasiz boʻlishi kerak.
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="assistant")
+
+    course: Mapped["Course"] = relationship("Course", back_populates="teachers")
+    user: Mapped["User"] = relationship("User")
+
+    def __str__(self):
+        return f"CourseTeacher course={self.course_id} user={self.user_id} ({self.role})"
 
 
 class CourseGroup(Base, IdIntPk, TimestampMixin):

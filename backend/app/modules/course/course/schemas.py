@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -129,3 +129,25 @@ class CourseTeacherSummary(BaseModel):
 
 class CourseTeacherSummaryResponse(BaseModel):
     teachers: List[CourseTeacherSummary]
+
+
+class CourseTeacherRow(BaseModel):
+    """Kurs oʻqituvchisi: asosiy yoki assistent."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    username: str
+    full_name: Optional[str] = None
+    role: str
+
+
+class CourseTeachersResponse(BaseModel):
+    teachers: List[CourseTeacherRow]
+
+
+class CourseTeacherAddRequest(BaseModel):
+    user_id: int
+    #: Hozircha faqat "assistant". Asosiy oʻqituvchini almashtirish alohida
+    #: amal: u kursni, darslarni va baholarni boshqa odamga berish demakdir.
+    role: Literal["assistant"] = "assistant"

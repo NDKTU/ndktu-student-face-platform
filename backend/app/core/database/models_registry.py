@@ -20,6 +20,7 @@ __all__ = [
     "Speciality",
     "Course",
     "CourseGroup",
+    "CourseTeacher",
     "CourseTopic",
     "Question",
     "Quiz",
@@ -54,6 +55,7 @@ from app.modules.auth.model import (
 from app.modules.course.model import (
     Course,
     CourseGroup,
+    CourseTeacher,
     CourseTopic,
     Homework,
     HomeworkSubmission,

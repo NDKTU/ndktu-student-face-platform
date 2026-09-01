@@ -78,10 +78,10 @@ class HomeworkRepository:
         course = (await session.execute(stmt)).scalar_one_or_none()
         if not course:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        if not await self._is_admin(user) and course.teacher_id != user.id:
+        if not await can_manage(session, course, user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Course owner or admin can manage homeworks",
+                detail="Faqat kurs oʻqituvchilari yoki admin uy vazifasini boshqara oladi",
             )
         return course
 

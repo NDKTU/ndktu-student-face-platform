@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.course_access import can_manage
 from app.modules.auth.model import User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import CourseTopic, Lesson
@@ -21,10 +22,10 @@ class CourseTopicRepository:
 
     async def _check_manage(self, session: AsyncSession, course_id: int, user: User) -> None:
         course = await get_course_repository.get_course_orm(session, course_id)
-        if not self._is_admin(user) and course.teacher_id != user.id:
+        if not await can_manage(session, course, user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Course owner or admin can manage topics",
+                detail="Faqat kurs oʻqituvchilari yoki admin mavzu qoʻsha oladi",
             )
 
     async def _serialize(self, session: AsyncSession, topic: CourseTopic) -> CourseTopicResponse:

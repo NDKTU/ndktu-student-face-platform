@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
+from app.core.utils.course_access import can_manage
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Homework, HomeworkSubmission, Lesson
@@ -35,10 +36,10 @@ class LessonRepository:
         is_admin: bool,
     ) -> tuple[Course, TeacherSubject, int]:
         course = await get_course_repository.get_course_orm(session, course_id)
-        if not is_admin and course.teacher_id != current_user.id:
+        if not is_admin and not await can_manage(session, course, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Teacher is not the owner of this Course",
+                detail="Faqat kurs oʻqituvchilari yoki admin dars qoʻsha oladi",
             )
 
         course_group_stmt = select(CourseGroup.group_id).where(CourseGroup.course_id == course.id)

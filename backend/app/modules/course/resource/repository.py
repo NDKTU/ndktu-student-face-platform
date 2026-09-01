@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.course_access import can_manage
 from app.modules.auth.model import User
 from app.modules.course.model import Course, Lesson, Resource
 from app.modules.file.storage import public_url, store_upload
@@ -30,11 +31,10 @@ class ResourceRepository:
         course = (await session.execute(select(Course).where(Course.id == course_id))).scalar_one_or_none()
         if not course:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        is_admin = any(r.name.lower() == "admin" for r in (user.roles or []))
-        if not is_admin and course.teacher_id != user.id:
+        if not await can_manage(session, course, user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only Course owner or admin can manage resources",
+                detail="Faqat kurs oʻqituvchilari yoki admin material qoʻsha oladi",
             )
 
     async def upload_file(self, session: AsyncSession, file: UploadFile, current_user: User) -> str:

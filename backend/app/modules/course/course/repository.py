@@ -1,13 +1,14 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.enums import semester_label
+from app.core.utils.course_access import ROLE_MAIN, can_manage, can_own, manageable_course_ids
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
-from app.modules.course.model import Course, CourseGroup, CourseTopic, Lesson
+from app.modules.course.model import Course, CourseGroup, CourseTeacher, CourseTopic, Lesson
 from app.modules.organization_structure.model import Group, Kafedra
 from app.modules.quiz.model import Subject
 
@@ -21,6 +22,9 @@ from .schemas import (
     CourseResponse,
     CourseSpecialityInfo,
     CourseSubjectInfo,
+    CourseTeacherRow,
+    CourseTeachersResponse,
+    CourseTeacherAddRequest,
     CourseTeacherInfo,
     CourseTeacherSummary,
     CourseTeacherSummaryResponse,
@@ -38,7 +42,8 @@ class CourseRepository:
     async def _ensure_view_access(self, session: AsyncSession, course: Course, current_user: User) -> None:
         """Allow admins, the owning teacher, and students enrolled in a course group."""
         roles = self._role_names(current_user)
-        if "admin" in roles or course.teacher_id == current_user.id:
+        # Assistent ham kursni koʻradi: u amaliyot oʻtkazadi va baholaydi.
+        if "admin" in roles or await can_manage(session, course, current_user):
             return
 
         if "student" in roles:
@@ -78,7 +83,10 @@ class CourseRepository:
             .outerjoin(Lesson, Lesson.course_id == Course.id)
         )
         if restrict_to_teacher:
-            stmt = stmt.where(Course.teacher_id == current_user.id)
+            # Assistent boʻlgan kurslar ham roʻyxatda boʻlishi kerak —
+            # aks holda oʻqituvchi oʻzi dars beradigan kursni topa olmasdi.
+            visible = await manageable_course_ids(session, current_user)
+            stmt = stmt.where(Course.id.in_(select(visible.c.id)))
         if faculty_id is not None:
             stmt = stmt.where(Course.faculty_id == faculty_id)
         if kafedra_id is not None:
@@ -247,6 +255,94 @@ class CourseRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
         return course
 
+    # ------------------------------------------------------------------ #
+    #  Kurs oʻqituvchilari
+    # ------------------------------------------------------------------ #
+    async def list_teachers(
+        self, session: AsyncSession, course_id: int, current_user: User
+    ) -> CourseTeachersResponse:
+        course = await self.get_course_orm(session, course_id)
+        await self._ensure_view_access(session, course, current_user)
+
+        rows = (
+            await session.execute(
+                select(CourseTeacher.user_id, CourseTeacher.role, User.username, Teacher.full_name)
+                .join(User, User.id == CourseTeacher.user_id)
+                .outerjoin(Teacher, Teacher.user_id == User.id)
+                .where(CourseTeacher.course_id == course_id)
+                # Asosiy oʻqituvchi doim birinchi.
+                .order_by(CourseTeacher.role.desc(), Teacher.full_name)
+            )
+        ).all()
+
+        return CourseTeachersResponse(
+            teachers=[
+                CourseTeacherRow(
+                    user_id=row.user_id,
+                    username=row.username,
+                    full_name=row.full_name,
+                    role=row.role,
+                )
+                for row in rows
+            ]
+        )
+
+    async def add_teacher(
+        self,
+        session: AsyncSession,
+        course_id: int,
+        data: CourseTeacherAddRequest,
+        current_user: User,
+    ) -> CourseTeachersResponse:
+        """Assistent qoʻshadi. Faqat asosiy oʻqituvchi yoki admin."""
+        course = await self.get_course_orm(session, course_id)
+        if not can_own(course, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
+            )
+
+        await self._ensure_user_exists(session, data.user_id)
+
+        exists = await session.scalar(
+            select(CourseTeacher.id).where(
+                CourseTeacher.course_id == course_id,
+                CourseTeacher.user_id == data.user_id,
+            )
+        )
+        if exists is None:
+            session.add(
+                CourseTeacher(course_id=course_id, user_id=data.user_id, role=data.role)
+            )
+            await session.commit()
+
+        return await self.list_teachers(session, course_id, current_user)
+
+    async def remove_teacher(
+        self, session: AsyncSession, course_id: int, user_id: int, current_user: User
+    ) -> None:
+        course = await self.get_course_orm(session, course_id)
+        if not can_own(course, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
+            )
+
+        if user_id == course.teacher_id:
+            # Asosiy oʻqituvchini olib tashlash kursni egasiz qoldirardi.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Asosiy oʻqituvchini olib tashlab boʻlmaydi — avval boshqasini tayinlang",
+            )
+
+        await session.execute(
+            delete(CourseTeacher).where(
+                CourseTeacher.course_id == course_id,
+                CourseTeacher.user_id == user_id,
+            )
+        )
+        await session.commit()
+
     async def create_course(self, session: AsyncSession, data: CourseCreateRequest) -> CourseResponse:
         await self._ensure_subject_exists(session, data.subject_id)
         await self._ensure_user_exists(session, data.teacher_id)
@@ -271,6 +367,10 @@ class CourseRepository:
 
         for group_id in group_ids:
             session.add(CourseGroup(course_id=course.id, group_id=group_id))
+
+        # Asosiy oʻqituvchi roʻyxatga ham tushadi: «kursning oʻqituvchilari»
+        # degan savolga ikki manbadan javob berish kerak boʻlmasligi uchun.
+        session.add(CourseTeacher(course_id=course.id, user_id=data.teacher_id, role=ROLE_MAIN))
 
         try:
             await session.commit()
@@ -311,7 +411,9 @@ class CourseRepository:
         if restrict_to_teacher:
             roles = self._role_names(current_user)
             if "teacher" in roles:
-                filters.append(Course.teacher_id == current_user.id)
+                # Assistent boʻlgan kurslar ham koʻrinadi.
+                visible = await manageable_course_ids(session, current_user)
+                filters.append(Course.id.in_(select(visible.c.id)))
             elif "student" in roles:
                 enrolled_course_ids = (
                     select(CourseGroup.course_id)

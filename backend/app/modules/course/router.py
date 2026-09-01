@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .course.repository import get_course_repository
 from .course.schemas import (
+    CourseTeacherAddRequest,
+    CourseTeachersResponse,
     CourseCreateRequest,
     CourseListRequest,
     CourseListResponse,
@@ -162,6 +164,37 @@ async def delete_course(
     _: "User" = Depends(PermissionRequired("delete:course")),
 ):
     await get_course_repository.delete_course(session=session, course_id=course_id)
+
+
+@course_router.get("/{course_id}/teachers", response_model=CourseTeachersResponse)
+async def list_course_teachers(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
+):
+    """Kursning oʻqituvchilari: asosiy va assistentlar."""
+    return await get_course_repository.list_teachers(session, course_id, current_user)
+
+
+@course_router.post("/{course_id}/teachers", response_model=CourseTeachersResponse)
+async def add_course_teacher(
+    course_id: int,
+    data: CourseTeacherAddRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:course")),
+):
+    """Assistent qoʻshadi — faqat asosiy oʻqituvchi yoki admin."""
+    return await get_course_repository.add_teacher(session, course_id, data, current_user)
+
+
+@course_router.delete("/{course_id}/teachers/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_course_teacher(
+    course_id: int,
+    user_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:course")),
+):
+    await get_course_repository.remove_teacher(session, course_id, user_id, current_user)
 
 
 # ============================================================================
