@@ -688,7 +688,7 @@ teacher_assignment_router = APIRouter(
 async def list_teacher_assignments(
     data: AssignmentListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("read:teacher")),
+    current_user: User = Depends(PermissionRequired("read:teacher_assignment")),
 ):
     """EPOS yuklamasi: kim, qaysi guruhga, qaysi fandan dars beradi.
 

@@ -150,7 +150,7 @@ function App() {
                                         <Route path="/faculties/*" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/kafedras" element={<PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute>} />
-                                        <Route path="/teacher-assignments" element={<PermissionRoute permission="read:teacher"><TeacherAssignmentsPage /></PermissionRoute>} />
+                                        <Route path="/teacher-assignments" element={<PermissionRoute permission="read:teacher_assignment"><TeacherAssignmentsPage /></PermissionRoute>} />
                                         <Route path="/files" element={<PermissionRoute permission="read:file"><FilesPage /></PermissionRoute>} />
                                         <Route path="/specialities" element={<PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
