@@ -3,12 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import type { QuestionCreateRequest } from '@/services/questionService';
-import { questionService } from '@/services/questionService';
+import { API_BASE_URL } from '@/config/env';
+import { getToken } from '@/services/tokenStorage';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { Card, CardContent } from '@/components/ui/Card';
-import { ArrowLeft, FolderOpen, ImagePlus, Loader2 } from 'lucide-react';
+import { ArrowLeft, FolderOpen, Loader2 } from 'lucide-react';
 import JoditEditor from 'jodit-react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -76,10 +77,9 @@ const QuestionFormPage = () => {
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
     const isLoading = isEditMode && isQuestionLoading;
 
-    // Refs to track which editor is "active" for image insertion
+    // Refs to track which editor is "active" for media library image insertion
     const activeEditorRef = useRef<any>(null);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const {
         register,
@@ -127,42 +127,121 @@ const QuestionFormPage = () => {
         }
     }, [question, reset]);
 
-    const joditConfig = useMemo(() => {
+    const [addAnother, setAddAnother] = useState(false);
+
+    const uploaderConfig = useMemo(() => ({
+        url: `${API_BASE_URL}/question/upload_image`,
+        format: 'json',
+        headers: {
+            Authorization: `Bearer ${getToken() || ''}`,
+        },
+        filesVariableName: () => 'file',
+        isSuccess: (resp: any) => Boolean(resp && !resp.error && resp.url),
+        process: (resp: any) => ({
+            files: resp?.url ? [resp.url] : [],
+            path: '',
+            baseurl: '',
+            error: resp?.error,
+            msg: resp?.message || resp?.detail,
+        }),
+        defaultHandlerSuccess: function (this: any, data: any) {
+            if (data?.files && data.files.length) {
+                for (let i = 0; i < data.files.length; i += 1) {
+                    this.selection.insertHTML(
+                        `<img src="${data.files[i]}" alt="savol-rasm" style="max-width: 100%; border-radius: 6px; margin: 4px 0;" />`
+                    );
+                }
+            }
+        },
+        defaultHandlerError: function (this: any, resp: any) {
+            toast.error(resp?.msg || resp?.message || 'Rasm yuklashda xatolik yuz berdi');
+        },
+        error: function (this: any, err: any) {
+            logger.error('Jodit upload error', err);
+            toast.error('Rasm yuklashda tarmoq xatoligi');
+        },
+    }), []);
+
+    const questionEditorConfig = useMemo(() => {
         return {
             readonly: false,
-            placeholder: 'Yozishni boshlang...',
-            uploader: {
-                insertImageAsBase64URI: false,
-            },
+            placeholder: 'Savol matnini kiriting...',
+            minHeight: 140,
+            toolbarAdaptive: false,
+            buttons: [
+                'bold', 'italic', 'underline', 'strikethrough', '|',
+                'superscript', 'subscript', '|',
+                'ul', 'ol', '|',
+                'brush', 'image', 'table', '|',
+                'undo', 'redo', '|',
+                'eraser'
+            ],
+            buttonsMD: [
+                'bold', 'italic', 'underline', '|',
+                'superscript', 'subscript', '|',
+                'ul', 'ol', '|',
+                'image', 'table', '|',
+                'undo', 'redo'
+            ],
+            buttonsSM: [
+                'bold', 'italic', '|',
+                'superscript', 'subscript', '|',
+                'ul', 'ol', '|',
+                'image', '|',
+                'undo', 'redo'
+            ],
+            buttonsXS: [
+                'bold', 'italic', '|',
+                'superscript', 'subscript', '|',
+                'image'
+            ],
+            showCharsCounter: true,
+            showWordsCounter: false,
+            showXPathInStatusbar: false,
+            uploader: uploaderConfig,
         } as any;
-    }, []);
+    }, [uploaderConfig]);
 
-    /** Havolani muharrirga rasm sifatida qoʻyadi. Yuklash ham, kutubxonadan
-     *  tanlash ham shu yerga tushadi — ikki joyda takrorlanmasligi uchun. */
+    const optionEditorConfig = useMemo(() => {
+        return {
+            readonly: false,
+            placeholder: 'Variant matnini kiriting...',
+            minHeight: 70,
+            height: 80,
+            toolbarAdaptive: false,
+            buttons: [
+                'bold', 'italic', '|',
+                'superscript', 'subscript', '|',
+                'brush', 'image', '|',
+                'undo', 'redo'
+            ],
+            buttonsMD: [
+                'bold', 'italic', '|',
+                'superscript', 'subscript', '|',
+                'image'
+            ],
+            buttonsSM: [
+                'bold', 'italic', '|',
+                'superscript', 'subscript', '|',
+                'image'
+            ],
+            buttonsXS: [
+                'bold', 'italic', '|',
+                'image'
+            ],
+            showCharsCounter: false,
+            showWordsCounter: false,
+            showXPathInStatusbar: false,
+            uploader: uploaderConfig,
+        } as any;
+    }, [uploaderConfig]);
+
+    /** Havolani muharrirga rasm sifatida qoʻyadi (Kutubxonadan tanlanganda). */
     const insertImage = (url: string, editorInstance: any) => {
         if (!url || !editorInstance) return;
         editorInstance.selection.insertHTML(
-            `<img src="${url}" alt="uploaded" style="max-width: 100%;" />`
+            `<img src="${url}" alt="savol-rasm" style="max-width: 100%; border-radius: 6px; margin: 4px 0;" />`
         );
-    };
-
-    const handleImageUpload = async (file: File, editorInstance: any) => {
-        try {
-            const result = await questionService.uploadImage(file);
-            insertImage(result.url, editorInstance);
-        } catch (error) {
-            logger.error('Image upload failed', error);
-            // Бэкенд отклоняет файл с понятной причиной (тип, размер, битое содержимое) —
-            // без неё преподаватель видит одно и то же сообщение и для сбоя сети, и для
-            // слишком большого файла.
-            const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            toast.error(detail || 'Rasm yuklashda xatolik yuz berdi');
-        }
-    };
-
-    const handleUploadButtonClick = (editorInstance: any) => {
-        activeEditorRef.current = editorInstance;
-        fileInputRef.current?.click();
     };
 
     // Kutubxonadan tanlash: fayl allaqachon serverda, qayta yuklanmaydi.
@@ -171,16 +250,7 @@ const QuestionFormPage = () => {
         setIsPickerOpen(true);
     };
 
-    const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && activeEditorRef.current) {
-            await handleImageUpload(file, activeEditorRef.current);
-        }
-        // Reset input so the same file can be selected again
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
+    const correctOption = watch('correct_option');
 
     const onSubmit = (data: QuestionFormValues) => {
         if (!user) {
@@ -246,7 +316,27 @@ const QuestionFormPage = () => {
         // on this page, so there's no stale id left referencing the old version.
         const onSuccess = () => {
             toast.success(isEditMode ? 'Savol yangilandi' : 'Savol yaratildi');
-            navigate(returnTo || '/questions');
+            if (!isEditMode && addAnother) {
+                reset({
+                    subject_id: data.subject_id,
+                    question_type: data.question_type,
+                    text: '',
+                    option_a: '',
+                    option_b: '',
+                    option_c: '',
+                    option_d: '',
+                    correct_option: 'a',
+                });
+                setTextAnswers(['']);
+                setPuzzleItems(['', '']);
+                setMultiOptions([
+                    { text: '', correct: true },
+                    { text: '', correct: false },
+                ]);
+                setAddAnother(false);
+            } else {
+                navigate(returnTo || '/questions');
+            }
         };
 
         const onError = (error: unknown) => {
@@ -269,70 +359,97 @@ const QuestionFormPage = () => {
         );
     }
 
-    const renderEditorWithUpload = (
-        label: string,
+    const renderQuestionEditor = (
         field: any,
-        error?: string,
-        optionKey?: 'a' | 'b' | 'c' | 'd'
+        error?: string
     ) => (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium">{label}</label>
-                    {optionKey && (
-                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                            <input
-                                type="radio"
-                                value={optionKey}
-                                {...register('correct_option')}
-                                className="h-3.5 w-3.5"
-                            />
-                            To'g'ri javob
-                        </label>
-                    )}
-                </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUploadButtonClick(field.ref)}
-                    className="flex items-center gap-1 text-xs"
-                >
-                    <ImagePlus className="h-3.5 w-3.5" />
-                    Rasm yuklash
-                </Button>
+                <label className="text-sm font-semibold text-foreground">Savol matni</label>
                 <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => handleLibraryButtonClick(field.ref)}
-                    className="flex items-center gap-1 text-xs"
-                    title="Ilgari yuklangan rasmni qayta yuklamasdan qoʻshish"
+                    className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    title="Ilgari yuklangan rasmni kutubxonadan tanlash"
                 >
                     <FolderOpen className="h-3.5 w-3.5" />
-                    Kutubxonadan
+                    Kutubxonadan rasm
                 </Button>
             </div>
-            <JoditEditor
-                ref={(ref: any) => { field.ref = ref; }}
-                value={field.value}
-                config={joditConfig}
-                onBlur={(newContent: string) => field.onChange(newContent)}
-            />
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            <div className="rounded-lg overflow-hidden border border-border/80 shadow-sm">
+                <JoditEditor
+                    ref={(ref: any) => { field.ref = ref; }}
+                    value={field.value}
+                    config={questionEditorConfig}
+                    onBlur={(newContent: string) => field.onChange(newContent)}
+                />
+            </div>
+            {error && <p className="text-xs text-destructive font-medium">{error}</p>}
         </div>
     );
 
+    const renderOptionCard = (
+        key: 'a' | 'b' | 'c' | 'd',
+        field: any,
+        error?: string
+    ) => {
+        const isCorrect = correctOption === key;
+        return (
+            <div
+                onClick={() => setValue('correct_option', key, { shouldValidate: true })}
+                className={`group relative rounded-xl border-2 p-4 transition-all duration-200 cursor-pointer ${
+                    isCorrect
+                        ? 'border-emerald-500 bg-emerald-50/40 shadow-sm ring-2 ring-emerald-500/20'
+                        : 'border-border/80 bg-card hover:border-primary/40 hover:bg-muted/20'
+                }`}
+            >
+                <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2.5">
+                        <span
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold shadow-sm transition-colors ${
+                                isCorrect
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
+                            }`}
+                        >
+                            {key.toUpperCase()}
+                        </span>
+                        <span className={`text-xs font-semibold ${isCorrect ? 'text-emerald-700' : 'text-muted-foreground'}`}>
+                            {isCorrect ? "✓ To'g'ri javob" : "To'g'ri javob deb tanlash"}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleLibraryButtonClick(field.ref)}
+                            className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
+                            title="Ilgari yuklangan rasmni kutubxonadan tanlash"
+                        >
+                            <FolderOpen className="h-3 w-3" />
+                            Kutubxona
+                        </Button>
+                    </div>
+                </div>
+
+                <div onClick={(e) => e.stopPropagation()} className="rounded-md overflow-hidden">
+                    <JoditEditor
+                        ref={(ref: any) => { field.ref = ref; }}
+                        value={field.value}
+                        config={optionEditorConfig}
+                        onBlur={(newContent: string) => field.onChange(newContent)}
+                    />
+                </div>
+                {error && <p className="mt-1.5 text-xs text-destructive font-medium">{error}</p>}
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6 w-full mx-auto pb-10">
-            {/* Hidden file input for image upload */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelected}
-                className="hidden"
-            />
 
             <div className="flex items-center gap-3">
                 <Button variant="ghost" size="sm" onClick={() => navigate('/questions')}>
@@ -347,16 +464,16 @@ const QuestionFormPage = () => {
                 </div>
             </div>
 
-            <Card>
+            <Card className="shadow-sm border-border/80">
                 <CardContent className="pt-6">
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Fan</label>
+                                <label className="text-sm font-semibold text-foreground">Fan</label>
                                 {lessonSubjectId ? (
                                     <>
                                         {/* Dars fani — tanlanmaydi, shunchaki ko'rsatiladi. */}
-                                        <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm">
+                                        <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">
                                             {subjects.find((s) => s.id === lessonSubjectId)?.name
                                                 ?? lessonData?.teacher_subject?.subject?.name
                                                 ?? `#${lessonSubjectId}`}
@@ -377,34 +494,34 @@ const QuestionFormPage = () => {
                                         ))}
                                     </select>
                                 )}
-                                {errors.subject_id && <p className="text-xs text-destructive">{errors.subject_id.message}</p>}
+                                {errors.subject_id && <p className="text-xs text-destructive font-medium">{errors.subject_id.message}</p>}
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Savol turi</label>
-                            <select
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                                {...register('question_type')}
-                                disabled={isEditMode}
-                            >
-                                <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
-                                <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
-                                <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
-                                <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
-                                <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
-                            </select>
-                            {isEditMode && (
-                                <p className="text-xs text-muted-foreground">
-                                    Mavjud savolning turi o'zgartirilmaydi — yangi savol yarating.
-                                </p>
-                            )}
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-foreground">Savol turi</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                    {...register('question_type')}
+                                    disabled={isEditMode}
+                                >
+                                    <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
+                                    <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
+                                    <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
+                                    <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
+                                    <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
+                                </select>
+                                {isEditMode && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Mavjud savolning turi o'zgartirilmaydi — yangi savol yarating.
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <Controller
                             name="text"
                             control={control}
-                            render={({ field }) => renderEditorWithUpload('Savol matni', field, errors.text?.message)}
+                            render={({ field }) => renderQuestionEditor(field, errors.text?.message)}
                         />
 
                         {questionType === 'TRUE_FALSE' && (
@@ -548,32 +665,61 @@ const QuestionFormPage = () => {
                             </div>
                         )}
 
-                        {questionType === 'QUIZ' && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Controller
-                                name="option_a"
-                                control={control}
-                                render={({ field }) => renderEditorWithUpload('A varianti', field, errors.option_a?.message, 'a')}
-                            />
-                            <Controller
-                                name="option_b"
-                                control={control}
-                                render={({ field }) => renderEditorWithUpload('B varianti', field, errors.option_b?.message, 'b')}
-                            />
-                            <Controller
-                                name="option_c"
-                                control={control}
-                                render={({ field }) => renderEditorWithUpload('C varianti', field, errors.option_c?.message, 'c')}
-                            />
-                            <Controller
-                                name="option_d"
-                                control={control}
-                                render={({ field }) => renderEditorWithUpload('D varianti', field, errors.option_d?.message, 'd')}
-                            />
-                        </div>}
+                        {questionType === 'QUIZ' && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-semibold text-foreground">Javob variantlari</label>
+                                    <span className="text-xs text-muted-foreground font-medium">
+                                        To'g'ri javobni tanlash uchun variant kartasi ustiga bosing
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Controller
+                                        name="option_a"
+                                        control={control}
+                                        render={({ field }) => renderOptionCard('a', field, errors.option_a?.message)}
+                                    />
+                                    <Controller
+                                        name="option_b"
+                                        control={control}
+                                        render={({ field }) => renderOptionCard('b', field, errors.option_b?.message)}
+                                    />
+                                    <Controller
+                                        name="option_c"
+                                        control={control}
+                                        render={({ field }) => renderOptionCard('c', field, errors.option_c?.message)}
+                                    />
+                                    <Controller
+                                        name="option_d"
+                                        control={control}
+                                        render={({ field }) => renderOptionCard('d', field, errors.option_d?.message)}
+                                    />
+                                </div>
+                            </div>
+                        )}
 
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => navigate('/questions')}>Bekor qilish</Button>
-                            <Button type="submit" isLoading={isSubmitting}>
+                        <div className="flex flex-wrap items-center justify-end gap-3 pt-5 border-t border-border/80">
+                            <Button type="button" variant="outline" onClick={() => navigate('/questions')}>
+                                Bekor qilish
+                            </Button>
+                            {!isEditMode && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={isSubmitting}
+                                    onClick={() => {
+                                        setAddAnother(true);
+                                        handleSubmit(onSubmit)();
+                                    }}
+                                >
+                                    Saqlash va yangisini qo'shish
+                                </Button>
+                            )}
+                            <Button
+                                type="submit"
+                                isLoading={isSubmitting}
+                                onClick={() => setAddAnother(false)}
+                            >
                                 {isEditMode ? 'Savolni yangilash' : 'Savol yaratish'}
                             </Button>
                         </div>
