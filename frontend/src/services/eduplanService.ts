@@ -135,6 +135,22 @@ export interface RunResponse {
     workloads_error: string | null;
 }
 
+/**
+ * Fon prognining holati.
+ *
+ * Progn bir necha daqiqa davom etadi va HTTP soʻrovda kutib boʻlmaydi:
+ * axios 10 soniyada, nginx 60 soniyada uzadi. Shuning uchun `/run` darhol
+ * shu holatni qaytaradi, interfeys esa `/run/status` ni soʻrab turadi.
+ */
+export interface RunState {
+    status: 'running' | 'done' | 'failed';
+    triggered_by: string;
+    started_at: string;
+    finished_at: string | null;
+    summary: RunResponse | null;
+    error: string | null;
+}
+
 /** Ключ предложения — он же идентификатор решения администратора. */
 export const proposalKey = (p: Proposal) => `${p.entity}:${p.external_id}`;
 
@@ -147,9 +163,14 @@ export const eduplanService = {
         const response = await api.post<PreviewResponse>('/integration/eduplan/preview');
         return response.data;
     },
-    /** Полный прогон: справочники + нагрузка, одним запросом. */
+    /** Prognni fonda boshlaydi va darhol qaytadi. Natija — `runState` orqali. */
     run: async () => {
-        const response = await api.post<RunResponse>('/integration/eduplan/run');
+        const response = await api.post<RunState>('/integration/eduplan/run');
+        return response.data;
+    },
+    /** Oxirgi prognning holati. `null` — hali progn boʻlmagan. */
+    runState: async () => {
+        const response = await api.get<RunState | null>('/integration/eduplan/run/status');
         return response.data;
     },
     getSettings: async () => {

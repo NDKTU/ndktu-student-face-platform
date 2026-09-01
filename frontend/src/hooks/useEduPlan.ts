@@ -72,15 +72,25 @@ export const useEduPlanApply = () => {
 };
 
 /** Полный прогон одной кнопкой: справочники и нагрузка сразу. */
-export const useEduPlanRun = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
+/**
+ * Prognni fonda boshlaydi. Javob — boshlangʻich holat, natija emas.
+ *
+ * Keshni bu yerda yangilamaymiz: soʻrov qaytganda progn hali ketyapti va
+ * yangilanadigan maʼlumot yoʻq. Kesh progn tugaganda, sahifadagi kuzatuvchi
+ * `done` holatini koʻrgach yangilanadi.
+ */
+export const useEduPlanRun = () =>
+    useMutation({
         mutationFn: () => eduplanService.run(),
-        onSuccess: () => {
-            MIRRORED_QUERY_KEYS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
-            queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
-        },
     });
+
+/** Progn tugagach chaqiriladi: koʻchirilgan spravochniklar keshini yangilaydi. */
+export const useInvalidateMirrored = () => {
+    const queryClient = useQueryClient();
+    return () => {
+        MIRRORED_QUERY_KEYS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+        queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+    };
 };
 
 // Отдельного импорта нагрузки в интерфейсе больше нет: она переносится тем же

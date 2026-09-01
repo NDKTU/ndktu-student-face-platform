@@ -12,6 +12,7 @@
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -32,6 +33,15 @@ LOCK_KEY = "eduplan:sync:lock"
 #: Потолок на один прогон. Если процесс умрёт, не сняв блокировку, она
 #: протухнет сама и следующий запуск не окажется заблокирован навсегда.
 LOCK_TTL_SECONDS = 30 * 60
+
+#: Oxirgi prognning holati. Interfeys shu kalitni soʻrab turadi: prognning
+#: oʻzi bir necha daqiqa davom etadi va HTTP soʻrovda kutib boʻlmaydi —
+#: brauzerdagi 10 soniyalik chegara ham, nginx dagi 60 soniya ham undan qisqa.
+STATE_KEY = "eduplan:sync:state"
+
+#: Tugagan prognning natijasi shuncha vaqt koʻrinib turadi: admin sahifani
+#: yopib, keyin qaytib kelsa ham nima boʻlganini koʻradi.
+STATE_TTL_SECONDS = 24 * 60 * 60
 
 #: Сколько новых строк в одном справочнике автоматический прогон считает
 #: подозрительным. Порог защищает от главного сценария порчи данных: если
@@ -108,6 +118,101 @@ class EduPlanSyncRunner:
             return summary
         finally:
             await redis_client.delete(LOCK_KEY)
+
+    # ------------------------------------------------------------------ #
+    #  Fon rejimi
+    # ------------------------------------------------------------------ #
+    async def _write_state(self, payload: dict) -> None:
+        await redis_client.set(STATE_KEY, json.dumps(payload), ex=STATE_TTL_SECONDS)
+
+    async def read_state(self) -> dict | None:
+        """Oxirgi prognning holati, interfeys uchun.
+
+        Agar holat «ketyapti» deb tursa-yu, qulf yoʻqolgan boʻlsa — jarayon
+        oʻlgan (konteyner qayta ishga tushgan). Buni «abadiy ketyapti» deb
+        koʻrsatish eng yomon variant: admin kutib oʻtiraveradi.
+        """
+        raw = await redis_client.get(STATE_KEY)
+        if raw is None:
+            return None
+
+        state = json.loads(raw)
+        if state.get("status") == "running" and not await redis_client.get(LOCK_KEY):
+            state = {
+                **state,
+                "status": "failed",
+                "error": "Prognni bajaruvchi jarayon toʻxtab qolgan. Qaytadan urinib koʻring.",
+            }
+            await self._write_state(state)
+        return state
+
+    async def _run_and_record(self, triggered_by: str) -> None:
+        """Fon vazifasi. Oʻz sessiyasini ochadi — soʻrovniki javob bilan yopiladi."""
+        started_at = datetime.now(TASHKENT_TZ).isoformat()
+        try:
+            async with db_helper.session_factory() as session:
+                summary = await self.run(session, triggered_by=triggered_by)
+            await self._write_state(
+                {
+                    "status": "done",
+                    "triggered_by": triggered_by,
+                    "started_at": started_at,
+                    "finished_at": datetime.now(TASHKENT_TZ).isoformat(),
+                    "summary": summary,
+                    "error": None,
+                }
+            )
+        except HTTPException as e:
+            await self._write_state(
+                {
+                    "status": "failed",
+                    "triggered_by": triggered_by,
+                    "started_at": started_at,
+                    "finished_at": datetime.now(TASHKENT_TZ).isoformat(),
+                    "summary": None,
+                    "error": str(e.detail),
+                }
+            )
+        except Exception as e:  # noqa: BLE001 — xato yoʻqolib ketmasligi kerak
+            logger.exception("EduPlan: fon progni xato bilan tugadi")
+            await self._write_state(
+                {
+                    "status": "failed",
+                    "triggered_by": triggered_by,
+                    "started_at": started_at,
+                    "finished_at": datetime.now(TASHKENT_TZ).isoformat(),
+                    "summary": None,
+                    "error": str(e) or e.__class__.__name__,
+                }
+            )
+
+    async def launch(self, triggered_by: str = "manual") -> dict:
+        """Prognni fonda boshlaydi va darhol qaytadi.
+
+        Qulf ``run()`` ichida atomar olinadi; bu yerdagi tekshiruv faqat
+        foydalanuvchiga darhol 409 aytish uchun — aks holda u 202 olib,
+        keyin holatda «allaqachon ketyapti» degan xatoni koʻrardi.
+        """
+        if await redis_client.get(LOCK_KEY):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sinxronizatsiya allaqachon ketyapti",
+            )
+
+        state = {
+            "status": "running",
+            "triggered_by": triggered_by,
+            "started_at": datetime.now(TASHKENT_TZ).isoformat(),
+            "finished_at": None,
+            "summary": None,
+            "error": None,
+        }
+        await self._write_state(state)
+
+        # Havola saqlanadi: aks holda GC vazifani oʻrtasida yigʻishtirib
+        # yuborishi mumkin.
+        self._task = asyncio.create_task(self._run_and_record(triggered_by))
+        return state
 
     @staticmethod
     def _bulk_create_risk(preview) -> list[str]:

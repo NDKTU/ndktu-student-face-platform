@@ -174,18 +174,35 @@ async def eduplan_sync_workloads(
 
 @router.post(
     "/run",
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(RateLimiter(times=2, seconds=60))],
 )
 async def eduplan_run_full_sync(
-    session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
 ):
-    """Полный прогон без участия человека.
+    """Прогон запускается в фоне, ответ возвращается сразу.
+
+    Прогон идёт минутами, а браузер обрывает запрос через 10 секунд (axios) —
+    раньше это выглядело как «timeout of 10000ms exceeded», хотя сервер
+    продолжал работать. Теперь клиент получает состояние и опрашивает
+    ``/run/status``.
 
     Применяет только однозначные предложения: конфликты и деактивации
     остаются администратору. Та же точка входа, что и у ночного расписания.
     """
-    return await eduplan_sync_runner.run(session, triggered_by="manual")
+    return await eduplan_sync_runner.launch(triggered_by="manual")
+
+
+@router.get("/run/status")
+async def eduplan_run_status(
+    _: PermissionRequired = Depends(PermissionRequired("read:eduplan")),
+):
+    """Последний прогон: идёт, завершён или упал.
+
+    ``null`` означает, что прогонов ещё не было (или прошли сутки — состояние
+    живёт столько же).
+    """
+    return await eduplan_sync_runner.read_state()
 
 
 @router.post(

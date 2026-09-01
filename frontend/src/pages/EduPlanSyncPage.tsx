@@ -27,6 +27,7 @@ import {
     useEduPlanApply,
     useEduPlanPreview,
     useEduPlanRun,
+    useInvalidateMirrored,
     useEduPlanSettings,
     useEduPlanStatus,
     useUpdateEduPlanSettings,
@@ -40,7 +41,9 @@ import {
     type EduPlanEntity,
     type PreviewResponse,
     type Proposal,
+    eduplanService,
     type RunResponse,
+    type RunState,
 } from '@/services/eduplanService';
 
 const ENTITY_LABEL: Record<EduPlanEntity, string> = {
@@ -68,8 +71,12 @@ const EduPlanSyncPage = () => {
     const runMutation = useEduPlanRun();
     const previewMutation = useEduPlanPreview();
     const applyMutation = useEduPlanApply();
+    const invalidateMirrored = useInvalidateMirrored();
 
     const [runResult, setRunResult] = useState<RunResponse | null>(null);
+    // Fon progni holati. Progn daqiqalar davom etadi, shuning uchun uni
+    // soʻrovda kutmaymiz — boshlaymiz va shu yerdan kuzatamiz.
+    const [runState, setRunState] = useState<RunState | null>(null);
     const [preview, setPreview] = useState<PreviewResponse | null>(null);
     const [choices, setChoices] = useState<Record<string, ConflictChoice>>({});
     const [applyDeactivations, setApplyDeactivations] = useState(false);
@@ -94,14 +101,57 @@ const EduPlanSyncPage = () => {
         setApplyResult(null);
         setPreview(null);
         setChoices({});
+        setRunResult(null);
 
-        const result = await runMutation.mutateAsync();
-        setRunResult(result);
+        // Javob — natija emas, boshlangʻich holat. Natijani kuzatuvchi oladi.
+        setRunState(await runMutation.mutateAsync());
+    };
 
-        if (result.requires_decision > 0) {
+    /** Progn tugagach: keshni yangilash va ziddiyatlar boʻlsa ularni yuklash. */
+    const finishRun = async (summary: RunResponse) => {
+        setRunResult(summary);
+        invalidateMirrored();
+        if (summary.requires_decision > 0) {
             setPreview(await previewMutation.mutateAsync());
         }
     };
+
+    // Sahifa ochilganda: progn ketayotgan boʻlsa unga ulanamiz, tugagan
+    // boʻlsa natijasini koʻrsatamiz. Admin sahifani yopib ketgan boʻlsa ham
+    // qaytganda nima boʻlganini koʻradi.
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            const state = await eduplanService.runState().catch(() => null);
+            if (cancelled || !state) return;
+            setRunState(state);
+            if (state.status === 'done' && state.summary) void finishRun(state.summary);
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Progn ketayotganda holatni soʻrab turamiz.
+    useEffect(() => {
+        if (runState?.status !== 'running') return;
+
+        const timer = setInterval(async () => {
+            const state = await eduplanService.runState().catch(() => null);
+            if (!state) return;
+            setRunState(state);
+
+            if (state.status === 'done' && state.summary) {
+                void finishRun(state.summary);
+            } else if (state.status === 'failed') {
+                toast.error(state.error ?? 'Sinxronizatsiya xato bilan tugadi');
+            }
+        }, 3000);
+
+        return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [runState?.status]);
 
     const runApply = async () => {
         if (!preview) return;
@@ -125,7 +175,10 @@ const EduPlanSyncPage = () => {
         setPreview(null);
     };
 
-    const syncing = runMutation.isPending || previewMutation.isPending;
+    // Tugma progn tugagunicha bloklanadi — brauzer kutmaydi, lekin ikkinchi
+    // marta bosish 409 beradi va bu foydalanuvchini chalkashtiradi.
+    const syncing =
+        runMutation.isPending || previewMutation.isPending || runState?.status === 'running';
 
     return (
         <div className="space-y-6 p-6">
@@ -193,14 +246,17 @@ const EduPlanSyncPage = () => {
 
                     {syncing && (
                         <div className="text-sm text-muted-foreground">
-                            {runMutation.isPending
-                                ? "Sinxronizatsiya ketmoqda: EduPlan o'qilmoqda va bir ma'noli o'zgarishlar qo'llanmoqda…"
+                            {runState?.status === 'running'
+                                ? "Sinxronizatsiya ketmoqda: EduPlan o'qilmoqda va bir ma'noli o'zgarishlar qo'llanmoqda. Bu bir necha daqiqa davom etadi — sahifani yopsangiz ham progn to'xtamaydi."
                                 : "Ziddiyatlar ro'yxati tayyorlanmoqda…"}
                         </div>
                     )}
 
                     {runMutation.isError && (
                         <Notice tone="destructive">{errorText(runMutation.error)}</Notice>
+                    )}
+                    {runState?.status === 'failed' && runState.error && (
+                        <Notice tone="destructive">{runState.error}</Notice>
                     )}
                     {previewMutation.isError && (
                         <Notice tone="warning">
