@@ -34,7 +34,10 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     const [stats, setStats] = useState<Map<number, SpecialityStats>>(new Map());
     const [search, setSearch] = useState('');
     const [degreeFilter, setDegreeFilter] = useState<DegreeFilter>('all');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
@@ -255,8 +258,6 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                     setCurrentPage(1);
                 }}
                 searchPlaceholder="Mutaxassislik nomi yoki kodi bo'yicha..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
                 chips={

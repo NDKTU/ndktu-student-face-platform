@@ -42,7 +42,10 @@ export const KafedraPage = () => {
     const [selectedFacultyFilter, setSelectedFacultyFilter] = useState<string>(facultyIdParam || 'all');
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
@@ -286,8 +289,6 @@ export const KafedraPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Kafedra nomi bo'yicha qidirish..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Kafedralar"
                 extraFilters={

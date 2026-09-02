@@ -47,7 +47,10 @@ export const StudentsPage = () => {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [studentToChangeGroup, setStudentToChangeGroup] = useState<Student | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
-    const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [displayMode] = useState<'table' | 'grid'>('table');
+
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -242,8 +245,6 @@ export const StudentsPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Talaba F.I.SH yoki ID bo'yicha qidirish..."
-                viewMode={displayMode}
-                onViewModeChange={setDisplayMode}
                 totalCount={totalCount}
                 totalLabel="Talabalar"
                 extraFilters={

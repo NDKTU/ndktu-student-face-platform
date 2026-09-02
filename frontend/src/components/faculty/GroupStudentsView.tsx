@@ -41,7 +41,7 @@ export const GroupStudentsView = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [studentToMove, setStudentToMove] = useState<Student | null>(null);
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+
     const pageSize = 15;
 
     useEffect(() => {
@@ -162,8 +162,6 @@ export const GroupStudentsView = ({
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Talaba F.I.SH yoki raqami bo'yicha..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Talabalar"
             />

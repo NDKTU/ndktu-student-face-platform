@@ -40,7 +40,10 @@ type SortOrder = 'asc' | 'desc';
 export const TeachersPage = () => {
     const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
-    const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [displayMode] = useState<'table' | 'grid'>('table');
+
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedKafedraFilter, setSelectedKafedraFilter] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -275,8 +278,6 @@ export const TeachersPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="O'qituvchi F.I.SH bo'yicha qidirish..."
-                viewMode={displayMode}
-                onViewModeChange={setDisplayMode}
                 totalCount={totalCount}
                 totalLabel="O'qituvchilar"
                 extraFilters={

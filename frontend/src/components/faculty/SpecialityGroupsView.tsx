@@ -43,7 +43,10 @@ export const SpecialityGroupsView = ({
     const [search, setSearch] = useState('');
     const [educationFormFilter, setEducationFormFilter] = useState<EducationFormFilter>('all');
     const [courseLevelFilter, setCourseLevelFilter] = useState<CourseLevelFilter>('all');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
@@ -267,8 +270,6 @@ export const SpecialityGroupsView = ({
                     setCurrentPage(1);
                 }}
                 searchPlaceholder="Guruh nomi yoki HEMIS kodi..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={filtered.length}
                 totalLabel="Guruhlar"
                 chips={

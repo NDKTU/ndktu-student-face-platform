@@ -45,7 +45,12 @@ export const CoursesPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 15;
 
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -245,8 +250,6 @@ export const CoursesPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Kurs, fan yoki o'qituvchi bo'yicha..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Kurslar"
                 extraFilters={

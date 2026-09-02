@@ -48,7 +48,10 @@ export const SpecialitiesPage = () => {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [degreeFilter, setDegreeFilter] = useState<DegreeFilter>('all');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
@@ -364,8 +367,6 @@ export const SpecialitiesPage = () => {
                 search={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Mutaxassislik nomi yoki kodi bo'yicha..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
                 extraFilters={

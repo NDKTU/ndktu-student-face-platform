@@ -54,7 +54,10 @@ export const SubjectsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const pageSize = 15;
@@ -228,8 +231,6 @@ export const SubjectsPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Fan nomi bo'yicha qidirish..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Fanlar"
                 extraFilters={<ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />}

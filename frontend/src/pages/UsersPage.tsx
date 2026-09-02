@@ -52,7 +52,10 @@ export const UsersPage = () => {
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
+    // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
+    const [viewMode] = useState<'table' | 'grid'>('table');
+
     const [sortField, setSortField] = useState<SortField>('id');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
@@ -228,8 +231,6 @@ export const UsersPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Foydalanuvchi nomi bo'yicha qidirish..."
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
                 totalCount={totalCount}
                 totalLabel="Foydalanuvchilar"
                 chips={

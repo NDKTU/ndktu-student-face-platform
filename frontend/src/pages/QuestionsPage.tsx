@@ -264,8 +264,6 @@ export const QuestionsPage = () => {
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Savol matni bo'yicha qidirish..."
-                viewMode="table"
-                onViewModeChange={() => {}}
                 totalCount={totalCount}
                 totalLabel="Savollar"
                 extraFilters={
