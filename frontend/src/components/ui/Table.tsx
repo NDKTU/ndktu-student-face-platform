@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from './EmptyState';
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
     ({ className, ...props }, ref) => (
@@ -94,35 +95,30 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
 );
 TableCell.displayName = 'TableCell';
 
-
-/** Full-width empty state row inside a table body */
+/** Full-width empty state inside table body or card */
 interface TableEmptyProps {
-    colSpan: number;
+    colSpan?: number;
     title?: string;
     description?: string;
     action?: React.ReactNode;
     icon?: React.ReactNode;
+    className?: string;
 }
 
 const TableEmpty: React.FC<TableEmptyProps> = ({
-    colSpan,
-    title = 'Ma\'lumot topilmadi',
-    description = 'Qidiruv mezonlariga mos yozuv yo\'q.',
+    title,
+    description,
     action,
     icon,
+    className,
 }) => (
-    <tr>
-        <td colSpan={colSpan}>
-            <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                {icon && <div className="text-muted-foreground">{icon}</div>}
-                <div>
-                    <p className="text-sm font-semibold text-foreground">{title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-                </div>
-                {action && <div className="mt-2">{action}</div>}
-            </div>
-        </td>
-    </tr>
+    <EmptyState
+        title={title}
+        description={description}
+        action={action}
+        icon={icon}
+        className={cn('py-8 w-full mx-auto', className)}
+    />
 );
 
 export {

@@ -97,6 +97,7 @@ export const TeacherGroupModal = ({ isOpen, onClose, teacher }: TeacherGroupModa
                         </div>
                     ))}
                     {groups.length === 0 && <span className="text-sm text-muted-foreground">Guruhlar topilmadi.</span>}
+                    {groups.length === 0 && <div className="col-span-full py-6 text-center text-sm text-muted-foreground">Guruhlar topilmadi.</div>}
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={onClose}>Bekor qilish</Button>

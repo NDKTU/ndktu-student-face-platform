@@ -22,15 +22,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     title = title ?? t("Ma'lumot topilmadi");
     description = description ?? t("Qidiruv mezonlariga mos yozuv yo'q.");
     return (
-    <div className={cn('flex flex-col items-center justify-center gap-3 py-12 text-center', className)}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            {icon ?? <Inbox className="h-6 w-6" />}
+        <div className={cn('flex flex-col items-center justify-center gap-3 py-12 text-center w-full mx-auto', className)}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/70 text-muted-foreground shadow-sm">
+                {icon ?? <Inbox className="h-6 w-6" />}
+            </div>
+            <div className="max-w-md mx-auto text-center space-y-1">
+                <p className="text-base font-semibold text-foreground">{title}</p>
+                <p className="text-sm text-muted-foreground">{description}</p>
+            </div>
+            {action && <div className="mt-2 flex justify-center">{action}</div>}
         </div>
-        <div>
-            <p className="text-sm font-medium text-foreground">{title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-        {action && <div className="mt-2">{action}</div>}
-    </div>
     );
 };

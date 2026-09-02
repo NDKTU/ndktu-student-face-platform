@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
@@ -67,8 +67,6 @@ interface OrganizationToolbarProps {
     search: string;
     onSearchChange: (val: string) => void;
     searchPlaceholder?: string;
-    viewMode: 'table' | 'grid';
-    onViewModeChange: (mode: 'table' | 'grid') => void;
     totalCount?: number;
     totalLabel?: string;
     chips?: React.ReactNode;
@@ -81,8 +79,6 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
     search,
     onSearchChange,
     searchPlaceholder = 'Qidirish...',
-    viewMode,
-    onViewModeChange,
     totalCount,
     totalLabel = 'Jami',
     chips,
@@ -127,41 +123,11 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                     )}
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                    {/* View Switcher (Table vs Grid) */}
-                    <div className="flex items-center rounded-xl border border-border/80 bg-muted/40 p-0.5" role="group" aria-label="Ko'rinish turi">
-                        <button
-                            type="button"
-                            onClick={() => onViewModeChange('table')}
-                            className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all',
-                                viewMode === 'table'
-                                    ? 'bg-card text-primary shadow-sm font-semibold'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            )}
-                            title="Jadval ko'rinishi"
-                        >
-                            <TableIcon className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Jadval</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onViewModeChange('grid')}
-                            className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all',
-                                viewMode === 'grid'
-                                    ? 'bg-card text-primary shadow-sm font-semibold'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            )}
-                            title="Kartochka ko'rinishi"
-                        >
-                            <LayoutGrid className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Karta</span>
-                        </button>
+                {actions && (
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                        {actions}
                     </div>
-
-                    {actions}
-                </div>
+                )}
             </div>
 
             {/* Bottom Chips / Secondary Filter Row if present */}
