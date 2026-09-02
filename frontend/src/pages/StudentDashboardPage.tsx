@@ -4,17 +4,27 @@ import { useAuth } from '@/context/AuthContext';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { PlayCircle, Brain, User, Clock, Trophy, ChevronRight } from 'lucide-react';
+import { PlayCircle, Brain, User, Clock, Trophy, ChevronRight, Megaphone } from 'lucide-react';
+import { useAnnouncementFeed } from '@/hooks/useAnnouncements';
+import { AnnouncementCard } from '@/components/announcement/AnnouncementCard';
 
 /**
  * Кабинет студента — главная страница вместо редиректа на профиль:
  * приветствие, быстрые действия и список активных тестов.
  */
 const StudentDashboardPage = () => {
-    const { user } = useAuth();
+    const { user, hasPermission } = useAuth();
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { data: quizzesData, isLoading } = useActiveQuizzes(1, 5);
+    // E'lonlar bo'limi faqat huquq bo'lsa so'raladi: aks holda har kirishda
+    // 403 qaytardi va konsol xatolarga to'lardi.
+    const canSeeAnnouncements = hasPermission('announcement:feed');
+    const { data: announcementsData, isLoading: isLoadingAnnouncements } = useAnnouncementFeed(
+        { page: 1, limit: 2 },
+        canSeeAnnouncements,
+    );
+    const announcements = announcementsData?.announcements ?? [];
 
     const firstName = user?.student?.first_name || user?.username || '';
     const activeQuizzes = (quizzesData?.quizzes ?? []).filter((q) => q.is_active);
@@ -31,6 +41,12 @@ const StudentDashboardPage = () => {
             icon: Brain,
             title: t('Psixologik testlar'),
             description: t("O'zingizni sinab ko'ring"),
+        },
+        {
+            to: '/announcements/student',
+            icon: Megaphone,
+            title: t("E'lonlar"),
+            description: t('Universitet xabarlari va tadbirlari'),
         },
         {
             to: '/profile',
@@ -57,7 +73,7 @@ const StudentDashboardPage = () => {
             </div>
 
             {/* Быстрые действия */}
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {actions.map((action) => (
                     <Link
                         key={action.to}
@@ -74,6 +90,31 @@ const StudentDashboardPage = () => {
                     </Link>
                 ))}
             </div>
+
+            {/* E'lonlar — bosh sahifada ko'zga tashlanishi uchun testlardan oldin */}
+            {canSeeAnnouncements && (isLoadingAnnouncements || announcements.length > 0) && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-display text-base font-semibold text-foreground">{t("E'lonlar")}</h2>
+                        <Link to="/announcements/student" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                            {t('Barchasi')}
+                            <ChevronRight className="h-4 w-4" />
+                        </Link>
+                    </div>
+                    {isLoadingAnnouncements ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Skeleton className="h-40 w-full rounded-2xl" />
+                            <Skeleton className="h-40 w-full rounded-2xl" />
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {announcements.map((announcement) => (
+                                <AnnouncementCard key={announcement.id} announcement={announcement} compact />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Активные тесты */}
             <Card>

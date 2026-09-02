@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from .announcement.router import router as announcement_router
 from .auth.router import router as auth_router
 from .course.router import router as course_router
 from .file.router import router as file_router
@@ -19,3 +20,4 @@ router.include_router(course_router)
 router.include_router(file_router)
 router.include_router(integration_router)
 router.include_router(logs_router)
+router.include_router(announcement_router)

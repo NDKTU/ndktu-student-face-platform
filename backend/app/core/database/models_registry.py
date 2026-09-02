@@ -4,6 +4,8 @@ Used by Alembic env.py and anywhere that needs all tables registered.
 """
 
 __all__ = [
+    "Announcement",
+    "AnnouncementRegistration",
     "User",
     "Role",
     "UserRole",
@@ -41,6 +43,10 @@ __all__ = [
     "FileUsage",
 ]
 
+from app.modules.announcement.model import (
+    Announcement,
+    AnnouncementRegistration,
+)
 from app.modules.auth.model import (
     Permission,
     Role,

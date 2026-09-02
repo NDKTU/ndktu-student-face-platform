@@ -20,6 +20,7 @@ import {
     Library,
     Database,
     Home,
+    Megaphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -44,6 +45,8 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: 'Foydalanuvchilar' },
     student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap, section: 'Foydalanuvchilar' },
+
+    announcement:  { label: "E'lonlar",         href: '/announcements', icon: Megaphone,   section: 'Boshqaruv' },
 
     role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
     permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Ruxsatlar tizimi' },
@@ -126,6 +129,8 @@ const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
 
 interface StudentSidebarItem extends SidebarItem {
     permission: string;
+    /** Qaysi bo'limga tushadi. Ko'rsatilmasa — «Testlar». */
+    section?: string;
 }
 
 export const SIDEBAR_RESOURCE_ORDER: string[] = [
@@ -135,6 +140,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'speciality',
     'group',
     'teacher_assignment',
+    'announcement',
 
     // Foydalanuvchilar
     'user',
@@ -170,6 +176,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, permission: 'read:psychology' },
+    { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, permission: 'announcement:feed', section: 'Umumiy' },
 ];
 
 // Resources whose generic admin/staff destination shouldn't be surfaced to a
@@ -178,10 +185,9 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
 // STUDENT_BESPOKE_ITEMS), or the permission is granted to students purely to
 // unblock an API call (e.g. QuizTestPage's own active-quiz fetch) and was
 // never meant to expose the admin management page itself.
-const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz']);
+const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz', 'announcement']);
 
 const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {
-    const sections: SidebarSection[] = [STUDENT_ALWAYS_VISIBLE];
     const grouped: Record<string, SidebarItem[]> = {};
 
     for (const resource of SIDEBAR_RESOURCE_ORDER) {
@@ -199,8 +205,14 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
 
     for (const item of STUDENT_BESPOKE_ITEMS) {
         if (!permissions.has(item.permission)) continue;
-        (grouped['Testlar'] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
+        (grouped[item.section ?? 'Testlar'] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
     }
+
+    // «Umumiy» sikldan tashqarida yig'iladi: unda doimiy havolalar bor va
+    // ularga ruxsatga bog'liq punktlar (masalan, e'lonlar) qo'shiladi.
+    const sections: SidebarSection[] = [
+        { ...STUDENT_ALWAYS_VISIBLE, items: [...STUDENT_ALWAYS_VISIBLE.items, ...(grouped['Umumiy'] ?? [])] },
+    ];
 
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
         if (sectionLabel === 'Umumiy') continue;
