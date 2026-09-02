@@ -185,7 +185,7 @@ class GroupRepository:
 
     async def delete_group(self, session: AsyncSession, group_id: int, force: bool = False) -> None:
         from app.modules.auth.model import Student
-        from app.modules.course.model import Lesson
+        from app.modules.course.model import CourseGroup, Lesson
         from app.modules.quiz.model import Quiz
 
         stmt = select(Group).where(Group.id == group_id)
@@ -218,8 +218,31 @@ class GroupRepository:
             lesson_count = (
                 await session.execute(select(func.count(Lesson.id)).where(Lesson.group_id == group_id))
             ).scalar() or 0
+            # Guruhsiz darslar (kursning barchasiga tegishli) guruh bilan
+            # o'chmaydi — lekin bu guruh kursning oxirgisi bo'lsa, ular
+            # hech kimga ko'rinmaydigan bo'lib qoladi.
+            stranded_count = (
+                await session.execute(
+                    select(func.count(Lesson.id))
+                    .where(Lesson.group_id.is_(None))
+                    .where(
+                        Lesson.course_id.in_(
+                            select(CourseGroup.course_id)
+                            .where(CourseGroup.group_id == group_id)
+                            .group_by(CourseGroup.course_id)
+                        )
+                    )
+                    .where(
+                        Lesson.course_id.in_(
+                            select(CourseGroup.course_id)
+                            .group_by(CourseGroup.course_id)
+                            .having(func.count(CourseGroup.group_id) == 1)
+                        )
+                    )
+                )
+            ).scalar() or 0
 
-            total = student_count + result_count + quiz_count + teacher_count + lesson_count
+            total = student_count + result_count + quiz_count + teacher_count + lesson_count + stranded_count
             if total > 0:
                 warnings = []
                 if student_count > 0:
@@ -232,6 +255,8 @@ class GroupRepository:
                     warnings.append(f"{teacher_count} ta o'qituvchi guruhdan uziladi")
                 if lesson_count > 0:
                     warnings.append(f"{lesson_count} ta o'tilgan dars tarixi butunlay o'chadi (tiklab bo'lmaydi)")
+                if stranded_count > 0:
+                    warnings.append(f"{stranded_count} ta kurs darsi guruhsiz qoladi va talabalarga ko'rinmaydi")
 
                 raise HTTPException(
                     status_code=409,
@@ -286,11 +311,7 @@ class GroupRepository:
         )
 
     async def find_by_hemis_id(self, session: AsyncSession, hemis_group_id: str) -> Group | None:
-        stmt = (
-            select(Group)
-            .options(selectinload(Group.faculty))
-            .where(Group.hemis_group_id == hemis_group_id)
-        )
+        stmt = select(Group).options(selectinload(Group.faculty)).where(Group.hemis_group_id == hemis_group_id)
         return (await session.execute(stmt)).scalar_one_or_none()
 
     async def resolve_for_hemis(

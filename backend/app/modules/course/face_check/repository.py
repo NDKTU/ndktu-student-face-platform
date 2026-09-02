@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.lesson_scope import covers_group
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, Lesson, LessonFaceCheck
 
@@ -64,7 +65,7 @@ class FaceCheckRepository:
         student = (
             await session.execute(select(Student).where(Student.user_id == user.id))
         ).scalar_one_or_none()
-        if student is None or student.group_id != lesson.group_id:
+        if student is None or not await covers_group(session, lesson, student.group_id):
             return None
         return student
 

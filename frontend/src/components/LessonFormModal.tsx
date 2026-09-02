@@ -55,7 +55,9 @@ export const LessonFormModal = ({
     useEffect(() => {
         if (!isOpen) return;
         if (editing) {
-            setFormGroupId(editing.group_id.toString());
+            // Guruhsiz dars — kursning barcha guruhlariniki; bu oynada
+            // guruh majburiy, shuning uchun bo'sh qoladi va o'qituvchi tanlaydi.
+            setFormGroupId(editing.group_id != null ? editing.group_id.toString() : '');
             setFormTopicId(editing.topic_id != null ? editing.topic_id.toString() : '');
             setFormLessonType(editing.lesson_type ?? '');
             setFormTopic(editing.topic);

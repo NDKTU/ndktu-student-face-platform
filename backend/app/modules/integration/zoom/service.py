@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.lesson_scope import covers_group
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, Lesson, Resource
@@ -45,7 +46,7 @@ class ZoomService:
         student_group_id = (
             await session.execute(select(Student.group_id).where(Student.user_id == user.id))
         ).scalar_one_or_none()
-        if student_group_id is not None and student_group_id == lesson.group_id:
+        if await covers_group(session, lesson, student_group_id):
             return
 
         raise HTTPException(

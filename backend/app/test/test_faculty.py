@@ -67,9 +67,16 @@ async def test_delete_faculty_warns_about_lessons_of_its_groups(
         },
     )
     assert course.status_code == 201, course.text
+    # Guruh ataylab ko'rsatiladi: dars aynan shu guruhniki bo'lsagina u
+    # guruh bilan birga o'chadi — tekshiruv shu haqda.
     lesson = await auth_client.post(
         "/lesson/",
-        json={"course_id": course.json()["id"], "topic": "Grafalar", "date": "2026-08-21"},
+        json={
+            "course_id": course.json()["id"],
+            "group_id": test_group["id"],
+            "topic": "Grafalar",
+            "date": "2026-08-21",
+        },
     )
     assert lesson.status_code == 201, lesson.text
 

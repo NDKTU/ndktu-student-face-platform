@@ -284,7 +284,10 @@ class QuizRepository:
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
         group_id, subject_id, lecturer_user_id = row
-        if data.group_id is None:
+        # Dars butun kursniki bo'lsa (`group_id` bo'sh), guruhni bu yerdan
+        # olib bo'lmaydi — test qaysi guruhga topshirilishini o'qituvchi o'zi
+        # ko'rsatadi.
+        if data.group_id is None and group_id is not None:
             data.group_id = group_id
         if data.subject_id is None:
             data.subject_id = subject_id

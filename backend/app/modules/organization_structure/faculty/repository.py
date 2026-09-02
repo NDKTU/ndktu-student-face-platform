@@ -116,7 +116,7 @@ class FacultyRepository:
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
         from sqlalchemy import delete, func, select
 
-        from app.modules.course.model import Lesson
+        from app.modules.course.model import CourseGroup, Lesson
         from app.modules.organization_structure.model import Group, Kafedra
 
         ensure_editable(await self.get_faculty(session, faculty_id), "факультета")
@@ -139,6 +139,27 @@ class FacultyRepository:
                     )
                 )
             ).scalar() or 0
+            # Guruhsiz darslar (kursning barcha guruhlariga tegishli) guruh
+            # bilan o'chmaydi. Lekin kursning hamma guruhi shu fakultetniki
+            # bo'lsa, ular guruhsiz qolib, hech kimga ko'rinmaydi.
+            faculty_courses = (
+                select(CourseGroup.course_id)
+                .join(Group, Group.id == CourseGroup.group_id)
+                .where(Group.faculty_id == faculty_id)
+            )
+            courses_elsewhere = (
+                select(CourseGroup.course_id)
+                .join(Group, Group.id == CourseGroup.group_id)
+                .where(Group.faculty_id != faculty_id)
+            )
+            stranded_count = (
+                await session.execute(
+                    select(func.count(Lesson.id))
+                    .where(Lesson.group_id.is_(None))
+                    .where(Lesson.course_id.in_(faculty_courses))
+                    .where(Lesson.course_id.not_in(courses_elsewhere))
+                )
+            ).scalar() or 0
 
             if kafedra_count > 0 or group_count > 0:
                 warnings = []
@@ -153,6 +174,8 @@ class FacultyRepository:
                         f"{lesson_count} ta o'tilgan dars tarixi guruhlar bilan birga butunlay o'chadi "
                         f"(tiklab bo'lmaydi)"
                     )
+                if stranded_count > 0:
+                    warnings.append(f"{stranded_count} ta kurs darsi guruhsiz qoladi va talabalarga ko'rinmaydi")
 
                 raise HTTPException(
                     status_code=409,

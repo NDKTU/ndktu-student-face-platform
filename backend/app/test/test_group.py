@@ -97,9 +97,16 @@ async def _lesson_in_group(auth_client, test_teacher, test_subject, test_faculty
         },
     )
     assert course.status_code == 201, course.text
+    # Guruh ataylab ko'rsatiladi: dars aynan shu guruhniki bo'lsagina u
+    # guruh bilan birga o'chadi — tekshiruv shu haqda.
     lesson = await auth_client.post(
         "/lesson/",
-        json={"course_id": course.json()["id"], "topic": "Grafalar", "date": "2026-08-21"},
+        json={
+            "course_id": course.json()["id"],
+            "group_id": group_id,
+            "topic": "Grafalar",
+            "date": "2026-08-21",
+        },
     )
     assert lesson.status_code == 201, lesson.text
     return lesson.json()["id"]
@@ -120,6 +127,41 @@ async def test_delete_group_warns_about_lessons_it_would_destroy(
     assert detail["requires_confirmation"] is True
     lesson_warnings = [w for w in detail["warnings"] if "dars tarixi" in w]
     assert lesson_warnings == ["1 ta o'tilgan dars tarixi butunlay o'chadi (tiklab bo'lmaydi)"]
+
+
+@pytest.mark.asyncio
+async def test_delete_group_warns_about_stranded_course_lessons(
+    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+):
+    """Guruhsiz dars guruh bilan o'chmaydi, lekin ko'rinmay qoladi.
+
+    Dars kursning barcha guruhlariga tegishli bo'lsa, u `groups` ga bog'lanmagan
+    va CASCADE unga tegmaydi. Kursning oxirgi guruhi o'chirilsa esa darsni
+    hech kim ko'rmaydi — operator buni oldindan bilishi kerak.
+    """
+    course = await auth_client.post(
+        "/course/",
+        json={
+            "name": "Oqim kursi",
+            "subject_id": test_subject.id,
+            "teacher_id": test_teacher["user_id"],
+            "group_ids": [test_group["id"]],
+            "faculty_id": test_faculty["id"],
+            "kafedra_id": test_kafedra["id"],
+        },
+    )
+    assert course.status_code == 201
+    lesson = await auth_client.post(
+        "/lesson/",
+        json={"course_id": course.json()["id"], "topic": "Grafalar", "date": "2026-08-21"},
+    )
+    assert lesson.status_code == 201
+    assert lesson.json()["group_id"] is None
+
+    response = await auth_client.delete(f"/group/{test_group['id']}")
+    assert response.status_code == 409
+    warnings = response.json()["detail"]["warnings"]
+    assert "1 ta kurs darsi guruhsiz qoladi va talabalarga ko'rinmaydi" in warnings
 
 
 @pytest.mark.asyncio

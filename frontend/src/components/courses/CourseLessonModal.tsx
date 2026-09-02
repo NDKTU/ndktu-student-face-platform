@@ -37,9 +37,14 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     const createLesson = useCreateLesson();
     const updateLesson = useUpdateLesson();
     const isEditing = Boolean(lesson);
-    // Группа берётся у курса. Выбор остаётся только для курса с несколькими
-    // группами — там подставить её автоматически нельзя.
-    const needsGroupChoice = course.groups.length > 1;
+    // Guruh so'ralmaydi: dars kursning barcha guruhlariga tegishli bo'ladi.
+    // Kursda to'qqiztagacha guruh bo'ladi va har biriga bir xil darsni qayta
+    // yozish o'qituvchining ishini shuncha marta takrorlashi edi.
+    //
+    // Tanlov bloki o'chirilmadi, o'chirib qo'yildi: bitta guruhga alohida
+    // dars kerak bo'lib qolsa, shu yerni `course.groups.length > 1` ga
+    // qaytarish kifoya — qolgan mantiq joyida turibdi.
+    const needsGroupChoice: boolean = false;
     const [groupId, setGroupId] = useState('');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -81,11 +86,10 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
 
     useEffect(() => {
         if (!isOpen) return;
-        setGroupId(
-            lesson?.group_id
-                ? String(lesson.group_id)
-                : course.groups.length === 1 ? String(course.groups[0].id) : '',
-        );
+        // Tahrirlashda darsning o'z guruhi saqlanadi; yangi dars esa guruhsiz
+        // yaratiladi — bekendda bo'sh `group_id` «kursning barcha guruhlari»
+        // degani.
+        setGroupId(lesson?.group_id ? String(lesson.group_id) : '');
         setTitle(lesson?.topic ?? '');
         setDescription(lesson?.description ?? '');
         setYoutubeUrl(lesson?.resources?.find((r) => r.resource_type === 'video')?.link_url ?? '');

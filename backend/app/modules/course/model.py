@@ -198,10 +198,14 @@ class Lesson(Base, IdIntPk, TimestampMixin):
         index=True,
     )
 
-    group_id: Mapped[int] = mapped_column(
+    #: Bo'sh = kursning barcha guruhlari. Kurs endi ma'ruza oqimiga tegishli
+    #: va unda bir nechta guruh bo'ladi; har biriga alohida dars yozish
+    #: o'qituvchini bir xil ishni takrorlashga majbur qilardi. Guruh
+    #: ko'rsatilgan eski darslar avvalgidek faqat o'z guruhiga ko'rinadi.
+    group_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("groups.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -231,7 +235,7 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     teacher_subject: Mapped["TeacherSubject"] = relationship("TeacherSubject")
-    group: Mapped["Group"] = relationship("Group")
+    group: Mapped["Group | None"] = relationship("Group")
     course: Mapped["Course"] = relationship("Course", back_populates="lessons")
     course_topic: Mapped["CourseTopic | None"] = relationship("CourseTopic", back_populates="lessons")
     resources: Mapped[list["Resource"]] = relationship(

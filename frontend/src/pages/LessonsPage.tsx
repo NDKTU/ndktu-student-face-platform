@@ -100,7 +100,9 @@ export default function LessonsPage() {
     const openEdit = (lesson: Lesson) => {
         setEditing(lesson);
         setFormSubjectTeacherId(lesson.teacher_subject_id.toString());
-        setFormGroupId(lesson.group_id.toString());
+        // Guruhsiz dars — kursning barcha guruhlariniki; bu forma guruh
+        // talab qiladi, shuning uchun bo'sh qoladi va o'qituvchi tanlaydi.
+        setFormGroupId(lesson.group_id != null ? lesson.group_id.toString() : '');
         setFormTopic(lesson.topic);
         setFormDate(lesson.date);
         setFormDescription(lesson.description ?? '');

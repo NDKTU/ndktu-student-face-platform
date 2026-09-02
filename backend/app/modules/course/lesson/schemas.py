@@ -49,8 +49,9 @@ class LessonCreateRequest(BaseModel):
     teacher_subject_id: Optional[int] = None
     # Jonli darsda yuz nazorati. Standart holat — o'chiq.
     face_check_enabled: bool = False
-    # Группу можно не передавать: у курса она уже выбрана. Обязательна только
-    # если курс ведётся сразу у нескольких групп — тогда угадывать нельзя.
+    # Guruh ixtiyoriy va odatda ko'rsatilmaydi: dars kursning barcha
+    # guruhlariga tegishli bo'ladi. Ataylab bitta guruhga dars kerak bo'lsa —
+    # o'sha guruhni yuboradi.
     group_id: Optional[int] = None
     course_id: int
     topic_id: Optional[int] = None
@@ -77,7 +78,8 @@ class LessonResponse(BaseModel):
     id: int
     teacher_subject_id: int
     face_check_enabled: bool = False
-    group_id: int
+    #: Bo'sh = kursning barcha guruhlari.
+    group_id: Optional[int] = None
     course_id: int
     topic_id: Optional[int] = None
     lesson_type: Optional[str] = None

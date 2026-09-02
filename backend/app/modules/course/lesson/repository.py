@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.course_access import can_manage
+from app.core.utils.course_access import can_manage, manageable_course_ids
+from app.core.utils.lesson_scope import visible_to_group
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, CourseTopic, Homework, HomeworkSubmission, Lesson
@@ -34,7 +35,7 @@ class LessonRepository:
         current_user: User,
         group_id: int | None,
         is_admin: bool,
-    ) -> tuple[Course, TeacherSubject, int]:
+    ) -> tuple[Course, TeacherSubject, int | None]:
         course = await get_course_repository.get_course_orm(session, course_id)
         if not is_admin and not await can_manage(session, course, current_user):
             raise HTTPException(
@@ -44,21 +45,16 @@ class LessonRepository:
 
         course_group_stmt = select(CourseGroup.group_id).where(CourseGroup.course_id == course.id)
         course_group_ids = set((await session.execute(course_group_stmt)).scalars().all())
-        if group_id is None:
-            # Группу курса не спрашиваем повторно: если она одна — берём её.
-            if len(course_group_ids) == 1:
-                group_id = next(iter(course_group_ids))
-            elif not course_group_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Course has no groups: add a group to the Course first",
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="group_id is required: this Course has several groups",
-                )
-        if group_id not in course_group_ids:
+        if not course_group_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Course has no groups: add a group to the Course first",
+            )
+        # Guruh so'ralmaydi: dars butun kursniki, ya'ni uning barcha
+        # guruhlariniki. Ilgari bir nechta guruhli kursda 400 qaytarilardi va
+        # o'qituvchi bir xil darsni har guruhga qayta yozishga majbur edi.
+        # Guruh ataylab ko'rsatilsa — faqat o'sha guruhga tegishli bo'ladi.
+        if group_id is not None and group_id not in course_group_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="group_id does not belong to this Course",
@@ -174,17 +170,22 @@ class LessonRepository:
             )
             allowed_teacher_subject_ids = (await session.execute(ts_stmt)).scalars().all()
 
-            conditions = []
+            # Butun kursga yozilgan (guruhsiz) darslar guruh ro'yxatiga
+            # tushmaydi — ularni kursning o'zi bo'yicha qo'shamiz, aks holda
+            # assistent o'zi dars beradigan kursning darsini ko'rmasdi.
+            manageable = await manageable_course_ids(session, current_user)
+
+            conditions = [Lesson.course_id.in_(select(manageable.c.id))]
             if allowed_group_ids:
                 conditions.append(Lesson.group_id.in_(allowed_group_ids))
             if allowed_teacher_subject_ids:
                 conditions.append(Lesson.teacher_subject_id.in_(allowed_teacher_subject_ids))
-            role_filter = or_(*conditions) if conditions else (Lesson.id == -1)
+            role_filter = or_(*conditions)
         elif is_student:
             student_stmt = select(Student.group_id).where(Student.user_id == current_user.id)
             student_group_id = (await session.execute(student_stmt)).scalar_one_or_none()
             if student_group_id:
-                role_filter = Lesson.group_id == student_group_id
+                role_filter = visible_to_group(student_group_id)
             else:
                 role_filter = Lesson.id == -1
 
@@ -194,7 +195,7 @@ class LessonRepository:
         if request.teacher_subject_id:
             stmt = stmt.where(Lesson.teacher_subject_id == request.teacher_subject_id)
         if request.group_id:
-            stmt = stmt.where(Lesson.group_id == request.group_id)
+            stmt = stmt.where(visible_to_group(request.group_id))
         if request.course_id is not None:
             stmt = stmt.where(Lesson.course_id == request.course_id)
         if request.date_from:
@@ -219,7 +220,7 @@ class LessonRepository:
         if request.teacher_subject_id:
             count_stmt = count_stmt.where(Lesson.teacher_subject_id == request.teacher_subject_id)
         if request.group_id:
-            count_stmt = count_stmt.where(Lesson.group_id == request.group_id)
+            count_stmt = count_stmt.where(visible_to_group(request.group_id))
         if request.course_id is not None:
             count_stmt = count_stmt.where(Lesson.course_id == request.course_id)
         if request.date_from:

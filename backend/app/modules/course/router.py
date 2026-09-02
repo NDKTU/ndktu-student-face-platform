@@ -12,15 +12,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .course.repository import get_course_repository
 from .course.schemas import (
-    CourseTeacherAddRequest,
-    CourseTeachersResponse,
     CourseCreateRequest,
     CourseListRequest,
     CourseListResponse,
     CourseResponse,
+    CourseTeacherAddRequest,
+    CourseTeachersResponse,
     CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
+from .face_check.repository import get_face_check_repository
+from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .homework.repository import get_homework_repository
 from .homework.schemas import (
     HomeworkCreateRequest,
@@ -34,8 +36,6 @@ from .homework.schemas import (
     SubmissionResponse,
     SubmissionSubmitRequest,
 )
-from .face_check.repository import get_face_check_repository
-from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .lesson.repository import get_lesson_repository
 from .lesson.schemas import (
     LessonCreateRequest,

@@ -7,11 +7,11 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.schemas import VisibilityRequest
-from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
 from app.core.utils.visibility import set_hidden
 from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
+from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
 
 from .faculty.repository import get_faculty_repository
 from .faculty.schemas import (

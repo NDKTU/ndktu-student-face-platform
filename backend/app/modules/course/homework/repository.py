@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import to_naive_utc as _to_naive_utc
 from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
+from app.core.utils.course_access import can_manage
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import Group

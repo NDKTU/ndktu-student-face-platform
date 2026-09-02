@@ -37,7 +37,8 @@ export type LessonType = 'lecture' | 'seminar' | 'independent' | 'lab';
 export interface Lesson {
     id: number;
     teacher_subject_id: number;
-    group_id: number;
+    /** Bo'sh = dars kursning barcha guruhlariga tegishli. */
+    group_id: number | null;
     course_id: number;
     sinf_id?: number | null;
     topic_id?: number | null;
