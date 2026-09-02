@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
+import { FileSourceField } from '@/components/file/FileSourceField';
 import { Input } from '@/components/ui/Input';
-import { FileText, Loader2, UploadCloud, X } from 'lucide-react';
+import { FileText, Loader2, X } from 'lucide-react';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/useAssignments';
 import { resourceService } from '@/services/resourceService';
 import type { Assignment, SubmissionFile } from '@/services/assignmentService';
@@ -146,31 +147,15 @@ export const AssignmentFormModal = ({
                 </div>
 
                 <div>
-                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Vazifa fayllari</label>
-                    {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi. */}
-                    <label
-                        htmlFor="assignment-files"
-                        className="flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-input bg-muted/20 px-4 py-5 text-center transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
-                    >
-                        <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-sm font-medium text-foreground">Fayl biriktirish uchun bosing</span>
-                        <span className="text-xs text-muted-foreground">Shart, namuna yoki tarqatma material</span>
-                    </label>
-                    <input
-                        id="assignment-files"
-                        type="file"
+                    {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi.
+                        Ikkala manba ham teng koʻrinadi: qurilma va kutubxona. */}
+                    <FileSourceField
+                        label="Vazifa fayllari"
                         multiple
-                        className="hidden"
-                        onChange={(event) => setNewFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
+                        deviceHint="Shart, namuna yoki tarqatma material"
+                        onFiles={(picked) => setNewFiles((prev) => [...prev, ...picked])}
+                        onPickLibrary={() => setIsPickerOpen(true)}
                     />
-                    {/* Ilgari yuklangan faylni qayta yuklamasdan qoʻshish. */}
-                    <button
-                        type="button"
-                        onClick={() => setIsPickerOpen(true)}
-                        className="mt-2 text-xs font-medium text-primary hover:underline"
-                    >
-                        yoki kutubxonadan tanlash
-                    </button>
                     {(attachments.length > 0 || newFiles.length > 0) && (
                         <ul className="mt-2 space-y-1.5">
                             {attachments.map((file, index) => (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, ScanFace, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Pencil, Plus, ScanFace, Trash2, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { useLesson } from '@/hooks/useLessons';
@@ -27,6 +27,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
+import { FileSourceField } from '@/components/file/FileSourceField';
 import type { LibraryFile } from '@/services/fileService';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -313,10 +314,22 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
         {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
         {kind === 'zoom' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://us05web.zoom.us/j/89012345678?pwd=..." /><p className="mt-1.5 text-xs text-muted-foreground">Zoom'da «Copy Invite Link» orqali olingan havolani qo'ying. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi, talabalar shu sahifada qo'shiladi.</p></div>}
-        {kind === 'file' && <div><label className="mb-1 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Fayl</label><Input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setLibraryFile(null); }} />
-            <button type="button" onClick={() => setIsPickerOpen(true)} className="mt-2 text-xs font-medium text-primary hover:underline">yoki kutubxonadan tanlash</button>
-            {libraryFile && <p className="mt-1.5 text-xs text-muted-foreground">Kutubxonadan: {libraryFile.title}</p>}
-        </div>}
+        {kind === 'file' && <FileSourceField
+            label="Fayl"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+            deviceHint="PDF, Word, Excel, PowerPoint, TXT yoki ZIP"
+            onFiles={(picked) => { setFile(picked[0] ?? null); setLibraryFile(null); }}
+            onPickLibrary={() => setIsPickerOpen(true)}
+        >
+            {(file || libraryFile) && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{file?.name ?? libraryFile?.title}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{file ? 'qurilmadan' : 'kutubxonadan'}</span>
+                    <Button type="button" variant="ghost" size="icon" aria-label="Olib tashlash" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => { setFile(null); setLibraryFile(null); }}><X className="h-3.5 w-3.5" /></Button>
+                </div>
+            )}
+        </FileSourceField>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button><Button onClick={submit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button></div>
         <FilePickerModal

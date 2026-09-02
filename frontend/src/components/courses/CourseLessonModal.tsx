@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, FilePlus2, FileText, Loader2, Pencil, Plus, Trash2, UploadCloud, Video, X, Youtube } from 'lucide-react';
+import { ClipboardList, FilePlus2, FileText, Loader2, Pencil, Plus, Trash2, Video, X, Youtube } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
+import { FileSourceField } from '@/components/file/FileSourceField';
 import type { LibraryFile } from '@/services/fileService';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
@@ -497,33 +498,16 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     {showResources && (
                         <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
                             <div>
-                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Hujjat yoki kitob</label>
-                                {/* Brauzerning «No files selected» tugmasi o'rniga tushunarli
-                                    yuklash maydoni: nima qilish kerakligi va qaysi format
-                                    qabul qilinishi ko'rinib turadi. */}
-                                <label
-                                    htmlFor="lesson-files"
-                                    className="flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-input bg-muted/20 px-4 py-6 text-center transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
-                                >
-                                    <UploadCloud className="h-6 w-6 text-muted-foreground" />
-                                    <span className="text-sm font-medium text-foreground">Fayl tanlash uchun bosing</span>
-                                    <span className="text-xs text-muted-foreground">PDF, Word, Excel, PowerPoint, TXT yoki ZIP</span>
-                                </label>
-                                <input
-                                    id="lesson-files"
-                                    type="file"
+                                {/* Brauzerning «No files selected» tugmasi o'rniga ikki teng
+                                    yoʻl: qurilmadan yuklash yoki kutubxonadan tanlash. */}
+                                <FileSourceField
+                                    label="Hujjat yoki kitob"
                                     multiple
-                                    className="hidden"
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
-                                    onChange={(event) => setExtraFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
+                                    deviceHint="PDF, Word, Excel, PowerPoint, TXT yoki ZIP"
+                                    onFiles={(picked) => setExtraFiles((prev) => [...prev, ...picked])}
+                                    onPickLibrary={() => setResourcePickerOpen(true)}
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setResourcePickerOpen(true)}
-                                    className="mt-2 text-xs font-medium text-primary hover:underline"
-                                >
-                                    yoki kutubxonadan tanlash
-                                </button>
                                 {libraryResources.length > 0 && (
                                     <ul className="mt-2 space-y-1.5">
                                         {libraryResources.map((file) => (
@@ -724,30 +708,14 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                                 placeholder="Vazifa tavsifi"
                             />
                             <div>
-                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Vazifa fayllari</label>
                                 {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi. */}
-                                <label
-                                    htmlFor="homework-files"
-                                    className="flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-input bg-muted/20 px-4 py-5 text-center transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
-                                >
-                                    <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                                    <span className="text-sm font-medium text-foreground">Fayl biriktirish uchun bosing</span>
-                                    <span className="text-xs text-muted-foreground">Shart, namuna yoki tarqatma material</span>
-                                </label>
-                                <input
-                                    id="homework-files"
-                                    type="file"
+                                <FileSourceField
+                                    label="Vazifa fayllari"
                                     multiple
-                                    className="hidden"
-                                    onChange={(event) => setHomeworkFiles((prev) => [...prev, ...Array.from(event.target.files ?? [])])}
+                                    deviceHint="Shart, namuna yoki tarqatma material"
+                                    onFiles={(picked) => setHomeworkFiles((prev) => [...prev, ...picked])}
+                                    onPickLibrary={() => setHomeworkPickerOpen(true)}
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setHomeworkPickerOpen(true)}
-                                    className="mt-2 text-xs font-medium text-primary hover:underline"
-                                >
-                                    yoki kutubxonadan tanlash
-                                </button>
                                 {libraryHomeworkFiles.length > 0 && (
                                     <ul className="mt-2 space-y-1.5">
                                         {libraryHomeworkFiles.map((file) => (
