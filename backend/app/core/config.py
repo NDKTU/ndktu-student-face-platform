@@ -14,7 +14,26 @@ class ServerConfig(BaseModel):
     app_path: str
     host: str
     port: int
-    reload: bool = True
+
+    #: Standart qiymat False: reload ishlab chiqish qulayligi, prod uchun esa
+    #: zarar. U fayl kuzatuvchi jarayon qoʻshadi va — eng muhimi — uvicorn'da
+    #: ``workers`` bilan birga ishlamaydi: reload yoqiq boʻlsa, worker soni
+    #: jimgina bittaga tushadi. Ilgari standart True edi, yaʼni prod'da
+    #: worker qoʻshish umuman taʼsir qilmasdi.
+    reload: bool = False
+
+    #: Nechta jarayon. Bitta jarayon bitta yadroda ishlaydi — asinxron kod
+    #: ham buni oʻzgartirmaydi, event loop bitta oqimda yuradi.
+    #:
+    #: Ajratilgan yadro sonidan oshirmaslik kerak, va yadrolar backend bilan
+    #: birga face-detection, Postgres va Redis'ga ham tegishli. Imtihon
+    #: paytida backend va face-detection barobar band boʻladi — hisob aynan
+    #: shu holatga qarab qilinsin.
+    #:
+    #: Diqqat: ``database.pool_size`` har bir jarayonga alohida tegishli.
+    #: Bu ikki sozlama birga oʻzgartiriladi, aks holda jami ulanishlar
+    #: Postgres'ning ``max_connections`` chegarasidan oshib ketadi.
+    workers: int = 1
 
 
 class JwtConfig(BaseModel):
@@ -35,8 +54,17 @@ class DatabaseConfig(BaseModel):
     test_url: PostgresDsn | None = None
     echo: bool = False
     echo_pool: bool = False
-    pool_size: int = 50
-    max_overflow: int = 10
+    #: Ulanishlar hovuzi — **har bir jarayonga**. Jami sarf
+    #: ``workers × (pool_size + max_overflow)`` va u Postgres'dagi
+    #: ``max_connections`` (standart 100) dan kichik boʻlishi shart.
+    #:
+    #: Ilgari 50 + 10 turardi. Bu ikki sababdan notoʻgʻri edi: birinchidan,
+    #: ikkita worker bilanoq 120 ulanish kerak boʻlardi va baza rad eta
+    #: boshlardi; ikkinchidan, oʻlchov paytida yuk ostida jami 12 ta ulanish
+    #: band edi — bitta event loop 50 tasini maʼnoli ishlata olmaydi, har
+    #: soʻrov bittasini qisqa vaqtga oladi va qaytaradi.
+    pool_size: int = 15
+    max_overflow: int = 5
 
     naming_convention: dict[str, str] = {
         "ix": "ix_%(column_0_label)s",

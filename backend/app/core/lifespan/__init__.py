@@ -17,6 +17,26 @@ from .sequences import reset_sequences
 
 logger = logging.getLogger(__name__)
 
+#: Ishga tushishdagi urugʻlantirish bir vaqtda bitta jarayonda ketsin.
+#:
+#: Nega kerak. ``sync_admin_role``, ``ensure_admin_user`` va
+#: ``assign_admin_permissions`` «tekshir, keyin qoʻsh» naqshida yozilgan.
+#: Bir nechta worker barobar koʻtarilganda boʻsh bazada ikkovi ham «Admin
+#: roli yoʻq» deb koʻradi va ikkovi ham qoʻshadi — ``roles.name`` UNIQUE
+#: boʻlgani uchun biri ``UniqueViolation`` bilan yiqiladi.
+#: ``role_permissions`` da esa ``(role_id, permission_id)`` unikalligi yoʻq:
+#: u yerda yiqilish emas, dublikat satr paydo boʻladi — yangi endpoint
+#: qoʻshilgan birinchi ishga tushishda har bir worker uni oʻzicha qoʻshadi.
+#: Bu jimgina sodir boʻladi va hech qayerda bilinmaydi.
+#:
+#: ``sync_permissions`` allaqachon ``ON CONFLICT DO NOTHING`` bilan
+#: himoyalangan; qulf qolgan uchtasi uchun.
+SEED_LOCK_KEY = "startup:seed:lock"
+#: Urugʻlantirish sekundning ichida tugaydi; TTL faqat jarayon oʻrtada
+#: oʻlib qolsa qulf abadiy qolib ketmasligi uchun.
+SEED_LOCK_TTL_SECONDS = 60
+SEED_LOCK_WAIT_SECONDS = 60
+
 
 async def _connect_database() -> None:
     try:
@@ -37,11 +57,43 @@ async def _connect_redis(redis_client) -> None:
         raise e
 
 
+async def _hold_seed_lock(redis_client) -> bool:
+    """Urugʻlantirish navbatini kutadi.
+
+    Qulf ishni oʻtkazib yubormaydi, navbatga qoʻyadi: urugʻlantirishning oʻzi
+    idempotent, faqat bir vaqtda ikkitasi bajarilmasa boʻlgani. Oʻtkazib
+    yuborish notoʻgʻri boʻlardi — oʻsha worker hali urugʻlantirilmagan bazada
+    soʻrovga xizmat qila boshlardi.
+    """
+    deadline = asyncio.get_running_loop().time() + SEED_LOCK_WAIT_SECONDS
+    while asyncio.get_running_loop().time() < deadline:
+        if await redis_client.set(SEED_LOCK_KEY, "1", nx=True, ex=SEED_LOCK_TTL_SECONDS):
+            return True
+        await asyncio.sleep(0.2)
+    return False
+
+
 async def _seed_admin(app: FastAPI) -> None:
     """
     Seed the Admin role/permissions and the bootstrap admin user using dynamic
     route discovery. Only "Admin" is auto-seeded — see defaults.py.
     """
+    from core.redis_client import redis_client
+
+    acquired = await _hold_seed_lock(redis_client)
+    if not acquired:
+        # Kutish tugadi. Yiqilgandan koʻra davom etgan maʼqul: urugʻlantirish
+        # bir necha soʻrovdan iborat, eng yomoni dublikat satr qoladi.
+        logger.warning("Urugʻlantirish qulfi %d sekundda olinmadi — qulfsiz davom etamiz", SEED_LOCK_WAIT_SECONDS)
+
+    try:
+        await _seed_admin_locked(app)
+    finally:
+        if acquired:
+            await redis_client.delete(SEED_LOCK_KEY)
+
+
+async def _seed_admin_locked(app: FastAPI) -> None:
     async with db_helper.session_factory() as session:
         try:
             logger.info("Initializing Admin role and permissions...")

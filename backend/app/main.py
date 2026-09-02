@@ -1,3 +1,4 @@
+import logging
 import mimetypes
 import os
 
@@ -12,6 +13,8 @@ from app.core.config import settings
 from app.core.lifespan import lifespan
 from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.modules.router import router
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="NDKTU Platform API",
@@ -85,11 +88,24 @@ async def health_check():
 
 
 def main():
+    # reload va workers uvicorn'da birga ishlamaydi: reload yoqilganda worker
+    # soni jimgina bittaga tushadi. Buni oshkor qilamiz — aks holda prod'da
+    # "workers=2 qo'ydim, nega hech nima o'zgarmadi" degan savol tug'ilardi.
+    workers = settings.server.workers
+    if settings.server.reload and workers > 1:
+        logger.warning(
+            "reload yoqilgan — workers=%d e'tiborsiz qoladi, bitta jarayon ishlaydi. "
+            "Prod'da APP_CONFIG__SERVER__RELOAD=False bo'lsin.",
+            workers,
+        )
+        workers = 1
+
     uvicorn.run(
         app=settings.server.app_path,
         host=settings.server.host,
         port=settings.server.port,
         reload=settings.server.reload,
+        workers=workers,
         proxy_headers=True,
         forwarded_allow_ips="*",
         access_log=False,
