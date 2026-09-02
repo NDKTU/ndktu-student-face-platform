@@ -8,16 +8,13 @@ ws://host/v1/video/stream
 """
 
 import base64
-import os
 import time
-from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.logging import get_logger
 from app.core.security import verify_ws_token
-from app.services import video_service
+from app.services import reference_cache, video_service
 from app.services.video_service import get_detector
 
 router = APIRouter()
@@ -47,49 +44,12 @@ async def realtime_stream(
     await websocket.accept()
     logger.info("WebSocket client connected: %s", websocket.client)
 
-    reference_encoding = None
-    
-    # 0. If image_url is provided, initialize reference_encoding
-    if image_url:
-        logger.info(f"Initializing reference image from: {image_url}")
-        
-        # Handle local relative URL directly from mounted volume mapping
-        if image_url.startswith("/uploads/"):
-            local_path = f"/face{image_url}"
-            logger.info(f"Reading local mounted file: {local_path}")
-            
-            if os.path.exists(local_path):
-                ref_frame = await video_service.decode_frame(Path(local_path).read_bytes())
-                if ref_frame is not None:
-                    reference_encoding = await video_service.get_face_encoding(ref_frame)
-                    if reference_encoding is not None:
-                        logger.info("Reference face successfully initialized from local file.")
-                    else:
-                        logger.warning("Could not find a face in the local image.")
-                else:
-                    logger.error("Failed to decode local reference image.")
-            else:
-                logger.error(f"Local file not found: {local_path}")
-                
-        else:
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(image_url, timeout=10.0)
-                    response.raise_for_status()
-                    
-                    # Save to temp file and get encoding
-                    # Временный файл больше не нужен: кадр разбирается прямо из байтов.
-                    ref_frame = await video_service.decode_frame(response.content)
-                    if ref_frame is not None:
-                        reference_encoding = await video_service.get_face_encoding(ref_frame)
-                        if reference_encoding is not None:
-                            logger.info("Reference face successfully initialized from URL.")
-                        else:
-                            logger.warning("Could not find a face in the provided URL image.")
-                    else:
-                        logger.error("Failed to decode reference image from URL.")
-            except Exception as e:
-                logger.error(f"Error processing reference image URL: {e}")
+    # Etalon vektori keshdan olinadi: bir talaba imtihon davomida bir necha
+    # marta qayta ulanishi mumkin (sahifa yangilandi, tarmoq uzildi), va har
+    # safar rasmni qaytadan yuklab, qaytadan hisoblash keraksiz.
+    reference_encoding = await reference_cache.get_encoding(image_url) if image_url else None
+    if image_url and reference_encoding is None:
+        logger.warning("Etalon tayyorlanmadi: %s", image_url)
 
     last_recognition_time = 0
 

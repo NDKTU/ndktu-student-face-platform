@@ -11,38 +11,17 @@ POST /v1/face/verify — сверка одного кадра с эталонн�
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, Depends
 
 from app.core.logging import get_logger
 from app.core.security import verify_internal_token
 from app.models.schemas import VerifyFaceRequest, VerifyFaceResponse
-from app.services import video_service
+from app.services import reference_cache, video_service
 from app.services.video_service import get_detector
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-# Эталон берётся либо из смонтированного тома (/uploads/...), либо по внешней
-# ссылке (HEMIS отдаёт фото студентов именно так).
-_LOCAL_PREFIX = "/uploads/"
-_LOCAL_ROOT = "/face"
-
-
-async def _load_reference_bytes(reference_url: str) -> bytes | None:
-    if reference_url.startswith(_LOCAL_PREFIX):
-        path = Path(f"{_LOCAL_ROOT}{reference_url}")
-        return path.read_bytes() if path.exists() else None
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(reference_url, timeout=10.0)
-            response.raise_for_status()
-            return response.content
-    except Exception as cause:  # noqa: BLE001 — сеть/битый файл: причина в логе, ответ ниже
-        logger.warning("Reference image download failed (%s): %s", reference_url, cause)
-        return None
 
 
 @router.post(
@@ -68,17 +47,14 @@ async def verify_face(data: VerifyFaceRequest) -> VerifyFaceResponse:
     if face_count != 1:
         return VerifyFaceResponse(face_count=face_count, is_match=False, reference_ready=False)
 
-    reference_bytes = await _load_reference_bytes(data.reference_url)
-    if reference_bytes is None:
+    # Etalon dars davomida oʻzgarmaydi, tekshiruv esa har 5-12 daqiqada
+    # takrorlanadi — shuning uchun vektor keshdan olinadi.
+    reference_encoding = await reference_cache.get_encoding(data.reference_url)
+    if reference_encoding is None:
+        # Sabab ikki xil — rasm kelmadi yoki unda yuz topilmadi. Ikkalasida
+        # ham qaror bir xil, batafsili jurnalda.
         return VerifyFaceResponse(
             face_count=face_count, is_match=False, reference_ready=False, detail="reference unavailable"
-        )
-
-    reference_frame = await video_service.decode_frame(reference_bytes)
-    reference_encoding = await video_service.get_face_encoding(reference_frame) if reference_frame is not None else None
-    if reference_encoding is None:
-        return VerifyFaceResponse(
-            face_count=face_count, is_match=False, reference_ready=False, detail="no face on reference photo"
         )
 
     current_encoding = await video_service.get_face_encoding(frame)
