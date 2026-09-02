@@ -22,6 +22,16 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --no-install-project
 RUN uv pip install git+https://github.com/ageitgey/face_recognition_models
 
+# MobileFaceNet (InsightFace buffalo_s). Модель кладём в образ, а не тянем
+# при старте: сервис должен подниматься без доступа в интернет, а тихая
+# загрузка на старте означала бы, что первый экзамен упадёт из-за чужого CDN.
+# Из архива нужен ровно один файл — остальные модели набора не используются.
+RUN mkdir -p /face/models \
+    && curl -fsSL -o /tmp/buffalo_s.zip \
+       https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_s.zip \
+    && python -c "import zipfile; zipfile.ZipFile('/tmp/buffalo_s.zip').extract('w600k_mbf.onnx', '/face/models')" \
+    && rm /tmp/buffalo_s.zip
+
 # Application code — changes on every commit, rebuilds quickly
 COPY . .
 RUN uv sync --no-dev
