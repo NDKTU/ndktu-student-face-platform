@@ -196,9 +196,7 @@ class EduPlanWorkloadService:
         for (teacher_id, subject_id, group_id), bucket in collapsed.items():
             row = existing_ta.get((teacher_id, subject_id, group_id))
             if row is None:
-                row = TeacherAssignment(
-                    teacher_id=teacher_id, subject_id=subject_id, group_id=group_id
-                )
+                row = TeacherAssignment(teacher_id=teacher_id, subject_id=subject_id, group_id=group_id)
                 created += 1
             else:
                 updated += 1

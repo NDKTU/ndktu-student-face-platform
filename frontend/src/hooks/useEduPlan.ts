@@ -84,6 +84,32 @@ export const useEduPlanRun = () =>
         mutationFn: () => eduplanService.run(),
     });
 
+/**
+ * Yuklamadan yigʻilgan kurs takliflari.
+ *
+ * Sahifa ochilishi bilan soʻralmaydi: hisob 374 ta biriktirma boʻyicha
+ * boradi va u faqat admin kurslar boʻlimini ochganda kerak.
+ */
+export const useEduPlanCoursePreview = (enabled: boolean) =>
+    useQuery({
+        queryKey: ['eduplan', 'course-preview'],
+        queryFn: () => eduplanService.previewCourses(),
+        enabled,
+        refetchOnWindowFocus: false,
+    });
+
+/** Kurslarni yaratadi: kurslar roʻyxati va taklif keshini yangilaydi. */
+export const useEduPlanApplyCourses = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => eduplanService.applyCourses(),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['eduplan', 'course-preview'], data);
+            queryClient.invalidateQueries({ queryKey: ['courses'] });
+        },
+    });
+};
+
 /** Progn tugagach chaqiriladi: koʻchirilgan spravochniklar keshini yangilaydi. */
 export const useInvalidateMirrored = () => {
     const queryClient = useQueryClient();

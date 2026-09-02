@@ -17,9 +17,11 @@ from app.modules.auth.user.schemas import UserLoginRequest, UserLoginResponse
 from . import credentials
 from .auth_service import eduplan_auth_service
 from .client import EduPlanClient
+from .course_builder import eduplan_course_builder
 from .schemas import (
     ApplyRequest,
     ApplyResponse,
+    CoursePreviewResponse,
     EduPlanSettingsIn,
     EduPlanSettingsOut,
     PreviewResponse,
@@ -170,6 +172,32 @@ async def eduplan_sync_workloads(
     нагрузка ссылается на них по external_id.
     """
     return await eduplan_workload_service.sync(session, academic_year_id)
+
+
+@router.get("/courses/preview", response_model=CoursePreviewResponse)
+async def eduplan_preview_courses(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:eduplan")),
+):
+    """Yuklamadan qanday kurslar chiqishini koʻrsatadi, hech nima yozmaydi.
+
+    Maʼruzachisi yoʻq guruhlar alohida roʻyxatda — ular kursga
+    aylanmaydi va ularni admin qoʻlda hal qiladi.
+    """
+    return await eduplan_course_builder.build(session)
+
+
+@router.post(
+    "/courses/apply",
+    response_model=CoursePreviewResponse,
+    dependencies=[Depends(RateLimiter(times=2, seconds=60))],
+)
+async def eduplan_apply_courses(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Yoʻq kurslarni yaratadi. Mavjudlariga tegmaydi."""
+    return await eduplan_course_builder.apply(session)
 
 
 @router.post(

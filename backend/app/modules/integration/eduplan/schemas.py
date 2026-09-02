@@ -9,7 +9,7 @@
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class EduPlanEntity(str, Enum):
@@ -246,3 +246,58 @@ class EduPlanSettingsOut(BaseModel):
     has_password: bool
     enabled: bool
     updated_at: Optional[Any] = None
+
+
+# ---------------------------------------------------------------------- #
+#  Yuklamadan kurs yigʻish
+# ---------------------------------------------------------------------- #
+class CoursePlan(BaseModel):
+    """Bitta kurs taklifi: fan + semestr + maʼruzachi + guruhlar."""
+
+    external_id: str
+    #: Shu kalitli kurs allaqachon bor. Takroriy prognda qayta yaratilmaydi.
+    exists: bool = False
+
+    subject_id: int
+    subject_name: str
+    teacher_user_id: int
+    teacher_name: Optional[str] = None
+
+    semester_type: Optional[str] = None
+    #: «Bahorgi, Kuzgi» birlashgan qiymatida semestr raqami boʻlmaydi.
+    semester_number: Optional[int] = None
+    academic_year_id: Optional[int] = None
+
+    group_ids: list[int] = Field(default_factory=list)
+    group_names: list[str] = Field(default_factory=list)
+    #: Amaliyot va laboratoriya olib boradigan oʻqituvchilar.
+    assistant_user_ids: list[int] = Field(default_factory=list)
+
+
+class CourseSkipped(BaseModel):
+    """Maʼruzachisi topilmagani uchun kurs yasalmagan guruhlar."""
+
+    subject_id: int
+    subject_name: str
+    semester_type: Optional[str] = None
+    group_names: list[str] = Field(default_factory=list)
+    reason: str
+
+
+class CoursePreviewResponse(BaseModel):
+    plans: list[CoursePlan] = Field(default_factory=list)
+    skipped: list[CourseSkipped] = Field(default_factory=list)
+    #: ``apply`` dan keyin haqiqatda yaratilgan kurslar soni.
+    created: int = 0
+
+    @computed_field
+    @property
+    def summary(self) -> dict[str, int]:
+        """Interfeys sarlavhasidagi sonlar."""
+        existing = sum(1 for p in self.plans if p.exists)
+        return {
+            "total": len(self.plans),
+            "existing": existing,
+            "to_create": len(self.plans) - existing,
+            "skipped_subjects": len(self.skipped),
+        }

@@ -151,6 +151,51 @@ export interface RunState {
     error: string | null;
 }
 
+/**
+ * Yuklamadan yigʻilgan kurs taklifi.
+ *
+ * Kursning egasi — maʼruza oʻqiydigan oʻqituvchi; uning oʻsha fan va
+ * semestrdagi barcha guruhlari bitta kursga birlashadi.
+ */
+export interface CoursePlan {
+    external_id: string;
+    /** Shu kalitli kurs allaqachon yaratilgan — qayta yaratilmaydi. */
+    exists: boolean;
+    subject_id: number;
+    subject_name: string;
+    teacher_user_id: number;
+    teacher_name: string | null;
+    semester_type: string | null;
+    /** «Bahorgi, Kuzgi» birlashgan qiymatida semestr raqami boʻlmaydi. */
+    semester_number: number | null;
+    academic_year_id: number | null;
+    group_ids: number[];
+    group_names: string[];
+    assistant_user_ids: number[];
+}
+
+/** Maʼruzachisi topilmagani uchun kursga aylanmagan guruhlar. */
+export interface CourseSkipped {
+    subject_id: number;
+    subject_name: string;
+    semester_type: string | null;
+    group_names: string[];
+    reason: string;
+}
+
+export interface CoursePreviewResponse {
+    plans: CoursePlan[];
+    skipped: CourseSkipped[];
+    /** `apply` dan keyin haqiqatda yaratilgan kurslar soni. */
+    created: number;
+    summary: {
+        total: number;
+        existing: number;
+        to_create: number;
+        skipped_subjects: number;
+    };
+}
+
 /** Ключ предложения — он же идентификатор решения администратора. */
 export const proposalKey = (p: Proposal) => `${p.entity}:${p.external_id}`;
 
@@ -183,6 +228,20 @@ export const eduplanService = {
     },
     clearSettings: async () => {
         await api.delete('/integration/eduplan/settings');
+    },
+    /** Yuklamadan qanday kurslar chiqishini koʻrsatadi, hech nima yozmaydi. */
+    previewCourses: async () => {
+        const response = await api.get<CoursePreviewResponse>(
+            '/integration/eduplan/courses/preview',
+        );
+        return response.data;
+    },
+    /** Yoʻq kurslarni yaratadi. Mavjudlariga tegmaydi. */
+    applyCourses: async () => {
+        const response = await api.post<CoursePreviewResponse>(
+            '/integration/eduplan/courses/apply',
+        );
+        return response.data;
     },
     apply: async (payload: {
         run_id: string;

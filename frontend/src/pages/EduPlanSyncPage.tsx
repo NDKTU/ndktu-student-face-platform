@@ -25,6 +25,8 @@ import {
 import {
     useClearEduPlanSettings,
     useEduPlanApply,
+    useEduPlanApplyCourses,
+    useEduPlanCoursePreview,
     useEduPlanPreview,
     useEduPlanRun,
     useInvalidateMirrored,
@@ -32,7 +34,7 @@ import {
     useEduPlanStatus,
     useUpdateEduPlanSettings,
 } from '@/hooks/useEduPlan';
-import { KeyRound, Save, Trash2 } from 'lucide-react';
+import { BookOpen, KeyRound, Save, Trash2 } from 'lucide-react';
 import {
     proposalKey,
     type ApplyResponse,
@@ -41,6 +43,7 @@ import {
     type EduPlanEntity,
     type PreviewResponse,
     type Proposal,
+    type CoursePlan,
     eduplanService,
     type RunResponse,
     type RunState,
@@ -448,6 +451,8 @@ const EduPlanSyncPage = () => {
                     </CardContent>
                 </Card>
             )}
+
+            <CourseGenerationCard />
         </div>
     );
 };
@@ -666,5 +671,161 @@ const ConnectionSettingsCard = () => {
         </Card>
     );
 };
+
+/**
+ * Yuklamadan kurs yigʻish.
+ *
+ * Alohida karta va alohida tugma: kurslar prognning oʻzida avtomatik
+ * yaratilmaydi. Kursga darslar, materiallar va natijalar bogʻlanadi —
+ * bir kechada yuzta kurs paydo boʻlib qolishi kutilmagan hol boʻlardi.
+ */
+const CourseGenerationCard = () => {
+    const [opened, setOpened] = useState(false);
+    const preview = useEduPlanCoursePreview(opened);
+    const applyCourses = useEduPlanApplyCourses();
+
+    const data = preview.data;
+    const summary = data?.summary;
+
+    const handleApply = async () => {
+        try {
+            const result = await applyCourses.mutateAsync();
+            toast.success(
+                result.created
+                    ? `${result.created} ta kurs yaratildi`
+                    : 'Yangi kurs yoʻq — hammasi allaqachon yaratilgan',
+            );
+        } catch (e) {
+            toast.error(errorText(e));
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    Yuklamadan kurslar
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Kursning egasi — maʼruza oʻqiydigan oʻqituvchi. Uning oʻsha fan va
+                    semestrdagi barcha guruhlari bitta kursga birlashadi, amaliyot va
+                    laboratoriya olib boradiganlar assistent boʻlib qoʻshiladi.
+                </p>
+
+                {!opened ? (
+                    <Button variant="outline" onClick={() => setOpened(true)}>
+                        Kurslarni hisoblash
+                    </Button>
+                ) : preview.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Hisoblanmoqda…
+                    </div>
+                ) : preview.isError ? (
+                    <Notice tone="destructive" icon={<XCircle className="h-4 w-4 shrink-0" />}>
+                        {errorText(preview.error)}
+                    </Notice>
+                ) : summary ? (
+                    <>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            <Stat label="Jami" value={summary.total} />
+                            <Stat label="Yaratiladi" value={summary.to_create} />
+                            <Stat label="Allaqachon bor" value={summary.existing} muted />
+                            <Stat label="Maʼruzachisiz fanlar" value={summary.skipped_subjects} muted />
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                onClick={handleApply}
+                                disabled={applyCourses.isPending || summary.to_create === 0}
+                            >
+                                {applyCourses.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                )}
+                                {summary.to_create} ta kursni yaratish
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => preview.refetch()}
+                                disabled={preview.isFetching}
+                            >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Qayta hisoblash
+                            </Button>
+                        </div>
+
+                        {data && data.plans.length > 0 && <CoursePlanTable plans={data.plans} />}
+
+                        {data && data.skipped.length > 0 && (
+                            <Notice
+                                tone="warning"
+                                icon={<AlertTriangle className="h-4 w-4 shrink-0" />}
+                            >
+                                <div className="mb-1 font-medium">
+                                    Maʼruza oʻqituvchisi biriktirilmagani uchun kurs yaratilmadi:
+                                </div>
+                                <ul className="list-inside list-disc space-y-0.5">
+                                    {data.skipped.map((s) => (
+                                        <li key={`${s.subject_id}-${s.semester_type}`}>
+                                            {s.subject_name}
+                                            {s.semester_type ? ` (${s.semester_type})` : ''} —{' '}
+                                            {s.group_names.join(', ')}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Notice>
+                        )}
+                    </>
+                ) : null}
+            </CardContent>
+        </Card>
+    );
+};
+
+const CoursePlanTable = ({ plans }: { plans: CoursePlan[] }) => (
+    <div className="max-h-[28rem] overflow-auto rounded-md border border-border">
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Fan</TableHead>
+                    <TableHead>Asosiy oʻqituvchi</TableHead>
+                    <TableHead>Semestr</TableHead>
+                    <TableHead>Guruhlar</TableHead>
+                    <TableHead>Assistent</TableHead>
+                    <TableHead>Holat</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {plans.map((p) => (
+                    <TableRow key={p.external_id}>
+                        <TableCell className="font-medium">{p.subject_name}</TableCell>
+                        <TableCell>{p.teacher_name ?? '—'}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                            {p.semester_type ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                            {p.group_names.join(', ')}
+                        </TableCell>
+                        <TableCell>
+                            <CountBadge value={p.assistant_user_ids.length} tone="primary" />
+                        </TableCell>
+                        <TableCell>
+                            {p.exists ? (
+                                <span className="badge badge-muted">bor</span>
+                            ) : (
+                                <span className="badge badge-success">yangi</span>
+                            )}
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    </div>
+);
 
 export default EduPlanSyncPage;
