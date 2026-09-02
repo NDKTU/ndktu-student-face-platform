@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { useAuth } from '@/context/AuthContext';
@@ -44,11 +45,19 @@ import { sanitizeHtml } from '@/utils/sanitize';
 type QuizPhase = 'start' | 'quiz' | 'results';
 
 
-/** Test topshirish paytida sidebar ko'rinmasin — sahifa butun ekranni egallaydi. */
-const FocusOverlay = ({ children }: { children: React.ReactNode }) => (
+/** Test topshirish paytida sidebar ko'rinmasin — sahifa butun ekranni egallaydi.
+ *
+ *  Оверлей рендерится порталом в <body>, а не по месту в дереве страницы:
+ *  `position: fixed` считает размеры от ближайшего предка с transform/filter,
+ *  а не от вьюпорта. Обёртка анимации перехода между страницами таким предком
+ *  и была — оверлей получал нулевую высоту, `overflow-y-auto` срезал тест, и
+ *  студент видел белый экран (см. комментарий у `pageEnter` в index.css).
+ *  Портал делает оверлей независимым от любых стилей предков. */
+const FocusOverlay = ({ children }: { children: React.ReactNode }) => createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
         <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">{children}</div>
-    </div>
+    </div>,
+    document.body,
 );
 
 const QuizTestPage = () => {

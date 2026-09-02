@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/Button';
@@ -107,7 +108,10 @@ export function QuestionsPanel({ method, onClose }: QuestionsPanelProps) {
         });
     };
 
-    return (
+    // Панель уходит порталом в <body>: `position: fixed` внутри страницы
+    // считается от ближайшего предка с transform, а не от вьюпорта, — так
+    // же, как ломался экран прохождения теста (см. `pageEnter` в index.css).
+    return createPortal(
         <>
             <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -244,6 +248,7 @@ export function QuestionsPanel({ method, onClose }: QuestionsPanelProps) {
                         : Math.max(...method.questions.map(q => q.order)) + 1
                 }
             />
-        </>
+        </>,
+        document.body,
     );
 }

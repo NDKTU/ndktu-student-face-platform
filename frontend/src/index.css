@@ -333,14 +333,19 @@ input[type='number'] {
 }
 
 /* ── Page & Modal Fluid Transitions ── */
+/* Внимание: здесь нельзя анимировать transform. Этой анимацией обёрнут
+   <Outlet/> обоих лейаутов, а элемент с transform (в том числе удержанным
+   через `forwards` или объявленным в `will-change`) становится containing
+   block для `position: fixed` потомков. Тогда оверлей `fixed inset-0`
+   внутри страницы считает размеры не от вьюпорта, а от обёртки — а она
+   без потока имеет нулевую высоту, и содержимое обрезается в белый экран.
+   Так ломался экран прохождения теста. Только opacity. */
 @keyframes pageEnter {
   0% {
     opacity: 0;
-    transform: translateY(6px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -357,7 +362,7 @@ input[type='number'] {
 
 .animate-page-enter {
   animation: pageEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
 .animate-fade-scale {
