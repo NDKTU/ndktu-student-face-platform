@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.core.database.models_registry  # noqa: F401
-from app.core.utils.password_hash import hash_password
+from app.core.utils.password_hash import hash_password_async
 from app.modules.auth.model import Teacher, User
 from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
@@ -104,7 +104,7 @@ class EduPlanAuthService:
         user_data: dict[str, Any],
     ) -> User:
         user = await get_user_repository.find_by_username(session, username)
-        hashed_password = hash_password(plain_password)
+        hashed_password = await hash_password_async(plain_password)
 
         if not user:
             user = User(

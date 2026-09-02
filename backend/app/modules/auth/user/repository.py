@@ -1,7 +1,7 @@
 import logging
 
 from core.utils.lesson_guard import ensure_no_lessons
-from core.utils.password_hash import hash_password
+from core.utils.password_hash import hash_password_async
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ class UserRepository:
 
         new_user = User(
             username=data.username,
-            password=hash_password(data.password),
+            password=await hash_password_async(data.password),
             roles=roles,
         )
 
@@ -128,7 +128,7 @@ class UserRepository:
         if data.username is not None:
             user.username = data.username
         if data.password is not None:
-            user.password = hash_password(data.password)
+            user.password = await hash_password_async(data.password)
 
         await session.commit()
         await session.refresh(user)
@@ -267,7 +267,7 @@ class UserRepository:
     _EXTERNAL_SOURCE_LABEL = {"eduplan": "EPOS", "hemis": "HEMIS"}
 
     async def change_my_credentials(self, session: AsyncSession, current_user: User, data) -> User:
-        from core.utils.password_hash import verify_password
+        from core.utils.password_hash import verify_password_async
 
         # Parolni tashqi tizimdagi hisob uchun bu yerda almashtirib bo'lmaydi:
         # keyingi kirishda u baribir tashqi tizimdagi parol bilan yangilanadi,
@@ -280,7 +280,7 @@ class UserRepository:
             )
 
         # Verify current password
-        if not verify_password(data.current_password, current_user.password):
+        if not await verify_password_async(data.current_password, current_user.password):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Joriy parol noto'g'ri")
 
         if data.new_username is None and data.new_password is None:
@@ -300,7 +300,7 @@ class UserRepository:
             current_user.username = data.new_username
 
         if data.new_password is not None:
-            current_user.password = hash_password(data.new_password)
+            current_user.password = await hash_password_async(data.new_password)
 
         await session.commit()
 
@@ -322,7 +322,7 @@ class UserRepository:
         return (await session.execute(stmt)).scalar_one_or_none()
 
     async def get_or_create_for_hemis(self, session: AsyncSession, username: str, plain_password: str) -> User:
-        hashed = hash_password(plain_password)
+        hashed = await hash_password_async(plain_password)
         user = await self.find_by_username(session, username)
         if not user:
             # Parolning egasi — HEMIS: bizda uni o'zgartirib bo'lmaydi.

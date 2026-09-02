@@ -16,7 +16,7 @@ import secrets
 
 from core.mixins.external_ref import SOURCE_EDUPLAN
 from core.mixins.time_stamp_mixin import utcnow_naive
-from core.utils.password_hash import hash_password
+from core.utils.password_hash import hash_password_async
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -206,7 +206,7 @@ class EduPlanRepository:
             # Пароль — случайный и никому не известный: такой пользователь
             # входит только через внешнюю аутентификацию.
             login = await self._unique_username(session, username, hemis_id or "")
-            user = User(username=login, password=hash_password(secrets.token_urlsafe(32)))
+            user = User(username=login, password=await hash_password_async(secrets.token_urlsafe(32)))
             session.add(user)
             await session.flush()
             await session.refresh(user, attribute_names=["roles"])

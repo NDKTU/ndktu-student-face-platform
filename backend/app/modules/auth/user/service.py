@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from core.config import settings
 from core.redis_client import redis_client
-from core.utils.password_hash import verify_password
+from core.utils.password_hash import verify_and_migrate
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
 from sqlalchemy import select
@@ -129,8 +129,15 @@ class UserService:
                 logger.error("EduPlan login error for %s: %s", data.username, exc)
 
         if user and user.password:
-            if verify_password(data.password, user.password):
+            matched, upgraded_hash = await verify_and_migrate(data.password, user.password)
+            if matched:
                 ensure_user_active(user)
+                # Eski 12-round xesh 10 ga koʻchadi — har kim oʻzining birinchi
+                # kirishida, parol tiklashsiz. Xeshdan parolni tiklab
+                # bo'lmagani uchun buni ommaviy qilishning iloji yo'q.
+                if upgraded_hash:
+                    user.password = upgraded_hash
+                    await session.commit()
                 access_token = await self.create_session_token(user.id)
                 return UserLoginResponse(type="Bearer", access_token=access_token)
             logger.warning(

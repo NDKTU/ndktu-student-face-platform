@@ -2,7 +2,7 @@ import logging
 
 import httpx
 from core.config import settings
-from core.utils.password_hash import verify_password
+from core.utils.password_hash import verify_and_migrate
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,10 +33,14 @@ class HemisLoginService:
         user = await get_user_repository.find_by_username(session, data.login)
 
         if user and user.password:
-            if verify_password(data.password, user.password):
+            matched, upgraded_hash = await verify_and_migrate(data.password, user.password)
+            if matched:
                 # Локальный вход остаётся аварийным путём для администратора,
                 # не зависящим от доступности внешних систем.
                 ensure_user_active(user)
+                if upgraded_hash:
+                    user.password = upgraded_hash
+                    await session.commit()
                 access_token = await auth_service.create_session_token(user.id)
                 return HemisLoginResponse(access_token=access_token)
             else:
