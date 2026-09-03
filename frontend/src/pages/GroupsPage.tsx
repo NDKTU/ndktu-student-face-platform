@@ -20,7 +20,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useGroups, useDeleteGroup } from '@/hooks/useGroups';
 import { useFaculties, useSpecialities } from '@/hooks/useReferenceData';
 import { Combobox } from '@/components/ui/Combobox';
-import { PermissionGate } from '@/components/auth/PermissionGate';
+import { PermissionGate, usePermission } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
@@ -40,6 +40,13 @@ export const GroupsPage = () => {
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
     const [showHidden, setShowHidden] = useState(false);
     const navigate = useNavigate();
+    // `read:student` bo'lsa — universitetning to'liq talabalar sahifasi (filtr
+    // bilan), bo'lmasa — faqat shu guruh sahifasi. O'qituvchida `read:student`
+    // yo'q, `/students` esa shu huquq bilan yopilgan: ilgari uning bosishi
+    // hech qayerga olib bormasdi.
+    const canReadAllStudents = usePermission('read:student');
+    const openGroupStudents = (groupId: number) =>
+        navigate(canReadAllStudents ? `/students?group_id=${groupId}` : `/groups/${groupId}/students`);
 
     const facultyIdParam = searchParams.get('faculty_id');
     const specialityIdParam = searchParams.get('speciality_id');
@@ -321,7 +328,7 @@ export const GroupsPage = () => {
                 variant="ghost"
                 size="sm"
                 className="h-8 px-2 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary gap-1"
-                onClick={() => navigate(`/students?group_id=${group.id}`)}
+                onClick={() => openGroupStudents(group.id)}
             >
                 <Users className="h-3.5 w-3.5" />
                 <span>Talabalar</span>
@@ -523,7 +530,7 @@ export const GroupsPage = () => {
                             return (
                                 <TableRow
                                     key={group.id}
-                                    onClick={() => navigate(`/students?group_id=${group.id}`)}
+                                    onClick={() => openGroupStudents(group.id)}
                                     className="group cursor-pointer transition-colors duration-150 hover:bg-primary/[0.04] dark:hover:bg-primary/10 border-b border-border/50"
                                 >
                                     {/* # Row Index */}
@@ -628,7 +635,7 @@ export const GroupsPage = () => {
                                     </span>
                                 </div>
                             }
-                            onClick={() => navigate(`/students?group_id=${group.id}`)}
+                            onClick={() => openGroupStudents(group.id)}
                             actions={renderActions(group)}
                             metrics={[
                                 { label: 'Bosqich', value: group.course ? `${group.course}-kurs` : '—' },

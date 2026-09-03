@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Teacher, User
+from app.modules.course.model import Course, CourseGroup, CourseTeacher
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Result
 
@@ -23,6 +24,39 @@ logger = logging.getLogger(__name__)
 
 
 class GroupRepository:
+    async def is_group_assigned_to_user(self, session: AsyncSession, user: User, group_id: int) -> bool:
+        """Guruh shu o'qituvchiniki-mi.
+
+        Ikki manba `list_teacher_students` dagi bilan bir xil: `teacher_group`
+        va o'qituvchining kurslariga biriktirilgan guruhlar. Ro'yxat ham shu
+        qoida bo'yicha cheklangan, shuning uchun ochib bo'lmaydigan qator
+        ko'rinmasligi kerak.
+        """
+        teacher_ids = select(Teacher.id).where(Teacher.user_id == user.id)
+        assigned = await session.execute(
+            select(TeacherGroup.id)
+            .where(TeacherGroup.group_id == group_id, TeacherGroup.teacher_id.in_(teacher_ids))
+            .limit(1)
+        )
+        if assigned.scalars().first() is not None:
+            return True
+
+        course_ids = (
+            select(Course.id.label("course_id"))
+            .where(Course.teacher_id == user.id)
+            .union(select(CourseTeacher.course_id.label("course_id")).where(CourseTeacher.user_id == user.id))
+            .subquery()
+        )
+        via_course = await session.execute(
+            select(CourseGroup.id)
+            .where(
+                CourseGroup.group_id == group_id,
+                CourseGroup.course_id.in_(select(course_ids.c.course_id)),
+            )
+            .limit(1)
+        )
+        return via_course.scalars().first() is not None
+
     async def create_group(self, session: AsyncSession, data: GroupCreateRequest) -> Group:
         stmt_check = select(Group).where(Group.name == data.name)
         result_check = await session.execute(stmt_check)

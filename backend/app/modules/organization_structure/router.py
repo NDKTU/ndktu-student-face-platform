@@ -1,8 +1,8 @@
 import logging
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, status
+from core.dependencies.role_checker import PermissionRequired, user_has_permission
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -258,9 +258,22 @@ async def get_group_students(
     limit: int = 100,
     search: str | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:student")),
+    current_user: User = Depends(PermissionRequired("read:group")),
 ):
-    """Return all students belonging to the specified group."""
+    """Guruh talabalari.
+
+    Huquq ikki bosqichli. `read:student` bo'lgan foydalanuvchi (admin yoki
+    huquq berilgani) istalgan guruhni ochadi. Bo'lmasa — faqat o'ziga
+    biriktirilgan guruh: guruhlar ro'yxati o'qituvchi uchun allaqachon shunday
+    cheklangan, ochilmaydigan qator ko'rsatish esa mantiqsiz bo'lardi.
+    """
+    if not await user_has_permission(session, current_user, "read:student"):
+        if not await get_group_repository.is_group_assigned_to_user(session, current_user, group_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: group is not assigned to you",
+            )
+
     request = StudentListRequest(page=page, limit=limit, search=search, group_id=group_id)
     return await student_repository.list_students(session=session, request=request)
 

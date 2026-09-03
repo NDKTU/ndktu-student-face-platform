@@ -80,3 +80,25 @@ class PermissionRequired:
             )
 
         return user
+
+
+async def user_has_permission(session: AsyncSession, user: User, permission_name: str) -> bool:
+    """Проверка права уже загруженного пользователя, без 403.
+
+    `PermissionRequired` годится только как зависимость роута: она бросает
+    исключение. Здесь право нужно как ветвление — например, «есть read:student
+    → отдаём всех студентов, нет → только свою группу».
+    """
+    if any(role.name.lower() == "admin" for role in user.roles):
+        return True
+
+    stmt = (
+        select(Permission.id)
+        .join(RolePermission, RolePermission.permission_id == Permission.id)
+        .join(Role, Role.id == RolePermission.role_id)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == user.id, Permission.name == permission_name)
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().first() is not None

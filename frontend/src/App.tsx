@@ -33,6 +33,7 @@ const AnnouncementsPage = lazy(() => import('@/pages/AnnouncementsPage'));
 const StudentAnnouncementsPage = lazy(() => import('@/pages/StudentAnnouncementsPage'));
 const TeacherAssignmentsPage = lazy(() => import('@/pages/TeacherAssignmentsPage'));
 const GroupsPage = lazy(() => import('@/pages/GroupsPage'));
+const GroupStudentsPage = lazy(() => import('@/pages/GroupStudentsPage'));
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'));
 const CoursesPage = lazy(() => import('@/pages/CoursesPage'));
 const CourseDetailPage = lazy(() => import('@/pages/CourseDetailPage'));
@@ -161,6 +162,8 @@ function App() {
                                         <Route path="/announcements/student" element={<PermissionRoute permission="announcement:feed"><StudentAnnouncementsPage /></PermissionRoute>} />
                                         <Route path="/specialities" element={<PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
+                                        {/* `read:group` yetarli: backend o'qituvchiga faqat o'z guruhini ochadi. */}
+                                        <Route path="/groups/:groupId/students" element={<PermissionRoute permission="read:group"><GroupStudentsPage /></PermissionRoute>} />
                                         <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />
                                         <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
                                         <Route path="/admin/eduplan-sync" element={<PermissionRoute permission="sync:eduplan"><EduPlanSyncPage /></PermissionRoute>} />

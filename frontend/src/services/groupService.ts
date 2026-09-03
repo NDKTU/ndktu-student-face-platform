@@ -33,6 +33,13 @@ export interface GroupStudent {
     student_id_number: string;
     group_id: number | null;
     user_id: number | null;
+    // Backend to'liq `StudentResponse` qaytaradi — quyidagilari ro'yxatda ko'rsatiladi.
+    specialty?: string | null;
+    level?: string | null;
+    semester?: string | null;
+    avg_gpa?: number | null;
+    phone?: string | null;
+    student_status?: string | null;
 }
 
 export interface GroupStudentListResponse {
