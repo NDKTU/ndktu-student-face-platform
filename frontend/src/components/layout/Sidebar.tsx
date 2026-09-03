@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { initialsOf } from '@/lib/avatarTiles';
+import { displayNameOf } from '@/lib/userDisplay';
 import { buildSidebar } from '@/constants/resources';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
@@ -22,6 +24,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     const location = useLocation();
     const { t } = useTranslation();
     const { user, permissions, activeRole } = useAuth();
+    // O'qituvchi va talabada — F.I.SH, qolganlarida login.
+    const displayName = displayNameOf(user, activeRole);
 
     const sections = useMemo(() => {
         // Ko'rinish tanlangan bo'lsa — faqat o'sha rol, aks holda barchasi.
@@ -124,11 +128,11 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                 <div className="shrink-0 p-3">
                     <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/30 p-2.5 transition-all duration-200 hover:bg-muted/50">
                         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary">
-                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                            {initialsOf(displayName)}
                             <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-card" />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
-                            <span className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{user?.username}</span>
+                            <span className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{displayName}</span>
                             <span className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">{activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
                         </div>
                     </div>

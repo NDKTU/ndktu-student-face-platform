@@ -11,6 +11,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { displayNameOf } from '@/lib/userDisplay';
 import {
     Users,
     BookOpen,
@@ -49,7 +50,7 @@ const QUICK_LINKS: { to: string; label: string; description: string; icon: React
 ];
 
 const Dashboard: React.FC = () => {
-    const { user } = useAuth();
+    const { user, activeRole } = useAuth();
 
     const { data: users,     isLoading: isUsersLoading }     = useQuery({ queryKey: ['dashboard-users'],     queryFn: () => userService.getUsers(1, 1) });
     const { data: teachers,  isLoading: isTeachersLoading }  = useQuery({ queryKey: ['dashboard-teachers'],  queryFn: () => teacherService.getTeachers(1, 1) });
@@ -70,7 +71,7 @@ const Dashboard: React.FC = () => {
         <div className="space-y-6">
             {/* Welcome header */}
             <PageHeader
-                title={`${getGreeting()}, ${user?.username ?? ''}`}
+                title={`${getGreeting()}, ${displayNameOf(user, activeRole)}`}
                 description="Universitet tizimidagi asosiy ko'rsatkichlar va bo'limlar."
             />
 

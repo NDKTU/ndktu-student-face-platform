@@ -6,6 +6,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { setLanguage } from '@/i18n';
 import { User, LogOut, Sun, Moon, Menu, ChevronDown, Check, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { initialsOf } from '@/lib/avatarTiles';
+import { displayNameOf } from '@/lib/userDisplay';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -82,13 +84,11 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
         navigate('/login');
     };
 
-    const initials = user?.username
-        ? user.username.slice(0, 2).toUpperCase()
-        : 'U';
+    // O'qituvchi va talabada — F.I.SH, qolganlarida login: HEMIS raqami
+    // ekranda hech narsa anglatmaydi.
+    const displayName = displayNameOf(user, activeRole);
 
-    const displayName = user?.student
-        ? `${user.student.first_name} ${user.student.last_name}`.trim() || user.username
-        : user?.username ?? 'User';
+    const initials = initialsOf(displayName);
 
     return (
         <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-md transition-colors duration-200">
