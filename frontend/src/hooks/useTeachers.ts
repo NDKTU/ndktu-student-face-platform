@@ -1,12 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teacherService, type TeacherCreateRequest, type TeacherUpdateRequest } from '@/services/teacherService';
+import {
+    teacherService,
+    type TeacherCreateRequest,
+    type TeacherStudentsParams,
+    type TeacherUpdateRequest,
+} from '@/services/teacherService';
 
-export const useTeachers = (page = 1, limit = 10, full_name?: string, enabled: boolean = true, kafedra_id?: number) => {
+export const useTeachers = (
+    page = 1,
+    limit = 10,
+    full_name?: string,
+    enabled: boolean = true,
+    kafedra_id?: number,
+    has_courses?: boolean,
+) => {
     return useQuery({
-        queryKey: ['teachers', page, limit, full_name, kafedra_id],
-        queryFn: () => teacherService.getTeachers(page, limit, full_name, kafedra_id),
+        queryKey: ['teachers', page, limit, full_name, kafedra_id, has_courses],
+        queryFn: () => teacherService.getTeachers(page, limit, full_name, kafedra_id, has_courses),
         placeholderData: (previousData) => previousData,
         enabled,
+    });
+};
+
+/** O'qituvchining guruhlaridagi talabalar. Sahifalash serverda: bitta
+ *  o'qituvchida 800 dan ortiq talaba bo'lishi mumkin. */
+export const useTeacherStudents = (teacherId?: number, params?: TeacherStudentsParams) => {
+    return useQuery({
+        queryKey: ['teacherStudents', teacherId, params ?? {}],
+        queryFn: () => teacherService.getTeacherStudents(teacherId!, params),
+        enabled: !!teacherId,
+        placeholderData: (previousData) => previousData,
     });
 };
 

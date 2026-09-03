@@ -13,6 +13,7 @@ import {
     ArrowDown,
     CheckCircle2,
     ArrowRight,
+    GraduationCap,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTeachers, useDeleteTeacher } from '@/hooks/useTeachers';
@@ -34,6 +35,12 @@ import { ExternalSourceBadge, InactiveBadge } from '@/components/common/External
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
 
+const COURSE_FILTER_OPTIONS = [
+    { value: 'all', label: 'Barchasi' },
+    { value: 'with', label: 'Kursi borlar' },
+    { value: 'without', label: 'Kursi yo\'qlar' },
+];
+
 type SortField = 'name' | 'kafedra' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
@@ -46,6 +53,7 @@ export const TeachersPage = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedKafedraFilter, setSelectedKafedraFilter] = useState<string>('all');
+    const [coursesFilter, setCoursesFilter] = useState<'all' | 'with' | 'without'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [sortField, setSortField] = useState<SortField>('name');
@@ -71,13 +79,16 @@ export const TeachersPage = () => {
     }, [searchTerm]);
 
     const kafedraIdNum = selectedKafedraFilter === 'all' ? undefined : Number(selectedKafedraFilter);
+    // `undefined` — filtrsiz. Filtr SQL darajasida ishlaydi, shuning uchun
+    // sahifalash hisoblagichi ham to'g'ri qoladi.
+    const hasCourses = coursesFilter === 'all' ? undefined : coursesFilter === 'with';
 
     const {
         data: teachersData,
         isLoading: isTeachersLoading,
         isError: isTeachersError,
         refetch,
-    } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedraIdNum);
+    } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedraIdNum, hasCourses);
 
     const { data: kafedrasData } = useKafedras(1, 200);
     const deleteTeacherMutation = useDeleteTeacher();
@@ -281,16 +292,29 @@ export const TeachersPage = () => {
                 totalCount={totalCount}
                 totalLabel="O'qituvchilar"
                 extraFilters={
-                    <div className="w-[200px] sm:w-[260px]">
-                        <Combobox
-                            options={kafedraOptions}
-                            value={selectedKafedraFilter}
-                            onChange={(val) => {
-                                setSelectedKafedraFilter(val);
-                                setCurrentPage(1);
-                            }}
-                            placeholder="Kafedra bo'yicha saralash"
-                        />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="w-[200px] sm:w-[260px]">
+                            <Combobox
+                                options={kafedraOptions}
+                                value={selectedKafedraFilter}
+                                onChange={(val) => {
+                                    setSelectedKafedraFilter(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Kafedra bo'yicha saralash"
+                            />
+                        </div>
+                        <div className="w-[180px] sm:w-[210px]">
+                            <Combobox
+                                options={COURSE_FILTER_OPTIONS}
+                                value={coursesFilter}
+                                onChange={(val) => {
+                                    setCoursesFilter(val as 'all' | 'with' | 'without');
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Kurslar bo'yicha"
+                            />
+                        </div>
                     </div>
                 }
                 actions={
@@ -330,10 +354,10 @@ export const TeachersPage = () => {
             ) : sortedTeachers.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={6}
+                        colSpan={7}
                         title="O'qituvchilar topilmadi"
                         description={
-                            searchTerm || selectedKafedraFilter !== 'all'
+                            searchTerm || selectedKafedraFilter !== 'all' || coursesFilter !== 'all'
                                 ? "Tanlangan filtrlarga mos o'qituvchi topilmadi."
                                 : "Hozircha o'qituvchi qo'shilmagan."
                         }
@@ -363,6 +387,7 @@ export const TeachersPage = () => {
                                     {renderSortIcon('kafedra')}
                                 </div>
                             </TableHead>
+                            <TableHead className="font-bold text-xs">Kurslar</TableHead>
                             <TableHead className="font-bold text-xs hidden md:table-cell">Foydalanuvchi</TableHead>
                             <TableHead
                                 onClick={() => handleSort('created_at')}
@@ -424,6 +449,26 @@ export const TeachersPage = () => {
                                             </span>
                                         ) : (
                                             <span className="text-xs text-muted-foreground italic">Biriktirilmagan</span>
+                                        )}
+                                    </TableCell>
+
+                                    {/* Kurslar */}
+                                    <TableCell>
+                                        {teacher.course_count ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                                                    <GraduationCap className="h-3 w-3" />
+                                                    {teacher.course_count}
+                                                </span>
+                                                <span
+                                                    className="hidden xl:inline max-w-[220px] truncate text-xs text-muted-foreground"
+                                                    title={(teacher.courses ?? []).map((c) => c.name).join(', ')}
+                                                >
+                                                    {(teacher.courses ?? []).slice(0, 2).map((c) => c.name).join(', ')}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">Kurs yo'q</span>
                                         )}
                                     </TableCell>
 

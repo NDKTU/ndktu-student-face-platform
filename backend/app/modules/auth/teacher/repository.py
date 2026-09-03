@@ -3,16 +3,17 @@ import logging
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import Float, asc, case, cast, desc, func, select
+from sqlalchemy import Float, asc, case, cast, desc, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Teacher, TeacherSubject, User
+from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
+from app.modules.course.model import Course, CourseGroup, CourseTeacher
 from app.modules.organization_structure.model import Faculty, Group, Kafedra, TeacherGroup
 from app.modules.quiz.model import Result, Subject
 
@@ -21,6 +22,7 @@ from .schemas import (
     FacultyRankItem,
     KafedraRankingResponse,
     KafedraRankItem,
+    TeacherCourseInfo,
     TeacherCreateRequest,
     TeacherGroupAssignRequest,
     TeacherListRequest,
@@ -28,6 +30,10 @@ from .schemas import (
     TeacherRankingResponse,
     TeacherRankItem,
     TeacherSelfUpdateRequest,
+    TeacherStudentGroupInfo,
+    TeacherStudentInfo,
+    TeacherStudentListRequest,
+    TeacherStudentListResponse,
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
@@ -51,6 +57,116 @@ class TeacherRepository:
     @staticmethod
     def _generate_full_name(first_name: str, last_name: str, third_name: str) -> str:
         return f"{last_name} {first_name} {third_name}"
+
+    # ── Kurslar ────────────────────────────────────────────────────────────
+    #
+    # `Course` o'qituvchiga `teachers.id` orqali emas, `users.id` orqali
+    # bog'langan (`courses.teacher_id` — asosiy o'qituvchi, `course_teachers` —
+    # to'liq ro'yxat), shuning uchun ORM relationship'i yo'q va kurslar sahifa
+    # olingandan keyin bitta so'rov bilan yig'iladi. Har bir o'qituvchi uchun
+    # alohida so'rov N+1 bo'lardi.
+
+    @staticmethod
+    def _course_user_ids_subquery():
+        """Kamida bitta kursi bor `users.id` lar."""
+        return (
+            select(Course.teacher_id.label("user_id"))
+            .union(select(CourseTeacher.user_id.label("user_id")))
+            .subquery()
+        )
+
+    @staticmethod
+    def _course_links_subquery(user_ids):
+        """(kurs, foydalanuvchi, rol) juftliklari.
+
+        `course_teachers` da asosiy o'qituvchi ham `role="main"` bilan turadi,
+        lekin jadval kursdan keyinroq paydo bo'lgan — eski kurslarda satr
+        bo'lmasligi mumkin, shuning uchun `courses.teacher_id` bilan birlashma.
+        """
+        return (
+            select(
+                Course.id.label("course_id"),
+                Course.teacher_id.label("user_id"),
+                literal("main").label("role"),
+            )
+            .where(Course.teacher_id.in_(user_ids))
+            .union(
+                select(
+                    CourseTeacher.course_id.label("course_id"),
+                    CourseTeacher.user_id.label("user_id"),
+                    CourseTeacher.role.label("role"),
+                ).where(CourseTeacher.user_id.in_(user_ids))
+            )
+            .subquery()
+        )
+
+    async def _attach_courses(self, session: AsyncSession, teachers: list[Teacher]) -> None:
+        for teacher in teachers:
+            teacher.courses = []
+            teacher.course_count = 0
+
+        user_ids = {t.user_id for t in teachers if t.user_id}
+        if not user_ids:
+            return
+
+        links = self._course_links_subquery(user_ids)
+        group_counts = (
+            select(
+                CourseGroup.course_id.label("course_id"),
+                func.count(CourseGroup.id).label("group_count"),
+            )
+            .group_by(CourseGroup.course_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                links.c.user_id,
+                # Bitta kursda ikkala satr ham uchrab qolsa, asosiy rol ustun
+                # bo'lishi kerak: alifboda "main" > "assistant".
+                func.max(links.c.role).label("role"),
+                Course.id,
+                Course.name,
+                Course.subject_id,
+                Subject.name.label("subject_name"),
+                Course.semester_number,
+                func.coalesce(group_counts.c.group_count, 0).label("group_count"),
+            )
+            .join(Course, Course.id == links.c.course_id)
+            .outerjoin(Subject, Subject.id == Course.subject_id)
+            .outerjoin(group_counts, group_counts.c.course_id == Course.id)
+            .group_by(
+                links.c.user_id,
+                Course.id,
+                Course.name,
+                Course.subject_id,
+                Subject.name,
+                Course.semester_number,
+                group_counts.c.group_count,
+            )
+            .order_by(links.c.user_id, Course.name)
+        )
+
+        rows = (await session.execute(stmt)).all()
+
+        by_user: dict[int, list[TeacherCourseInfo]] = {}
+        for row in rows:
+            by_user.setdefault(row.user_id, []).append(
+                TeacherCourseInfo(
+                    id=row.id,
+                    name=row.name,
+                    subject_id=row.subject_id,
+                    subject_name=row.subject_name,
+                    semester_number=row.semester_number,
+                    group_count=row.group_count or 0,
+                    role=row.role or "main",
+                )
+            )
+
+        for teacher in teachers:
+            courses = by_user.get(teacher.user_id, [])
+            teacher.courses = courses
+            teacher.course_count = len(courses)
 
     async def upload_image(self, file: UploadFile) -> str:
         filename = await save_image(file, settings.profile_upload_dir)
@@ -107,6 +223,7 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
+        await self._attach_courses(session, [teacher])
         return teacher
 
     async def get_teacher_by_user_id(self, session: AsyncSession, user_id: int) -> Teacher:
@@ -117,6 +234,7 @@ class TeacherRepository:
         if not teacher:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found for this user")
 
+        await self._attach_courses(session, [teacher])
         return teacher
 
     async def list_teachers(self, session: AsyncSession, request: TeacherListRequest) -> TeacherListResponse:
@@ -131,14 +249,24 @@ class TeacherRepository:
             stmt = stmt.where(Teacher.kafedra_id == request.kafedra_id)
             count_stmt = count_stmt.where(Teacher.kafedra_id == request.kafedra_id)
 
+        if request.has_courses is not None:
+            course_users = self._course_user_ids_subquery()
+            condition = Teacher.user_id.in_(select(course_users.c.user_id))
+            if not request.has_courses:
+                condition = ~condition
+            stmt = stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
+
         stmt = stmt.order_by(desc(Teacher.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
-        teachers = result.scalars().all()
+        teachers = list(result.scalars().all())
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
+
+        await self._attach_courses(session, teachers)
 
         return TeacherListResponse(total=total, page=request.page, limit=request.limit, teachers=teachers)
 
@@ -447,6 +575,162 @@ class TeacherRepository:
             )
 
         return teacher
+
+    # ── O'qituvchining talabalari ──────────────────────────────────────────
+
+    async def _teacher_group_sources(self, session: AsyncSession, teacher: Teacher) -> dict[int, set[str]]:
+        """Guruh -> bog'lanish manbalari.
+
+        Ikki manba: `teacher_group` (admin biriktirgan) va o'qituvchining
+        kurslariga biriktirilgan guruhlar. Faqat birinchisiga tayanib bo'lmaydi
+        — kursga guruh qo'shilganda `teacher_group` ga satr yozilmaydi.
+        `teacher_assignments` bu yerda ataylab ishlatilmagan: u EduPlan yuklama
+        sinxronizatsiyasidan keladi va hozircha o'qituvchilarning ozchiligini
+        qamraydi.
+        """
+        sources: dict[int, set[str]] = {}
+
+        assigned = await session.execute(
+            select(TeacherGroup.group_id).where(TeacherGroup.teacher_id == teacher.id)
+        )
+        for (group_id,) in assigned:
+            sources.setdefault(group_id, set()).add("assignment")
+
+        if teacher.user_id:
+            course_ids = (
+                select(Course.id.label("course_id"))
+                .where(Course.teacher_id == teacher.user_id)
+                .union(
+                    select(CourseTeacher.course_id.label("course_id")).where(
+                        CourseTeacher.user_id == teacher.user_id
+                    )
+                )
+                .subquery()
+            )
+            from_courses = await session.execute(
+                select(CourseGroup.group_id).where(
+                    CourseGroup.course_id.in_(select(course_ids.c.course_id))
+                )
+            )
+            for (group_id,) in from_courses:
+                sources.setdefault(group_id, set()).add("course")
+
+        return sources
+
+    async def list_teacher_students(
+        self,
+        session: AsyncSession,
+        teacher_id: int,
+        request: TeacherStudentListRequest,
+    ) -> TeacherStudentListResponse:
+        teacher = await session.get(Teacher, teacher_id)
+        if not teacher:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+        sources = await self._teacher_group_sources(session, teacher)
+        if not sources:
+            return TeacherStudentListResponse(
+                total=0, page=request.page, limit=request.limit, teacher_id=teacher_id
+            )
+
+        group_stmt = select(Group).where(Group.id.in_(sources.keys()))
+        if not request.include_inactive_groups:
+            group_stmt = group_stmt.where(Group.is_active.is_(True))
+        group_rows = list((await session.execute(group_stmt.order_by(Group.name))).scalars().all())
+        visible_ids = [g.id for g in group_rows]
+
+        if not visible_ids:
+            return TeacherStudentListResponse(
+                total=0, page=request.page, limit=request.limit, teacher_id=teacher_id
+            )
+
+        counts_rows = await session.execute(
+            select(Student.group_id, func.count(Student.id))
+            .where(Student.group_id.in_(visible_ids))
+            .group_by(Student.group_id)
+        )
+        counts = {group_id: count for group_id, count in counts_rows}
+
+        groups = [
+            TeacherStudentGroupInfo(
+                id=g.id,
+                name=g.name,
+                student_count=counts.get(g.id, 0),
+                is_active=bool(g.is_active),
+                sources=sorted(sources.get(g.id, set())),
+            )
+            for g in group_rows
+        ]
+
+        # Bitta guruh bo'yicha filtr. Begona guruh so'ralsa 404: bo'sh ro'yxat
+        # qaytarish "talaba yo'q" degan yolg'on javob bo'lardi.
+        selected_ids = visible_ids
+        if request.group_id is not None:
+            if request.group_id not in visible_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Group is not assigned to this teacher",
+                )
+            selected_ids = [request.group_id]
+
+        conditions = [Student.group_id.in_(selected_ids)]
+        if request.search:
+            pattern = f"%{request.search.strip()}%"
+            conditions.append(
+                or_(
+                    Student.full_name.ilike(pattern),
+                    Student.first_name.ilike(pattern),
+                    Student.last_name.ilike(pattern),
+                    Student.student_id_number.ilike(pattern),
+                )
+            )
+
+        total = (
+            await session.execute(select(func.count()).select_from(Student).where(*conditions))
+        ).scalar() or 0
+
+        students_stmt = (
+            select(Student)
+            .options(selectinload(Student.group), selectinload(Student.user))
+            .join(Group, Group.id == Student.group_id)
+            .where(*conditions)
+            .order_by(Group.name, Student.full_name)
+            .offset(request.offset)
+            .limit(request.limit)
+        )
+        students = (await session.execute(students_stmt)).scalars().all()
+
+        return TeacherStudentListResponse(
+            total=total,
+            page=request.page,
+            limit=request.limit,
+            teacher_id=teacher_id,
+            groups=groups,
+            students=[
+                TeacherStudentInfo(
+                    id=st.id,
+                    user_id=st.user_id,
+                    first_name=st.first_name,
+                    last_name=st.last_name,
+                    third_name=st.third_name,
+                    full_name=st.full_name,
+                    student_id_number=st.student_id_number,
+                    image_path=st.image_path,
+                    phone=st.phone,
+                    gender=st.gender,
+                    faculty=st.faculty,
+                    specialty=st.specialty,
+                    level=st.level,
+                    semester=st.semester,
+                    student_status=st.student_status,
+                    avg_gpa=st.avg_gpa,
+                    group_id=st.group_id,
+                    group_name=st.group.name if st.group else None,
+                    username=st.user.username if st.user else None,
+                )
+                for st in students
+            ],
+        )
 
     # ------------------------------------------------------------------
     # Bayesian helper

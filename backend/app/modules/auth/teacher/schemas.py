@@ -38,6 +38,26 @@ class TeacherSubjectLinkInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeacherCourseInfo(BaseModel):
+    """O'qituvchining kursi — ro'yxat va kartochka uchun qisqacha ma'lumot.
+
+    `Course` `teachers.id` ga emas, `users.id` ga bog'langan (`courses.teacher_id`
+    va `course_teachers.user_id`), shuning uchun bu bog'lanish ORM relationship'i
+    bilan emas, repozitoriydagi alohida so'rov bilan yig'iladi.
+    """
+
+    id: int
+    name: str
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    semester_number: Optional[int] = None
+    group_count: int = 0
+    #: "main" — kursning asosiy o'qituvchisi, "assistant" — yordamchisi.
+    role: str = "main"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TeacherUserInfo(BaseModel):
     id: int
     username: str
@@ -144,6 +164,11 @@ class TeacherCreateResponse(ExternalRefFields):
     teacher_groups: list[TeacherGroupLinkInfo] = []
     teacher_subjects: list[TeacherSubjectLinkInfo] = []
 
+    # Kurslar ORM bog'lanishi emas: repozitoriy ularni sahifadagi o'qituvchilar
+    # uchun bitta so'rovda yig'ib, obyektga qo'shib qo'yadi.
+    courses: list[TeacherCourseInfo] = []
+    course_count: int = 0
+
     model_config = ConfigDict(
         from_attributes=True,
     )
@@ -152,6 +177,9 @@ class TeacherCreateResponse(ExternalRefFields):
 class TeacherListRequest(BaseModel):
     full_name: Optional[str] = None
     kafedra_id: Optional[int] = None
+    #: True — faqat kursi bor o'qituvchilar. Filtr SQL darajasida qo'llanadi,
+    #: aks holda `total` sahifalashda yolg'on ko'rsatardi.
+    has_courses: Optional[bool] = None
 
     page: int = 1
 
@@ -224,6 +252,74 @@ class TeacherAssignedGroupsResponse(BaseModel):
         if hasattr(data, "teacher_groups"):
             data.__dict__["group_teachers"] = data.teacher_groups
         return data
+
+
+# ── Teacher students schemas ──────────────────────────────────────────────────
+
+
+class TeacherStudentGroupInfo(BaseModel):
+    """O'qituvchining guruhi va undagi talabalar soni."""
+
+    id: int
+    name: str
+    student_count: int = 0
+    is_active: bool = True
+    #: Bog'lanish qayerdan keldi: "assignment" — `teacher_group`,
+    #: "course" — o'qituvchining kursiga biriktirilgan guruh. Ikkalasi ham
+    #: bo'lishi mumkin, shuning uchun ro'yxat.
+    sources: list[str] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeacherStudentInfo(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    first_name: str
+    last_name: str
+    third_name: str
+    full_name: str
+    student_id_number: str
+    image_path: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    faculty: Optional[str] = None
+    specialty: Optional[str] = None
+    level: Optional[str] = None
+    semester: Optional[str] = None
+    student_status: Optional[str] = None
+    avg_gpa: Optional[float] = None
+    group_id: Optional[int] = None
+    group_name: Optional[str] = None
+    username: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeacherStudentListRequest(BaseModel):
+    page: int = 1
+    limit: int = 20
+    search: Optional[str] = None
+    #: Faqat bitta guruh bo'yicha. Guruh o'qituvchiga biriktirilmagan bo'lsa 404.
+    group_id: Optional[int] = None
+    #: EduPlan'da yo'qolgan (is_active = false) guruhlarni ham ko'rsatish.
+    include_inactive_groups: bool = False
+
+    @property
+    def offset(self) -> int:
+        if self.page < 1:
+            return 0
+        return (self.page - 1) * self.limit
+
+
+class TeacherStudentListResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    teacher_id: int
+    #: Filtr uchun to'liq ro'yxat — sahifadagi talabalardan yig'ilmaydi.
+    groups: list[TeacherStudentGroupInfo] = []
+    students: list[TeacherStudentInfo] = []
 
 
 # ── Teacher ranking schemas ───────────────────────────────────────────────────

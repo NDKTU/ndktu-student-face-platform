@@ -1,12 +1,24 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { ArrowLeft, BookOpen, ArrowRight } from 'lucide-react';
+import { ArrowLeft, BookOpen, ArrowRight, GraduationCap, Users } from 'lucide-react';
 import type { Teacher } from '@/services/teacherService';
+import { cn } from '@/lib/utils';
 import { TeacherQuestionsList } from './TeacherQuestionsList';
+import { TeacherStudentsPanel } from './TeacherStudentsPanel';
+
+type DetailTab = 'info' | 'courses' | 'students';
+
+const TABS: { id: DetailTab; label: string }[] = [
+    { id: 'info', label: "Ma'lumotlar" },
+    { id: 'courses', label: 'Kurslar' },
+    { id: 'students', label: 'Talabalar' },
+];
 
 export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: () => void }) => {
     const [selectedSubject, setSelectedSubject] = useState<{ id: number; name: string } | null>(null);
+    const [activeTab, setActiveTab] = useState<DetailTab>('info');
+    const courses = teacher.courses ?? [];
 
     if (selectedSubject) {
         return (
@@ -32,6 +44,81 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                 </div>
             </div>
 
+            <div className="flex border-b border-border overflow-x-auto custom-scrollbar">
+                {TABS.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                            'px-4 py-2.5 text-sm transition-colors whitespace-nowrap border-b-2 cursor-pointer',
+                            activeTab === tab.id
+                                ? 'border-primary text-primary font-bold'
+                                : 'border-transparent text-slate-700 dark:text-slate-300 font-semibold hover:text-primary hover:border-primary/40'
+                        )}
+                    >
+                        {tab.label}
+                        {tab.id === 'courses' && courses.length > 0 && (
+                            <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                                {courses.length}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {activeTab === 'students' && <TeacherStudentsPanel teacherId={teacher.id} />}
+
+            {activeTab === 'courses' && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                            Kurslar
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {courses.length > 0 ? (
+                            <div className="grid gap-2">
+                                {courses.map((course) => (
+                                    <div
+                                        key={course.id}
+                                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold">{course.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {course.subject_name || "Fan ko'rsatilmagan"}
+                                                {course.semester_number ? ` — ${course.semester_number}-semestr` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                                                <Users className="h-3 w-3" />
+                                                {course.group_count} guruh
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                                                    course.role === 'main'
+                                                        ? 'bg-primary/10 text-primary'
+                                                        : 'bg-secondary/60 text-secondary-foreground'
+                                                )}
+                                            >
+                                                {course.role === 'main' ? 'Asosiy' : 'Yordamchi'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="text-sm text-muted-foreground">Kurs biriktirilmagan.</span>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {activeTab === 'info' && (
+            <>
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader>
@@ -123,6 +210,8 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                     </CardContent>
                 </Card>
             </div>
+            </>
+            )}
         </div>
     );
 };

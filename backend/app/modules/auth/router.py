@@ -53,6 +53,8 @@ from .teacher.schemas import (
     TeacherListResponse,
     TeacherRankingResponse,
     TeacherSelfUpdateRequest,
+    TeacherStudentListRequest,
+    TeacherStudentListResponse,
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
@@ -459,6 +461,24 @@ async def update_my_teacher_profile(
     current_user: User = Depends(PermissionRequired("teacher:me")),
 ):
     return await get_teacher_repository.update_my_profile(session=session, user_id=current_user.id, data=data)
+
+
+@teacher_router.get("/{teacher_id}/students", response_model=TeacherStudentListResponse)
+async def list_teacher_students(
+    teacher_id: int,
+    data: TeacherStudentListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:teacher")),
+):
+    """O'qituvchiga biriktirilgan guruhlarning talabalari.
+
+    Barcha talabalar emas: guruhlar `teacher_group` dan va o'qituvchining
+    kurslariga biriktirilgan guruhlardan yig'iladi. Bitta o'qituvchida 800 dan
+    ortiq talaba bo'lishi mumkin, shuning uchun sahifalash server tomonida.
+    """
+    return await get_teacher_repository.list_teacher_students(
+        session=session, teacher_id=teacher_id, request=data
+    )
 
 
 @teacher_router.get("/{teacher_id}", response_model=TeacherCreateResponse)
