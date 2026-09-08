@@ -139,6 +139,19 @@ class Permission(Base, IdIntPk, TimestampMixin):
 
 class Student(Base, TimestampMixin, IdIntPk):
     __tablename__ = "students"
+    __table_args__ = (
+        # Номер студента — ключ, по которому его находят и HEMIS-импорт, и вход
+        # в личный кабинет. Уникальности у него не было ни в базе, ни в коде:
+        # два одновременных прогона (cron и кнопка в интерфейсе) заводили
+        # человека дважды, и дальше «тот самый» студент выбирался как повезёт.
+        # Частичный индекс — у заведённых вручную строк номер бывает пустым.
+        Index(
+            "uq_students_student_id_number",
+            "student_id_number",
+            unique=True,
+            postgresql_where=text("student_id_number <> ''"),
+        ),
+    )
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 

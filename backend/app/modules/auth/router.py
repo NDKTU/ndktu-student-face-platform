@@ -10,11 +10,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.model import User
 
 from .hemis.schemas import (
+    GroupMatchApplyRequest,
+    GroupMatchApplyResponse,
+    GroupMatchPreviewResponse,
+    HemisDataProbeResponse,
+    HemisDataSettingsIn,
+    HemisDataSettingsOut,
+    StudentSyncApplyRequest,
+    StudentSyncApplyResponse,
+    StudentSyncPreviewResponse,
     HemisLoginRequest,
     HemisLoginResponse,
     HemisPreviewResponse,
     HemisSyncResponse,
 )
+from .hemis import data_credentials as hemis_data_credentials
+from .hemis.data_service import hemis_data_service
+from .hemis.student_sync import hemis_student_sync
+from .hemis.student_sync_runner import student_sync_runner
 from .hemis.service import hemis_service
 from .permission.repository import get_permission_repository
 from .permission.schemas import (
@@ -689,6 +702,106 @@ async def sync_hemis_data(
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
     return await hemis_service.sync_hemis_data(session=session, data=data)
+
+
+# ── Ma'lumot API (token) ─────────────────────────────────────────────────────
+
+
+@hemis_router.get("/data-settings", response_model=HemisDataSettingsOut)
+async def get_hemis_data_settings(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Token holati. Tokenning o'zi qaytarilmaydi — faqat oxirgi to'rt belgisi."""
+    return await hemis_data_credentials.masked(session)
+
+
+@hemis_router.put("/data-settings", response_model=HemisDataSettingsOut)
+async def save_hemis_data_settings(
+    data: HemisDataSettingsIn,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    await hemis_data_credentials.upsert(session, data, current_user.id)
+    return await hemis_data_credentials.masked(session)
+
+
+@hemis_router.post("/data-settings/test", response_model=HemisDataProbeResponse)
+async def test_hemis_data_token(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Bitta yozuv so'raladi: token tirikmi va HEMIS nechta faol talaba beradi."""
+    return await hemis_data_service.probe(session)
+
+
+# ── Guruhlarni bog'lash ──────────────────────────────────────────────────────
+
+
+@hemis_router.post(
+    "/groups/match/preview",
+    response_model=GroupMatchPreviewResponse,
+    dependencies=[Depends(RateLimiter(times=3, seconds=300))],
+)
+async def preview_hemis_group_match(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """HEMIS guruhlarini bizdagi guruhlar bilan solishtiradi.
+
+    Hech narsa yozmaydi: to'liq o'tish (49 sahifa, ~50 soniya) va takliflar
+    Redis'ga `run_id` ostida muzlatiladi. Chegara qattiq — bu og'ir so'rov.
+    """
+    return await hemis_data_service.group_match_preview(session)
+
+
+@hemis_router.post("/groups/match/apply", response_model=GroupMatchApplyResponse)
+async def apply_hemis_group_match(
+    data: GroupMatchApplyRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Tasdiqlangan juftliklarni `groups.hemis_group_id` ga yozadi."""
+    return await hemis_data_service.group_match_apply(session, data)
+
+
+# ── Talabalar importi ────────────────────────────────────────────────────────
+
+
+@hemis_router.post(
+    "/students/preview",
+    response_model=StudentSyncPreviewResponse,
+    dependencies=[Depends(RateLimiter(times=3, seconds=300))],
+)
+async def preview_hemis_students(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Nima o'zgarishini ko'rsatadi, hech narsa yozmaydi."""
+    return await hemis_student_sync.preview(session)
+
+
+@hemis_router.post(
+    "/students/apply",
+    response_model=StudentSyncApplyResponse,
+    dependencies=[Depends(RateLimiter(times=2, seconds=600))],
+)
+async def apply_hemis_students(
+    data: StudentSyncApplyRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Talabalarni yaratadi va yangilaydi.
+
+    Ma'lumot qayta o'qiladi: apply preview'dan keyin ishlaydi va oradagi
+    o'zgarishlarni ham hisobga olishi kerak. Ommaviy yaratish uchun
+    `allow_bulk_create` shart.
+
+    Prognoz `student_sync_runner` orqali ketadi — u tungi cron bilan bitta
+    qulfni bo'lishadi, aks holda ikkalasi bir vaqtda ishlab, bir talabani ikki
+    marta yaratardi.
+    """
+    return await student_sync_runner.run(session, data, triggered_by="api")
 
 
 # ============================================================================

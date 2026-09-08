@@ -9,9 +9,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.lesson_access import is_admin as user_is_admin
+from app.core.utils.lesson_access import is_lesson_teacher
 from app.core.utils.lesson_scope import covers_group
-from app.modules.auth.model import Student, Teacher, TeacherSubject, User
-from app.modules.course.model import Course, Lesson, LessonFaceCheck
+from app.modules.auth.model import Student, User
+from app.modules.course.model import Lesson, LessonFaceCheck
 
 from .schemas import (
     FaceCheckItem,
@@ -43,23 +45,14 @@ class FaceCheckRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
         return lesson
 
+    # Ruxsat mantig'i `core/utils/lesson_access.py` da — davomat jurnali ham
+    # aynan shu savolga javob beradi, ikki nusxa esa vaqt o'tib bir-biridan
+    # ajralib ketardi.
     def _is_admin(self, user: User) -> bool:
-        return any(role.name.lower() == "admin" for role in user.roles)
+        return user_is_admin(user)
 
     async def _is_lesson_teacher(self, session: AsyncSession, lesson: Lesson, user: User) -> bool:
-        teacher_user_id = (
-            await session.execute(
-                select(Teacher.user_id)
-                .join(TeacherSubject, TeacherSubject.teacher_id == Teacher.id)
-                .where(TeacherSubject.id == lesson.teacher_subject_id)
-            )
-        ).scalar_one_or_none()
-        if teacher_user_id == user.id:
-            return True
-        course_owner_id = (
-            await session.execute(select(Course.teacher_id).where(Course.id == lesson.course_id))
-        ).scalar_one_or_none()
-        return course_owner_id == user.id
+        return await is_lesson_teacher(session, lesson, user)
 
     async def _student_of_lesson(self, session: AsyncSession, lesson: Lesson, user: User) -> Student | None:
         student = (

@@ -129,6 +129,7 @@ class EduPlanRepository:
         education_shape: str | None,
         student_count: int | None,
         existing: Group | None,
+        hemis_group_id: str | None = None,
     ) -> Group:
         row = existing or Group(name=name, faculty_id=faculty_id)
         row.name = name
@@ -137,6 +138,32 @@ class EduPlanRepository:
         row.course = course
         row.education_shape = education_shape
         row.student_count = student_count
+        # Пустое значение из EduPlan не затирает уже известную связку: её мог
+        # проставить экран сопоставления HEMIS, и потерять её из-за незаполненного
+        # поля на той стороне было бы обидно.
+        #
+        # Разобранную вручную связку не трогаем и при непустом значении.
+        # Администратор разбирал её глазами — на экране сопоставления и видно
+        # голоса студентов, и похожие названия, — а EPOS отдаёт `hemis_id`
+        # заполненным далеко не везде и не всегда верно. Молчаливый откат
+        # такого решения означал бы переезд студентов в чужую группу на
+        # следующем импорте, поэтому расхождение уходит в лог, а не в базу.
+        if hemis_group_id:
+            if (
+                row.hemis_group_id_source == "manual"
+                and str(row.hemis_group_id or "") != str(hemis_group_id)
+            ):
+                logger.warning(
+                    "EduPlan: guruh %s (id %s) uchun hemis_id %s keldi, lekin qo'lda "
+                    "bog'langani %s — qo'lda bog'langani saqlanadi",
+                    row.name,
+                    row.id,
+                    hemis_group_id,
+                    row.hemis_group_id,
+                )
+            else:
+                row.hemis_group_id = str(hemis_group_id)
+                row.hemis_group_id_source = "eduplan"
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()

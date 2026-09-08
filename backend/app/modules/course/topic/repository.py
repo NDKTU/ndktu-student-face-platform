@@ -8,6 +8,7 @@ from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import CourseTopic, Lesson
 
 from .schemas import (
+    TOPIC_TYPE_TITLES,
     CourseTopicCreateRequest,
     CourseTopicListResponse,
     CourseTopicResponse,
@@ -36,6 +37,7 @@ class CourseTopicRepository:
             id=topic.id,
             course_id=topic.course_id,
             title=topic.title,
+            topic_type=topic.topic_type,
             order_index=topic.order_index,
             lesson_count=lesson_count,
             created_at=topic.created_at,
@@ -70,7 +72,13 @@ class CourseTopicRepository:
                 )
             ).scalar()
             order_index = (maximum or 0) + 1
-        topic = CourseTopic(course_id=data.course_id, title=data.title.strip(), order_index=order_index)
+        topic = CourseTopic(
+            course_id=data.course_id,
+            # Nom turdan olinadi: formada alohida sarlavha maydoni yo'q.
+            title=(data.title or "").strip() or TOPIC_TYPE_TITLES[data.topic_type],
+            topic_type=data.topic_type,
+            order_index=order_index,
+        )
         session.add(topic)
         await session.commit()
         await session.refresh(topic)
@@ -85,6 +93,13 @@ class CourseTopicRepository:
         await self._check_manage(session, topic.course_id, current_user)
         if data.title is not None:
             topic.title = data.title.strip()
+        if data.topic_type is not None:
+            # Nom turdan yig'ilgan bo'lsa — yangi turga moslanadi. Qo'lda
+            # yozilgan nom (turlar joriy qilingunga qadar tuzilgan eski
+            # mavzular) tegilmaydi: uni qaytarishning yo'li yo'q edi.
+            if data.title is None and topic.title in TOPIC_TYPE_TITLES.values():
+                topic.title = TOPIC_TYPE_TITLES[data.topic_type]
+            topic.topic_type = data.topic_type
         if data.order_index is not None:
             topic.order_index = data.order_index
         await session.commit()

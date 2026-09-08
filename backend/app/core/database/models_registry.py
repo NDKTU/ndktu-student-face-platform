@@ -6,6 +6,7 @@ Used by Alembic env.py and anywhere that needs all tables registered.
 __all__ = [
     "Announcement",
     "AnnouncementRegistration",
+    "HemisDataCredential",
     "User",
     "Role",
     "UserRole",
@@ -34,6 +35,7 @@ __all__ = [
     "Lesson",
     "Homework",
     "HomeworkSubmission",
+    "LessonAttendance",
     "LessonFaceCheck",
     "Resource",
     "EduPlanCredential",
@@ -58,6 +60,9 @@ from app.modules.auth.model import (
     User,
     UserRole,
 )
+from app.modules.auth.hemis.model import (
+    HemisDataCredential,
+)
 from app.modules.course.model import (
     Course,
     CourseGroup,
@@ -66,6 +71,7 @@ from app.modules.course.model import (
     Homework,
     HomeworkSubmission,
     Lesson,
+    LessonAttendance,
     LessonFaceCheck,
     Resource,
 )

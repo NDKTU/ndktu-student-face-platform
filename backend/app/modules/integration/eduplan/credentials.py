@@ -20,6 +20,22 @@ from .schemas import EduPlanSettingsIn, EduPlanSettingsOut
 logger = logging.getLogger(__name__)
 
 
+def normalize_base_url(url: str) -> str:
+    """Приводит адрес к виду, от которого клиент строит запросы.
+
+    Из формы регулярно приходит ссылка на Swagger UI (`.../rest/docs`) — она
+    же открыта в соседней вкладке, и скопировать её естественно. Клиент
+    дописывает `/api/v1/...` сам, поэтому такой адрес даёт 404 на логине, а
+    сообщение выглядит как «логин или пароль не приняты». Отрезаем хвост здесь
+    один раз, вместо того чтобы каждый раз объяснять это человеку.
+    """
+    cleaned = (url or "").strip().rstrip("/")
+    for suffix in ("/docs", "/redoc", "/openapi.json"):
+        if cleaned.lower().endswith(suffix):
+            cleaned = cleaned[: -len(suffix)].rstrip("/")
+    return cleaned
+
+
 async def load_row(session: AsyncSession) -> EduPlanCredential | None:
     result = await session.execute(select(EduPlanCredential).order_by(EduPlanCredential.id.desc()).limit(1))
     return result.scalars().first()
@@ -41,7 +57,9 @@ async def effective_config(session: AsyncSession) -> EduPlanConfig:
     return base.model_copy(
         update={
             "enabled": True,
-            "base_url": row.base_url or base.base_url,
+            # Нормализуем и на чтении: строки, сохранённые до этой правки,
+            # должны заработать без повторного ввода.
+            "base_url": normalize_base_url(row.base_url) or base.base_url,
             "username": row.username,
             "password": password,
             "active_role": row.active_role,
@@ -85,7 +103,7 @@ async def upsert(session: AsyncSession, data: EduPlanSettingsIn, user_id: int | 
         if not data.password:
             raise ValueError("Parol kiritilishi shart")
         row = EduPlanCredential(
-            base_url=data.base_url or settings.eduplan.base_url,
+            base_url=normalize_base_url(data.base_url) or settings.eduplan.base_url,
             username=data.username,
             password_encrypted=encrypt_secret(data.password),
             active_role=data.active_role or "",
@@ -93,7 +111,7 @@ async def upsert(session: AsyncSession, data: EduPlanSettingsIn, user_id: int | 
         )
         session.add(row)
     else:
-        row.base_url = data.base_url or row.base_url
+        row.base_url = normalize_base_url(data.base_url) or row.base_url
         row.username = data.username
         row.active_role = data.active_role or ""
         row.updated_by_user_id = user_id

@@ -10,7 +10,7 @@ from app.modules.integration.eduplan.auth_service import EduPlanAuthService
 @pytest.mark.asyncio
 async def test_eduplan_login_invalid_credentials():
     service = EduPlanAuthService()
-    dummy_cfg = EduPlanConfig(enabled=True, base_url="https://edu.plan.nsumt.uz/rest", username="test", password="123")
+    dummy_cfg = EduPlanConfig(enabled=True, base_url="https://epmos.nsumt.uz/rest", username="test", password="123")
 
     with (
         patch("app.modules.integration.eduplan.auth_service.effective_config", return_value=dummy_cfg),
@@ -31,7 +31,7 @@ async def test_eduplan_login_invalid_credentials():
 @pytest.mark.asyncio
 async def test_eduplan_login_success_mocked():
     service = EduPlanAuthService()
-    dummy_cfg = EduPlanConfig(enabled=True, base_url="https://edu.plan.nsumt.uz/rest", username="test", password="123")
+    dummy_cfg = EduPlanConfig(enabled=True, base_url="https://epmos.nsumt.uz/rest", username="test", password="123")
 
     mock_token_resp = MagicMock()
     mock_token_resp.status_code = 200

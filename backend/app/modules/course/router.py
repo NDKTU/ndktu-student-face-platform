@@ -21,6 +21,14 @@ from .course.schemas import (
     CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
+from .attendance.repository import get_attendance_repository
+from .attendance.schemas import (
+    AttendanceBulkRequest,
+    AttendanceListResponse,
+    AttendanceStatsResponse,
+    CourseAttendanceResponse,
+    MyAttendanceResponse,
+)
 from .face_check.repository import get_face_check_repository
 from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .homework.repository import get_homework_repository
@@ -344,6 +352,40 @@ async def lesson_face_check_report(
     return await get_face_check_repository.report(session=session, lesson_id=lesson_id, current_user=current_user)
 
 
+@lesson_router.get("/{lesson_id}/attendance", response_model=AttendanceListResponse)
+async def lesson_attendance(
+    lesson_id: int,
+    group_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:attendance")),
+):
+    """Dars davomati jurnali: guruh tarkibi va qo'yilgan belgilar.
+
+    Oqim darsida (bir nechta guruh) `group_id` shart — usiz faqat guruhlar
+    ro'yxati qaytadi.
+    """
+    return await get_attendance_repository.list_attendance(
+        session=session, lesson_id=lesson_id, current_user=current_user, group_id=group_id
+    )
+
+
+@lesson_router.put(
+    "/{lesson_id}/attendance",
+    response_model=AttendanceListResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def save_lesson_attendance(
+    lesson_id: int,
+    data: AttendanceBulkRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("mark:attendance")),
+):
+    """Davomatni belgilash. `status: null` — belgini olib tashlaydi."""
+    return await get_attendance_repository.save_attendance(
+        session=session, lesson_id=lesson_id, data=data, current_user=current_user
+    )
+
+
 @lesson_router.get("/face-check/{check_id}/image")
 async def lesson_face_check_image(
     check_id: int,
@@ -588,6 +630,70 @@ async def delete_resource(
 
 
 # ============================================================================
+#  ATTENDANCE (kurs jurnali, statistika, talabaning o'zi)
+# ============================================================================
+attendance_router = APIRouter(tags=["Attendance"], prefix="/attendance")
+
+
+@attendance_router.get("/me", response_model=MyAttendanceResponse)
+async def my_attendance(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("attendance:me")),
+):
+    """Talabaning o'z davomati: umumiy foiz, kurslar kesimi va qoldirgan darslari.
+
+    Alohida huquq (`attendance:me`) — `read:attendance` o'qituvchiniki va u
+    bilan boshqalarning jurnali ham ochilib ketardi.
+    """
+    return await get_attendance_repository.my_attendance(session=session, current_user=current_user)
+
+
+@attendance_router.get("/stats", response_model=AttendanceStatsResponse)
+async def attendance_stats(
+    student_ids: str,
+    course_id: int | None = None,
+    teacher_user_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:attendance")),
+):
+    """Ro'yxatdagi talabalar uchun davomat foizi.
+
+    `student_ids` — vergul bilan ajratilgan id'lar (sahifadagi talabalar).
+    `teacher_user_id` berilsa, hisob faqat o'sha o'qituvchining kurslari
+    bo'yicha: o'qituvchi o'z sahifasida universitet bo'yicha foizni emas,
+    o'z darslarining foizini kutadi.
+    """
+    try:
+        ids = [int(part) for part in student_ids.split(",") if part.strip()]
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="student_ids noto'g'ri")
+    if len(ids) > 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bir so'rovda 200 tagacha talaba")
+
+    course_ids: list[int] | None = None
+    if course_id is not None:
+        course_ids = [course_id]
+    elif teacher_user_id is not None:
+        course_ids = await get_attendance_repository.teacher_course_ids(session, teacher_user_id)
+
+    stats = await get_attendance_repository.stats_for_students(session, ids, course_ids)
+    return AttendanceStatsResponse(students=[stats[sid] for sid in ids if sid in stats])
+
+
+@course_router.get("/{course_id}/attendance", response_model=CourseAttendanceResponse)
+async def course_attendance(
+    course_id: int,
+    group_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:attendance")),
+):
+    """Kurs jurnali: darslar × talabalar matritsasi va har biriga foiz."""
+    return await get_attendance_repository.course_attendance(
+        session=session, course_id=course_id, current_user=current_user, group_id=group_id
+    )
+
+
+# ============================================================================
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
@@ -596,3 +702,4 @@ router.include_router(topic_router)
 router.include_router(lesson_router)
 router.include_router(homework_router)
 router.include_router(resource_router)
+router.include_router(attendance_router)

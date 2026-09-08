@@ -84,8 +84,22 @@ class EduPlanClient:
             )
 
         if resp.status_code != 200:
+            # Своё сообщение EduPlan отдаёт в `detail`; показываем его как есть.
+            # Без этого администратор видел только «HTTP 400» и не мог отличить
+            # неверный пароль от неверного адреса — а это разные починки.
+            detail = ""
+            try:
+                payload = resp.json()
+                detail = payload.get("detail") if isinstance(payload, dict) else ""
+                if isinstance(detail, list):  # ошибки валидации приходят списком
+                    detail = "; ".join(str(item.get("msg", item)) for item in detail)
+            except ValueError:
+                detail = (resp.text or "")[:200]
+
+            suffix = f": {detail}" if detail else ""
             raise EduPlanError(
-                f"EduPlan servis akkaunti login yoki parolini qabul qilmadi (HTTP {resp.status_code})",
+                f"EduPlan servis akkaunti login yoki parolini qabul qilmadi "
+                f"(HTTP {resp.status_code}){suffix}",
                 status_code=status.HTTP_502_BAD_GATEWAY,
             )
 

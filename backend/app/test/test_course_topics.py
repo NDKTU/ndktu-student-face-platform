@@ -27,7 +27,7 @@ async def test_course_topics_and_lesson_linkage(
 
     topic_response = await auth_client.post(
         "/course-topic/",
-        json={"course_id": course_id, "title": "Limits", "order_index": 1},
+        json={"course_id": course_id, "topic_type": "lecture", "title": "Limits", "order_index": 1},
     )
     assert topic_response.status_code == 201
     topic_id = topic_response.json()["id"]
@@ -46,6 +46,7 @@ async def test_course_topics_and_lesson_linkage(
     lesson = lesson_response.json()
     assert lesson["topic_id"] == topic_id
     assert lesson["course_topic"]["title"] == "Limits"
+    assert topic_response.json()["topic_type"] == "lecture"
     assert lesson["resources"] == []
 
     topics_response = await auth_client.get("/course-topic/", params={"course_id": course_id})
@@ -92,7 +93,7 @@ async def test_lesson_rejects_topic_from_another_course(
 
     topic = await auth_client.post(
         "/course-topic/",
-        json={"course_id": first.json()["id"], "title": "First topic"},
+        json={"course_id": first.json()["id"], "topic_type": "lecture", "title": "First topic"},
     )
     assert topic.status_code == 201
 
@@ -108,3 +109,68 @@ async def test_lesson_rejects_topic_from_another_course(
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Topic does not belong to this Course"
+
+
+@pytest.mark.asyncio
+async def test_topic_title_is_derived_from_type(
+    auth_client,
+    test_teacher,
+    test_subject,
+    test_group,
+    test_faculty,
+    test_kafedra,
+):
+    """Sarlavhasiz yaratilgan mavzu nomini turidan oladi.
+
+    Formada alohida nom maydoni yo'q: o'qituvchi faqat turni tanlaydi.
+    """
+    course = await auth_client.post(
+        "/course/",
+        json={
+            "name": "Physics",
+            "subject_id": test_subject.id,
+            "teacher_id": test_teacher["user_id"],
+            "group_ids": [test_group["id"]],
+            "faculty_id": test_faculty["id"],
+            "kafedra_id": test_kafedra["id"],
+        },
+    )
+    assert course.status_code == 201
+
+    topic = await auth_client.post(
+        "/course-topic/",
+        json={"course_id": course.json()["id"], "topic_type": "lab"},
+    )
+    assert topic.status_code == 201
+    assert topic.json()["title"] == "Laboratoriya"
+    assert topic.json()["topic_type"] == "lab"
+
+
+@pytest.mark.asyncio
+async def test_topic_type_is_required(
+    auth_client,
+    test_teacher,
+    test_subject,
+    test_group,
+    test_faculty,
+    test_kafedra,
+):
+    """Tursiz mavzu yaratib bo'lmaydi: darslar turini shundan oladi."""
+    course = await auth_client.post(
+        "/course/",
+        json={
+            "name": "Chemistry",
+            "subject_id": test_subject.id,
+            "teacher_id": test_teacher["user_id"],
+            "group_ids": [test_group["id"]],
+            "faculty_id": test_faculty["id"],
+            "kafedra_id": test_kafedra["id"],
+        },
+    )
+    assert course.status_code == 201
+
+    topic = await auth_client.post(
+        "/course-topic/",
+        json={"course_id": course.json()["id"], "title": "Tursiz"},
+    )
+    assert topic.status_code == 422

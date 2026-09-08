@@ -70,7 +70,16 @@ const errorText = (e: unknown) => {
 };
 
 const EduPlanSyncPage = () => {
-    const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useEduPlanStatus();
+    const {
+        data: status,
+        isLoading: statusLoading,
+        // Сорванный запрос и «интеграция не настроена» — разные вещи: во
+        // втором случае надо править настройки, в первом — смотреть, почему
+        // не отвечает наш собственный backend. Раньше оба показывались как
+        // «Integratsiya sozlanmagan» с пустым пояснением.
+        isError: statusFailed,
+        refetch: refetchStatus,
+    } = useEduPlanStatus();
     const runMutation = useEduPlanRun();
     const previewMutation = useEduPlanPreview();
     const applyMutation = useEduPlanApply();
@@ -205,10 +214,18 @@ const EduPlanSyncPage = () => {
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" /> Ulanish tekshirilmoqda…
                         </div>
-                    ) : !status?.configured ? (
+                    ) : statusFailed || !status ? (
+                        <Notice tone="destructive" icon={<XCircle className="mt-0.5 h-4 w-4 shrink-0" />}>
+                            <div className="font-medium">Holatni tekshirib bo'lmadi</div>
+                            <div>
+                                Backend javob bermadi. Sahifani yangilang yoki «Ulanishni tekshirish»
+                                tugmasini bosing.
+                            </div>
+                        </Notice>
+                    ) : !status.configured ? (
                         <Notice tone="warning" icon={<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}>
                             <div className="font-medium">Integratsiya sozlanmagan</div>
-                            <div>{status?.detail}</div>
+                            <div>{status.detail || 'Sozlamalarni to‘ldiring'}</div>
                         </Notice>
                     ) : !status.reachable ? (
                         <Notice tone="destructive" icon={<XCircle className="mt-0.5 h-4 w-4 shrink-0" />}>
@@ -641,7 +658,7 @@ const ConnectionSettingsCard = () => {
                             label="EduPlan manzili"
                             value={baseUrl}
                             onChange={(e) => setBaseUrl(e.target.value)}
-                            placeholder="https://edu.plan.nsumt.uz/rest"
+                            placeholder="https://epmos.nsumt.uz/rest"
                         />
                     </div>
                 )}

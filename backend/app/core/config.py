@@ -91,6 +91,12 @@ class HemisConfig(BaseModel):
     employee_login_url: str = ""
     employee_me_url: str = ""
 
+    # Административный API справочников: ходит по долгоживущему токену, а не
+    # по логину студента. Токен протухает, поэтому основное место хранения —
+    # таблица `hemis_data_credentials`, а это лишь запасной вариант.
+    data_url: str = "https://student.ndki.uz/rest/v1/data/student-list"
+    data_token: str = ""
+
     @property
     def employee_login_enabled(self) -> bool:
         return bool(self.employee_login_url and self.employee_me_url)
@@ -105,7 +111,7 @@ class EduPlanConfig(BaseModel):
     """
 
     enabled: bool = False
-    base_url: str = "https://edu.plan.nsumt.uz/rest"
+    base_url: str = "https://epmos.nsumt.uz/rest"
     username: str = ""
     password: str = ""
     # Все защищённые эндпоинты EduPlan принимают X-Active-Role: у них
@@ -167,6 +173,17 @@ class ZoomConfig(BaseModel):
         return bool(self.client_id and self.client_secret)
 
 
+class AttendanceConfig(BaseModel):
+    """Davomat jurnali sozlamalari."""
+
+    #: Jurnalni dars sanasidan keyin necha kun tahrirlash mumkin.
+    #: Bo'sh (standart) — cheklov yo'q. Qiymat berilganda dars sanasidan
+    #: `edit_window_days` kun o'tgach jurnal yopiladi: o'tgan semestrni
+    #: keyinchalik «to'g'rilash» imkoni jurnalning ma'nosini yo'qotadi.
+    #: Sana Toshkent vaqtida hisoblanadi — konteyner UTC'da ishlaydi.
+    edit_window_days: int | None = None
+
+
 class AdminConfig(BaseModel):
     """Bootstrap admin account, created once by init_db on first boot.
 
@@ -199,6 +216,7 @@ class AppConfig(BaseSettings):
     cors: CorsConfig = CorsConfig()
     admin: AdminConfig = AdminConfig()
     zoom: ZoomConfig = ZoomConfig()
+    attendance: AttendanceConfig = AttendanceConfig()
 
     # Add derived absolute paths
     @property

@@ -66,7 +66,7 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                 ))}
             </div>
 
-            {activeTab === 'students' && <TeacherStudentsPanel teacherId={teacher.id} />}
+            {activeTab === 'students' && <TeacherStudentsPanel teacherId={teacher.id} teacherUserId={teacher.user_id} />}
 
             {activeTab === 'courses' && (
                 <Card>

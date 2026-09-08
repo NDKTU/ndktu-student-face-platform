@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Search, Users } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
@@ -8,8 +8,17 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { useGroup, useGroupStudents } from '@/hooks/useGroups';
+import { useAttendanceStats } from '@/hooks/useAttendance';
+import { usePermission } from '@/components/auth/PermissionGate';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
+
+const percentColor = (percent: number | null | undefined) => {
+    if (percent == null) return 'text-muted-foreground';
+    if (percent >= 85) return 'text-emerald-600 dark:text-emerald-400';
+    if (percent >= 60) return 'text-amber-600 dark:text-amber-400';
+    return 'text-rose-600 dark:text-rose-400';
+};
 
 /**
  * Bitta guruhning talabalari. `read:student` talab qilinmaydi — backend
@@ -34,6 +43,17 @@ const GroupStudentsPage = () => {
 
     const students = data?.students ?? [];
     const total = data?.total ?? 0;
+
+    // Foiz — guruhning barcha darslari bo'yicha (kurs bilan cheklanmagan).
+    const canReadAttendance = usePermission('read:attendance');
+    const { data: attendance } = useAttendanceStats(
+        students.map((s) => s.id),
+        { enabled: canReadAttendance }
+    );
+    const attendanceById = useMemo(
+        () => new Map((attendance ?? []).map((row) => [row.student_id, row])),
+        [attendance]
+    );
 
     return (
         <div className="space-y-5">
@@ -93,6 +113,9 @@ const GroupStudentsPage = () => {
                             <TableHead className="font-bold text-xs">Talaba F.I.SH</TableHead>
                             <TableHead className="font-bold text-xs hidden md:table-cell">Talaba ID</TableHead>
                             <TableHead className="font-bold text-xs hidden lg:table-cell">Kurs / semestr</TableHead>
+                            {canReadAttendance && (
+                                <TableHead className="text-right font-bold text-xs">Davomat</TableHead>
+                            )}
                             <TableHead className="text-right font-bold text-xs pr-5 hidden lg:table-cell">GPA</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -130,6 +153,20 @@ const GroupStudentsPage = () => {
                                         {student.level || '—'} / {student.semester || '—'}
                                     </span>
                                 </TableCell>
+                                {canReadAttendance && (
+                                    <TableCell className="text-right">
+                                        <span
+                                            className={cn(
+                                                'font-mono text-xs font-semibold',
+                                                percentColor(attendanceById.get(student.id)?.percent)
+                                            )}
+                                        >
+                                            {attendanceById.get(student.id)?.percent == null
+                                                ? '—'
+                                                : `${attendanceById.get(student.id)!.percent}%`}
+                                        </span>
+                                    </TableCell>
+                                )}
                                 <TableCell className="text-right pr-5 hidden lg:table-cell">
                                     <span className="font-mono text-xs font-semibold">
                                         {student.avg_gpa != null ? student.avg_gpa.toFixed(1) : '—'}

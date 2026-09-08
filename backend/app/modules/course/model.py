@@ -12,7 +12,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import TeacherSubject, User
+    from app.modules.auth.model import Student, TeacherSubject, User
     from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
     from app.modules.quiz.model import Subject
 
@@ -170,6 +170,8 @@ class CourseGroup(Base, IdIntPk, TimestampMixin):
 
 
 class CourseTopic(Base, IdIntPk, TimestampMixin):
+    """Kurs mavzusi — darslar shu mavzu ichida yig'iladi."""
+
     __tablename__ = "course_topics"
 
     course_id: Mapped[int] = mapped_column(
@@ -179,6 +181,14 @@ class CourseTopic(Base, IdIntPk, TimestampMixin):
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    #: lecture | lab | seminar. Mashg'ulot turi mavzu darajasida beriladi:
+    #: o'quv rejada soatlar aynan shu kesimda bo'linadi, va mavzu ichidagi
+    #: barcha darslar bir xil turda bo'ladi. Yangi dars turini qo'shish
+    #: migratsiyasiz bo'lishi uchun enum emas, satr. Eski mavzularda NULL —
+    #: ular tur tanlanmagunicha shundayligicha qoladi.
+    topic_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     course: Mapped["Course"] = relationship("Course", back_populates="topics")
@@ -356,6 +366,64 @@ class LessonFaceCheck(Base, IdIntPk, TimestampMixin):
 
     def __str__(self):
         return f"FaceCheck {self.id} (lesson={self.lesson_id}, user={self.user_id}, {self.status})"
+
+
+class LessonAttendance(Base, IdIntPk, TimestampMixin):
+    """Dars davomati — bitta dars, bitta talaba.
+
+    Nega yo'q qator «kelmadi» degani emas. Belgilanmagan dars — hali jurnal
+    to'ldirilmagan dars, va u foizga kirmasligi kerak: aks holda o'qituvchi
+    unutgan har bir para butun guruhning ko'rsatkichini yerga urardi.
+
+    Nega `student_id`, `user_id` emas. Jurnal guruh tarkibidan quriladi
+    (`students.group_id`), va yozuv hisob o'chirilsa ham qolishi kerak.
+
+    Nega `group_id` ham saqlanadi. Dars oqimniki bo'lishi mumkin
+    (`lessons.group_id IS NULL` — kursning barcha guruhlari), talaba esa keyin
+    boshqa guruhga o'tishi mumkin: o'sha paytdagi guruh yozib qo'yilmasa,
+    o'tgan oyning jurnali talaba bilan birga ko'chib ketardi.
+    """
+
+    __tablename__ = "lesson_attendances"
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "student_id", name="uq_lesson_attendance"),
+        # Talabaning davomat tarixi — hisobotlarning asosiy so'rovi.
+        Index("ix_lesson_attendances_student_lesson", "student_id", "lesson_id"),
+    )
+
+    lesson_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    student_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    #: present | absent | late | excused. Enum emas, satr: yangi holat qo'shish
+    #: migratsiyasiz bo'lishi kerak.
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+
+    #: manual — o'qituvchi qo'li bilan, face_check — yuz nazoratidan yig'ilgan.
+    #: Hozir doim "manual"; ustun avtomatik to'ldirish qo'shilganda jonli
+    #: bazada migratsiya talab qilmasligi uchun oldindan turibdi.
+    source: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'manual'"), default="manual")
+
+    #: Kim belgiladi. Jurnal — mas'uliyatli hujjat, izsiz o'zgarmasligi kerak.
+    marked_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    lesson: Mapped["Lesson"] = relationship("Lesson")
+    student: Mapped["Student"] = relationship("Student")
+    group: Mapped["Group | None"] = relationship("Group")
+    marked_by: Mapped["User | None"] = relationship("User")
+
+    def __str__(self):
+        return f"Attendance {self.id} (lesson={self.lesson_id}, student={self.student_id}, {self.status})"
 
 
 class Resource(Base, IdIntPk, TimestampMixin):

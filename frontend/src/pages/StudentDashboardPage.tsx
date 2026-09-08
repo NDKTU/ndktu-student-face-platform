@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { PlayCircle, Brain, User, Clock, Trophy, ChevronRight, Megaphone } from 'lucide-react';
 import { useAnnouncementFeed } from '@/hooks/useAnnouncements';
 import { AnnouncementCard } from '@/components/announcement/AnnouncementCard';
+import { MyAttendanceCard } from '@/components/courses/MyAttendanceCard';
 
 /**
  * Кабинет студента — главная страница вместо редиректа на профиль:
@@ -92,6 +93,10 @@ const StudentDashboardPage = () => {
             </div>
 
             {/* E'lonlar — bosh sahifada ko'zga tashlanishi uchun testlardan oldin */}
+            {/* Davomat — huquq bo'lsa. Hech narsa belgilanmagan bo'lsa
+                komponentning o'zi hech nima ko'rsatmaydi. */}
+            {hasPermission('attendance:me') && <MyAttendanceCard />}
+
             {canSeeAnnouncements && (isLoadingAnnouncements || announcements.length > 0) && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">

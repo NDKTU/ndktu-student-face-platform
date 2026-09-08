@@ -3,8 +3,9 @@ import { Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Combobox } from '@/components/ui/Combobox';
 import { useCreateCourseTopic, useUpdateCourseTopic } from '@/hooks/useCourseTopics';
-import type { CourseTopic } from '@/services/courseTopicService';
+import { TOPIC_TYPE_OPTIONS, type CourseTopic, type CourseTopicType } from '@/services/courseTopicService';
 
 interface Props {
     isOpen: boolean;
@@ -17,20 +18,23 @@ interface Props {
 export function CourseTopicModal({ isOpen, onClose, courseId, nextOrder, topic }: Props) {
     const createTopic = useCreateCourseTopic();
     const updateTopic = useUpdateCourseTopic();
-    const [title, setTitle] = useState('');
+    // Mavzuning nomi turdan olinadi — alohida sarlavha so'ralmaydi.
+    // Standart tur yo'q: o'qituvchi ataylab tanlashi kerak, aks holda
+    // hammasi jimgina «ma'ruza» bo'lib qolardi.
+    const [topicType, setTopicType] = useState<CourseTopicType | ''>('');
     const [orderIndex, setOrderIndex] = useState(nextOrder);
     const [error, setError] = useState('');
 
     useEffect(() => {
         if (!isOpen) return;
-        setTitle(topic?.title ?? '');
+        setTopicType(topic?.topic_type ?? '');
         setOrderIndex(topic?.order_index ?? nextOrder);
         setError('');
     }, [isOpen, nextOrder, topic]);
 
     const save = async () => {
-        if (!title.trim()) {
-            setError("Mavzu nomini kiriting");
+        if (!topicType) {
+            setError("Mashg'ulot turini tanlang");
             return;
         }
         setError('');
@@ -38,12 +42,12 @@ export function CourseTopicModal({ isOpen, onClose, courseId, nextOrder, topic }
             if (topic) {
                 await updateTopic.mutateAsync({
                     id: topic.id,
-                    data: { title: title.trim(), order_index: orderIndex },
+                    data: { topic_type: topicType, order_index: orderIndex },
                 });
             } else {
                 await createTopic.mutateAsync({
                     course_id: courseId,
-                    title: title.trim(),
+                    topic_type: topicType,
                     order_index: orderIndex,
                 });
             }
@@ -60,14 +64,16 @@ export function CourseTopicModal({ isOpen, onClose, courseId, nextOrder, topic }
         <Modal isOpen={isOpen} onClose={onClose} title={topic ? "Mavzuni tahrirlash" : "Yangi mavzu"}>
             <div className="space-y-5">
                 <div>
-                    <label className="mb-2 block text-sm font-medium">Mavzu nomi</label>
-                    <Input
-                        autoFocus
-                        value={title}
-                        onChange={(event) => setTitle(event.target.value)}
-                        placeholder="Masalan, Kuchlanish va deformatsiya"
-                        onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
+                    <label className="mb-2 block text-sm font-medium">Mashg'ulot turi</label>
+                    <Combobox
+                        options={TOPIC_TYPE_OPTIONS}
+                        value={topicType}
+                        onChange={(value) => setTopicType(value as CourseTopicType)}
+                        placeholder="Turini tanlang"
                     />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                        Mavzu ichida yaratilgan darslar shu turni oladi.
+                    </p>
                 </div>
                 <div className="max-w-32">
                     <label className="mb-2 block text-sm font-medium">Tartib raqami</label>

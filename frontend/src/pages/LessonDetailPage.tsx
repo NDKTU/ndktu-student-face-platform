@@ -13,6 +13,7 @@ import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
 import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
+import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePanel';
 import { Switch } from '@/components/ui/Switch';
 import { toast } from 'sonner';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
@@ -146,6 +147,14 @@ export default function LessonDetailPage() {
                     {zoom?.link_url
                         ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />
                         : <p className="text-sm text-muted-foreground">Bu darsga jonli uchrashuv biriktirilmagan.</p>}
+                </CardContent></Card>
+            )}
+
+            {/* Davomat — faqat darsni boshqaradiganlarga va faqat huquqi
+                borlarga: talaba o'z jurnalini bu yerda ko'rmaydi. */}
+            {canManageContent && hasPermission('read:attendance') && (
+                <Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Davomat</CardTitle></CardHeader><CardContent>
+                    <LessonAttendancePanel lessonId={lesson.id} />
                 </CardContent></Card>
             )}
 

@@ -116,6 +116,13 @@ class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     # HEMIS и EPOS расходятся и переименовываются, идентификатор — нет.
     hemis_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # Откуда взялась связка выше: `manual` — администратор разобрал её руками
+    # на экране сопоставления, `eduplan` — приехала из EPOS, пусто — угадана по
+    # имени при входе студента. Различать обязательно: EPOS перезаписывал
+    # ручное решение своим `hemis_id`, и разобранная вручную группа молча
+    # откатывалась, а студенты на следующем импорте переезжали в чужую.
+    hemis_group_id_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="groups")
     speciality: Mapped["Speciality | None"] = relationship("Speciality", back_populates="groups")
     students: Mapped[list["Student"]] = relationship("Student", back_populates="group")

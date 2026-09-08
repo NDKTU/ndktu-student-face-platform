@@ -11,6 +11,7 @@ import { useCreateLesson, useUpdateLesson } from '@/hooks/useLessons';
 import { resourceService } from '@/services/resourceService';
 import { assignmentService } from '@/services/assignmentService';
 import type { Course } from '@/services/courseService';
+import { topicTypeLabel } from '@/services/courseTopicService';
 import type { Lesson, LessonResourceInfo } from '@/services/lessonService';
 import type { Assignment } from '@/services/assignmentService';
 import { formatDate } from '@/utils/date';
@@ -30,11 +31,14 @@ interface Props {
     onClose: () => void;
     course: Course;
     topicId?: number;
+    /** Mavzu nomi va turi — dars qaysi bo'limga tushayotgani ko'rinib tursin. */
+    topicTitle?: string;
+    topicType?: string | null;
     /** Berilgan bo'lsa — oyna tahrirlash rejimida ochiladi. */
     lesson?: Lesson | null;
 }
 
-export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: Props) {
+export function CourseLessonModal({ isOpen, onClose, course, topicId, topicTitle, topicType, lesson }: Props) {
     const createLesson = useCreateLesson();
     const updateLesson = useUpdateLesson();
     const isEditing = Boolean(lesson);
@@ -362,6 +366,18 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? "Darsni tahrirlash" : "Yangi dars"} className="max-w-2xl">
             <div className="space-y-5">
+                {topicTitle && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">Mavzu:</span>
+                        <span className="font-medium text-foreground">{topicTitle}</span>
+                        {/* Yangi mavzuning nomi turning o'zi — takrorlanmasin. */}
+                        {topicTypeLabel(topicType) && topicTypeLabel(topicType) !== topicTitle && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                                {topicTypeLabel(topicType)}
+                            </span>
+                        )}
+                    </div>
+                )}
                 <div>
                     <label className="mb-2 block text-sm font-medium">Dars nomi</label>
                     <Input
@@ -372,34 +388,42 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     />
                 </div>
 
-                <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                        <Youtube className="h-4 w-4 text-red-600" /> Video (YouTube havolasi)
-                        <span className="font-normal text-muted-foreground">(ixtiyoriy)</span>
-                    </label>
-                    <Input
-                        value={youtubeUrl}
-                        onChange={(event) => setYoutubeUrl(event.target.value)}
-                        placeholder="https://www.youtube.com/watch?v=..."
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi qabul qilinadi.</p>
-                </div>
+                {/* Yangi darsda faqat nomi va tavsifi so'raladi: video, resurs, uy
+                    vazifasi va testlar dars sahifasida qo'shiladi. Bularning hammasini
+                    yaratish oynasiga tiqish o'qituvchini bitta uzun forma oldida
+                    ushlab turardi, holbuki material odatda keyinroq tayyor bo'ladi. */}
+                {isEditing && (
+                    <>
+                    <div>
+                        <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                            <Youtube className="h-4 w-4 text-red-600" /> Video (YouTube havolasi)
+                            <span className="font-normal text-muted-foreground">(ixtiyoriy)</span>
+                        </label>
+                        <Input
+                            value={youtubeUrl}
+                            onChange={(event) => setYoutubeUrl(event.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=..."
+                        />
+                        <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi qabul qilinadi.</p>
+                    </div>
 
-                <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                        <Video className="h-4 w-4 text-primary" /> Jonli dars (Zoom havolasi)
-                        <span className="font-normal text-muted-foreground">(ixtiyoriy)</span>
-                    </label>
-                    <Input
-                        value={zoomUrl}
-                        onChange={(event) => setZoomUrl(event.target.value)}
-                        placeholder="https://us05web.zoom.us/j/89012345678?pwd=..."
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                        Zoom'da «Copy Invite Link» orqali olingan havola. Uchrashuvni siz Zoom ilovasida
-                        boshlaysiz, talabalar esa dars sahifasidan qo'shiladi.
-                    </p>
-                </div>
+                    <div>
+                        <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                            <Video className="h-4 w-4 text-primary" /> Jonli dars (Zoom havolasi)
+                            <span className="font-normal text-muted-foreground">(ixtiyoriy)</span>
+                        </label>
+                        <Input
+                            value={zoomUrl}
+                            onChange={(event) => setZoomUrl(event.target.value)}
+                            placeholder="https://us05web.zoom.us/j/89012345678?pwd=..."
+                        />
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                            Zoom'da «Copy Invite Link» orqali olingan havola. Uchrashuvni siz Zoom ilovasida
+                            boshlaysiz, talabalar esa dars sahifasidan qo'shiladi.
+                        </p>
+                    </div>
+                    </>
+                )}
 
                 {needsGroupChoice && (
                     <div>
@@ -424,416 +448,427 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, lesson }: 
                     />
                 </div>
 
-                <section className="rounded-xl border border-border/60 p-4">
-                    {isEditing && (
-                        <div className="mb-4 space-y-2">
-                            {otherResources.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">Qo'shimcha resurs yo'q.</p>
-                            ) : otherResources.map((resource) => (
-                                <div key={resource.id} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                                    {editingResourceId === resource.id ? (
-                                        <div className="space-y-2">
-                                            <Input
-                                                value={resourceDraft.title}
-                                                onChange={(event) => setResourceDraft((d) => ({ ...d, title: event.target.value }))}
-                                                placeholder="Resurs nomi"
-                                            />
-                                            {resource.link_url != null && (
+                {!isEditing && (
+                    <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        Video, Zoom havolasi, resurslar, uy vazifasi va testlar dars yaratilgandan
+                        keyin uning sahifasida qo'shiladi.
+                    </p>
+                )}
+
+                {isEditing && (
+                    <>
+                    <section className="rounded-xl border border-border/60 p-4">
+                        {isEditing && (
+                            <div className="mb-4 space-y-2">
+                                {otherResources.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">Qo'shimcha resurs yo'q.</p>
+                                ) : otherResources.map((resource) => (
+                                    <div key={resource.id} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                        {editingResourceId === resource.id ? (
+                                            <div className="space-y-2">
                                                 <Input
-                                                    value={resourceDraft.link}
-                                                    onChange={(event) => setResourceDraft((d) => ({ ...d, link: event.target.value }))}
-                                                    placeholder="https://..."
+                                                    value={resourceDraft.title}
+                                                    onChange={(event) => setResourceDraft((d) => ({ ...d, title: event.target.value }))}
+                                                    placeholder="Resurs nomi"
                                                 />
-                                            )}
-                                            <div className="flex justify-end gap-2">
-                                                <Button type="button" variant="outline" size="sm" onClick={() => setEditingResourceId(null)}>
-                                                    Bekor qilish
-                                                </Button>
-                                                <Button type="button" size="sm" onClick={() => void saveResource(resource)}>
-                                                    Saqlash
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <span className="min-w-0 flex-1 truncate text-sm">{resource.title}</span>
-                                            <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
-                                                {resource.resource_type}
-                                            </span>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label="Resursni tahrirlash"
-                                                className="h-7 w-7 text-muted-foreground"
-                                                onClick={() => startResourceEdit(resource)}
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label="Resursni o'chirish"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                onClick={() => void removeResource(resource.id)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold">Resurslar</p>
-                            <p className="text-xs text-muted-foreground">Kitob, hujjat yoki tashqi havola</p>
-                        </div>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setShowResources((value) => !value)}>
-                            <FilePlus2 className="h-4 w-4" /> {showResources ? 'Yopish' : "Resurs qo'shish"}
-                        </Button>
-                    </div>
-                    {showResources && (
-                        <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
-                            <div>
-                                {/* Brauzerning «No files selected» tugmasi o'rniga ikki teng
-                                    yoʻl: qurilmadan yuklash yoki kutubxonadan tanlash. */}
-                                <FileSourceField
-                                    label="Hujjat yoki kitob"
-                                    multiple
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
-                                    deviceHint="PDF, Word, Excel, PowerPoint, TXT yoki ZIP"
-                                    onFiles={(picked) => setExtraFiles((prev) => [...prev, ...picked])}
-                                    onPickLibrary={() => setResourcePickerOpen(true)}
-                                />
-                                {libraryResources.length > 0 && (
-                                    <ul className="mt-2 space-y-1.5">
-                                        {libraryResources.map((file) => (
-                                            <li
-                                                key={file.id}
-                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
-                                            >
-                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
-                                                <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                    kutubxonadan
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label="Olib tashlash"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                    onClick={() =>
-                                                        setLibraryResources((prev) =>
-                                                            prev.filter((item) => item.id !== file.id),
-                                                        )
-                                                    }
-                                                >
-                                                    <X className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                                {extraFiles.length > 0 && (
-                                    <ul className="mt-2 space-y-1.5">
-                                        {extraFiles.map((file, index) => (
-                                            <li
-                                                key={`${file.name}-${index}`}
-                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
-                                            >
-                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                                                <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                    {(file.size / 1024).toFixed(0)} KB
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label="Faylni ro'yxatdan olib tashlash"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                    onClick={() => setExtraFiles((prev) => prev.filter((_, i) => i !== index))}
-                                                >
-                                                    <X className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                            <div>
-                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Tashqi havolalar</label>
-                                {links.length > 0 && (
-                                    <div className="mb-2 space-y-2">
-                                        {links.map((link, index) => (
-                                            <div key={index} className="flex items-start gap-2">
-                                                <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                                                {resource.link_url != null && (
                                                     <Input
-                                                        value={link.url}
-                                                        onChange={(event) =>
-                                                            setLinks((prev) => prev.map((item, i) =>
-                                                                i === index ? { ...item, url: event.target.value } : item))
-                                                        }
+                                                        value={resourceDraft.link}
+                                                        onChange={(event) => setResourceDraft((d) => ({ ...d, link: event.target.value }))}
                                                         placeholder="https://..."
                                                     />
-                                                    <Input
-                                                        value={link.title}
-                                                        onChange={(event) =>
-                                                            setLinks((prev) => prev.map((item, i) =>
-                                                                i === index ? { ...item, title: event.target.value } : item))
-                                                        }
-                                                        placeholder="Havola nomi"
-                                                    />
+                                                )}
+                                                <div className="flex justify-end gap-2">
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => setEditingResourceId(null)}>
+                                                        Bekor qilish
+                                                    </Button>
+                                                    <Button type="button" size="sm" onClick={() => void saveResource(resource)}>
+                                                        Saqlash
+                                                    </Button>
                                                 </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="min-w-0 flex-1 truncate text-sm">{resource.title}</span>
+                                                <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                    {resource.resource_type}
+                                                </span>
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label="Havolani olib tashlash"
-                                                    className="mt-0.5 h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                                                    onClick={() => setLinks((prev) => prev.filter((_, i) => i !== index))}
+                                                    aria-label="Resursni tahrirlash"
+                                                    className="h-7 w-7 text-muted-foreground"
+                                                    onClick={() => startResourceEdit(resource)}
                                                 >
-                                                    <X className="h-4 w-4" />
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Resursni o'chirish"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => void removeResource(resource.id)}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </Button>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                )}
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-dashed"
-                                    onClick={() => setLinks((prev) => [...prev, { url: '', title: '' }])}
-                                >
-                                    <Plus className="h-4 w-4" /> Havola qo'shish
-                                </Button>
+                                ))}
                             </div>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-semibold">Resurslar</p>
+                                <p className="text-xs text-muted-foreground">Kitob, hujjat yoki tashqi havola</p>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setShowResources((value) => !value)}>
+                                <FilePlus2 className="h-4 w-4" /> {showResources ? 'Yopish' : "Resurs qo'shish"}
+                            </Button>
                         </div>
-                    )}
-                </section>
-
-                <section className="rounded-xl border border-border/60 p-4">
-                    {isEditing && (
-                        <div className="mb-4 space-y-2">
-                            {homeworks.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">Bu darsga vazifa biriktirilmagan.</p>
-                            ) : homeworks.map((homework) => (
-                                <div key={homework.id} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                                    {editingHomeworkId === homework.id ? (
-                                        <div className="space-y-2">
-                                            <Input
-                                                value={homeworkDraft.title}
-                                                onChange={(event) => setHomeworkDraft((d) => ({ ...d, title: event.target.value }))}
-                                                placeholder="Uy vazifasi sarlavhasi"
-                                            />
-                                            <textarea
-                                                className="min-h-16 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                                                value={homeworkDraft.description}
-                                                onChange={(event) => setHomeworkDraft((d) => ({ ...d, description: event.target.value }))}
-                                                placeholder="Vazifa tavsifi"
-                                            />
-                                            <div>
-                                                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Topshirish muddati</label>
-                                                <Input
-                                                    type="datetime-local"
-                                                    value={homeworkDraft.deadline}
-                                                    onChange={(event) => setHomeworkDraft((d) => ({ ...d, deadline: event.target.value }))}
-                                                />
-                                            </div>
-                                            <div className="flex justify-end gap-2">
-                                                <Button type="button" variant="outline" size="sm" onClick={() => setEditingHomeworkId(null)}>
-                                                    Bekor qilish
-                                                </Button>
-                                                <Button type="button" size="sm" onClick={() => void saveHomework(homework)}>
-                                                    Saqlash
-                                                </Button>
-                                            </div>
+                        {showResources && (
+                            <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
+                                <div>
+                                    {/* Brauzerning «No files selected» tugmasi o'rniga ikki teng
+                                        yoʻl: qurilmadan yuklash yoki kutubxonadan tanlash. */}
+                                    <FileSourceField
+                                        label="Hujjat yoki kitob"
+                                        multiple
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+                                        deviceHint="PDF, Word, Excel, PowerPoint, TXT yoki ZIP"
+                                        onFiles={(picked) => setExtraFiles((prev) => [...prev, ...picked])}
+                                        onPickLibrary={() => setResourcePickerOpen(true)}
+                                    />
+                                    {libraryResources.length > 0 && (
+                                        <ul className="mt-2 space-y-1.5">
+                                            {libraryResources.map((file) => (
+                                                <li
+                                                    key={file.id}
+                                                    className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                                >
+                                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
+                                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                        kutubxonadan
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label="Olib tashlash"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                        onClick={() =>
+                                                            setLibraryResources((prev) =>
+                                                                prev.filter((item) => item.id !== file.id),
+                                                            )
+                                                        }
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {extraFiles.length > 0 && (
+                                        <ul className="mt-2 space-y-1.5">
+                                            {extraFiles.map((file, index) => (
+                                                <li
+                                                    key={`${file.name}-${index}`}
+                                                    className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                                >
+                                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                        {(file.size / 1024).toFixed(0)} KB
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label="Faylni ro'yxatdan olib tashlash"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setExtraFiles((prev) => prev.filter((_, i) => i !== index))}
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Tashqi havolalar</label>
+                                    {links.length > 0 && (
+                                        <div className="mb-2 space-y-2">
+                                            {links.map((link, index) => (
+                                                <div key={index} className="flex items-start gap-2">
+                                                    <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                                                        <Input
+                                                            value={link.url}
+                                                            onChange={(event) =>
+                                                                setLinks((prev) => prev.map((item, i) =>
+                                                                    i === index ? { ...item, url: event.target.value } : item))
+                                                            }
+                                                            placeholder="https://..."
+                                                        />
+                                                        <Input
+                                                            value={link.title}
+                                                            onChange={(event) =>
+                                                                setLinks((prev) => prev.map((item, i) =>
+                                                                    i === index ? { ...item, title: event.target.value } : item))
+                                                            }
+                                                            placeholder="Havola nomi"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label="Havolani olib tashlash"
+                                                        className="mt-0.5 h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setLinks((prev) => prev.filter((_, i) => i !== index))}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <span className="min-w-0 flex-1 truncate text-sm">{homework.title}</span>
-                                            <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                {formatDate(homework.deadline)}
-                                            </span>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label="Vazifani tahrirlash"
-                                                className="h-7 w-7 text-muted-foreground"
-                                                onClick={() => startHomeworkEdit(homework)}
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label="Vazifani o'chirish"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                onClick={() => void removeHomework(homework.id)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-dashed"
+                                        onClick={() => setLinks((prev) => [...prev, { url: '', title: '' }])}
+                                    >
+                                        <Plus className="h-4 w-4" /> Havola qo'shish
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
+                    <section className="rounded-xl border border-border/60 p-4">
+                        {isEditing && (
+                            <div className="mb-4 space-y-2">
+                                {homeworks.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">Bu darsga vazifa biriktirilmagan.</p>
+                                ) : homeworks.map((homework) => (
+                                    <div key={homework.id} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                        {editingHomeworkId === homework.id ? (
+                                            <div className="space-y-2">
+                                                <Input
+                                                    value={homeworkDraft.title}
+                                                    onChange={(event) => setHomeworkDraft((d) => ({ ...d, title: event.target.value }))}
+                                                    placeholder="Uy vazifasi sarlavhasi"
+                                                />
+                                                <textarea
+                                                    className="min-h-16 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                                    value={homeworkDraft.description}
+                                                    onChange={(event) => setHomeworkDraft((d) => ({ ...d, description: event.target.value }))}
+                                                    placeholder="Vazifa tavsifi"
+                                                />
+                                                <div>
+                                                    <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Topshirish muddati</label>
+                                                    <Input
+                                                        type="datetime-local"
+                                                        value={homeworkDraft.deadline}
+                                                        onChange={(event) => setHomeworkDraft((d) => ({ ...d, deadline: event.target.value }))}
+                                                    />
+                                                </div>
+                                                <div className="flex justify-end gap-2">
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => setEditingHomeworkId(null)}>
+                                                        Bekor qilish
+                                                    </Button>
+                                                    <Button type="button" size="sm" onClick={() => void saveHomework(homework)}>
+                                                        Saqlash
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="min-w-0 flex-1 truncate text-sm">{homework.title}</span>
+                                                <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                    {formatDate(homework.deadline)}
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Vazifani tahrirlash"
+                                                    className="h-7 w-7 text-muted-foreground"
+                                                    onClick={() => startHomeworkEdit(homework)}
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Vazifani o'chirish"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => void removeHomework(homework.id)}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-semibold">Uy vazifasi</p>
+                                <p className="text-xs text-muted-foreground">Kerak bo'lsa darsga vazifa biriktiring</p>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setShowHomework((value) => !value)}>
+                                <ClipboardList className="h-4 w-4" /> {showHomework ? 'Yopish' : "Uy vazifasi qo'shish"}
+                            </Button>
+                        </div>
+                        {showHomework && (
+                            <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
+                                <div>
+                                    <Input value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} placeholder="Uy vazifasi sarlavhasi (ixtiyoriy)" />
+                                    <p className="mt-1 text-xs text-muted-foreground">Bo'sh qoldirsangiz, dars mavzusi nom bo'lib qo'yiladi.</p>
+                                </div>
+                                <textarea
+                                    className="min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                    value={homeworkDescription}
+                                    onChange={(event) => setHomeworkDescription(event.target.value)}
+                                    placeholder="Vazifa tavsifi"
+                                />
+                                <div>
+                                    {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi. */}
+                                    <FileSourceField
+                                        label="Vazifa fayllari"
+                                        multiple
+                                        deviceHint="Shart, namuna yoki tarqatma material"
+                                        onFiles={(picked) => setHomeworkFiles((prev) => [...prev, ...picked])}
+                                        onPickLibrary={() => setHomeworkPickerOpen(true)}
+                                    />
+                                    {libraryHomeworkFiles.length > 0 && (
+                                        <ul className="mt-2 space-y-1.5">
+                                            {libraryHomeworkFiles.map((file) => (
+                                                <li
+                                                    key={file.id}
+                                                    className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                                >
+                                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
+                                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                        kutubxonadan
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label="Olib tashlash"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                        onClick={() =>
+                                                            setLibraryHomeworkFiles((prev) =>
+                                                                prev.filter((item) => item.id !== file.id),
+                                                            )
+                                                        }
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {homeworkFiles.length > 0 && (
+                                        <ul className="mt-2 space-y-1.5">
+                                            {homeworkFiles.map((file, index) => (
+                                                <li
+                                                    key={`${file.name}-${index}`}
+                                                    className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
+                                                >
+                                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                        {(file.size / 1024).toFixed(0)} KB
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label="Faylni olib tashlash"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setHomeworkFiles((prev) => prev.filter((_, i) => i !== index))}
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Talaba qanday topshiradi</label>
+                                    <div className="flex flex-wrap gap-4">
+                                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowFile}
+                                                onChange={(event) => setAllowFile(event.target.checked)}
+                                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                            />
+                                            Fayl yuklaydi
+                                        </label>
+                                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowText}
+                                                onChange={(event) => setAllowText(event.target.checked)}
+                                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                            />
+                                            Matn yozadi
+                                        </label>
+                                    </div>
+                                    {allowFile && (
+                                        <div className="mt-3">
+                                            <p className="mb-2 text-xs text-muted-foreground">
+                                                Qabul qilinadigan fayl turlari — hech biri tanlanmasa, cheklov qo'yilmaydi.
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {FILE_TYPE_OPTIONS.map((option) => {
+                                                    const active = allowedTypes.includes(option.value);
+                                                    return (
+                                                        <button
+                                                            key={option.value}
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAllowedTypes((prev) =>
+                                                                    active
+                                                                        ? prev.filter((v) => v !== option.value)
+                                                                        : [...prev, option.value])
+                                                            }
+                                                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                                                active
+                                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                                    : 'border-border text-muted-foreground hover:border-primary/40'
+                                                            }`}
+                                                        >
+                                                            {option.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold">Uy vazifasi</p>
-                            <p className="text-xs text-muted-foreground">Kerak bo'lsa darsga vazifa biriktiring</p>
-                        </div>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setShowHomework((value) => !value)}>
-                            <ClipboardList className="h-4 w-4" /> {showHomework ? 'Yopish' : "Uy vazifasi qo'shish"}
-                        </Button>
-                    </div>
-                    {showHomework && (
-                        <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
-                            <div>
-                                <Input value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} placeholder="Uy vazifasi sarlavhasi (ixtiyoriy)" />
-                                <p className="mt-1 text-xs text-muted-foreground">Bo'sh qoldirsangiz, dars mavzusi nom bo'lib qo'yiladi.</p>
-                            </div>
-                            <textarea
-                                className="min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                                value={homeworkDescription}
-                                onChange={(event) => setHomeworkDescription(event.target.value)}
-                                placeholder="Vazifa tavsifi"
-                            />
-                            <div>
-                                {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi. */}
-                                <FileSourceField
-                                    label="Vazifa fayllari"
-                                    multiple
-                                    deviceHint="Shart, namuna yoki tarqatma material"
-                                    onFiles={(picked) => setHomeworkFiles((prev) => [...prev, ...picked])}
-                                    onPickLibrary={() => setHomeworkPickerOpen(true)}
-                                />
-                                {libraryHomeworkFiles.length > 0 && (
-                                    <ul className="mt-2 space-y-1.5">
-                                        {libraryHomeworkFiles.map((file) => (
-                                            <li
-                                                key={file.id}
-                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
-                                            >
-                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate text-sm">{file.title}</span>
-                                                <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                    kutubxonadan
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label="Olib tashlash"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                    onClick={() =>
-                                                        setLibraryHomeworkFiles((prev) =>
-                                                            prev.filter((item) => item.id !== file.id),
-                                                        )
-                                                    }
-                                                >
-                                                    <X className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                                {homeworkFiles.length > 0 && (
-                                    <ul className="mt-2 space-y-1.5">
-                                        {homeworkFiles.map((file, index) => (
-                                            <li
-                                                key={`${file.name}-${index}`}
-                                                className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2"
-                                            >
-                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                                                <span className="shrink-0 text-[11px] text-muted-foreground">
-                                                    {(file.size / 1024).toFixed(0)} KB
-                                                </span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label="Faylni olib tashlash"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                    onClick={() => setHomeworkFiles((prev) => prev.filter((_, i) => i !== index))}
-                                                >
-                                                    <X className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                            <div>
-                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Talaba qanday topshiradi</label>
-                                <div className="flex flex-wrap gap-4">
-                                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                        <input
-                                            type="checkbox"
-                                            checked={allowFile}
-                                            onChange={(event) => setAllowFile(event.target.checked)}
-                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                        />
-                                        Fayl yuklaydi
-                                    </label>
-                                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                        <input
-                                            type="checkbox"
-                                            checked={allowText}
-                                            onChange={(event) => setAllowText(event.target.checked)}
-                                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                        />
-                                        Matn yozadi
-                                    </label>
+                                <div>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Topshirish muddati</label>
+                                    <Input type="datetime-local" value={homeworkDeadline} onChange={(event) => setHomeworkDeadline(event.target.value)} />
                                 </div>
-                                {allowFile && (
-                                    <div className="mt-3">
-                                        <p className="mb-2 text-xs text-muted-foreground">
-                                            Qabul qilinadigan fayl turlari — hech biri tanlanmasa, cheklov qo'yilmaydi.
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {FILE_TYPE_OPTIONS.map((option) => {
-                                                const active = allowedTypes.includes(option.value);
-                                                return (
-                                                    <button
-                                                        key={option.value}
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setAllowedTypes((prev) =>
-                                                                active
-                                                                    ? prev.filter((v) => v !== option.value)
-                                                                    : [...prev, option.value])
-                                                        }
-                                                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                                                            active
-                                                                ? 'border-primary bg-primary/10 text-primary'
-                                                                : 'border-border text-muted-foreground hover:border-primary/40'
-                                                        }`}
-                                                    >
-                                                        {option.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
-                            <div>
-                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Topshirish muddati</label>
-                                <Input type="datetime-local" value={homeworkDeadline} onChange={(event) => setHomeworkDeadline(event.target.value)} />
-                            </div>
-                        </div>
-                    )}
-                </section>
+                        )}
+                    </section>
+                    </>
+                )}
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="-mx-6 -mb-4 flex justify-end gap-2 border-t border-border/60 px-6 pt-4">

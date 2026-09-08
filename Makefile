@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply restore-dates restore-dates-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply restore-dates restore-dates-apply
 
 .DEFAULT_GOAL := help
 
@@ -42,6 +42,8 @@ help:
 	@echo "make eduplan-sync      - Sync org-structure directories + workloads now"
 	@echo "make eduplan-workloads - Sync only teacher workloads"
 	@echo "make eduplan-cron      - Print the crontab line for a nightly 00:00 run"
+	@echo "make hemis-students    - Import students from HEMIS (incremental; ARGS=--full for all)"
+	@echo "make hemis-cron        - Print the crontab lines for HEMIS student import"
 	@echo ""
 
 # Start development services (localhost, no nginx)
@@ -117,6 +119,17 @@ eduplan-workloads:
 eduplan-cron:
 	@echo "# EduPlan sync — nightly at 00:00 (server must be Asia/Tashkent)"
 	@echo "0 0 * * * $(CURDIR)/scripts/eduplan_sync.sh >> /dev/null 2>&1"
+
+# Import students from HEMIS. Incremental by default; --full walks all pages.
+hemis-students:
+	@./scripts/hemis_student_sync.sh $(ARGS)
+
+# Print the crontab lines for HEMIS student import
+hemis-cron:
+	@echo "# HEMIS students — incremental every night at 01:00"
+	@echo "0 1 * * * $(CURDIR)/scripts/hemis_student_sync.sh >> /dev/null 2>&1"
+	@echo "# full walk once a week, Sunday 02:00 — picks up rows HEMIS didn't mark as changed"
+	@echo "0 2 * * 0 $(CURDIR)/scripts/hemis_student_sync.sh --full >> /dev/null 2>&1"
 
 # Run database migrations
 migrate:

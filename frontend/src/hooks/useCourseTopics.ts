@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { courseTopicService, type CourseTopicCreateRequest } from '@/services/courseTopicService';
+import {
+    courseTopicService,
+    type CourseTopicCreateRequest,
+    type CourseTopicUpdateRequest,
+} from '@/services/courseTopicService';
 
 export const useCourseTopics = (courseId?: number, enabled = true) => useQuery({
     queryKey: ['course-topics', courseId],
@@ -22,7 +26,7 @@ export const useCreateCourseTopic = () => {
 export const useUpdateCourseTopic = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { title?: string; order_index?: number } }) =>
+        mutationFn: ({ id, data }: { id: number; data: CourseTopicUpdateRequest }) =>
             courseTopicService.update(id, data),
         onSuccess: (topic) => {
             queryClient.invalidateQueries({ queryKey: ['course-topics', topic.course_id] });

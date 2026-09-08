@@ -27,6 +27,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     // O'qituvchi va talabada — F.I.SH, qolganlarida login.
     const displayName = displayNameOf(user, activeRole);
 
+
     const sections = useMemo(() => {
         // Ko'rinish tanlangan bo'lsa — faqat o'sha rol, aks holda barchasi.
         const roleNames = (activeRole ? [activeRole] : (user?.roles ?? [])).map((r) => r.name);

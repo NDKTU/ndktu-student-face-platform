@@ -69,6 +69,10 @@ class EduPlanGroup(_Lenient):
     course: Optional[int] = None
     student_count: Optional[int] = None
     education_shape: Optional[str] = None
+    #: Та же группа в студенческом HEMIS. EPOS хранит эту связку сам, и до сих
+    #: пор мы её просто выбрасывали — а потом восстанавливали голосованием по
+    #: студентам и сопоставлением имён. Читаем как обычное зеркальное поле.
+    hemis_id: Optional[str] = None
 
 
 class EduPlanSubject(_Lenient):

@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Loader2, ArrowLeft, RefreshCw, UserCheck, AlertCircle,
-    CheckCircle2, XCircle, Users, GraduationCap,
+    CheckCircle2, Users, GraduationCap,
     ChevronRight, Check, Info, ShieldCheck, Database, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { hemisService } from '@/services/hemisService';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
+import { HemisGroupMatch } from '@/components/hemis/HemisGroupMatch';
+import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
 
 /* Шаги мастера: проверка данных → синхронизация → готово. */
 const STEPS = ['Tekshirish', 'Sinxronlash', 'Yakun'];
@@ -109,17 +111,18 @@ const HemisSyncPage = () => {
         }
     });
 
+    // Login/parolsiz kirilganda bu sahifa endi xato emas: bitta talabaning
+    // sehrgari o'sha parametrlar bilan ochiladi, ularsiz esa ommaviy
+    // vositalar — token va guruhlarni bog'lash — ko'rsatiladi.
     if (!login || !password) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-                <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
-                    <XCircle className="w-10 h-10 text-destructive" />
-                </div>
-                <h1 className="text-2xl font-bold mb-2">Noto'g'ri so'rov</h1>
-                <p className="text-muted-foreground max-w-sm mb-8">Login yoki parol taqdim etilmagan. Iltimos, talabalar sahifasidan qaytadan urinib ko'ring.</p>
-                <Button onClick={() => navigate('/students')} size="lg">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Orqaga qaytish
-                </Button>
+            <div className="space-y-5">
+                <PageHeader
+                    title="HEMIS sinxronizatsiyasi"
+                    description="Ma'lumot API tokeni va guruhlarni bog'lash. Bitta talabani sinxronlash talabalar sahifasidan ochiladi."
+                />
+                <HemisGroupMatch />
+                <HemisStudentImport />
             </div>
         );
     }

@@ -149,7 +149,16 @@ class UserService:
         try:
             access_token = await eduplan_auth_service.login(session, data.username, data.password)
             return UserLoginResponse(type="Bearer", access_token=access_token)
-        except HTTPException:
+        except HTTPException as exc:
+            # Mahalliy hisob uchun EduPlan xabarini ko'rsatish chalg'itadi:
+            # odam «EduPlan qabul qilmadi» ni o'qib, integratsiyani tuzatishga
+            # kirishadi, aslida esa oddiy parol xato. EduPlan matni faqat
+            # bizda umuman yo'q hisoblar uchun ma'noli.
+            if user is not None and user.password:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Login yoki parol noto'g'ri",
+                ) from exc
             raise
         except Exception as e:
             logger.error("EduPlan login fallback failed: %s", e)

@@ -265,7 +265,16 @@ class StudentRepository:
             "faculty": faculty_name,
             "level": _extract(me_data.get("level")),
             "semester": _extract(me_data.get("semester")),
-            "address": me_data.get("address", ""),
+            # Тот же порядок источников, что и в массовом импорте
+            # (`hemis/student_sync.py::_fields`): служебный список отдаёт
+            # только `district`/`province`, и если здесь брать сначала
+            # `address`, два синхронизатора будут по очереди переписывать
+            # адрес друг друга — при каждом входе студента и каждую ночь.
+            "address": (
+                _extract(me_data.get("district"))
+                or _extract(me_data.get("province"))
+                or me_data.get("address", "")
+            ),
             "group_id": group_id,
         }
 

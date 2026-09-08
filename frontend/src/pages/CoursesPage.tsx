@@ -19,6 +19,7 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useTeachers } from '@/hooks/useTeachers';
 import type { Course } from '@/services/courseService';
 import { CourseModal } from '@/components/courses/CourseModal';
@@ -32,6 +33,18 @@ import { Combobox } from '@/components/ui/Combobox';
 
 type SortField = 'subject' | 'teacher' | 'semester';
 type SortOrder = 'asc' | 'desc';
+
+type FilterOption = { value: string; label: string };
+
+/** Filtr ro'yxati uchun sahifa hajmi: qidiruv serverda, shuning uchun ko'p
+ *  yuklashning hojati yo'q. */
+const FILTER_PAGE_SIZE = 50;
+
+/** Tanlangan qiymat qidiruv natijasida bo'lmasa ham ro'yxatda qolsin. */
+const withSelected = (list: FilterOption[], selected: FilterOption | null): FilterOption[] =>
+    selected && !list.some((option) => option.value === selected.value)
+        ? [selected, ...list]
+        : list;
 
 export const CoursesPage = () => {
     const navigate = useNavigate();
@@ -79,9 +92,45 @@ export const CoursesPage = () => {
         refetch,
     } = useCourses(currentPage, pageSize, parsedTeacherId, parsedSubjectId, parsedGroupId);
 
-    const { data: allSubjectsData } = useSubjects(1, 500, '', undefined, hasPermission('read:subject'));
-    const { data: allGroupsData } = useGroups(1, 500, '', undefined, undefined, hasPermission('read:group'));
-    const { data: allTeachersData } = useTeachers(1, 500, undefined, isAdmin && hasPermission('read:teacher'));
+    // Filtrlar serverda qidiradi, mijozda emas. Ilgari birinchi 500 satr
+    // yuklanib, ro'yxat o'sha ichida filtrlanardi — bazada esa 650 guruh,
+    // 819 o'qituvchi va 2935 fan bor, ya'ni kerakli qator ko'pincha
+    // ro'yxatga umuman tushmasdi va «Ma'lumot topilmadi» chiqardi.
+    const [subjectQuery, setSubjectQuery] = useState('');
+    const [groupQuery, setGroupQuery] = useState('');
+    const [teacherQuery, setTeacherQuery] = useState('');
+    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
+    const debouncedGroupQuery = useDebouncedValue(groupQuery);
+    const debouncedTeacherQuery = useDebouncedValue(teacherQuery);
+
+    const { data: allSubjectsData } = useSubjects(
+        1,
+        FILTER_PAGE_SIZE,
+        debouncedSubjectQuery,
+        undefined,
+        hasPermission('read:subject'),
+    );
+    const { data: allGroupsData } = useGroups(
+        1,
+        FILTER_PAGE_SIZE,
+        debouncedGroupQuery,
+        undefined,
+        undefined,
+        hasPermission('read:group'),
+    );
+    const { data: allTeachersData } = useTeachers(
+        1,
+        FILTER_PAGE_SIZE,
+        debouncedTeacherQuery || undefined,
+        isAdmin && hasPermission('read:teacher'),
+    );
+
+    // Tanlangan qiymat qidiruv natijasidan tushib qolishi mumkin — u holda
+    // Combobox nom o'rniga placeholder ko'rsatardi, go'yo filtr olib
+    // tashlangandek. Shuning uchun tanlov alohida eslab qolinadi.
+    const [selectedSubjectOption, setSelectedSubjectOption] = useState<FilterOption | null>(null);
+    const [selectedGroupOption, setSelectedGroupOption] = useState<FilterOption | null>(null);
+    const [selectedTeacherOption, setSelectedTeacherOption] = useState<FilterOption | null>(null);
 
     const deleteCourseMutation = useDeleteCourse();
 
@@ -95,21 +144,24 @@ export const CoursesPage = () => {
 
     const subjectOptions = useMemo(() => {
         const list = allSubjects.map((s) => ({ value: String(s.id), label: s.name }));
-        return [{ value: 'all', label: 'Barcha fanlar' }, ...list];
-    }, [allSubjects]);
+        return [{ value: 'all', label: 'Barcha fanlar' }, ...withSelected(list, selectedSubjectOption)];
+    }, [allSubjects, selectedSubjectOption]);
 
     const groupOptions = useMemo(() => {
         const list = allGroups.map((g) => ({ value: String(g.id), label: g.name }));
-        return [{ value: 'all', label: 'Barcha guruhlar' }, ...list];
-    }, [allGroups]);
+        return [{ value: 'all', label: 'Barcha guruhlar' }, ...withSelected(list, selectedGroupOption)];
+    }, [allGroups, selectedGroupOption]);
 
     const teacherOptions = useMemo(() => {
         const list = allTeachers.map((t) => ({
             value: String(t.user_id),
             label: t.full_name || t.user?.username || `ID: ${t.id}`,
         }));
-        return [{ value: 'all', label: "Barcha o'qituvchilar" }, ...list];
-    }, [allTeachers]);
+        return [
+            { value: 'all', label: "Barcha o'qituvchilar" },
+            ...withSelected(list, selectedTeacherOption),
+        ];
+    }, [allTeachers, selectedTeacherOption]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -258,22 +310,32 @@ export const CoursesPage = () => {
                             <Combobox
                                 options={subjectOptions}
                                 value={filterSubjectId}
+                                onSearchChange={setSubjectQuery}
                                 onChange={(val) => {
                                     setFilterSubjectId(val);
+                                    setSelectedSubjectOption(
+                                        subjectOptions.find((o) => o.value === val) ?? null
+                                    );
                                     setCurrentPage(1);
                                 }}
                                 placeholder="Fan bo'yicha"
+                                searchPlaceholder="Fan nomi..."
                             />
                         </div>
                         <div className="w-[180px] sm:w-[220px]">
                             <Combobox
                                 options={groupOptions}
                                 value={filterGroupId}
+                                onSearchChange={setGroupQuery}
                                 onChange={(val) => {
                                     setFilterGroupId(val);
+                                    setSelectedGroupOption(
+                                        groupOptions.find((o) => o.value === val) ?? null
+                                    );
                                     setCurrentPage(1);
                                 }}
                                 placeholder="Guruh bo'yicha"
+                                searchPlaceholder="Guruh nomi..."
                             />
                         </div>
                         {isAdmin && (
@@ -281,11 +343,16 @@ export const CoursesPage = () => {
                                 <Combobox
                                     options={teacherOptions}
                                     value={filterTeacherId}
+                                    onSearchChange={setTeacherQuery}
                                     onChange={(val) => {
                                         setFilterTeacherId(val);
+                                        setSelectedTeacherOption(
+                                            teacherOptions.find((o) => o.value === val) ?? null
+                                        );
                                         setCurrentPage(1);
                                     }}
                                     placeholder="O'qituvchi bo'yicha"
+                                    searchPlaceholder="F.I.SH..."
                                 />
                             </div>
                         )}
@@ -395,7 +462,7 @@ export const CoursesPage = () => {
                                     {/* Fan Nomi */}
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
+                                            <span className="flex items-center gap-2 font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
                                                 {subjectName}
                                             </span>
                                         </div>

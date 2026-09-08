@@ -23,8 +23,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
+import { CourseAttendanceJournal } from '@/components/courses/CourseAttendanceJournal';
 import { CourseTopicModal } from '@/components/courses/CourseTopicModal';
-import type { CourseTopic } from '@/services/courseTopicService';
+import { topicTypeLabel, type CourseTopic } from '@/services/courseTopicService';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
 
@@ -37,6 +38,8 @@ export default function CourseDetailPage() {
     const canCreateLessons = hasPermission('create:lesson');
     const canUpdateLessons = hasPermission('update:lesson');
     const canDeleteLessons = hasPermission('delete:lesson');
+    // Jurnal o'qituvchi va adminniki: talabada `read:attendance` yo'q.
+    const canReadAttendance = hasPermission('read:attendance');
 
     const [topicModalOpen, setTopicModalOpen] = useState(false);
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
@@ -141,6 +144,8 @@ export default function CourseDetailPage() {
             toast.error("Mavzuni o'chirishda xatolik yuz berdi");
         }
     };
+
+    const selectedTopic = topics.find((item) => item.id === selectedTopicId);
 
     const lessonsForTopic = (topicId: number) => lessons.filter((lesson) => lesson.topic_id === topicId);
     const orphanLessons = lessons.filter((lesson) => !lesson.topic_id);
@@ -280,7 +285,17 @@ export default function CourseDetailPage() {
                                                 </span>
                                                 <span className="min-w-0 flex-1">
                                                     <span className="block truncate text-sm font-semibold text-foreground">{topic.title}</span>
-                                                    <span className="text-xs text-muted-foreground">{topicLessons.length} ta dars</span>
+                                                    <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                                                        {/* Yangi mavzularning nomi turning o'zi — nishonni ikkinchi
+                                                            marta ko'rsatish shart emas. U turlar joriy qilinishidan
+                                                            oldingi, nomi qo'lda yozilgan mavzular uchun qoladi. */}
+                                                        {topicTypeLabel(topic.topic_type) && topicTypeLabel(topic.topic_type) !== topic.title && (
+                                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+                                                                {topicTypeLabel(topic.topic_type)}
+                                                            </span>
+                                                        )}
+                                                        <span>{topicLessons.length} ta dars</span>
+                                                    </span>
                                                 </span>
                                                 {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                                             </button>
@@ -339,6 +354,15 @@ export default function CourseDetailPage() {
                 </section>
             )}
 
+            {canReadAttendance && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Davomat jurnali</h2>
+                    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                        <CourseAttendanceJournal courseId={course.id} />
+                    </div>
+                </section>
+            )}
+
             <CourseTopicModal
                 isOpen={topicModalOpen}
                 onClose={() => { setTopicModalOpen(false); setEditingTopic(null); }}
@@ -351,6 +375,8 @@ export default function CourseDetailPage() {
                 onClose={() => { setLessonModalOpen(false); setEditingLesson(null); }}
                 course={course}
                 topicId={selectedTopicId}
+                topicTitle={selectedTopic?.title}
+                topicType={selectedTopic?.topic_type}
                 lesson={editingLesson}
             />
             <ConfirmDialog

@@ -21,6 +21,7 @@ import {
     Database,
     Home,
     Megaphone,
+    RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -225,6 +226,19 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
     return sections;
 };
 
+// Пункты, которые не следуют правилу `read:<resource>` -> RESOURCES[resource]:
+// у страницы своё право, не привязанное к CRUD справочника. Тот же приём, что
+// и STUDENT_BESPOKE_ITEMS, только для сотрудников.
+const STAFF_BESPOKE_ITEMS: { name: string; href: string; icon: LucideIcon; permission: string; section: string }[] = [
+    {
+        name: 'HEMIS sinxronizatsiyasi',
+        href: '/admin/hemis-sync',
+        icon: RefreshCw,
+        permission: 'hemis_admin_sync',
+        section: 'Sozlamalar',
+    },
+];
+
 export const buildSidebar = (
     permissions: ReadonlySet<string>,
     roleNames: ReadonlyArray<string>
@@ -244,6 +258,11 @@ export const buildSidebar = (
             href: meta.href,
             icon: meta.icon,
         });
+    }
+
+    for (const item of STAFF_BESPOKE_ITEMS) {
+        if (!permissions.has(item.permission)) continue;
+        (grouped[item.section] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
     }
 
     const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');

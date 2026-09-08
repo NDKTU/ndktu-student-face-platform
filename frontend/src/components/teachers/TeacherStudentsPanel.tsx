@@ -7,10 +7,19 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { useTeacherStudents } from '@/hooks/useTeachers';
+import { useAttendanceStats } from '@/hooks/useAttendance';
+import { usePermission } from '@/components/auth/PermissionGate';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
+
+const percentColor = (percent: number | null | undefined) => {
+    if (percent == null) return 'text-muted-foreground';
+    if (percent >= 85) return 'text-emerald-600 dark:text-emerald-400';
+    if (percent >= 60) return 'text-amber-600 dark:text-amber-400';
+    return 'text-rose-600 dark:text-rose-400';
+};
 
 /**
  * O'qituvchining talabalari — universitetning barcha talabalari emas, faqat
@@ -18,7 +27,14 @@ const PAGE_SIZE = 20;
  * olinadi (sahifadagi talabalardan yig'ilmaydi), aks holda filtr birinchi
  * sahifada uchragan guruhlar bilan cheklanib qolardi.
  */
-export const TeacherStudentsPanel = ({ teacherId }: { teacherId: number }) => {
+export const TeacherStudentsPanel = ({
+    teacherId,
+    teacherUserId,
+}: {
+    teacherId: number;
+    /** Davomat foizini shu o'qituvchining kurslari bilan cheklash uchun. */
+    teacherUserId?: number;
+}) => {
     const [page, setPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -41,6 +57,18 @@ export const TeacherStudentsPanel = ({ teacherId }: { teacherId: number }) => {
 
     const groups = data?.groups ?? [];
     const students = data?.students ?? [];
+
+    // Foiz faqat sahifadagi talabalar uchun so'raladi — butun ro'yxatni
+    // hisoblashning hojati yo'q.
+    const canReadAttendance = usePermission('read:attendance');
+    const { data: attendance } = useAttendanceStats(
+        students.map((s) => s.id),
+        { teacherUserId, enabled: canReadAttendance }
+    );
+    const attendanceById = useMemo(
+        () => new Map((attendance ?? []).map((row) => [row.student_id, row])),
+        [attendance]
+    );
     const total = data?.total ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -123,6 +151,9 @@ export const TeacherStudentsPanel = ({ teacherId }: { teacherId: number }) => {
                             <TableHead className="font-bold text-xs">Guruh</TableHead>
                             <TableHead className="font-bold text-xs hidden md:table-cell">Talaba ID</TableHead>
                             <TableHead className="font-bold text-xs hidden lg:table-cell">Kurs / semestr</TableHead>
+                            {canReadAttendance && (
+                                <TableHead className="text-right font-bold text-xs">Davomat</TableHead>
+                            )}
                             <TableHead className="text-right font-bold text-xs pr-5 hidden lg:table-cell">GPA</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -161,6 +192,20 @@ export const TeacherStudentsPanel = ({ teacherId }: { teacherId: number }) => {
                                         {student.level || '—'} / {student.semester || '—'}
                                     </span>
                                 </TableCell>
+                                {canReadAttendance && (
+                                    <TableCell className="text-right">
+                                        <span
+                                            className={cn(
+                                                'font-mono text-xs font-semibold',
+                                                percentColor(attendanceById.get(student.id)?.percent)
+                                            )}
+                                        >
+                                            {attendanceById.get(student.id)?.percent == null
+                                                ? '—'
+                                                : `${attendanceById.get(student.id)!.percent}%`}
+                                        </span>
+                                    </TableCell>
+                                )}
                                 <TableCell className="text-right pr-5 hidden lg:table-cell">
                                     <span className="font-mono text-xs font-semibold">
                                         {student.avg_gpa != null ? student.avg_gpa.toFixed(1) : '—'}
