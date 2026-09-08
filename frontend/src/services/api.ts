@@ -2,6 +2,10 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/env';
 import { getToken, clearToken, setLogoutReason } from '@/services/tokenStorage';
 
+//: Kirish so'rovlari: bulardagi 401 sessiyaning tugashi emas, balki
+//  noto'g'ri parol. Global qayta yo'naltirish bularga tegmasligi kerak.
+const LOGIN_PATHS = ['/user/login', '/hemis/login'];
+
 const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 10000,
@@ -40,7 +44,14 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Kirish so'rovining o'zidagi 401 — «parol noto'g'ri», sessiya
+        // tugagani emas. Bu yerda sahifani qayta yuklash formaning endigina
+        // qo'ygan xato matnini o'chirib yuboradi: odam bo'sh forma ko'radi va
+        // nima bo'lganini tushunmaydi. Xatoni forma o'zi ko'rsatadi.
+        const requestUrl: string = originalRequest?.url ?? '';
+        const isLoginRequest = LOGIN_PATHS.some((path) => requestUrl.includes(path));
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isLoginRequest) {
             originalRequest._retry = true;
 
             // Remove token and redirect on 401.
