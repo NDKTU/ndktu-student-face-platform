@@ -4,6 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
+#: Kursning mashg'ulot turi. EPOS yuklamasi `lecture`, `practice`, `lab`
+#: beradi; `seminar` unda yo'q va faqat qo'lda yaratiladi.
+COURSE_TYPE_VALUES = Literal["lecture", "practice", "lab", "seminar"]
+
 
 class CourseSubjectInfo(BaseModel):
     id: int
@@ -43,11 +47,13 @@ class CourseSpecialityInfo(BaseModel):
 
 
 class CourseCreateRequest(BaseModel):
-    # Название собирается на сервере из предмета, групп и семестра. Поле осталось
-    # необязательным ради старых клиентов: присланное имя имеет приоритет.
+    # Название собирается на сервере из предмета, групп, типа и семестра. Поле
+    # осталось необязательным ради старых клиентов: присланное имя имеет приоритет.
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     subject_id: int
     teacher_id: int
+    #: Majburiy: kurs endi «fan + semestr + o'qituvchi + tur» to'rtligi.
+    course_type: COURSE_TYPE_VALUES
     description: Optional[str] = None
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     group_ids: List[int] = Field(default_factory=list)
@@ -60,6 +66,7 @@ class CourseUpdateRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     subject_id: Optional[int] = None
     teacher_id: Optional[int] = None
+    course_type: Optional[COURSE_TYPE_VALUES] = None
     description: Optional[str] = None
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     group_ids: Optional[List[int]] = None
@@ -74,17 +81,19 @@ class CourseResponse(BaseModel):
     description: Optional[str] = None
     subject_id: int
     teacher_id: int
+    course_type: Optional[str] = None
     semester_number: Optional[int] = None
     faculty_id: Optional[int] = None
     kafedra_id: Optional[int] = None
     speciality_id: Optional[int] = None
+    #: False — kurs arxivda: EPOS yuklamasida endi yo'q.
+    is_active: bool = True
     subject: Optional[CourseSubjectInfo] = None
     teacher: Optional[CourseTeacherInfo] = None
     faculty: Optional[CourseFacultyInfo] = None
     kafedra: Optional[CourseKafedraInfo] = None
     speciality: Optional[CourseSpecialityInfo] = None
     groups: List[CourseGroupInfo] = []
-    topic_count: int = 0
     lesson_count: int = 0
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
@@ -96,6 +105,10 @@ class CourseListRequest(BaseModel):
     teacher_id: Optional[int] = None
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
+    course_type: Optional[COURSE_TYPE_VALUES] = None
+    #: Yuborilmasa — faqat faol kurslar. `false` — arxiv. Aralash ro'yxat
+    #: ataylab yo'q: arxivdagi kurs faol kurslar orasida chalkashtiradi.
+    is_active: Optional[bool] = None
     semester_number: Optional[int] = None
     faculty_id: Optional[int] = None
     kafedra_id: Optional[int] = None

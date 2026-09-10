@@ -14,6 +14,8 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
+    Archive,
+    X,
 } from 'lucide-react';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
@@ -30,8 +32,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Combobox } from '@/components/ui/Combobox';
+import { COURSE_TYPE_OPTIONS, courseTypeLabel, type CourseType } from '@/services/courseTypes';
 
-type SortField = 'subject' | 'teacher' | 'semester';
+type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
 
 type FilterOption = { value: string; label: string };
@@ -70,6 +73,10 @@ export const CoursesPage = () => {
     const [filterSubjectId, setFilterSubjectId] = useState<string>('all');
     const [filterGroupId, setFilterGroupId] = useState<string>('all');
     const [filterTeacherId, setFilterTeacherId] = useState<string>('all');
+    const [filterCourseType, setFilterCourseType] = useState<string>('all');
+    // Arxiv — EPOS yuklamasidan yo'qolgan kurslar. Ular o'chirilmaydi (jurnal
+    // ularga bog'langan), lekin faol ro'yxatda ham turmasligi kerak.
+    const [showArchived, setShowArchived] = useState(false);
     const [sortField, setSortField] = useState<SortField>('subject');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
@@ -84,13 +91,23 @@ export const CoursesPage = () => {
     const parsedSubjectId = filterSubjectId !== 'all' && filterSubjectId ? Number(filterSubjectId) : undefined;
     const parsedGroupId = filterGroupId !== 'all' && filterGroupId ? Number(filterGroupId) : undefined;
     const parsedTeacherId = filterTeacherId !== 'all' && filterTeacherId ? Number(filterTeacherId) : undefined;
+    const parsedCourseType =
+        filterCourseType !== 'all' && filterCourseType ? (filterCourseType as CourseType) : undefined;
 
     const {
         data: coursesData,
         isLoading: isCoursesLoading,
         isError: isCoursesError,
         refetch,
-    } = useCourses(currentPage, pageSize, parsedTeacherId, parsedSubjectId, parsedGroupId);
+    } = useCourses({
+        page: currentPage,
+        limit: pageSize,
+        teacherId: parsedTeacherId,
+        subjectId: parsedSubjectId,
+        groupId: parsedGroupId,
+        courseType: parsedCourseType,
+        isActive: showArchived ? false : undefined,
+    });
 
     // Filtrlar serverda qidiradi, mijozda emas. Ilgari birinchi 500 satr
     // yuklanib, ro'yxat o'sha ichida filtrlanardi — bazada esa 650 guruh,
@@ -163,6 +180,39 @@ export const CoursesPage = () => {
         ];
     }, [allTeachers, selectedTeacherOption]);
 
+    // Filtrlarning bir qismi serverga ketadi, bir qismi (qidiruv) mijozda
+    // ishlaydi — tozalash tugmasi ikkalasini ham nolga qaytaradi.
+    const hasActiveFilters =
+        Boolean(searchTerm)
+        || filterSubjectId !== 'all'
+        || filterGroupId !== 'all'
+        || filterTeacherId !== 'all'
+        || filterCourseType !== 'all'
+        || showArchived;
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setFilterSubjectId('all');
+        setFilterGroupId('all');
+        setFilterTeacherId('all');
+        setFilterCourseType('all');
+        setShowArchived(false);
+        // Combobox tanlangan qiymatni alohida eslab qoladi — u ham tozalanadi,
+        // aks holda ro'yxat bo'shab, tanlov nomi ekranda qolib ketardi.
+        setSelectedSubjectOption(null);
+        setSelectedGroupOption(null);
+        setSelectedTeacherOption(null);
+        setCurrentPage(1);
+    };
+
+    const courseTypeOptions = useMemo(
+        () => [
+            { value: 'all', label: 'Barcha turlar' },
+            ...COURSE_TYPE_OPTIONS.map((option) => ({ value: option.value as string, label: option.label })),
+        ],
+        [],
+    );
+
     const handleSort = (field: SortField) => {
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -194,6 +244,9 @@ export const CoursesPage = () => {
             } else if (sortField === 'teacher') {
                 valA = (a.teacher?.full_name || a.teacher?.username || '').toLowerCase();
                 valB = (b.teacher?.full_name || b.teacher?.username || '').toLowerCase();
+            } else if (sortField === 'type') {
+                valA = courseTypeLabel(a.course_type)?.toLowerCase() || '';
+                valB = courseTypeLabel(b.course_type)?.toLowerCase() || '';
             } else if (sortField === 'semester') {
                 valA = a.semester_number ?? 0;
                 valB = b.semester_number ?? 0;
@@ -338,6 +391,31 @@ export const CoursesPage = () => {
                                 searchPlaceholder="Guruh nomi..."
                             />
                         </div>
+                        <div className="w-[150px] sm:w-[170px]">
+                            <Combobox
+                                options={courseTypeOptions}
+                                value={filterCourseType}
+                                onChange={(val) => {
+                                    setFilterCourseType(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Turi bo'yicha"
+                                searchPlaceholder="Tur..."
+                            />
+                        </div>
+                        <Button
+                            variant={showArchived ? 'primary' : 'outline'}
+                            size="sm"
+                            className="h-9 gap-1.5"
+                            onClick={() => {
+                                setShowArchived((prev) => !prev);
+                                setCurrentPage(1);
+                            }}
+                            title="EPOS yuklamasidan yo'qolgan kurslar"
+                        >
+                            <Archive className="h-4 w-4" />
+                            <span>Arxiv</span>
+                        </Button>
                         {isAdmin && (
                             <div className="w-[180px] sm:w-[220px]">
                                 <Combobox
@@ -355,6 +433,17 @@ export const CoursesPage = () => {
                                     searchPlaceholder="F.I.SH..."
                                 />
                             </div>
+                        )}
+                        {hasActiveFilters && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 gap-1.5 text-muted-foreground"
+                                onClick={clearFilters}
+                            >
+                                <X className="h-4 w-4" />
+                                <span>Tozalash</span>
+                            </Button>
                         )}
                     </div>
                 }
@@ -392,12 +481,17 @@ export const CoursesPage = () => {
             ) : sortedCourses.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={6}
-                        title="Kurslar topilmadi"
+                        colSpan={7}
+                        title={showArchived ? 'Arxiv bo\'sh' : 'Kurslar topilmadi'}
                         description={
-                            searchTerm || filterSubjectId !== 'all' || filterGroupId !== 'all'
-                                ? "Tanlangan filtrlarga mos kurs topilmadi."
-                                : "Hozircha kurslar qo'shilmagan."
+                            showArchived
+                                ? "Hech bir kurs arxivga o'tkazilmagan."
+                                : searchTerm ||
+                                    filterSubjectId !== 'all' ||
+                                    filterGroupId !== 'all' ||
+                                    filterCourseType !== 'all'
+                                  ? 'Tanlangan filtrlarga mos kurs topilmadi.'
+                                  : "Hozircha kurslar qo'shilmagan."
                         }
                     />
                 </div>
@@ -414,6 +508,15 @@ export const CoursesPage = () => {
                                 <div className="flex items-center">
                                     <span>Fan Nomi</span>
                                     {renderSortIcon('subject')}
+                                </div>
+                            </TableHead>
+                            <TableHead
+                                onClick={() => handleSort('type')}
+                                className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
+                            >
+                                <div className="flex items-center justify-center">
+                                    <span>Turi</span>
+                                    {renderSortIcon('type')}
                                 </div>
                             </TableHead>
                             <TableHead className="font-bold text-xs">Biriktirilgan Guruhlar</TableHead>
@@ -466,6 +569,13 @@ export const CoursesPage = () => {
                                                 {subjectName}
                                             </span>
                                         </div>
+                                    </TableCell>
+
+                                    {/* Turi */}
+                                    <TableCell className="text-center">
+                                        <span className="inline-flex items-center justify-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                                            {courseTypeLabel(course.course_type) ?? '—'}
+                                        </span>
                                     </TableCell>
 
                                     {/* Biriktirilgan Guruhlar */}
@@ -530,6 +640,7 @@ export const CoursesPage = () => {
                                     </div>
                                 }
                                 metrics={[
+                                    { label: 'Turi', value: courseTypeLabel(course.course_type) ?? '—' },
                                     { label: 'Semestr', value: course.semester_number ? `${course.semester_number}` : '—' },
                                     { label: 'Guruh', value: `${(course.groups || []).length} ta` },
                                 ]}

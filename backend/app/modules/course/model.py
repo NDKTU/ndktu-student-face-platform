@@ -22,8 +22,12 @@ class Course(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
 
     ``ExternalRefMixin`` avtomatik yaratilgan kurslarni qoʻlda tuzilganidan
     ajratish uchun: EPOS'da kurs degan obyekt yoʻq, shuning uchun
-    ``external_id`` ni oʻzimiz yigʻamiz — ``{oʻquv_yili}:{fan}:{oʻqituvchi}``.
-    Usiz takroriy progn oʻsha kurslarni qaytadan yaratardi.
+    ``external_id`` ni oʻzimiz yigʻamiz —
+    ``{oʻquv_yili}:{fan}:{oʻqituvchi}:{semestr}:{tur}``. Usiz takroriy progn
+    oʻsha kurslarni qaytadan yaratardi.
+
+    ``is_active`` — arxiv. EPOS yuklamasidan yoʻqolgan kurs oʻchirilmaydi:
+    unga darslar, davomat jurnali, uy vazifalari va baholar bogʻlangan.
     """
 
     __tablename__ = "courses"
@@ -45,6 +49,12 @@ class Course(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         index=True,
     )
     semester_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    #: lecture | practice | lab | seminar. Mashg'ulot turi kursning o'zida:
+    #: EPOS yuklamasi aynan shu kesimda keladi va har bir tur alohida
+    #: o'qituvchining alohida yuklamasi bo'ladi. Enum emas, satr — yangi
+    #: tur qo'shish migratsiyasiz bo'lishi kerak. Eski kurslarda `lecture`.
+    course_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     faculty_id: Mapped[int | None] = mapped_column(
         Integer,
@@ -89,13 +99,6 @@ class Course(Base, IdIntPk, TimestampMixin, ExternalRefMixin):
         "Lesson",
         back_populates="course",
     )
-    topics: Mapped[list["CourseTopic"]] = relationship(
-        "CourseTopic",
-        back_populates="course",
-        cascade="all, delete-orphan",
-        order_by="CourseTopic.order_index",
-    )
-
     resources: Mapped[list["Resource"]] = relationship(
         "Resource",
         back_populates="course",
@@ -169,35 +172,6 @@ class CourseGroup(Base, IdIntPk, TimestampMixin):
         return f"CourseGroup course={self.course_id} group={self.group_id}"
 
 
-class CourseTopic(Base, IdIntPk, TimestampMixin):
-    """Kurs mavzusi — darslar shu mavzu ichida yig'iladi."""
-
-    __tablename__ = "course_topics"
-
-    course_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("courses.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    #: lecture | lab | seminar. Mashg'ulot turi mavzu darajasida beriladi:
-    #: o'quv rejada soatlar aynan shu kesimda bo'linadi, va mavzu ichidagi
-    #: barcha darslar bir xil turda bo'ladi. Yangi dars turini qo'shish
-    #: migratsiyasiz bo'lishi uchun enum emas, satr. Eski mavzularda NULL —
-    #: ular tur tanlanmagunicha shundayligicha qoladi.
-    topic_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-
-    course: Mapped["Course"] = relationship("Course", back_populates="topics")
-    lessons: Mapped[list["Lesson"]] = relationship("Lesson", back_populates="course_topic")
-
-    def __str__(self):
-        return f"CourseTopic {self.id} ({self.title})"
-
-
 class Lesson(Base, IdIntPk, TimestampMixin):
     __tablename__ = "lessons"
 
@@ -225,13 +199,8 @@ class Lesson(Base, IdIntPk, TimestampMixin):
         nullable=False,
         index=True,
     )
-    topic_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("course_topics.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-
+    #: lecture | practice | lab | seminar | independent. Odatda kursning
+    #: turidan olinadi; qo'lda tanlash mustaqil ta'lim darsi uchun qoladi.
     lesson_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Jonli darsda yuz nazorati. O'qituvchi o'zi yoqadi: har bir dars uchun
@@ -247,7 +216,6 @@ class Lesson(Base, IdIntPk, TimestampMixin):
     teacher_subject: Mapped["TeacherSubject"] = relationship("TeacherSubject")
     group: Mapped["Group | None"] = relationship("Group")
     course: Mapped["Course"] = relationship("Course", back_populates="lessons")
-    course_topic: Mapped["CourseTopic | None"] = relationship("CourseTopic", back_populates="lessons")
     resources: Mapped[list["Resource"]] = relationship(
         "Resource", back_populates="lesson", cascade="all, delete-orphan"
     )

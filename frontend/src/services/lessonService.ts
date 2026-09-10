@@ -17,12 +17,6 @@ export interface LessonGroupInfo {
     name: string;
 }
 
-export interface LessonTopicInfo {
-    id: number;
-    title: string;
-    order_index: number;
-}
-
 export interface LessonResourceInfo {
     id: number;
     resource_type: string;
@@ -32,7 +26,9 @@ export interface LessonResourceInfo {
     order_index: number;
 }
 
-export type LessonType = 'lecture' | 'seminar' | 'independent' | 'lab';
+/** Kurs turlariga «mustaqil ta'lim» qo'shiladi: u yuklama turi emas va
+ *  faqat dars darajasida uchraydi. Odatda dars turini kursdan meros oladi. */
+export type LessonType = 'lecture' | 'practice' | 'lab' | 'seminar' | 'independent';
 
 export interface Lesson {
     id: number;
@@ -41,7 +37,6 @@ export interface Lesson {
     group_id: number | null;
     course_id: number;
     sinf_id?: number | null;
-    topic_id?: number | null;
     lesson_type?: LessonType | null;
     /** Jonli darsda yuz nazorati — o'qituvchi yoqadi. */
     face_check_enabled?: boolean;
@@ -53,7 +48,6 @@ export interface Lesson {
     updated_at: string;
     teacher_subject?: LessonTeacherSubjectInfo | null;
     group?: LessonGroupInfo | null;
-    course_topic?: LessonTopicInfo | null;
     resources: LessonResourceInfo[];
 }
 
@@ -71,7 +65,6 @@ export interface LessonCreateRequest {
     group_id?: number;
     course_id?: number;
     sinf_id?: number | null;
-    topic_id?: number | null;
     lesson_type?: LessonType | null;
     duration_minutes?: number | null;
     topic: string;
@@ -86,7 +79,6 @@ export interface LessonUpdateRequest {
     group_id?: number;
     course_id?: number;
     sinf_id?: number | null;
-    topic_id?: number | null;
     lesson_type?: LessonType | null;
     duration_minutes?: number | null;
     topic?: string;
@@ -99,7 +91,6 @@ export interface LessonListParams {
     group_id?: number;
     course_id?: number;
     sinf_id?: number;
-    topic_id?: number;
     date_from?: string;
     date_to?: string;
     page?: number;

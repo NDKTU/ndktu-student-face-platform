@@ -7,6 +7,7 @@ async def _create_course(auth_client, test_teacher, test_subject, test_faculty, 
         json={
             "name": name,
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": group_ids,
             "faculty_id": test_faculty["id"],

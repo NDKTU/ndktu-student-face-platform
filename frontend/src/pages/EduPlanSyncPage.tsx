@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
     AlertCircle,
     AlertTriangle,
+    Archive,
     CheckCircle2,
     Link2,
     Loader2,
@@ -48,6 +49,7 @@ import {
     type RunResponse,
     type RunState,
 } from '@/services/eduplanService';
+import { COURSE_TYPE_OPTIONS, courseTypeLabel } from '@/services/courseTypes';
 
 const ENTITY_LABEL: Record<EduPlanEntity, string> = {
     faculty: 'Fakultetlar',
@@ -698,20 +700,23 @@ const ConnectionSettingsCard = () => {
  */
 const CourseGenerationCard = () => {
     const [opened, setOpened] = useState(false);
+    const [confirmArchive, setConfirmArchive] = useState(false);
     const preview = useEduPlanCoursePreview(opened);
     const applyCourses = useEduPlanApplyCourses();
 
     const data = preview.data;
     const summary = data?.summary;
 
-    const handleApply = async () => {
+    const handleApply = async (archive: boolean) => {
         try {
-            const result = await applyCourses.mutateAsync();
-            toast.success(
-                result.created
-                    ? `${result.created} ta kurs yaratildi`
-                    : 'Yangi kurs yoʻq — hammasi allaqachon yaratilgan',
-            );
+            const result = await applyCourses.mutateAsync(archive);
+            const parts = [
+                result.created ? `${result.created} ta kurs yaratildi` : '',
+                result.restored ? `${result.restored} tasi arxivdan qaytdi` : '',
+                result.archived ? `${result.archived} tasi arxivga o'tdi` : '',
+            ].filter(Boolean);
+            toast.success(parts.length ? parts.join(', ') : 'Oʻzgarish yoʻq — hammasi joyida');
+            setConfirmArchive(false);
         } catch (e) {
             toast.error(errorText(e));
         }
@@ -727,9 +732,9 @@ const CourseGenerationCard = () => {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    Kursning egasi — maʼruza oʻqiydigan oʻqituvchi. Uning oʻsha fan va
-                    semestrdagi barcha guruhlari bitta kursga birlashadi, amaliyot va
-                    laboratoriya olib boradiganlar assistent boʻlib qoʻshiladi.
+                    Kurs — «fan + semestr + oʻqituvchi + mashgʻulot turi». Har bir tur alohida
+                    kurs boʻladi va uning egasi — oʻsha turni olib boradigan oʻqituvchining
+                    oʻzi. Seminar EPOS yuklamasida yoʻq: u faqat qoʻlda yaratiladi.
                 </p>
 
                 {!opened ? (
@@ -747,17 +752,36 @@ const CourseGenerationCard = () => {
                     </Notice>
                 ) : summary ? (
                     <>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                             <Stat label="Jami" value={summary.total} />
                             <Stat label="Yaratiladi" value={summary.to_create} />
+                            <Stat label="Arxivdan qaytadi" value={summary.to_restore} muted />
                             <Stat label="Allaqachon bor" value={summary.existing} muted />
-                            <Stat label="Maʼruzachisiz fanlar" value={summary.skipped_subjects} muted />
+                            <Stat label="Arxivga tushadi" value={summary.to_archive} muted />
                         </div>
+
+                        {data && Object.keys(data.by_type).length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {COURSE_TYPE_OPTIONS.filter((option) => data.by_type[option.value]).map(
+                                    (option) => (
+                                        <span
+                                            key={option.value}
+                                            className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+                                        >
+                                            {option.label}: {data.by_type[option.value]}
+                                        </span>
+                                    ),
+                                )}
+                            </div>
+                        )}
 
                         <div className="flex flex-wrap gap-2">
                             <Button
-                                onClick={handleApply}
-                                disabled={applyCourses.isPending || summary.to_create === 0}
+                                onClick={() => void handleApply(false)}
+                                disabled={
+                                    applyCourses.isPending
+                                    || (summary.to_create === 0 && summary.to_restore === 0)
+                                }
                             >
                                 {applyCourses.isPending ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -778,23 +802,61 @@ const CourseGenerationCard = () => {
 
                         {data && data.plans.length > 0 && <CoursePlanTable plans={data.plans} />}
 
-                        {data && data.skipped.length > 0 && (
+                        {data && data.archive.length > 0 && (
                             <Notice
                                 tone="warning"
                                 icon={<AlertTriangle className="h-4 w-4 shrink-0" />}
                             >
                                 <div className="mb-1 font-medium">
-                                    Maʼruza oʻqituvchisi biriktirilmagani uchun kurs yaratilmadi:
+                                    EPOS yuklamasida qolmagan {data.archive.length} ta kurs:
                                 </div>
-                                <ul className="list-inside list-disc space-y-0.5">
-                                    {data.skipped.map((s) => (
-                                        <li key={`${s.subject_id}-${s.semester_type}`}>
-                                            {s.subject_name}
-                                            {s.semester_type ? ` (${s.semester_type})` : ''} —{' '}
-                                            {s.group_names.join(', ')}
+                                <ul className="mb-2 list-inside list-disc space-y-0.5">
+                                    {data.archive.map((row) => (
+                                        <li key={row.course_id}>
+                                            {row.name}
+                                            {row.teacher_name ? ` — ${row.teacher_name}` : ''}
+                                            {row.lesson_count > 0 ? ` (${row.lesson_count} ta dars)` : ''}
                                         </li>
                                     ))}
                                 </ul>
+                                <p className="mb-2">
+                                    Ular oʻchirilmaydi — arxivga oʻtadi. Darslar, davomat jurnali va
+                                    baholar joyida qoladi, lekin kurs faol roʻyxatlarda koʻrinmaydi.
+                                </p>
+                                {data.archive_blocked ? (
+                                    <p className="font-medium">
+                                        Bu juda koʻp: odatda bunday holat yuklama toʻliq
+                                        yuklanmaganini bildiradi. Avval yuklamani qayta import
+                                        qiling.
+                                    </p>
+                                ) : confirmArchive ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => void handleApply(true)}
+                                            disabled={applyCourses.isPending}
+                                        >
+                                            Ha, arxivga oʻtkazilsin
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setConfirmArchive(false)}
+                                        >
+                                            Bekor qilish
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setConfirmArchive(true)}
+                                    >
+                                        <Archive className="mr-2 h-4 w-4" />
+                                        Arxivga oʻtkazish
+                                    </Button>
+                                )}
                             </Notice>
                         )}
                     </>
@@ -810,10 +872,10 @@ const CoursePlanTable = ({ plans }: { plans: CoursePlan[] }) => (
             <TableHeader>
                 <TableRow>
                     <TableHead>Fan</TableHead>
-                    <TableHead>Asosiy oʻqituvchi</TableHead>
+                    <TableHead>Turi</TableHead>
+                    <TableHead>Oʻqituvchi</TableHead>
                     <TableHead>Semestr</TableHead>
                     <TableHead>Guruhlar</TableHead>
-                    <TableHead>Assistent</TableHead>
                     <TableHead>Holat</TableHead>
                 </TableRow>
             </TableHeader>
@@ -821,6 +883,9 @@ const CoursePlanTable = ({ plans }: { plans: CoursePlan[] }) => (
                 {plans.map((p) => (
                     <TableRow key={p.external_id}>
                         <TableCell className="font-medium">{p.subject_name}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                            {courseTypeLabel(p.course_type)}
+                        </TableCell>
                         <TableCell>{p.teacher_name ?? '—'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                             {p.semester_type ?? '—'}
@@ -828,15 +893,8 @@ const CoursePlanTable = ({ plans }: { plans: CoursePlan[] }) => (
                         <TableCell className="text-muted-foreground">
                             {p.group_names.join(', ')}
                         </TableCell>
-                        <TableCell>
-                            <CountBadge value={p.assistant_user_ids.length} tone="primary" />
-                        </TableCell>
-                        <TableCell>
-                            {p.exists ? (
-                                <span className="badge badge-muted">bor</span>
-                            ) : (
-                                <span className="badge badge-success">yangi</span>
-                            )}
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {p.exists ? 'Bor' : p.archived ? 'Arxivdan qaytadi' : 'Yaratiladi'}
                         </TableCell>
                     </TableRow>
                 ))}

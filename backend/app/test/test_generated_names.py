@@ -83,6 +83,7 @@ async def test_course_name_and_org_fields_are_derived(
         "/course/",
         json={
             "subject_id": subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "semester_number": 1,
             "group_ids": [test_group["id"]],
@@ -91,7 +92,7 @@ async def test_course_name_and_org_fields_are_derived(
 
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == f"Fizika — {test_group['name']} (1-semestr)"
+    assert data["name"] == f"Fizika — {test_group['name']} (ma'ruza, kuzgi semestr)"
     # Кафедра — от предмета, факультет — от группы: их больше не выбирают руками,
     # но фильтры списка курсов по-прежнему на них смотрят.
     assert data["kafedra_id"] == test_kafedra["id"]
@@ -104,6 +105,7 @@ async def test_course_name_follows_semester_change(auth_client, test_user, test_
         "/course/",
         json={
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "semester_number": 1,
             "group_ids": [test_group["id"]],
@@ -118,4 +120,7 @@ async def test_course_name_follows_semester_change(auth_client, test_user, test_
     )
 
     assert update_response.status_code == 200
-    assert update_response.json()["name"] == f"{test_subject.name} — {test_group['name']} (2-semestr)"
+    assert (
+        update_response.json()["name"]
+        == f"{test_subject.name} — {test_group['name']} (ma'ruza, bahorgi semestr)"
+    )

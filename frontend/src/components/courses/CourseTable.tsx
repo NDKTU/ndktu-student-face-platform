@@ -1,4 +1,5 @@
 import { Pencil, Trash2, Library, ChevronRight } from 'lucide-react';
+import { courseTypeLabel } from '@/services/courseTypes';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { PermissionGate } from '@/components/auth/PermissionGate';
@@ -101,8 +102,10 @@ export const CourseTable = ({ courses, isLoading, isError, onRetry, onEdit, onDe
 
                         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/60 pt-4">
                             <div className="min-w-0">
-                                <p className="font-display text-lg font-bold text-foreground">{course.topic_count ?? 0}</p>
-                                <p className="text-xs text-muted-foreground">Mavzu</p>
+                                <p className="font-display text-lg font-bold text-foreground">
+                                    {courseTypeLabel(course.course_type) ?? '—'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Turi</p>
                             </div>
                             <div>
                                 <p className="font-display text-lg font-bold text-primary">{course.lesson_count ?? 0}</p>

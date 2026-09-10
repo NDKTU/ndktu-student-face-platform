@@ -23,6 +23,7 @@ async def course_with_two_groups(auth_client, test_teacher, test_subject, test_f
         json={
             "name": "Oqim kursi",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": [first.json()["id"], second.json()["id"]],
             "faculty_id": test_faculty["id"],

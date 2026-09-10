@@ -6,6 +6,7 @@
  */
 
 import { semesterLabel } from '@/utils/semester';
+import { courseTypeNameLabel } from '@/services/courseTypes';
 
 const formatDate = (date: Date) =>
     `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
@@ -27,11 +28,12 @@ export const buildQuizTitle = (
     return withSemester(parts.join(' — '), semesterNumber);
 };
 
-/** «Oliy matematika — 101-19, 102-19 (kuzgi semestr)» */
+/** «Oliy matematika — 101-19, 102-19 (amaliyot, kuzgi semestr)» */
 export const buildCourseName = (
     subjectName?: string,
     groupNames: string[] = [],
     semesterNumber?: number,
+    courseType?: string,
 ): string => {
     let name = subjectName || 'Kurs';
     if (groupNames.length > 0) {
@@ -41,5 +43,6 @@ export const buildCourseName = (
         const shown = sorted.slice(0, 3).join(', ');
         name = `${name} — ${sorted.length > 3 ? `${shown} +${sorted.length - 3}` : shown}`;
     }
-    return withSemester(name, semesterNumber);
+    const parts = [courseTypeNameLabel(courseType), semesterLabel(semesterNumber)].filter(Boolean);
+    return parts.length > 0 ? `${name} (${parts.join(', ')})` : name;
 };

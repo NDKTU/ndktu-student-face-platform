@@ -14,6 +14,7 @@ import { logger } from '@/utils/logger';
 import { buildCourseName } from '@/utils/generatedNames';
 import { courseSchema, type CourseFormValues } from '@/schemas/course';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
+import { COURSE_TYPE_OPTIONS } from '@/services/courseTypes';
 
 interface CourseModalProps {
     isOpen: boolean;
@@ -28,6 +29,8 @@ const selectClassName =
 const emptyForm: CourseFormValues = {
     teacher_id: '',
     subject_id: '',
+    // Ma'ruza — eng ko'p uchraydigan tur (bazadagi yuklamaning yarmi).
+    course_type: 'lecture',
     semester_number: '',
     group_ids: [],
 };
@@ -54,6 +57,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
 
     const teacherId = watch('teacher_id');
     const subjectId = watch('subject_id');
+    const courseType = watch('course_type');
     const semesterNumber = watch('semester_number');
     const selectedGroupIds = watch('group_ids');
 
@@ -108,6 +112,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
             reset({
                 teacher_id: course.teacher_id.toString(),
                 subject_id: course.subject_id.toString(),
+                course_type: course.course_type ?? 'lecture',
                 semester_number: course.semester_number ? course.semester_number.toString() : '',
                 group_ids: course.groups.map(g => g.id),
             });
@@ -119,14 +124,20 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     const previewName = useMemo(() => {
         const subjectName = subjectOptions.find(o => o.value === subjectId)?.label;
         const groupNames = groupOptions.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name);
-        return buildCourseName(subjectName, groupNames, semesterNumber ? parseInt(semesterNumber, 10) : undefined);
-    }, [subjectOptions, subjectId, groupOptions, selectedGroupIds, semesterNumber]);
+        return buildCourseName(
+            subjectName,
+            groupNames,
+            semesterNumber ? parseInt(semesterNumber, 10) : undefined,
+            courseType,
+        );
+    }, [subjectOptions, subjectId, groupOptions, selectedGroupIds, semesterNumber, courseType]);
 
     const onSubmit = (data: CourseFormValues) => {
         // Nom yuborilmaydi — uni server fan, guruhlar va semestrdan yig'adi.
         const payload: CourseCreateRequest | CourseUpdateRequest = {
             subject_id: parseInt(data.subject_id, 10),
             teacher_id: parseInt(data.teacher_id, 10),
+            course_type: data.course_type,
             semester_number: parseInt(data.semester_number, 10),
             group_ids: data.group_ids,
         };
@@ -203,6 +214,22 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
                         </p>
                     )}
                     {errors.subject_id && <p className="text-sm text-destructive">{errors.subject_id.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Mashg'ulot turi</label>
+                    <select className={selectClassName} {...register('course_type')}>
+                        {COURSE_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                    {errors.course_type && (
+                        <p className="text-sm text-destructive">{errors.course_type.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        Har bir tur — alohida kurs: jurnali ham, materiallari ham o'zining.
+                        Seminar EPOS yuklamasida yo'q, u faqat shu yerdan yaratiladi.
+                    </p>
                 </div>
 
                 <div className="space-y-2">

@@ -342,6 +342,7 @@ async def _teacher_with_lesson(auth_client, test_teacher, test_subject, test_gro
         json={
             "name": "Course with a lesson",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": [test_group["id"]],
             "faculty_id": test_faculty["id"],

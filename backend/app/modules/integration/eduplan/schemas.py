@@ -256,16 +256,21 @@ class EduPlanSettingsOut(BaseModel):
 #  Yuklamadan kurs yigʻish
 # ---------------------------------------------------------------------- #
 class CoursePlan(BaseModel):
-    """Bitta kurs taklifi: fan + semestr + maʼruzachi + guruhlar."""
+    """Bitta kurs taklifi: fan + semestr + oʻqituvchi + mashgʻulot turi."""
 
     external_id: str
-    #: Shu kalitli kurs allaqachon bor. Takroriy prognda qayta yaratilmaydi.
+    #: Shu kalitli faol kurs allaqachon bor. Takroriy prognda qayta yaratilmaydi.
     exists: bool = False
+    #: Kurs arxivda turibdi va yuklamada yana paydo boʻldi — qaytariladi.
+    archived: bool = False
 
     subject_id: int
     subject_name: str
     teacher_user_id: int
     teacher_name: Optional[str] = None
+
+    #: lecture | practice | lab. Seminar EPOS yuklamasida yoʻq.
+    course_type: str
 
     semester_type: Optional[str] = None
     #: «Bahorgi, Kuzgi» birlashgan qiymatida semestr raqami boʻlmaydi.
@@ -274,34 +279,50 @@ class CoursePlan(BaseModel):
 
     group_ids: list[int] = Field(default_factory=list)
     group_names: list[str] = Field(default_factory=list)
-    #: Amaliyot va laboratoriya olib boradigan oʻqituvchilar.
-    assistant_user_ids: list[int] = Field(default_factory=list)
 
 
-class CourseSkipped(BaseModel):
-    """Maʼruzachisi topilmagani uchun kurs yasalmagan guruhlar."""
+class CourseArchiveRow(BaseModel):
+    """EPOS yuklamasida qolmagan kurs. Oʻchirilmaydi — arxivga oʻtadi."""
 
-    subject_id: int
-    subject_name: str
-    semester_type: Optional[str] = None
+    course_id: int
+    name: str
+    course_type: Optional[str] = None
+    teacher_name: Optional[str] = None
     group_names: list[str] = Field(default_factory=list)
-    reason: str
+    #: Adminga qaror uchun: darslari bor kursni arxivlash jurnalni yashiradi.
+    lesson_count: int = 0
 
 
 class CoursePreviewResponse(BaseModel):
     plans: list[CoursePlan] = Field(default_factory=list)
-    skipped: list[CourseSkipped] = Field(default_factory=list)
-    #: ``apply`` dan keyin haqiqatda yaratilgan kurslar soni.
+    #: Yuklamada qolmagan, arxivga tushishi mumkin boʻlgan kurslar.
+    archive: list[CourseArchiveRow] = Field(default_factory=list)
+    #: ``apply`` dan keyin haqiqatda oʻzgargan kurslar soni.
     created: int = 0
+    restored: int = 0
+    archived: int = 0
+    #: Arxivlash chegaradan oshib ketdi — sabab odatda boʻsh yuklama.
+    archive_blocked: bool = False
 
     @computed_field
     @property
     def summary(self) -> dict[str, int]:
         """Interfeys sarlavhasidagi sonlar."""
         existing = sum(1 for p in self.plans if p.exists)
+        restorable = sum(1 for p in self.plans if p.archived)
         return {
             "total": len(self.plans),
             "existing": existing,
-            "to_create": len(self.plans) - existing,
-            "skipped_subjects": len(self.skipped),
+            "to_create": len(self.plans) - existing - restorable,
+            "to_restore": restorable,
+            "to_archive": len(self.archive),
         }
+
+    @computed_field
+    @property
+    def by_type(self) -> dict[str, int]:
+        """Turlar kesimi — sinxronizatsiya kartasidagi raqamlar."""
+        counts: dict[str, int] = {}
+        for plan in self.plans:
+            counts[plan.course_type] = counts.get(plan.course_type, 0) + 1
+        return counts

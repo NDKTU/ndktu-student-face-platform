@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     ArrowLeft,
     BookOpen,
-    ChevronDown,
     ChevronRight,
     Clock3,
     GripVertical,
@@ -15,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useCourse } from '@/hooks/useCourses';
 import { useDeleteLesson, useLessons } from '@/hooks/useLessons';
-import { useCourseTopics, useDeleteCourseTopic } from '@/hooks/useCourseTopics';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -24,10 +22,9 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
 import { CourseAttendanceJournal } from '@/components/courses/CourseAttendanceJournal';
-import { CourseTopicModal } from '@/components/courses/CourseTopicModal';
-import { topicTypeLabel, type CourseTopic } from '@/services/courseTopicService';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
+import { courseTypeLabel } from '@/services/courseTypes';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -35,40 +32,25 @@ export default function CourseDetailPage() {
     const { hasPermission } = useAuth();
     const courseId = id ? Number.parseInt(id, 10) : undefined;
     const canReadLessons = hasPermission('read:lesson');
-    const canCreateLessons = hasPermission('create:lesson');
-    const canUpdateLessons = hasPermission('update:lesson');
-    const canDeleteLessons = hasPermission('delete:lesson');
     // Jurnal o'qituvchi va adminniki: talabada `read:attendance` yo'q.
     const canReadAttendance = hasPermission('read:attendance');
 
-    const [topicModalOpen, setTopicModalOpen] = useState(false);
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
-    const [selectedTopicId, setSelectedTopicId] = useState<number>();
-    const [editingTopic, setEditingTopic] = useState<CourseTopic | null>(null);
-    const [deletingTopic, setDeletingTopic] = useState<CourseTopic | null>(null);
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
     // Bekend 409 bilan «nima yo'qoladi» ro'yxatini qaytaradi — uni ko'rsatib,
     // ikkinchi bosishda `force` bilan yuboramiz.
     const [lessonCascadeWarnings, setLessonCascadeWarnings] = useState<string[]>([]);
-    const [expandedTopics, setExpandedTopics] = useState<Set<number>>(new Set());
 
     const courseQuery = useCourse(courseId);
-    const topicsQuery = useCourseTopics(courseId, canReadLessons);
     const lessonsQuery = useLessons(
         courseId ? { course_id: courseId, page: 1, limit: 500 } : undefined,
         Boolean(courseId && canReadLessons),
     );
-    const deleteTopic = useDeleteCourseTopic();
     const deleteLesson = useDeleteLesson();
 
-    const topics = useMemo(() => topicsQuery.data ?? [], [topicsQuery.data]);
+    // Darslar sana bo'yicha keladi — kursning o'tilish tartibi shu.
     const lessons = lessonsQuery.data?.lessons ?? [];
-
-    useEffect(() => {
-        if (topics.length === 0) return;
-        setExpandedTopics((current) => current.size > 0 ? current : new Set([topics[0].id]));
-    }, [topics]);
 
     if (!courseId || Number.isNaN(courseId)) {
         return <EmptyState title="Kurs topilmadi" description="Kurs identifikatori noto'g'ri." />;
@@ -88,23 +70,15 @@ export default function CourseDetailPage() {
     const course = courseQuery.data;
     if (!course) return <EmptyState title="Kurs topilmadi" description="Bu kurs o'chirilgan yoki mavjud emas." />;
 
-    const toggleTopic = (topicId: number) => {
-        setExpandedTopics((current) => {
-            const next = new Set(current);
-            if (next.has(topicId)) next.delete(topicId);
-            else next.add(topicId);
-            return next;
-        });
-    };
+    // Arxivdagi kurs faqat o'qish uchun: jurnal va materiallar joyida qoladi,
+    // lekin unga yangi dars qo'shish ma'nosiz — u yuklamada endi yo'q.
+    const isArchived = !course.is_active;
+    const canCreateLessons = hasPermission('create:lesson') && !isArchived;
+    const canUpdateLessons = hasPermission('update:lesson') && !isArchived;
+    const canDeleteLessons = hasPermission('delete:lesson') && !isArchived;
 
-    const openNewTopic = () => {
-        setEditingTopic(null);
-        setTopicModalOpen(true);
-    };
-
-    const openNewLesson = (topicId: number) => {
+    const openNewLesson = () => {
         setEditingLesson(null);
-        setSelectedTopicId(topicId);
         setLessonModalOpen(true);
     };
 
@@ -133,22 +107,6 @@ export default function CourseDetailPage() {
             toast.error(typeof detail === 'string' ? detail : "Darsni o'chirishda xatolik");
         }
     };
-
-    const confirmDeleteTopic = async () => {
-        if (!deletingTopic) return;
-        try {
-            await deleteTopic.mutateAsync(deletingTopic.id);
-            toast.success("Mavzu o'chirildi");
-            setDeletingTopic(null);
-        } catch {
-            toast.error("Mavzuni o'chirishda xatolik yuz berdi");
-        }
-    };
-
-    const selectedTopic = topics.find((item) => item.id === selectedTopicId);
-
-    const lessonsForTopic = (topicId: number) => lessons.filter((lesson) => lesson.topic_id === topicId);
-    const orphanLessons = lessons.filter((lesson) => !lesson.topic_id);
 
     const renderLesson = (lesson: Lesson, index: number) => {
         const video = lesson.resources?.find((resource) => resource.resource_type === 'video');
@@ -192,7 +150,6 @@ export default function CourseDetailPage() {
                         aria-label="Darsni tahrirlash"
                         onClick={() => {
                             setEditingLesson(lesson);
-                            setSelectedTopicId(lesson.topic_id ?? undefined);
                             setLessonModalOpen(true);
                         }}
                     >
@@ -235,9 +192,17 @@ export default function CourseDetailPage() {
                             ))}
                         </div>
                         <h1 className="page-title">{course.name}</h1>
+                        {isArchived && (
+                            <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                                Arxivda — EPOS yuklamasida bu kurs yo'q
+                            </p>
+                        )}
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                             <span className="inline-flex items-center gap-1.5"><UserRound className="h-4 w-4" />{course.teacher?.full_name || course.teacher?.username}</span>
                             {course.kafedra?.name && <><span>·</span><span>{course.kafedra.name}</span></>}
+                            {courseTypeLabel(course.course_type) && (
+                                <><span>·</span><span>{courseTypeLabel(course.course_type)}</span></>
+                            )}
                             {course.semester_number && <><span>·</span><span className="capitalize">{semesterLabel(course.semester_number)}</span></>}
                             <><span>·</span><span>{lessons.length} ta dars</span></>
                         </div>
@@ -248,107 +213,31 @@ export default function CourseDetailPage() {
             {canReadLessons && (
                 <section className="space-y-3">
                     <div className="flex items-center justify-between gap-3 px-0.5">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mavzular</h2>
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Darslar</h2>
                         {canCreateLessons && (
-                            <Button onClick={openNewTopic}>
-                                <Plus className="h-4 w-4" /> Mavzu qo'shish
+                            <Button onClick={openNewLesson}>
+                                <Plus className="h-4 w-4" /> Dars qo'shish
                             </Button>
                         )}
                     </div>
 
-                    {topicsQuery.isLoading || lessonsQuery.isLoading ? (
+                    {lessonsQuery.isLoading ? (
                         <div className="space-y-3">
-                            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-20 rounded-2xl" />)}
+                            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-16 rounded-2xl" />)}
                         </div>
-                    ) : topicsQuery.isError || lessonsQuery.isError ? (
-                        <ErrorState onRetry={() => { void topicsQuery.refetch(); void lessonsQuery.refetch(); }} />
-                    ) : topics.length === 0 && orphanLessons.length === 0 ? (
+                    ) : lessonsQuery.isError ? (
+                        <ErrorState onRetry={() => { void lessonsQuery.refetch(); }} />
+                    ) : lessons.length === 0 ? (
                         <div className="rounded-2xl border border-border/60 bg-card py-8">
                             <EmptyState
                                 icon={<BookOpen className="h-6 w-6" />}
-                                title="Mavzular yo'q"
-                                description="Avval mavzu yarating, keyin uning ichiga darslar qo'shing."
+                                title="Darslar yo'q"
+                                description="Birinchi darsni qo'shing — ular o'tilgan sana bo'yicha tartiblanadi."
                             />
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {topics.map((topic, topicIndex) => {
-                                const topicLessons = lessonsForTopic(topic.id);
-                                const expanded = expandedTopics.has(topic.id);
-                                return (
-                                    <article key={topic.id} className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-                                        <div className="flex items-center gap-3 px-4 py-3">
-                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                                            <button type="button" onClick={() => toggleTopic(topic.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
-                                                    {topic.order_index || topicIndex + 1}
-                                                </span>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm font-semibold text-foreground">{topic.title}</span>
-                                                    <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                                                        {/* Yangi mavzularning nomi turning o'zi — nishonni ikkinchi
-                                                            marta ko'rsatish shart emas. U turlar joriy qilinishidan
-                                                            oldingi, nomi qo'lda yozilgan mavzular uchun qoladi. */}
-                                                        {topicTypeLabel(topic.topic_type) && topicTypeLabel(topic.topic_type) !== topic.title && (
-                                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-                                                                {topicTypeLabel(topic.topic_type)}
-                                                            </span>
-                                                        )}
-                                                        <span>{topicLessons.length} ta dars</span>
-                                                    </span>
-                                                </span>
-                                                {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                                            </button>
-                                            {canUpdateLessons && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label="Mavzuni tahrirlash"
-                                                    onClick={() => { setEditingTopic(topic); setTopicModalOpen(true); }}
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            {canDeleteLessons && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                    aria-label="Mavzuni o'chirish"
-                                                    onClick={() => setDeletingTopic(topic)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                        {expanded && (
-                                            <div className="space-y-2 border-t border-border/50 bg-muted/20 px-4 py-3 sm:pl-10">
-                                                {topicLessons.length === 0 && (
-                                                    <p className="py-2 text-sm text-muted-foreground">Bu mavzuda hali dars yo'q.</p>
-                                                )}
-                                                {topicLessons.map(renderLesson)}
-                                                {canCreateLessons && (
-                                                    <Button variant="outline" size="sm" className="border-dashed text-primary" onClick={() => openNewLesson(topic.id)}>
-                                                        <Plus className="h-4 w-4" /> Dars qo'shish
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </article>
-                                );
-                            })}
-
-                            {orphanLessons.length > 0 && (
-                                <article className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-                                    <div className="px-5 py-4">
-                                        <p className="text-sm font-semibold">Boshqa darslar</p>
-                                        <p className="text-xs text-muted-foreground">{orphanLessons.length} ta dars</p>
-                                    </div>
-                                    <div className="space-y-2 border-t border-border/50 bg-muted/20 px-4 py-3 sm:pl-10">
-                                        {orphanLessons.map(renderLesson)}
-                                    </div>
-                                </article>
-                            )}
+                        <div className="space-y-2 rounded-2xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
+                            {lessons.map(renderLesson)}
                         </div>
                     )}
                 </section>
@@ -363,20 +252,10 @@ export default function CourseDetailPage() {
                 </section>
             )}
 
-            <CourseTopicModal
-                isOpen={topicModalOpen}
-                onClose={() => { setTopicModalOpen(false); setEditingTopic(null); }}
-                courseId={course.id}
-                nextOrder={(topics.at(-1)?.order_index ?? 0) + 1}
-                topic={editingTopic}
-            />
             <CourseLessonModal
                 isOpen={lessonModalOpen}
                 onClose={() => { setLessonModalOpen(false); setEditingLesson(null); }}
                 course={course}
-                topicId={selectedTopicId}
-                topicTitle={selectedTopic?.title}
-                topicType={selectedTopic?.topic_type}
                 lesson={editingLesson}
             />
             <ConfirmDialog
@@ -390,15 +269,6 @@ export default function CourseDetailPage() {
                         : `"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar va uy vazifasi ham yo'qoladi.`
                 }
                 confirmText={lessonCascadeWarnings.length > 0 ? "Ha, o'chirilsin" : "O'chirish"}
-                cancelText="Bekor qilish"
-            />
-            <ConfirmDialog
-                isOpen={Boolean(deletingTopic)}
-                onClose={() => setDeletingTopic(null)}
-                onConfirm={() => void confirmDeleteTopic()}
-                title="Mavzuni o'chirish"
-                description={`"${deletingTopic?.title ?? ''}" mavzusi o'chiriladi. Ichidagi darslar "Boshqa darslar" bo'limida saqlanadi.`}
-                confirmText="O'chirish"
                 cancelText="Bekor qilish"
             />
         </div>

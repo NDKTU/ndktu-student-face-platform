@@ -5,10 +5,10 @@ from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.enums import semester_label
+from app.core.enums import course_type_label, semester_label
 from app.core.utils.course_access import ROLE_MAIN, can_manage, can_own, manageable_course_ids
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
-from app.modules.course.model import Course, CourseGroup, CourseTeacher, CourseTopic, Lesson
+from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson
 from app.modules.organization_structure.model import Group, Kafedra
 from app.modules.quiz.model import Subject
 
@@ -81,6 +81,7 @@ class CourseRepository:
             .outerjoin(Teacher, Teacher.user_id == User.id)
             .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
             .outerjoin(Lesson, Lesson.course_id == Course.id)
+            .where(Course.is_active.is_(True))
         )
         if restrict_to_teacher:
             # Assistent boʻlgan kurslar ham roʻyxatda boʻlishi kerak —
@@ -132,11 +133,14 @@ class CourseRepository:
         subject_id: int,
         group_ids: list[int],
         semester_number: int | None,
+        course_type: str | None = None,
     ) -> str:
-        """Собирает название курса: «Фан — 101-19, 102-19 (kuzgi semestr)».
+        """Собирает название курса: «Фан — 101-19, 102-19 (amaliyot, kuzgi semestr)».
 
-        Руками его больше не печатают: оно однозначно следует из предмета, групп
-        и семестра, а расхождения в написании только мешали искать курс.
+        Руками его больше не печатают: оно однозначно следует из предмета, групп,
+        типа занятия и семестра, а расхождения в написании только мешали искать
+        курс. Тип входит в название, потому что у одного преподавателя по одному
+        предмету теперь бывает несколько курсов, и в списке их различают именно им.
         """
         subject_name = (
             await session.execute(select(Subject.name).where(Subject.id == subject_id))
@@ -158,9 +162,9 @@ class CourseRepository:
             if len(group_names) > 3:
                 shown = f"{shown} +{len(group_names) - 3}"
             name = f"{name} — {shown}"
-        label = semester_label(semester_number)
-        if label:
-            name = f"{name} ({label})"
+        parts = [part for part in (course_type_label(course_type), semester_label(semester_number)) if part]
+        if parts:
+            name = f"{name} ({', '.join(parts)})"
         return name[:255]
 
     async def _derive_org_fields(
@@ -205,17 +209,15 @@ class CourseRepository:
         lesson_count = (
             await session.execute(select(func.count(Lesson.id)).where(Lesson.course_id == course.id))
         ).scalar() or 0
-        topic_count = (
-            await session.execute(select(func.count(CourseTopic.id)).where(CourseTopic.course_id == course.id))
-        ).scalar() or 0
-
         return CourseResponse(
             id=course.id,
             name=course.name,
             description=course.description,
             subject_id=course.subject_id,
             teacher_id=course.teacher_id,
+            course_type=course.course_type,
             semester_number=course.semester_number,
+            is_active=course.is_active,
             faculty_id=course.faculty_id,
             kafedra_id=course.kafedra_id,
             speciality_id=course.speciality_id,
@@ -231,7 +233,6 @@ class CourseRepository:
             kafedra=CourseKafedraInfo.model_validate(course.kafedra) if course.kafedra else None,
             speciality=CourseSpecialityInfo.model_validate(course.speciality) if course.speciality else None,
             groups=[CourseGroupInfo.model_validate(g) for g in course.groups],
-            topic_count=topic_count,
             lesson_count=lesson_count,
             created_at=course.created_at,
             updated_at=course.updated_at,
@@ -353,10 +354,14 @@ class CourseRepository:
         )
 
         course = Course(
-            name=data.name or await self._build_course_name(session, data.subject_id, group_ids, data.semester_number),
+            name=data.name
+            or await self._build_course_name(
+                session, data.subject_id, group_ids, data.semester_number, data.course_type
+            ),
             subject_id=data.subject_id,
             teacher_id=data.teacher_id,
             description=data.description,
+            course_type=data.course_type,
             semester_number=data.semester_number,
             faculty_id=data.faculty_id if data.faculty_id is not None else derived_faculty_id,
             kafedra_id=data.kafedra_id if data.kafedra_id is not None else derived_kafedra_id,
@@ -423,10 +428,14 @@ class CourseRepository:
                 filters.append(Course.id.in_(enrolled_course_ids))
             else:
                 filters.append(Course.teacher_id == current_user.id)
+        # Arxiv aralashmaydi: so'ralmasa — faqat faol kurslar.
+        filters.append(Course.is_active.is_(True if request.is_active is None else request.is_active))
         if request.teacher_id:
             filters.append(Course.teacher_id == request.teacher_id)
         if request.subject_id:
             filters.append(Course.subject_id == request.subject_id)
+        if request.course_type:
+            filters.append(Course.course_type == request.course_type)
         if request.semester_number:
             filters.append(Course.semester_number == request.semester_number)
         if request.faculty_id:
@@ -455,6 +464,7 @@ class CourseRepository:
 
         subject_changed = False
         semester_changed = False
+        type_changed = False
 
         if data.subject_id is not None and data.subject_id != course.subject_id:
             await self._ensure_subject_exists(session, data.subject_id)
@@ -470,6 +480,9 @@ class CourseRepository:
         if data.semester_number is not None and data.semester_number != course.semester_number:
             course.semester_number = data.semester_number
             semester_changed = True
+        if data.course_type is not None and data.course_type != course.course_type:
+            course.course_type = data.course_type
+            type_changed = True
         if data.faculty_id is not None:
             course.faculty_id = data.faculty_id
         if data.kafedra_id is not None:
@@ -510,9 +523,9 @@ class CourseRepository:
             if data.speciality_id is None:
                 course.speciality_id = derived_speciality_id
 
-        if data.name is None and (subject_changed or groups_changed or semester_changed):
+        if data.name is None and (subject_changed or groups_changed or semester_changed or type_changed):
             course.name = await self._build_course_name(
-                session, course.subject_id, final_group_ids, course.semester_number
+                session, course.subject_id, final_group_ids, course.semester_number, course.course_type
             )
 
         try:

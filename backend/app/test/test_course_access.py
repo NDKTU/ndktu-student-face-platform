@@ -21,6 +21,7 @@ async def test_student_sees_only_courses_for_their_group(
         json={
             "name": "Student course",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "group_ids": [test_group["id"]],
         },
@@ -93,6 +94,7 @@ async def test_student_cannot_open_course_from_another_group(
         json={
             "name": "Private group course",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "group_ids": [test_group["id"]],
         },

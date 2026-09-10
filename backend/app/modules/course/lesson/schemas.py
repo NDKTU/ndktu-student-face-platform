@@ -5,7 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
-LESSON_TYPE_VALUES = Literal["lecture", "seminar", "independent", "lab"]
+#: Dars turi. Kurs turlariga «mustaqil ta'lim» qo'shiladi: u yuklama turi
+#: emas, shuning uchun kursda emas, faqat darsda uchraydi.
+LESSON_TYPE_VALUES = Literal["lecture", "practice", "lab", "seminar", "independent"]
 
 
 class LessonSubjectInfo(BaseModel):
@@ -28,13 +30,6 @@ class LessonGroupInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class LessonTopicInfo(BaseModel):
-    id: int
-    title: str
-    order_index: int
-    model_config = ConfigDict(from_attributes=True)
-
-
 class LessonResourceInfo(BaseModel):
     id: int
     resource_type: str
@@ -54,7 +49,7 @@ class LessonCreateRequest(BaseModel):
     # o'sha guruhni yuboradi.
     group_id: Optional[int] = None
     course_id: int
-    topic_id: Optional[int] = None
+    #: Yuborilmasa — kursning turidan olinadi.
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
     topic: str = Field(min_length=1, max_length=255)
     # Дату можно не передавать — проставим сегодняшнюю по Ташкенту.
@@ -67,7 +62,6 @@ class LessonUpdateRequest(BaseModel):
     face_check_enabled: Optional[bool] = None
     group_id: Optional[int] = None
     course_id: Optional[int] = None
-    topic_id: Optional[int] = None
     lesson_type: Optional[LESSON_TYPE_VALUES] = None
     topic: Optional[str] = Field(default=None, min_length=1, max_length=255)
     date: Optional[date_type] = None
@@ -81,7 +75,6 @@ class LessonResponse(BaseModel):
     #: Bo'sh = kursning barcha guruhlari.
     group_id: Optional[int] = None
     course_id: int
-    topic_id: Optional[int] = None
     lesson_type: Optional[str] = None
     topic: str
     date: date_type
@@ -90,7 +83,6 @@ class LessonResponse(BaseModel):
     updated_at: TashkentDatetime
     teacher_subject: Optional[LessonTeacherSubjectInfo] = None
     group: Optional[LessonGroupInfo] = None
-    course_topic: Optional[LessonTopicInfo] = None
     resources: list[LessonResourceInfo] = []
 
     model_config = ConfigDict(from_attributes=True)

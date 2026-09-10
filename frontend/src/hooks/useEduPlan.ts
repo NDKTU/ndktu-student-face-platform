@@ -102,7 +102,7 @@ export const useEduPlanCoursePreview = (enabled: boolean) =>
 export const useEduPlanApplyCourses = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: () => eduplanService.applyCourses(),
+        mutationFn: (archive: boolean = false) => eduplanService.applyCourses(archive),
         onSuccess: (data) => {
             queryClient.setQueryData(['eduplan', 'course-preview'], data);
             queryClient.invalidateQueries({ queryKey: ['courses'] });

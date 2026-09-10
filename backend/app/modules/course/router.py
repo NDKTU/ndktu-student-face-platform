@@ -60,13 +60,6 @@ from .resource.schemas import (
     ResourceResponse,
     ResourceUpdateRequest,
 )
-from .topic.repository import get_course_topic_repository
-from .topic.schemas import (
-    CourseTopicCreateRequest,
-    CourseTopicListResponse,
-    CourseTopicResponse,
-    CourseTopicUpdateRequest,
-)
 
 if TYPE_CHECKING:
     from app.modules.auth.model import User
@@ -203,54 +196,6 @@ async def remove_course_teacher(
     current_user: "User" = Depends(PermissionRequired("update:course")),
 ):
     await get_course_repository.remove_teacher(session, course_id, user_id, current_user)
-
-
-# ============================================================================
-#  COURSE TOPIC
-# ============================================================================
-topic_router = APIRouter(tags=["Course Topic"], prefix="/course-topic")
-
-
-@topic_router.post(
-    "/",
-    response_model=CourseTopicResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
-)
-async def create_course_topic(
-    data: CourseTopicCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("create:lesson")),
-):
-    return await get_course_topic_repository.create_topic(session, data, current_user)
-
-
-@topic_router.get("/", response_model=CourseTopicListResponse)
-async def list_course_topics(
-    course_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    return await get_course_topic_repository.list_topics(session, course_id, current_user)
-
-
-@topic_router.put("/{topic_id}", response_model=CourseTopicResponse)
-async def update_course_topic(
-    topic_id: int,
-    data: CourseTopicUpdateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("update:lesson")),
-):
-    return await get_course_topic_repository.update_topic(session, topic_id, data, current_user)
-
-
-@topic_router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_course_topic(
-    topic_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("delete:lesson")),
-):
-    await get_course_topic_repository.delete_topic(session, topic_id, current_user)
 
 
 # ============================================================================
@@ -698,7 +643,6 @@ async def course_attendance(
 # ============================================================================
 router = APIRouter()
 router.include_router(course_router)
-router.include_router(topic_router)
 router.include_router(lesson_router)
 router.include_router(homework_router)
 router.include_router(resource_router)

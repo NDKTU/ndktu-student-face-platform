@@ -1,21 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { courseService, type CourseCreateRequest, type CourseUpdateRequest } from '@/services/courseService';
+import {
+    courseService,
+    type CourseCreateRequest,
+    type CourseListFilters,
+    type CourseUpdateRequest,
+} from '@/services/courseService';
 
-export const useCourses = (
-    page = 1,
-    limit = 10,
-    teacherId?: number,
-    subjectId?: number,
-    groupId?: number,
-    semesterNumber?: number,
-    facultyId?: number,
-    kafedraId?: number,
-    specialityId?: number,
-    enabled: boolean = true,
-) => {
+export const useCourses = (filters: CourseListFilters = {}, enabled: boolean = true) => {
     return useQuery({
-        queryKey: ['courses', page, limit, teacherId, subjectId, groupId, semesterNumber, facultyId, kafedraId, specialityId],
-        queryFn: () => courseService.getCourses(page, limit, teacherId, subjectId, groupId, semesterNumber, facultyId, kafedraId, specialityId),
+        queryKey: ['courses', filters],
+        queryFn: () => courseService.getCourses(filters),
         placeholderData: (previousData) => previousData,
         enabled,
     });

@@ -1,4 +1,5 @@
 import api from './api';
+import type { CourseType } from './courseTypes';
 
 /** Сущности, которые зеркалятся из EduPlan. Значения совпадают с бэкендом. */
 export type EduPlanEntity =
@@ -154,46 +155,58 @@ export interface RunState {
 /**
  * Yuklamadan yigʻilgan kurs taklifi.
  *
- * Kursning egasi — maʼruza oʻqiydigan oʻqituvchi; uning oʻsha fan va
- * semestrdagi barcha guruhlari bitta kursga birlashadi.
+ * Kurs — «fan + semestr + oʻqituvchi + mashgʻulot turi» toʻrtligi. Har bir
+ * turning oʻz kursi va oʻz egasi bor.
  */
 export interface CoursePlan {
     external_id: string;
-    /** Shu kalitli kurs allaqachon yaratilgan — qayta yaratilmaydi. */
+    /** Shu kalitli faol kurs allaqachon bor — qayta yaratilmaydi. */
     exists: boolean;
+    /** Kurs arxivda va yuklamada yana paydo boʻldi — qaytariladi. */
+    archived: boolean;
     subject_id: number;
     subject_name: string;
     teacher_user_id: number;
     teacher_name: string | null;
+    /** lecture | practice | lab. Seminar EPOS yuklamasida yoʻq. */
+    course_type: CourseType;
     semester_type: string | null;
     /** «Bahorgi, Kuzgi» birlashgan qiymatida semestr raqami boʻlmaydi. */
     semester_number: number | null;
     academic_year_id: number | null;
     group_ids: number[];
     group_names: string[];
-    assistant_user_ids: number[];
 }
 
-/** Maʼruzachisi topilmagani uchun kursga aylanmagan guruhlar. */
-export interface CourseSkipped {
-    subject_id: number;
-    subject_name: string;
-    semester_type: string | null;
+/** EPOS yuklamasida qolmagan kurs. Oʻchirilmaydi — arxivga oʻtadi. */
+export interface CourseArchiveRow {
+    course_id: number;
+    name: string;
+    course_type: CourseType | null;
+    teacher_name: string | null;
     group_names: string[];
-    reason: string;
+    /** Darslari bor kursni arxivlash jurnalni ham koʻzdan yashiradi. */
+    lesson_count: number;
 }
 
 export interface CoursePreviewResponse {
     plans: CoursePlan[];
-    skipped: CourseSkipped[];
-    /** `apply` dan keyin haqiqatda yaratilgan kurslar soni. */
+    archive: CourseArchiveRow[];
+    /** `apply` dan keyin haqiqatda oʻzgargan kurslar soni. */
     created: number;
+    restored: number;
+    archived: number;
+    /** Arxivlash chegaradan oshdi — sabab odatda toʻliq yuklanmagan yuklama. */
+    archive_blocked: boolean;
     summary: {
         total: number;
         existing: number;
         to_create: number;
-        skipped_subjects: number;
+        to_restore: number;
+        to_archive: number;
     };
+    /** Turlar kesimi: `{ lecture: 128, practice: 88, lab: 29 }`. */
+    by_type: Record<string, number>;
 }
 
 /** Ключ предложения — он же идентификатор решения администратора. */
@@ -236,10 +249,17 @@ export const eduplanService = {
         );
         return response.data;
     },
-    /** Yoʻq kurslarni yaratadi. Mavjudlariga tegmaydi. */
-    applyCourses: async () => {
+    /**
+     * Yoʻq kurslarni yaratadi va arxivdan qaytganlarini tiklaydi.
+     *
+     * `archive` — yuklamada qolmagan kurslarni arxivga oʻtkazish. Alohida
+     * tasdiq, chunki kurs bilan birga uning jurnali ham koʻzdan yoʻqoladi.
+     */
+    applyCourses: async (archive = false) => {
         const response = await api.post<CoursePreviewResponse>(
             '/integration/eduplan/courses/apply',
+            null,
+            { params: archive ? { archive: true } : undefined },
         );
         return response.data;
     },

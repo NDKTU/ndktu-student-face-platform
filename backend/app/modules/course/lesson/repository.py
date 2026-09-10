@@ -11,7 +11,7 @@ from app.core.utils.course_access import can_manage, manageable_course_ids
 from app.core.utils.lesson_scope import visible_to_group
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
-from app.modules.course.model import Course, CourseGroup, CourseTopic, Homework, HomeworkSubmission, Lesson
+from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import TeacherGroup
 
 from .schemas import (
@@ -63,26 +63,6 @@ class LessonRepository:
         teacher_subject = await get_course_repository.get_or_create_teacher_subject_for_course(session, course)
         return course, teacher_subject, group_id
 
-    async def _validate_topic(self, session: AsyncSession, course_id: int, topic_id: int | None) -> str | None:
-        """Mavzu shu kursnikimi — tekshiradi va uning turini qaytaradi.
-
-        Tur qaytarilishi kerak: mashg'ulot turi endi mavzuda tanlanadi va
-        dars uni meros qilib oladi, aks holda forma har bir dars uchun
-        o'sha savolni qayta berardi.
-        """
-        if topic_id is None:
-            return None
-        topic = (
-            await session.execute(
-                select(CourseTopic.topic_type).where(
-                    CourseTopic.id == topic_id, CourseTopic.course_id == course_id
-                )
-            )
-        ).one_or_none()
-        if topic is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic does not belong to this Course")
-        return topic[0]
-
     # ── Lessons ──────────────────────────────────────────────────────────────
 
     async def create_lesson(
@@ -93,18 +73,17 @@ class LessonRepository:
     ) -> Lesson:
         is_admin = await self._is_role(current_user, "admin")
 
-        _, teacher_subject, group_id = await self._resolve_course_context(
+        course, teacher_subject, group_id = await self._resolve_course_context(
             session, data.course_id, current_user, data.group_id, is_admin
         )
-        topic_type = await self._validate_topic(session, data.course_id, data.topic_id)
 
         new_lesson = Lesson(
             teacher_subject_id=teacher_subject.id,
             group_id=group_id,
             course_id=data.course_id,
-            topic_id=data.topic_id,
-            # Aniq ko'rsatilmasa — mavzudan olinadi.
-            lesson_type=data.lesson_type or topic_type,
+            # Aniq ko'rsatilmasa — kursning turidan olinadi. Qo'lda tanlash
+            # amalda faqat mustaqil ta'lim darsi uchun kerak bo'ladi.
+            lesson_type=data.lesson_type or course.course_type,
             topic=data.topic,
             # Форма дарса даты не спрашивает: занятие заводят в день проведения.
             date=data.date or datetime.now(TASHKENT_TZ).date(),
@@ -132,7 +111,6 @@ class LessonRepository:
             .options(
                 selectinload(Lesson.teacher_subject).selectinload(TeacherSubject.subject),
                 selectinload(Lesson.group),
-                selectinload(Lesson.course_topic),
                 selectinload(Lesson.resources),
             )
             .where(Lesson.id == lesson_id)
@@ -154,7 +132,6 @@ class LessonRepository:
         stmt = select(Lesson).options(
             selectinload(Lesson.teacher_subject).selectinload(TeacherSubject.subject),
             selectinload(Lesson.group),
-            selectinload(Lesson.course_topic),
             selectinload(Lesson.resources),
         )
 
@@ -214,10 +191,10 @@ class LessonRepository:
             stmt = stmt.where(Lesson.date <= request.date_to)
 
         if request.course_id is not None:
-            stmt = stmt.outerjoin(CourseTopic, CourseTopic.id == Lesson.topic_id).order_by(
-                CourseTopic.order_index.asc().nullslast(), Lesson.id.asc()
-            )
+            # Kurs sahifasida darslar o'tilish tartibida — eskisidan yangisiga.
+            stmt = stmt.order_by(Lesson.date.asc(), Lesson.id.asc())
         else:
+            # Umumiy ro'yxatda esa yaqin kunlar tepada bo'lgani qulay.
             stmt = stmt.order_by(desc(Lesson.date), desc(Lesson.id))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
@@ -265,19 +242,8 @@ class LessonRepository:
             lesson.teacher_subject_id = data.teacher_subject_id
         if data.group_id is not None:
             lesson.group_id = data.group_id
-        moved_topic_type: str | None = None
-        if data.topic_id is not None:
-            moved_topic_type = await self._validate_topic(
-                session, data.course_id or lesson.course_id, data.topic_id
-            )
-            lesson.topic_id = data.topic_id
         if data.lesson_type is not None:
             lesson.lesson_type = data.lesson_type
-        elif moved_topic_type and lesson.lesson_type is None:
-            # Boshqa mavzuga ko'chirilgan turi belgilanmagan dars yangi
-            # mavzuning turini oladi. Belgilangani tegilmaydi: o'qituvchi uni
-            # ataylab qo'ygan bo'lishi mumkin.
-            lesson.lesson_type = moved_topic_type
         if data.face_check_enabled is not None:
             lesson.face_check_enabled = data.face_check_enabled
         if data.topic is not None:

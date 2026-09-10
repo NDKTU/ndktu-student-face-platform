@@ -30,6 +30,7 @@ async def test_catalog_and_analytics_endpoints(
         json={
             "name": "Backend fundamentals",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "group_ids": [test_group["id"]],
             "faculty_id": test_faculty["id"],

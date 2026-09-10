@@ -1,9 +1,9 @@
 """Yuklamadan kurs yigʻish.
 
-Qoida bitta: kursning egasi — maʼruza oʻqiydigan oʻqituvchi. Uning oʻsha fan
-va semestrdagi guruhlari bitta kursga birlashadi, oʻsha guruhlarda amaliyot
-olib boradiganlar assistent boʻladi. Maʼruzachisi yoʻq guruhdan kurs
-yasalmaydi — aks holda tasodifiy oʻqituvchi kursning egasiga aylanardi.
+Qoida bitta: kurs — «fan + semestr + oʻqituvchi + mashgʻulot turi» toʻrtligi.
+Har bir tur alohida kurs, va uning egasi — oʻsha turni olib boradigan
+oʻqituvchining oʻzi. Oʻqituvchining oʻsha turdagi barcha guruhlari bitta
+kursga birlashadi.
 """
 
 import pytest
@@ -16,9 +16,9 @@ from app.modules.integration.eduplan.course_builder import eduplan_course_builde
 async def workload(async_db, test_faculty, test_kafedra):
     """Ikki oʻqituvchi, bitta fan, uch guruh.
 
-    Maʼruzani birinchi oʻqituvchi ikkita guruhga oʻqiydi, ikkinchisi oʻsha
-    guruhlarning birida amaliyot olib boradi. Uchinchi guruhda faqat amaliyot
-    bor — maʼruzachisi yoʻq.
+    Maʼruzani birinchi oʻqituvchi ikkita guruhga oʻqiydi va birinchi guruhda
+    amaliyot ham olib boradi. Ikkinchi oʻqituvchida faqat amaliyot bor —
+    ikkinchi va uchinchi guruhlarda. Yaʼni uchta kurs chiqishi kerak.
     """
     from core.utils.password_hash import hash_password
 
@@ -101,6 +101,14 @@ async def workload(async_db, test_faculty, test_kafedra):
     }
 
 
+def _plan(preview, course_type: str, teacher_user_id: int):
+    return next(
+        p
+        for p in preview.plans
+        if p.course_type == course_type and p.teacher_user_id == teacher_user_id
+    )
+
+
 @pytest.mark.asyncio
 async def test_lecturer_owns_one_course_over_all_their_groups(async_db, workload):
     """Ikki guruhga maʼruza — ikkita emas, bitta kurs.
@@ -110,28 +118,37 @@ async def test_lecturer_owns_one_course_over_all_their_groups(async_db, workload
     """
     preview = await eduplan_course_builder.build(async_db)
 
-    assert len(preview.plans) == 1
-    plan = preview.plans[0]
-    assert plan.teacher_user_id == workload["lecturer_user_id"]
+    plan = _plan(preview, "lecture", workload["lecturer_user_id"])
     assert plan.group_ids == workload["group_ids"][:2]
     assert plan.semester_number == 1
 
 
 @pytest.mark.asyncio
-async def test_practice_teacher_becomes_an_assistant(async_db, workload):
+async def test_each_load_type_becomes_its_own_course(async_db, workload):
+    """Maʼruza va amaliyot — bir oʻqituvchida ham alohida kurslar.
+
+    Soatlar oʻquv rejada aynan shu kesimda boʻlinadi, jurnal ham shunday
+    yuritiladi. Bitta kursga qoʻshilsa, ular bir-birining davomatiga
+    aralashib ketardi.
+    """
     preview = await eduplan_course_builder.build(async_db)
 
-    assert preview.plans[0].assistant_user_ids == [workload["assistant_user_id"]]
+    assert len(preview.plans) == 3
+    assert preview.by_type == {"lecture": 1, "practice": 2}
+    assert _plan(preview, "practice", workload["lecturer_user_id"]).group_ids == workload["group_ids"][:1]
 
 
 @pytest.mark.asyncio
-async def test_group_without_a_lecturer_is_reported_not_created(async_db, workload):
-    """Uchinchi guruh kursga aylanmaydi, lekin koʻzdan ham qochmaydi."""
+async def test_practice_teacher_owns_their_course(async_db, workload):
+    """Amaliyot oʻqituvchisi — mehmon emas, egasi.
+
+    Ilgari u maʼruzachining kursida assistent boʻlardi: oʻz yuklamasi bor
+    odam birovning kursida jurnal yurita olmasdi.
+    """
     preview = await eduplan_course_builder.build(async_db)
 
-    assert len(preview.skipped) == 1
-    assert preview.skipped[0].group_names == ["103-23"]
-    assert preview.summary["to_create"] == 1
+    plan = _plan(preview, "practice", workload["assistant_user_id"])
+    assert plan.group_ids == workload["group_ids"][1:]
 
 
 @pytest.mark.asyncio
@@ -141,22 +158,39 @@ async def test_apply_creates_the_course_with_groups_and_teachers(async_db, workl
     from app.modules.course.model import Course, CourseGroup, CourseTeacher
 
     result = await eduplan_course_builder.apply(async_db)
-    assert result.created == 1
+    assert result.created == 3
 
-    course = (await async_db.scalars(select(Course))).one()
-    assert course.external_source == "eduplan"
-    assert course.teacher_id == workload["lecturer_user_id"]
-    assert course.semester_number == 1
-    assert course.kafedra_id is not None
+    courses = {course.course_type: course for course in (await async_db.scalars(select(Course))).all()}
+    lecture = courses["lecture"]
+    assert lecture.external_source == "eduplan"
+    assert lecture.teacher_id == workload["lecturer_user_id"]
+    assert lecture.semester_number == 1
+    assert lecture.kafedra_id is not None
+    assert lecture.is_active is True
+    assert lecture.synced_at is not None
 
-    group_ids = sorted((await async_db.scalars(select(CourseGroup.group_id))).all())
-    assert group_ids == sorted(workload["group_ids"][:2])
+    lecture_groups = sorted(
+        (await async_db.scalars(select(CourseGroup.group_id).where(CourseGroup.course_id == lecture.id))).all()
+    )
+    assert lecture_groups == sorted(workload["group_ids"][:2])
 
-    roles = {row.user_id: row.role for row in (await async_db.scalars(select(CourseTeacher))).all()}
-    assert roles == {
-        workload["lecturer_user_id"]: "main",
-        workload["assistant_user_id"]: "assistant",
-    }
+    # Assistent degan rol qolmadi: har kim oʻz kursining asosiy oʻqituvchisi.
+    roles = {row.role for row in (await async_db.scalars(select(CourseTeacher))).all()}
+    assert roles == {"main"}
+
+
+@pytest.mark.asyncio
+async def test_course_name_carries_the_type(async_db, workload):
+    """Nomda tur boʻlishi shart — roʻyxatda kurslar aynan shu bilan farqlanadi."""
+    from sqlalchemy import select
+
+    from app.modules.course.model import Course
+
+    await eduplan_course_builder.apply(async_db)
+
+    names = {course.course_type: course.name for course in (await async_db.scalars(select(Course))).all()}
+    assert "ma'ruza" in names["lecture"]
+    assert "amaliyot" in names["practice"]
 
 
 @pytest.mark.asyncio
@@ -174,7 +208,69 @@ async def test_apply_twice_does_not_duplicate(async_db, workload):
     second = await eduplan_course_builder.apply(async_db)
 
     assert second.created == 0
-    assert (await async_db.scalar(select(func.count()).select_from(Course))) == 1
+    assert (await async_db.scalar(select(func.count()).select_from(Course))) == 3
+
+
+@pytest.mark.asyncio
+async def test_vanished_workload_is_archived_only_when_asked(async_db, workload):
+    """Yuklamadan yoʻqolgan kurs oʻchirilmaydi va oʻzicha arxivga ham tushmaydi.
+
+    Kursga darslar, davomat jurnali va baholar bogʻlangan, shuning uchun
+    qarorni admin qabul qiladi.
+    """
+    from sqlalchemy import select
+
+    from app.modules.auth.model import TeacherAssignment
+    from app.modules.course.model import Course
+
+    await eduplan_course_builder.apply(async_db)
+
+    # EPOS'da amaliyot yuklamasi olib tashlandi: ikkita kurs egasiz qoldi.
+    for assignment in (await async_db.scalars(select(TeacherAssignment))).all():
+        remaining = [t for t in (assignment.load_types or []) if t != "practice"]
+        if remaining:
+            assignment.load_types = remaining
+        else:
+            await async_db.delete(assignment)
+    await async_db.commit()
+
+    preview = await eduplan_course_builder.build(async_db)
+    assert preview.summary["to_archive"] == 2
+    assert preview.archive_blocked is False
+    assert all(row.lesson_count == 0 for row in preview.archive)
+
+    without_archive = await eduplan_course_builder.apply(async_db)
+    assert without_archive.archived == 0
+    assert (await async_db.scalars(select(Course.is_active))).all() == [True, True, True]
+
+    with_archive = await eduplan_course_builder.apply(async_db, archive=True)
+    assert with_archive.archived == 2
+    active = (await async_db.scalars(select(Course.course_type).where(Course.is_active.is_(True)))).all()
+    assert list(active) == ["lecture"]
+
+
+@pytest.mark.asyncio
+async def test_archived_course_returns_instead_of_a_second_one(async_db, workload):
+    """Yuklamaga qaytgan kurs arxivdan tiklanadi, yangisi yaratilmaydi.
+
+    Aks holda oʻqituvchi oʻzining oʻtgan yarim yillik jurnalini boy berardi.
+    """
+    from sqlalchemy import func, select, update
+
+    from app.modules.course.model import Course
+
+    await eduplan_course_builder.apply(async_db)
+    await async_db.execute(update(Course).where(Course.course_type == "lecture").values(is_active=False))
+    await async_db.commit()
+
+    preview = await eduplan_course_builder.build(async_db)
+    assert preview.summary["to_restore"] == 1
+    assert preview.summary["to_create"] == 0
+
+    result = await eduplan_course_builder.apply(async_db)
+    assert result.restored == 1
+    assert (await async_db.scalar(select(func.count()).select_from(Course))) == 3
+    assert (await async_db.scalar(select(func.count()).select_from(Course).where(Course.is_active.is_(False)))) == 0
 
 
 @pytest.mark.asyncio

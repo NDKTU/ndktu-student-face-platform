@@ -1,4 +1,5 @@
 import api from './api';
+import type { CourseType } from './courseTypes';
 
 export interface CourseSubjectInfo {
     id: number;
@@ -37,7 +38,10 @@ export interface Course {
     description?: string | null;
     subject_id: number;
     teacher_id: number;
+    course_type?: CourseType | null;
     semester_number?: number | null;
+    /** `false` — kurs arxivda: EPOS yuklamasida endi yo'q. */
+    is_active: boolean;
     faculty_id?: number | null;
     kafedra_id?: number | null;
     speciality_id?: number | null;
@@ -47,17 +51,17 @@ export interface Course {
     kafedra?: CourseKafedraInfo;
     speciality?: CourseSpecialityInfo;
     groups: CourseGroupInfo[];
-    topic_count: number;
     lesson_count: number;
     created_at: string;
     updated_at: string;
 }
 
 export interface CourseCreateRequest {
-    /** Bo'sh qoldirilsa server fan, guruhlar va semestrdan yig'adi. */
+    /** Bo'sh qoldirilsa server fan, guruhlar, tur va semestrdan yig'adi. */
     name?: string;
     subject_id: number;
     teacher_id: number;
+    course_type: CourseType;
     description?: string;
     semester_number?: number;
     group_ids?: number[];
@@ -67,6 +71,21 @@ export interface CourseCreateRequest {
 }
 
 export type CourseUpdateRequest = Partial<CourseCreateRequest>;
+
+export interface CourseListFilters {
+    page?: number;
+    limit?: number;
+    teacherId?: number;
+    subjectId?: number;
+    groupId?: number;
+    courseType?: CourseType;
+    semesterNumber?: number;
+    facultyId?: number;
+    kafedraId?: number;
+    specialityId?: number;
+    /** `false` — arxiv. Yuborilmasa faqat faol kurslar. */
+    isActive?: boolean;
+}
 
 export interface CourseListResponse {
     total: number;
@@ -92,25 +111,19 @@ export const courseService = {
         });
         return response.data.teachers;
     },
-    getCourses: async (
-        page = 1,
-        limit = 10,
-        teacherId?: number,
-        subjectId?: number,
-        groupId?: number,
-        semesterNumber?: number,
-        facultyId?: number,
-        kafedraId?: number,
-        specialityId?: number,
-    ) => {
-        const params: any = { page, limit };
-        if (teacherId) params.teacher_id = teacherId;
-        if (subjectId) params.subject_id = subjectId;
-        if (groupId) params.group_id = groupId;
-        if (semesterNumber) params.semester_number = semesterNumber;
-        if (facultyId) params.faculty_id = facultyId;
-        if (kafedraId) params.kafedra_id = kafedraId;
-        if (specialityId) params.speciality_id = specialityId;
+    getCourses: async (filters: CourseListFilters = {}) => {
+        const { page = 1, limit = 10 } = filters;
+        const params: Record<string, unknown> = { page, limit };
+        if (filters.teacherId) params.teacher_id = filters.teacherId;
+        if (filters.subjectId) params.subject_id = filters.subjectId;
+        if (filters.groupId) params.group_id = filters.groupId;
+        if (filters.courseType) params.course_type = filters.courseType;
+        if (filters.semesterNumber) params.semester_number = filters.semesterNumber;
+        if (filters.facultyId) params.faculty_id = filters.facultyId;
+        if (filters.kafedraId) params.kafedra_id = filters.kafedraId;
+        if (filters.specialityId) params.speciality_id = filters.specialityId;
+        // Yuborilmasa server faqat faol kurslarni qaytaradi.
+        if (filters.isActive === false) params.is_active = false;
 
         const response = await api.get<CourseListResponse>('/course/', { params });
         return response.data;

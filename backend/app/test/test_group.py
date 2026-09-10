@@ -90,6 +90,7 @@ async def _lesson_in_group(auth_client, test_teacher, test_subject, test_faculty
         json={
             "name": "Discrete math",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": [group_id],
             "faculty_id": test_faculty["id"],
@@ -144,6 +145,7 @@ async def test_delete_group_warns_about_stranded_course_lessons(
         json={
             "name": "Oqim kursi",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": [test_group["id"]],
             "faculty_id": test_faculty["id"],

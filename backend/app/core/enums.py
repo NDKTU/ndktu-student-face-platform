@@ -41,3 +41,22 @@ def semester_label(semester_number: int | None) -> str | None:
         return None
     name = SEMESTER_LABELS.get(semester_number)
     return f"{name} semestr" if name else f"{semester_number}-semestr"
+
+
+# Mashg'ulot turlari. Kurs turi ham, dars turi ham shu ro'yxatdan oladi.
+# EPOS yuklamasi aynan shu kesimda keladi — `lecture`, `practice`, `lab`;
+# `seminar` EPOS'da yo'q va faqat qo'lda yaratiladi. Enum emas, satr:
+# yangi tur qo'shish migratsiyasiz bo'lishi kerak.
+COURSE_TYPE_LABELS = {
+    "lecture": "ma'ruza",
+    "practice": "amaliyot",
+    "lab": "tajriba",
+    "seminar": "seminar",
+}
+
+
+def course_type_label(course_type: str | None) -> str | None:
+    """«lecture» -> «ma'ruza». Noma'lum qiymat o'zicha qaytadi."""
+    if not course_type:
+        return None
+    return COURSE_TYPE_LABELS.get(course_type, course_type)

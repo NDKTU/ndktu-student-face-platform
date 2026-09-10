@@ -181,8 +181,9 @@ async def eduplan_preview_courses(
 ):
     """Yuklamadan qanday kurslar chiqishini koʻrsatadi, hech nima yozmaydi.
 
-    Maʼruzachisi yoʻq guruhlar alohida roʻyxatda — ular kursga
-    aylanmaydi va ularni admin qoʻlda hal qiladi.
+    Kurs — «fan + semestr + oʻqituvchi + tur» toʻrtligi. Yuklamada qolmagan
+    kurslar alohida roʻyxatda: ular oʻchirilmaydi, adminning tasdigʻi bilan
+    arxivga oʻtadi.
     """
     return await eduplan_course_builder.build(session)
 
@@ -193,11 +194,18 @@ async def eduplan_preview_courses(
     dependencies=[Depends(RateLimiter(times=2, seconds=60))],
 )
 async def eduplan_apply_courses(
+    archive: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
 ):
-    """Yoʻq kurslarni yaratadi. Mavjudlariga tegmaydi."""
-    return await eduplan_course_builder.apply(session)
+    """Yoʻq kurslarni yaratadi va arxivdan qaytganlarini tiklaydi.
+
+    Mavjud kurslarning guruhlari yangilanmaydi — bitta oʻquv yili ichida kurs
+    tarkibi qotib turadi. ``archive=true`` yuklamada qolmagan kurslarni
+    arxivga oʻtkazadi; bu alohida tasdiq, chunki kurs bilan birga uning
+    jurnali ham koʻzdan yoʻqoladi.
+    """
+    return await eduplan_course_builder.apply(session, archive=archive)
 
 
 @router.post(

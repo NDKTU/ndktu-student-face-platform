@@ -74,6 +74,7 @@ async def test_delete_user_blocked_by_lessons_returns_409(
         json={
             "name": "Discrete math",
             "subject_id": test_subject.id,
+            "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
             "group_ids": [test_group["id"]],
             "faculty_id": test_faculty["id"],

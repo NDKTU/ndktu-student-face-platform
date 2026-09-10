@@ -11,7 +11,7 @@ import { useCreateLesson, useUpdateLesson } from '@/hooks/useLessons';
 import { resourceService } from '@/services/resourceService';
 import { assignmentService } from '@/services/assignmentService';
 import type { Course } from '@/services/courseService';
-import { topicTypeLabel } from '@/services/courseTopicService';
+import { courseTypeLabel } from '@/services/courseTypes';
 import type { Lesson, LessonResourceInfo } from '@/services/lessonService';
 import type { Assignment } from '@/services/assignmentService';
 import { formatDate } from '@/utils/date';
@@ -30,15 +30,11 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     course: Course;
-    topicId?: number;
-    /** Mavzu nomi va turi — dars qaysi bo'limga tushayotgani ko'rinib tursin. */
-    topicTitle?: string;
-    topicType?: string | null;
     /** Berilgan bo'lsa — oyna tahrirlash rejimida ochiladi. */
     lesson?: Lesson | null;
 }
 
-export function CourseLessonModal({ isOpen, onClose, course, topicId, topicTitle, topicType, lesson }: Props) {
+export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
     const createLesson = useCreateLesson();
     const updateLesson = useUpdateLesson();
     const isEditing = Boolean(lesson);
@@ -274,7 +270,6 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, topicTitle
                 const created = await createLesson.mutateAsync({
                     course_id: course.id,
                     group_id: groupId ? Number(groupId) : undefined,
-                    topic_id: topicId,
                     topic: title.trim(),
                     description: description.trim() || null,
                 });
@@ -366,16 +361,13 @@ export function CourseLessonModal({ isOpen, onClose, course, topicId, topicTitle
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? "Darsni tahrirlash" : "Yangi dars"} className="max-w-2xl">
             <div className="space-y-5">
-                {topicTitle && (
+                {courseTypeLabel(course.course_type) && (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">Mavzu:</span>
-                        <span className="font-medium text-foreground">{topicTitle}</span>
-                        {/* Yangi mavzuning nomi turning o'zi — takrorlanmasin. */}
-                        {topicTypeLabel(topicType) && topicTypeLabel(topicType) !== topicTitle && (
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                                {topicTypeLabel(topicType)}
-                            </span>
-                        )}
+                        <span className="text-muted-foreground">Mashg'ulot turi:</span>
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                            {courseTypeLabel(course.course_type)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">kursdan olinadi</span>
                     </div>
                 )}
                 <div>

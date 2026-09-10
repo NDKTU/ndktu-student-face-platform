@@ -47,6 +47,7 @@ async def course_with_assistant(async_db, auth_client, test_user, test_kafedra, 
         "/course/",
         json={
             "subject_id": subject.id,
+            "course_type": "lecture",
             "teacher_id": test_user["id"],
             "semester_number": 1,
             "group_ids": [test_group["id"]],
