@@ -70,7 +70,12 @@ def _votes(items: list[dict], local_by_sid: dict[str, int]) -> dict[int, Counter
 
 
 async def build_proposals(session: AsyncSession, items: list[dict]) -> list[GroupMatchProposal]:
-    groups = list((await session.execute(select(Group))).scalars().all())
+    # Arxivdagi guruhlar nomzod boʻlmaydi. Ular EPOS'dan yoʻqolgan yoki
+    # dublikat sifatida birlashtirilgan satrlar; nomzodlar orasida qolsa,
+    # har bir nomga ikkita javob chiqib, nom boʻyicha bogʻlash butunlay
+    # ishlamay qolardi — aynan shu sabab 419 guruh «qoʻlda hal qiling»
+    # roʻyxatiga tushib turgan edi.
+    groups = list((await session.execute(select(Group).where(Group.is_active.is_(True)))).scalars().all())
     local_names = {g.id: g.name for g in groups}
     # `groups.hemis_group_id` — строковый столбец, поэтому ключи строками.
     already = {str(g.hemis_group_id): g.id for g in groups if g.hemis_group_id}

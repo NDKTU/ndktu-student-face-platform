@@ -49,7 +49,64 @@ export interface GroupStudentListResponse {
     students: GroupStudent[];
 }
 
+/**
+ * Takrorlangan guruhlar. EPOS guruhning `external_id` sini almashtirsa,
+ * zerkalo uni tanimay yangi qator yaratadi — eskisi talabalari bilan yonida
+ * qolaveradi. Shundan keyin HEMIS guruhini nomiga qarab bog'lash ishlamaydi:
+ * bitta nomga ikkita nomzod chiqadi.
+ */
+export interface GroupMergeRow {
+    group_id: number;
+    name: string;
+    external_id?: string | null;
+    synced_at?: string | null;
+    hemis_group_id?: string | null;
+    students: number;
+    courses: number;
+    workloads: number;
+    lessons: number;
+    /** true — shu nusxa qoladi, qolganlari unga qo'shiladi. */
+    keep: boolean;
+}
+
+export interface GroupDuplicateCluster {
+    name: string;
+    faculty_id?: number | null;
+    keep: GroupMergeRow;
+    merge: GroupMergeRow[];
+}
+
+export interface GroupDuplicatePreview {
+    clusters: GroupDuplicateCluster[];
+    summary: {
+        clusters: number;
+        to_archive: number;
+        students_to_move: number;
+        courses_to_move: number;
+    };
+}
+
+export interface GroupMergeResult {
+    clusters: number;
+    archived: number;
+    moved: Record<string, number>;
+}
+
 export const groupService = {
+    /** Takrorlangan guruhlar ro'yxati. Hech nima yozmaydi. */
+    previewDuplicates: async (): Promise<GroupDuplicatePreview> => {
+        const response = await api.get<GroupDuplicatePreview>('/group/duplicates');
+        return response.data;
+    },
+
+    /** Birlashtiradi: eski nusxa arxivga, uning hamma bog'lanishlari tirikka. */
+    mergeDuplicates: async (groupIds: number[] = []): Promise<GroupMergeResult> => {
+        const response = await api.post<GroupMergeResult>('/group/duplicates/merge', {
+            group_ids: groupIds,
+        });
+        return response.data;
+    },
+
     getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number, speciality_id?: number, includeHidden?: boolean) => {
         const params: any = { page, limit };
         if (includeHidden) params.include_hidden = true;

@@ -21,12 +21,16 @@ from .faculty.schemas import (
     FacultyListResponse,
     FacultyStatsResponse,
 )
+from .group.merge import group_merge_service
 from .group.repository import get_group_repository
 from .group.schemas import (
     GroupCreateRequest,
     GroupCreateResponse,
+    GroupDuplicatePreview,
     GroupListRequest,
     GroupListResponse,
+    GroupMergeRequest,
+    GroupMergeResponse,
 )
 from .kafedra.repository import get_kafedra_repository
 from .kafedra.schemas import (
@@ -231,6 +235,38 @@ async def create_group(
 ):
     result = await get_group_repository.create_group(session=session, data=data)
     return result
+
+
+@group_router.get("/duplicates", response_model=GroupDuplicatePreview)
+async def preview_group_duplicates(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("update:group")),
+):
+    """Nomi bir xil boʻlgan guruhlar — birlashtirishdan oldingi koʻrinish.
+
+    Hech nima yozmaydi. Har toʻdada qaysi nusxa qolishi va qaysi biri arxivga
+    tushishi, hamda ularga nechta talaba, kurs va yuklama bogʻlangani
+    koʻrsatiladi.
+    """
+    return await group_merge_service.preview(session)
+
+
+@group_router.post(
+    "/duplicates/merge",
+    response_model=GroupMergeResponse,
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
+async def merge_group_duplicates(
+    data: GroupMergeRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("update:group")),
+):
+    """Takrorlangan guruhlarni birlashtiradi.
+
+    Eski nusxaning talabalari, kurslari, yuklamalari, darslari va davomati
+    tirik nusxaga koʻchadi, oʻzi esa arxivga tushadi — oʻchirilmaydi.
+    """
+    return await group_merge_service.apply(session, data.group_ids or None)
 
 
 @group_router.get("/{group_id}", response_model=GroupCreateResponse)

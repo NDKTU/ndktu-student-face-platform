@@ -14,6 +14,7 @@ import { hemisService } from '@/services/hemisService';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
 import { HemisGroupMatch } from '@/components/hemis/HemisGroupMatch';
+import { GroupDuplicates } from '@/components/hemis/GroupDuplicates';
 import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
 
 /* Шаги мастера: проверка данных → синхронизация → готово. */
@@ -121,6 +122,7 @@ const HemisSyncPage = () => {
                     title="HEMIS sinxronizatsiyasi"
                     description="Ma'lumot API tokeni va guruhlarni bog'lash. Bitta talabani sinxronlash talabalar sahifasidan ochiladi."
                 />
+                <GroupDuplicates />
                 <HemisGroupMatch />
                 <HemisStudentImport />
             </div>
