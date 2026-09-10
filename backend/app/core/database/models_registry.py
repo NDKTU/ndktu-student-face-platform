@@ -21,6 +21,7 @@ __all__ = [
     "TeacherSubject",
     "TeacherAssignment",
     "Speciality",
+    "Curriculum",
     "Course",
     "CourseGroup",
     "CourseTeacher",
@@ -83,6 +84,7 @@ from app.modules.integration.eduplan.model import (
     EduPlanCredential,
 )
 from app.modules.organization_structure.model import (
+    Curriculum,
     Faculty,
     Group,
     Kafedra,

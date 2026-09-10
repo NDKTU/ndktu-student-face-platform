@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { eduplanService } from '@/services/eduplanService';
+import { eduplanService, type EduPlanEntity } from '@/services/eduplanService';
 
 export const useEduPlanStatus = () => {
     return useQuery({
@@ -42,9 +42,17 @@ export const useClearEduPlanSettings = () => {
     });
 };
 
+/**
+ * Umumiy koʻrib chiqish. Argumentsiz — barcha boʻlimlar.
+ *
+ * `void` variant ataylab: `mutateAsync()` ni argumentsiz chaqirish mumkin
+ * boʻlishi kerak, aks holda faqat ziddiyatlarni yuklaydigan joylarda ham
+ * roʻyxat uzatishga majbur boʻlardik.
+ */
 export const useEduPlanPreview = () => {
     return useMutation({
-        mutationFn: () => eduplanService.preview(),
+        mutationFn: (entities?: EduPlanEntity[] | void) =>
+            eduplanService.preview(entities || undefined),
     });
 };
 
@@ -70,6 +78,64 @@ export const useEduPlanApply = () => {
         },
     });
 };
+
+/** Qaysi boʻlim qaysi keshni eskirtiradi. */
+const ENTITY_QUERY_KEYS: Record<EduPlanEntity, string[]> = {
+    faculty: ['faculties'],
+    kafedra: ['kafedras'],
+    speciality: ['specialities'],
+    group: ['groups'],
+    subject: ['subjects'],
+    teacher: ['employees', 'teachers'],
+    curriculum: ['curriculums'],
+};
+
+/**
+ * Bitta boʻlimni sinxronlash.
+ *
+ * Har bir boʻlim uchun alohida chaqiriladi va oʻz `isPending` holatiga ega
+ * boʻladi — shuning uchun mutatsiya boʻlim boʻyicha parametrlangan, bitta
+ * umumiy emas: aks holda bitta tugma bosilganda hammasi «yuklanmoqda»
+ * koʻrinishiga oʻtardi.
+ *
+ * Kesh faqat shu boʻlimniki yangilanadi: fakultetlarni sinxronlash guruhlar
+ * roʻyxatini qayta soʻrashga sabab boʻlmasligi kerak.
+ */
+export const useSyncEntity = (entity: EduPlanEntity) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (applyDeactivations: boolean = false) =>
+            eduplanService.syncEntity(entity, applyDeactivations),
+        onSuccess: () => {
+            ENTITY_QUERY_KEYS[entity].forEach((key) =>
+                queryClient.invalidateQueries({ queryKey: [key] }),
+            );
+        },
+    });
+};
+
+/**
+ * Yuklamalarni sinxronlash.
+ *
+ * Boshqa boʻlimlardan farqli: yuklama koʻrib chiqishsiz qoʻllanadi, chunki
+ * u yangi satr yaratmaydi — faqat allaqachon bogʻlangan oʻqituvchi, fan va
+ * guruhlarni bir-biriga ulaydi. Bogʻlanmaganlari `unresolved_*` da sanaladi.
+ */
+export const useSyncWorkloads = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => eduplanService.syncWorkloads(),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+        },
+    });
+};
+
+/** Bitta boʻlim boʻyicha koʻrib chiqish: nima oʻzgarishini koʻrsatadi, yozmaydi. */
+export const usePreviewEntity = (entity: EduPlanEntity) =>
+    useMutation({
+        mutationFn: () => eduplanService.previewEntity(entity),
+    });
 
 /** Полный прогон одной кнопкой: справочники и нагрузка сразу. */
 /**

@@ -14,7 +14,7 @@
 import json
 import logging
 import uuid
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from core.mixins.time_stamp_mixin import utcnow_naive
 from core.redis_client import redis_client
@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Teacher
 from app.modules.organization_structure.model import (
+    Curriculum,
     Faculty,
     Group,
     Kafedra,
@@ -34,12 +35,14 @@ from .client import EduPlanClient
 from .credentials import effective_config
 from .repository import eduplan_repository, normalize_name
 from .schemas import (
+    ENTITY_DEPENDENCIES,
     SYNC_ORDER,
     ApplyRequest,
     ApplyResponse,
     ApplyResult,
     Candidate,
     Decision,
+    EduPlanCurriculum,
     EduPlanDepartment,
     EduPlanEntity,
     EduPlanFaculty,
@@ -67,6 +70,20 @@ ENTITY_MODEL = {
     EduPlanEntity.group: Group,
     EduPlanEntity.subject: Subject,
     EduPlanEntity.teacher: Teacher,
+    EduPlanEntity.curriculum: Curriculum,
+}
+
+
+#: Какой ключ снимка какому справочнику соответствует. Один источник правды
+#: для чтения из EPMOS и для подсчёта итогов.
+ENTITY_SOURCE_KEY: dict[EduPlanEntity, str] = {
+    EduPlanEntity.faculty: "faculties",
+    EduPlanEntity.kafedra: "departments",
+    EduPlanEntity.speciality: "specialities",
+    EduPlanEntity.group: "groups",
+    EduPlanEntity.subject: "subjects",
+    EduPlanEntity.teacher: "staff",
+    EduPlanEntity.curriculum: "edu_plans",
 }
 
 
@@ -76,20 +93,87 @@ def _snapshot_key(run_id: str) -> str:
 
 class EduPlanSyncService:
     # ------------------------------------------------------------------ #
+    #  Выбор справочников
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _normalize_entities(
+        entities: Sequence[EduPlanEntity] | None,
+    ) -> tuple[EduPlanEntity, ...]:
+        """Убирает дубли и возвращает выбранное в порядке SYNC_ORDER.
+
+        Порядок важен, даже когда справочник один: применение разрешает
+        родителя по ``id_map``, и обход не в том порядке дал бы пропуски
+        внутри одного прогона, если выбрано сразу несколько разделов.
+        """
+        if not entities:
+            return SYNC_ORDER
+        chosen = set(entities)
+        return tuple(e for e in SYNC_ORDER if e in chosen)
+
+    @staticmethod
+    def _with_dependencies(
+        entities: Sequence[EduPlanEntity],
+    ) -> tuple[EduPlanEntity, ...]:
+        """Выбранное плюс всё, на что оно ссылается, в порядке SYNC_ORDER.
+
+        Зависимости не синхронизируются — они лишь читаются из уже
+        сохранённого зеркала, чтобы разрешить ссылку на родителя.
+        """
+        needed: set[EduPlanEntity] = set()
+        queue = list(entities)
+        while queue:
+            entity = queue.pop()
+            if entity in needed:
+                continue
+            needed.add(entity)
+            queue.extend(ENTITY_DEPENDENCIES.get(entity, ()))
+        return tuple(e for e in SYNC_ORDER if e in needed)
+
+    @staticmethod
+    async def _fetch_snapshot(
+        client: EduPlanClient,
+        entities: Sequence[EduPlanEntity],
+    ) -> dict[str, list[dict]]:
+        """Читает из EPMOS только выбранные справочники.
+
+        Каждый обход — это десятки страниц по сети, поэтому лишние не
+        запрашиваем: синхронизация одних факультетов должна стоить один
+        запрос, а не шесть обходов.
+        """
+        readers = {
+            EduPlanEntity.faculty: client.faculties,
+            EduPlanEntity.kafedra: client.departments,
+            EduPlanEntity.speciality: client.specialities,
+            EduPlanEntity.group: client.groups,
+            EduPlanEntity.subject: client.subjects,
+            EduPlanEntity.teacher: client.staff,
+            EduPlanEntity.curriculum: client.edu_plans,
+        }
+        snapshot: dict[str, list[dict]] = {}
+        for entity in entities:
+            snapshot[ENTITY_SOURCE_KEY[entity]] = await readers[entity]()
+        return snapshot
+
+    # ------------------------------------------------------------------ #
     #  Фаза 1: предпросмотр
     # ------------------------------------------------------------------ #
-    async def build_preview(self, session: AsyncSession) -> PreviewResponse:
-        async with EduPlanClient(await effective_config(session)) as client:
-            snapshot = {
-                "faculties": await client.faculties(),
-                "departments": await client.departments(),
-                "specialities": await client.specialities(),
-                "groups": await client.groups(),
-                "subjects": await client.subjects(),
-                "staff": await client.staff(),
-            }
+    async def build_preview(
+        self,
+        session: AsyncSession,
+        entities: Sequence[EduPlanEntity] | None = None,
+    ) -> PreviewResponse:
+        """Предпросмотр по выбранным справочникам.
 
-        proposals = await self._build_proposals(session, snapshot)
+        ``entities=None`` — все, как раньше. Явный список читает из EPMOS
+        только нужные разделы: синхронизация одних преподавателей не должна
+        тянуть 206 групп и 754 предмета.
+        """
+        selected = self._normalize_entities(entities)
+
+        async with EduPlanClient(await effective_config(session)) as client:
+            snapshot = await self._fetch_snapshot(client, selected)
+
+        proposals = await self._build_proposals(session, snapshot, selected)
 
         run_id = str(uuid.uuid4())
         # Замораживаем именно предложения: в них уже разложены все поля, которые
@@ -98,18 +182,22 @@ class EduPlanSyncService:
         await redis_client.set(
             _snapshot_key(run_id),
             json.dumps(
-                {"proposals": [p.model_dump(mode="json") for p in proposals]},
+                {
+                    "proposals": [p.model_dump(mode="json") for p in proposals],
+                    "entities": [e.value for e in selected],
+                },
                 ensure_ascii=False,
             ),
             ex=SNAPSHOT_TTL_SECONDS,
         )
 
-        summary = self._summarize(snapshot, proposals)
+        summary = self._summarize(snapshot, proposals, selected)
         requires_decision = sum(1 for p in proposals if p.action == ProposalAction.conflict)
 
         logger.info(
-            "EduPlan preview %s: %d предложений, %d требуют решения",
+            "EPMOS preview %s [%s]: %d предложений, %d требуют решения",
             run_id,
+            ",".join(e.value for e in selected),
             len(proposals),
             requires_decision,
         )
@@ -117,6 +205,7 @@ class EduPlanSyncService:
         return PreviewResponse(
             run_id=run_id,
             generated_at=utcnow_naive().isoformat(),
+            entities=list(selected),
             summary=summary,
             proposals=proposals,
             requires_decision=requires_decision,
@@ -186,10 +275,15 @@ class EduPlanSyncService:
             changes=changes,
         )
 
-    async def _build_proposals(self, session: AsyncSession, snapshot: dict[str, list[dict]]) -> list[Proposal]:
+    async def _build_proposals(
+        self,
+        session: AsyncSession,
+        snapshot: dict[str, list[dict]],
+        entities: Sequence[EduPlanEntity],
+    ) -> list[Proposal]:
         proposals: list[Proposal] = []
 
-        for entity in SYNC_ORDER:
+        for entity in entities:
             model = ENTITY_MODEL[entity]
             linked = await eduplan_repository.index_by_external(session, model)
 
@@ -289,6 +383,21 @@ class EduPlanSyncService:
                     by_name,
                 )
 
+        elif entity == EduPlanEntity.curriculum:
+            for raw in snapshot["edu_plans"]:
+                cp = EduPlanCurriculum.model_validate(raw)
+                yield (
+                    str(cp.id),
+                    cp.name,
+                    {
+                        "name": cp.name,
+                        "speciality_external_id": str(cp.speciality_id),
+                        "education_form": cp.education_form,
+                        "education_type": cp.education_type,
+                    },
+                    by_name,
+                )
+
         elif entity == EduPlanEntity.teacher:
             for raw in snapshot["staff"]:
                 st = EduPlanStaff.model_validate(raw)
@@ -311,20 +420,16 @@ class EduPlanSyncService:
                 )
 
     @staticmethod
-    def _summarize(snapshot: dict[str, list[dict]], proposals: list[Proposal]) -> list[EntitySummary]:
-        source_key = {
-            EduPlanEntity.faculty: "faculties",
-            EduPlanEntity.kafedra: "departments",
-            EduPlanEntity.speciality: "specialities",
-            EduPlanEntity.group: "groups",
-            EduPlanEntity.subject: "subjects",
-            EduPlanEntity.teacher: "staff",
-        }
+    def _summarize(
+        snapshot: dict[str, list[dict]],
+        proposals: list[Proposal],
+        entities: Sequence[EduPlanEntity],
+    ) -> list[EntitySummary]:
         summary = []
-        for entity in SYNC_ORDER:
+        for entity in entities:
             item = EntitySummary(
                 entity=entity,
-                total_external=len(snapshot.get(source_key[entity], [])),
+                total_external=len(snapshot.get(ENTITY_SOURCE_KEY[entity], [])),
             )
             for p in proposals:
                 if p.entity == entity:
@@ -345,13 +450,20 @@ class EduPlanSyncService:
 
         stored = json.loads(raw)
         proposals = [Proposal.model_validate(p) for p in stored["proposals"]]
+        # Разделы берём из самого снимка, а не из запроса: применять можно
+        # ровно то, что администратор видел в предпросмотре.
+        entities = self._normalize_entities(
+            [EduPlanEntity(v) for v in stored.get("entities", [])] or None
+        )
         decisions: dict[str, Decision] = {d.key: d for d in request.decisions}
 
         # external_id -> локальный id, по сущностям. Заполняется как уже
         # связанными строками, так и созданными в этом прогоне: ребёнок
-        # разрешает родителя именно отсюда.
+        # разрешает родителя именно отсюда. Берём и зависимости выбранного:
+        # родителя мог связать другой, более ранний прогон, и без него
+        # ребёнок не разрешился бы.
         id_map: dict[EduPlanEntity, dict[str, int]] = {}
-        for entity in SYNC_ORDER:
+        for entity in self._with_dependencies(entities):
             linked = await eduplan_repository.index_by_external(session, ENTITY_MODEL[entity])
             id_map[entity] = {ext_id: row.id for ext_id, row in linked.items()}
 
@@ -364,10 +476,10 @@ class EduPlanSyncService:
             s.id: s.kafedra_id for s in await eduplan_repository.load_all(session, Speciality)
         }
 
-        results: dict[EduPlanEntity, ApplyResult] = {entity: ApplyResult(entity=entity) for entity in SYNC_ORDER}
+        results: dict[EduPlanEntity, ApplyResult] = {entity: ApplyResult(entity=entity) for entity in entities}
 
         try:
-            for entity in SYNC_ORDER:
+            for entity in entities:
                 for proposal in (p for p in proposals if p.entity == entity):
                     await self._apply_one(
                         session=session,
@@ -382,15 +494,40 @@ class EduPlanSyncService:
             await session.commit()
         except Exception:
             await session.rollback()
-            logger.exception("EduPlan apply %s провалился, изменения откачены", request.run_id)
+            logger.exception("EPMOS apply %s провалился, изменения откачены", request.run_id)
             raise
 
-        logger.info("EduPlan apply %s завершён", request.run_id)
+        logger.info("EPMOS apply %s [%s] завершён", request.run_id, ",".join(e.value for e in entities))
         return ApplyResponse(
             run_id=request.run_id,
+            entities=list(entities),
             results=list(results.values()),
             finished_at=utcnow_naive().isoformat(),
         )
+
+    async def sync_entity(
+        self,
+        session: AsyncSession,
+        entity: EduPlanEntity,
+        *,
+        apply_deactivations: bool = False,
+    ) -> tuple[PreviewResponse, ApplyResponse]:
+        """Один раздел: предпросмотр и сразу применение однозначного.
+
+        Нужно там, где разбирать нечего — повторный прогон уже связанного
+        справочника. Конфликты не применяются и остаются в предпросмотре:
+        их видно в ответе, и разобрать их можно на общем экране.
+        """
+        preview = await self.build_preview(session, [entity])
+        applied = await self.apply(
+            session,
+            ApplyRequest(
+                run_id=preview.run_id,
+                decisions=[],
+                apply_deactivations=apply_deactivations,
+            ),
+        )
+        return preview, applied
 
     async def _apply_one(
         self,
@@ -405,6 +542,10 @@ class EduPlanSyncService:
         result: ApplyResult,
     ) -> None:
         entity = proposal.entity
+        # Родителя может не оказаться в карте, если предпросмотр пришёл из
+        # снимка, снятого до появления зависимости. Пустой словарь даёт
+        # понятный «родитель не разрешён», а не KeyError посреди прогона.
+        parents = lambda e: id_map.get(e, {})  # noqa: E731
         action = decision.action if decision else proposal.action
         local_id = decision.local_id if decision and decision.local_id else proposal.local_id
 
@@ -436,7 +577,7 @@ class EduPlanSyncService:
                 row = await eduplan_repository.upsert_faculty(session, proposal.external_id, changes["name"], existing)
 
             elif entity == EduPlanEntity.kafedra:
-                faculty_id = id_map[EduPlanEntity.faculty].get(changes["faculty_external_id"])
+                faculty_id = parents(EduPlanEntity.faculty).get(changes["faculty_external_id"])
                 if faculty_id is None:
                     result.errors.append(f"Кафедра {proposal.external_name}: факультет не разрешён, пропущена")
                     result.skipped += 1
@@ -447,7 +588,7 @@ class EduPlanSyncService:
                 kafedra_faculty[row.id] = faculty_id
 
             elif entity == EduPlanEntity.speciality:
-                kafedra_id = id_map[EduPlanEntity.kafedra].get(changes["kafedra_external_id"])
+                kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
                 if kafedra_id is None:
                     result.errors.append(f"Специальность {proposal.external_name}: кафедра не разрешена, пропущена")
                     result.skipped += 1
@@ -463,7 +604,7 @@ class EduPlanSyncService:
                 speciality_kafedra[row.id] = kafedra_id
 
             elif entity == EduPlanEntity.group:
-                speciality_id = id_map[EduPlanEntity.speciality].get(changes["speciality_external_id"])
+                speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
                 # У группы в EduPlan факультета нет — выводим по цепочке
                 # специальность -> кафедра -> факультет.
                 faculty_id = None
@@ -488,7 +629,7 @@ class EduPlanSyncService:
                 )
 
             elif entity == EduPlanEntity.subject:
-                kafedra_id = id_map[EduPlanEntity.kafedra].get(changes["kafedra_external_id"])
+                kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
                 row = await eduplan_repository.upsert_subject(
                     session,
                     proposal.external_id,
@@ -497,9 +638,47 @@ class EduPlanSyncService:
                     existing,
                 )
 
+            elif entity == EduPlanEntity.curriculum:
+                speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
+                # Кафедра и факультет выводятся по той же цепочке, что и у
+                # группы: специальность -> кафедра -> факультет.
+                #
+                # Если специальность не разрешена, связки НЕ затираем.
+                # Новый план заводим и без них — сам по себе он осмысленная
+                # строка справочника. А вот у существующего молчаливое
+                # обнуление означало бы, что план исчез из выборок по
+                # факультету, и причину пришлось бы искать в базе: строка на
+                # месте, данные на месте, а в списке её нет.
+                if speciality_id is None:
+                    if existing is not None and existing.speciality_id is not None:
+                        result.errors.append(
+                            f"O'quv reja {proposal.external_name}: mutaxassislik (EPMOS #"
+                            f"{changes['speciality_external_id']}) bog'lanmagan — avval "
+                            "«Mutaxassisliklarni sinxronlash» ni bajaring. Rejaning eski "
+                            "bog'lanishi saqlab qolindi."
+                        )
+                    speciality_id = existing.speciality_id if existing else None
+                    kafedra_id = existing.kafedra_id if existing else None
+                    faculty_id = existing.faculty_id if existing else None
+                else:
+                    kafedra_id = speciality_kafedra.get(speciality_id)
+                    faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
+
+                row = await eduplan_repository.upsert_curriculum(
+                    session,
+                    proposal.external_id,
+                    changes["name"],
+                    speciality_id,
+                    kafedra_id,
+                    faculty_id,
+                    changes.get("education_form"),
+                    changes.get("education_type"),
+                    existing,
+                )
+
             elif entity == EduPlanEntity.teacher:
                 kafedra_ext = changes.get("kafedra_external_id")
-                kafedra_id = id_map[EduPlanEntity.kafedra].get(kafedra_ext) if kafedra_ext else None
+                kafedra_id = parents(EduPlanEntity.kafedra).get(kafedra_ext) if kafedra_ext else None
                 row = await eduplan_repository.upsert_teacher(
                     session,
                     external_id=proposal.external_id,
@@ -520,7 +699,7 @@ class EduPlanSyncService:
             result.skipped += 1
             return
 
-        id_map[entity][proposal.external_id] = row.id
+        id_map.setdefault(entity, {})[proposal.external_id] = row.id
         if was_new:
             result.created += 1
         elif action == ProposalAction.link:

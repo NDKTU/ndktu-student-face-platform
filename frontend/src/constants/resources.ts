@@ -5,8 +5,6 @@ import {
     Shield,
     Key,
     BookOpen,
-    FileQuestion,
-    FileText,
     Brain,
     Building2,
     Layers,
@@ -22,58 +20,91 @@ import {
     Home,
     Megaphone,
     RefreshCw,
+    Award,
+    BookMarked,
+    UserCog,
+    Network,
+    SlidersHorizontal,
+    ClipboardPen,
+    MessageCircleQuestion,
+    Timer,
+    ChartColumnBig,
+    ListChecks,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+
+/**
+ * Ikonka rangi — mavzudagi `--stat-*` tokenlaridan biri. Ranglar mavzu
+ * bilan birga o'zgaradi (to'q rejimda ochroq variantlari), shuning uchun
+ * bu yerda hex emas, token nomi saqlanadi.
+ */
+export type IconTone =
+    | 'teal'
+    | 'blue'
+    | 'cyan'
+    | 'green'
+    | 'orange'
+    | 'yellow'
+    | 'purple'
+    | 'pink'
+    | 'red';
 
 export interface ResourceMeta {
     label: string;
     href?: string;
     icon?: LucideIcon;
     section?: string;
+    /** Ikonka rangi; ko'rsatilmasa — neytral kulrang. */
+    tone?: IconTone;
 }
 
+// Bo'limlar ish chastotasi bo'yicha: kundalik ish tepada, ma'lumotnomalar
+// o'rtada, yiliga bir necha marta ochiladigan sozlamalar pastda. Ilgari
+// bo'limlar jadvallar bo'yicha bo'lingandi va «Testlar» aralash quti edi:
+// unda kurslar, uy vazifalari va fayllar ham turardi.
 export const SIDEBAR_SECTION_ORDER = [
     'Umumiy',
-    'Boshqaruv',
-    'Foydalanuvchilar',
-    'Testlar',
-    'Psixologiya',
-    'Ruxsatlar tizimi',
-    'Sozlamalar',
+    "O'quv jarayoni",
+    'Baholash',
+    "Ma'lumotnoma",
+    'Tizim',
 ] as const;
 
 export const RESOURCES: Record<string, ResourceMeta> = {
-    user:          { label: 'Foydalanuvchilar', href: '/users',       icon: Users,         section: 'Foydalanuvchilar' },
-    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: 'Foydalanuvchilar' },
-    student:       { label: 'Talabalar',        href: '/students',    icon: GraduationCap, section: 'Foydalanuvchilar' },
+    user:          { label: 'Foydalanuvchilar', href: '/users',       icon: UserCog,       section: "Ma'lumotnoma", tone: 'blue' },
+    teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: "Ma'lumotnoma", tone: 'teal' },
+    student:       { label: 'Talabalar',        href: '/students',    icon: Users,         section: "Ma'lumotnoma", tone: 'cyan' },
 
-    announcement:  { label: "E'lonlar",         href: '/announcements', icon: Megaphone,   section: 'Boshqaruv' },
+    announcement:  { label: "E'lonlar",         href: '/announcements', icon: Megaphone,   section: 'Tizim', tone: 'pink' },
 
-    role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Ruxsatlar tizimi' },
-    permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Ruxsatlar tizimi' },
+    role:          { label: 'Rollar',           href: '/roles',       icon: Shield,        section: 'Tizim', tone: 'purple' },
+    permission:    { label: 'Ruxsatlar',        href: '/permissions', icon: Key,           section: 'Tizim', tone: 'yellow' },
 
     // Пункт появляется у роли с правом read:eduplan (оно объявлено ручкой
     // статуса интеграции) и ведёт на экран синхронизации оргструктуры.
-    // Живёт в «Sozlamalar» — как системная настройка, а не ежедневный раздел.
-    eduplan:       { label: 'EduPlan sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Sozlamalar' },
+    // Живёт в «Tizim» — как системная настройка, а не ежедневный раздел.
+    eduplan:       { label: 'EPMOS sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Tizim', tone: 'blue' },
 
-    faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: 'Boshqaruv' },
-    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: 'Boshqaruv' },
-    speciality:    { label: 'Mutaxassisliklar', href: '/specialities', icon: GraduationCap, section: 'Boshqaruv' },
-    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound,    section: 'Boshqaruv' },
-    subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookOpen,      section: 'Testlar' },
-    course:        { label: 'Kurslar',          href: '/courses',     icon: Library,       section: 'Testlar' },
+    faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: "Ma'lumotnoma", tone: 'purple' },
+    kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: "Ma'lumotnoma", tone: 'blue' },
+    speciality:    { label: 'Mutaxassisliklar', href: '/specialities', icon: Award,        section: "Ma'lumotnoma", tone: 'yellow' },
+    // EPMOS ko'zgusi, faqat o'qish uchun. Ruxsati mutaxassislikniki bilan
+    // bir xil: reja mutaxassislikning davomi.
+    curriculum:    { label: "O'quv rejalar",    href: '/curriculums', icon: BookOpen,      section: "Ma'lumotnoma", tone: 'teal' },
+    group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound,    section: "Ma'lumotnoma", tone: 'cyan' },
+    subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookMarked,    section: "Ma'lumotnoma", tone: 'green' },
+    course:        { label: 'Kurslar',          href: '/courses',     icon: Library,       section: "O'quv jarayoni", tone: 'teal' },
 
-    quiz:          { label: 'Testlar',          href: '/quizzes',     icon: BookOpen,      section: 'Testlar' },
-    active_quiz:   { label: 'Faol testlar',     href: '/active-quizzes', icon: PlayCircle, section: 'Testlar' },
-    question:      { label: 'Savollar',         href: '/questions',   icon: FileQuestion,  section: 'Testlar' },
-    result:        { label: 'Natijalar',        href: '/results',     icon: FileText,      section: 'Testlar' },
-    lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen },
-    file:          { label: 'Fayl kutubxonasi', href: '/files',       icon: FolderOpen,    section: 'Testlar' },
-    teacher_assignment: { label: 'Oʻquv yuklamasi', href: '/teacher-assignments', icon: ClipboardList, section: 'Boshqaruv' },
-    homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: 'Testlar' },
-    psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Psixologiya' },
-    psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Psixologiya' },
+    quiz:          { label: 'Testlar',          href: '/quizzes',     icon: ClipboardPen,    section: 'Baholash', tone: 'blue' },
+    active_quiz:   { label: 'Faol testlar',     href: '/active-quizzes', icon: Timer, section: 'Baholash', tone: 'green' },
+    question:      { label: 'Savollar',         href: '/questions',   icon: MessageCircleQuestion,  section: 'Baholash', tone: 'purple' },
+    result:        { label: 'Natijalar',        href: '/results',     icon: ChartColumnBig,      section: 'Baholash', tone: 'orange' },
+    lesson:        { label: 'Darslar',          href: '/lessons',     icon: BookOpen, tone: 'teal' },
+    file:          { label: 'Fayl kutubxonasi', href: '/files',       icon: FolderOpen,    section: "O'quv jarayoni", tone: 'yellow' },
+    teacher_assignment: { label: 'Oʻquv yuklamasi', href: '/teacher-assignments', icon: ClipboardList, section: "O'quv jarayoni", tone: 'orange' },
+    homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: "O'quv jarayoni", tone: 'green' },
+    psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Baholash', tone: 'pink' },
+    psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Baholash', tone: 'purple' },
 
     me:            { label: 'Profil' },
     quiz_process:  { label: 'Test jarayoni' },
@@ -105,6 +136,13 @@ export interface SidebarItem {
     name: string;
     href: string;
     icon: LucideIcon;
+    /** Ikonka rangi; ko'rsatilmasa — neytral kulrang. */
+    tone?: IconTone;
+    /**
+     * Yig'iluvchi guruh ichidagi punktlar. Bo'lsa — o'zi havola emas,
+     * ochib-yopiladigan sarlavha (`href` faqat faol yo'lni aniqlash uchun).
+     */
+    children?: SidebarItem[];
 }
 
 export interface SidebarSection {
@@ -112,72 +150,139 @@ export interface SidebarSection {
     items: SidebarItem[];
 }
 
+// «Reyting» ilgari shu yerda, Dashboard yonida turardi. U kundalik
+// navigatsiya emas, o'qituvchilar ko'rsatkichi — shuning uchun «Baholash»
+// bo'limiga ko'chdi (buildSidebar ichida, avvalgidek faqat adminda).
 const ALWAYS_VISIBLE: SidebarSection = {
     label: 'Umumiy',
     items: [
-        { name: 'Dashboard', href: '/', icon: BarChart2 },
-        { name: 'Reyting', href: '/teacher-ranking', icon: Trophy },
+        { name: 'Dashboard', href: '/', icon: BarChart2, tone: 'teal' },
     ],
 };
 
 const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
     label: 'Umumiy',
     items: [
-        { name: 'Bosh sahifa', href: '/', icon: Home },
-        { name: 'Profil', href: '/profile', icon: User },
+        { name: 'Bosh sahifa', href: '/', icon: Home, tone: 'teal' },
+        { name: 'Profil', href: '/profile', icon: User, tone: 'blue' },
     ],
 };
 
 interface StudentSidebarItem extends SidebarItem {
     permission: string;
-    /** Qaysi bo'limga tushadi. Ko'rsatilmasa — «Testlar». */
+    /** Qaysi bo'limga tushadi. Ko'rsatilmasa — «Baholash». */
     section?: string;
 }
 
 export const SIDEBAR_RESOURCE_ORDER: string[] = [
-    // Boshqaruv
-    'faculty',
-    'kafedra',
-    'speciality',
-    'group',
-    'teacher_assignment',
-    'announcement',
-
-    // Foydalanuvchilar
-    'user',
-    'teacher',
-    'student',
-
-    // Testlar
-    'subject',
-    'question',
-    'quiz',
-    'result',
+    // O'quv jarayoni
     'course',
+    'teacher_assignment',
     'homework',
-    'active_quiz',
     'lesson',
     'file',
 
-    // Psixologiya
+    // Baholash
+    'quiz',
+    'question',
+    'active_quiz',
+    'result',
     'psychology',
     'psychology_results',
 
-    // Ruxsatlar tizimi
+    // Ma'lumotnoma
+    'user',
+    'teacher',
+    'student',
+    'group',
+    'subject',
+    'faculty',
+    'kafedra',
+    'speciality',
+    'curriculum',
+
+    // Tizim
+    'announcement',
     'role',
     'permission',
-
-    // Sozlamalar
     'eduplan',
 ];
+
+/**
+ * Yig'iluvchi guruhlar: kalit — guruh nomi, qiymat — unga tushadigan
+ * resurslar. Guruhda kamida ikkita punkt ko'rinsagina guruh yasaladi,
+ * aks holda yagona punkt guruhsiz, o'z holicha chiqadi — bir punktli
+ * ochib-yopiladigan sarlavha foydasiz.
+ */
+interface SidebarGroupSpec {
+    name: string;
+    icon: LucideIcon;
+    section: string;
+    resources: string[];
+    /** Guruh sarlavhasi bosilganda ochiladigan sahifa. */
+    href: string;
+    /** Guruh ikonkasining rangi. */
+    tone: IconTone;
+}
+
+export const SIDEBAR_GROUPS: SidebarGroupSpec[] = [
+    {
+        name: 'Testlar',
+        icon: ListChecks,
+        section: 'Baholash',
+        resources: ['quiz', 'question', 'active_quiz'],
+        href: '/quizzes',
+        tone: 'blue',
+    },
+    {
+        name: 'Psixologiya',
+        icon: Brain,
+        section: 'Baholash',
+        resources: ['psychology', 'psychology_results'],
+        href: '/psychology',
+        tone: 'pink',
+    },
+    {
+        name: 'Foydalanuvchilar',
+        icon: UserCog,
+        section: "Ma'lumotnoma",
+        resources: ['user', 'teacher', 'student'],
+        href: '/users',
+        tone: 'blue',
+    },
+    {
+        name: 'Tashkiliy tuzilma',
+        icon: Network,
+        section: "Ma'lumotnoma",
+        resources: ['faculty', 'kafedra', 'speciality', 'curriculum'],
+        href: '/faculties',
+        tone: 'purple',
+    },
+    {
+        name: 'Sozlamalar',
+        icon: SlidersHorizontal,
+        section: 'Tizim',
+        resources: ['role', 'permission', 'eduplan'],
+        href: '/roles',
+        tone: 'yellow',
+    },
+];
+
+/** Guruh ichidagi punktning ko'rinadigan nomi (guruh nomi takrorlanmasligi uchun). */
+const GROUPED_ITEM_LABELS: Record<string, string> = {
+    quiz: "Testlar ro'yxati",
+    psychology: 'Metodikalar',
+    psychology_results: 'Natijalar',
+    user: 'Barcha foydalanuvchilar',
+};
 
 // Student-only destinations that don't follow the generic read:<resource> ->
 // RESOURCES[resource] convention (their route/permission differs from the
 // admin/staff page for the same concept, e.g. quiz-taking vs quiz management).
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
-    { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, permission: 'quiz_process:start_quiz' },
-    { name: 'Psixologiya', href: '/psychology/student', icon: Brain, permission: 'read:psychology' },
-    { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, permission: 'announcement:feed', section: 'Umumiy' },
+    { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
+    { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
+    { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
 ];
 
 // Resources whose generic admin/staff destination shouldn't be surfaced to a
@@ -201,12 +306,13 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
             name: meta.label,
             href: meta.href,
             icon: meta.icon,
+            tone: meta.tone,
         });
     }
 
     for (const item of STUDENT_BESPOKE_ITEMS) {
         if (!permissions.has(item.permission)) continue;
-        (grouped[item.section ?? 'Testlar'] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
+        (grouped[item.section ?? 'Baholash'] ??= []).push({ name: item.name, href: item.href, icon: item.icon, tone: item.tone });
     }
 
     // «Umumiy» sikldan tashqarida yig'iladi: unda doimiy havolalar bor va
@@ -229,13 +335,24 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
 // Пункты, которые не следуют правилу `read:<resource>` -> RESOURCES[resource]:
 // у страницы своё право, не привязанное к CRUD справочника. Тот же приём, что
 // и STUDENT_BESPOKE_ITEMS, только для сотрудников.
-const STAFF_BESPOKE_ITEMS: { name: string; href: string; icon: LucideIcon; permission: string; section: string }[] = [
+const STAFF_BESPOKE_ITEMS: {
+    name: string;
+    href: string;
+    icon: LucideIcon;
+    tone?: IconTone;
+    permission: string;
+    section: string;
+    /** Shu nomli yig'iluvchi guruh ichiga tushadi. */
+    group?: string;
+}[] = [
     {
         name: 'HEMIS sinxronizatsiyasi',
         href: '/admin/hemis-sync',
         icon: RefreshCw,
+        tone: 'cyan',
         permission: 'hemis_admin_sync',
-        section: 'Sozlamalar',
+        section: 'Tizim',
+        group: 'Sozlamalar',
     },
 ];
 
@@ -246,26 +363,72 @@ export const buildSidebar = (
     const isStudent = roleNames.some((r) => r.toLowerCase() === 'student');
     if (isStudent) return buildStudentSidebar(permissions);
 
+    // Qaysi resurs qaysi yig'iluvchi guruhga tegishli.
+    const groupOf = new Map<string, SidebarGroupSpec>();
+    for (const spec of SIDEBAR_GROUPS) {
+        for (const resource of spec.resources) groupOf.set(resource, spec);
+    }
+
     const grouped: Record<string, SidebarItem[]> = {};
+    // Guruh nomi -> unga yig'ilgan bolalar. Guruhning bo'limdagi o'rni
+    // birinchi ko'ringan bolasi bo'yicha belgilanadi, shuning uchun
+    // joy-egallovchi (placeholder) darhol qo'yiladi.
+    const groupChildren = new Map<string, SidebarItem[]>();
+
+    const pushTo = (section: string, item: SidebarItem) => {
+        (grouped[section] ??= []).push(item);
+    };
 
     for (const resource of SIDEBAR_RESOURCE_ORDER) {
         if (!permissions.has(`read:${resource}`)) continue;
         const meta = RESOURCES[resource];
         if (!meta?.href || !meta.icon || !meta.section) continue;
 
-        (grouped[meta.section] ??= []).push({
-            name: meta.label,
+        const spec = groupOf.get(resource);
+        if (!spec) {
+            pushTo(meta.section, { name: meta.label, href: meta.href, icon: meta.icon, tone: meta.tone });
+            continue;
+        }
+
+        let children = groupChildren.get(spec.name);
+        if (!children) {
+            children = [];
+            groupChildren.set(spec.name, children);
+            // Guruh sarlavhasi shu yerda joy oladi; bolalari havolaga bog'liq.
+            pushTo(spec.section, { name: spec.name, href: spec.href, icon: spec.icon, tone: spec.tone, children });
+        }
+        children.push({
+            name: GROUPED_ITEM_LABELS[resource] ?? meta.label,
             href: meta.href,
             icon: meta.icon,
+            tone: meta.tone,
         });
     }
 
     for (const item of STAFF_BESPOKE_ITEMS) {
         if (!permissions.has(item.permission)) continue;
-        (grouped[item.section] ??= []).push({ name: item.name, href: item.href, icon: item.icon });
+        const entry = { name: item.name, href: item.href, icon: item.icon, tone: item.tone };
+        const children = item.group ? groupChildren.get(item.group) : undefined;
+        if (children) children.push(entry);
+        else pushTo(item.section, entry);
+    }
+
+    // Bitta bolasi qolgan guruhni ochib-yopishning ma'nosi yo'q: uni
+    // o'sha yagona punktning o'ziga almashtiramiz.
+    for (const items of Object.values(grouped)) {
+        for (let i = 0; i < items.length; i++) {
+            const kids = items[i].children;
+            if (kids && kids.length === 1) items[i] = kids[0];
+        }
     }
 
     const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');
+    // Reyting ilgari «Umumiy»da, faqat adminda ko'rinardi — o'sha shart
+    // saqlanadi, faqat joyi «Baholash»ga ko'chdi.
+    if (isAdmin) {
+        pushTo('Baholash', { name: 'Reyting', href: '/teacher-ranking', icon: Trophy, tone: 'yellow' });
+    }
+
     const sections: SidebarSection[] = isAdmin ? [ALWAYS_VISIBLE] : [];
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
         if (sectionLabel === 'Umumiy') continue;

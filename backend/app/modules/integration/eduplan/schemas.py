@@ -21,10 +21,12 @@ class EduPlanEntity(str, Enum):
     group = "group"
     subject = "subject"
     teacher = "teacher"
+    curriculum = "curriculum"
 
 
 #: Порядок обхода. Ребёнок не может примениться раньше родителя: кафедра
-#: требует факультет, специальность — кафедру, группа — специальность.
+#: требует факультет, специальность — кафедру, группа — специальность,
+#: учебный план — специальность.
 SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.faculty,
     EduPlanEntity.kafedra,
@@ -32,7 +34,26 @@ SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.group,
     EduPlanEntity.subject,
     EduPlanEntity.teacher,
+    EduPlanEntity.curriculum,
 )
+
+#: От чего зависит каждая сущность. Пользователь запускает любую
+#: синхронизацию отдельно, но разрешить ссылку на родителя можно только
+#: если тот уже связан: кафедра без факультета не применится.
+#:
+#: Зависимости не запускаются сами — прогон одной сущности читает из EPMOS
+#: только её, а родителей берёт из уже сохранённого зеркала. Если родитель
+#: не связан, строка пропускается с внятной ошибкой, а не тянет за собой
+#: чужой прогон.
+ENTITY_DEPENDENCIES: dict[EduPlanEntity, tuple[EduPlanEntity, ...]] = {
+    EduPlanEntity.faculty: (),
+    EduPlanEntity.kafedra: (EduPlanEntity.faculty,),
+    EduPlanEntity.speciality: (EduPlanEntity.kafedra,),
+    EduPlanEntity.group: (EduPlanEntity.speciality,),
+    EduPlanEntity.subject: (EduPlanEntity.kafedra,),
+    EduPlanEntity.teacher: (EduPlanEntity.kafedra,),
+    EduPlanEntity.curriculum: (EduPlanEntity.speciality,),
+}
 
 
 # ---------------------------------------------------------------------- #
@@ -79,6 +100,21 @@ class EduPlanSubject(_Lenient):
     id: int
     name: str
     department_id: int
+
+
+class EduPlanCurriculum(_Lenient):
+    """Учебный план EPMOS (`/edu-plans/`).
+
+    Кафедра и факультет в ответе не приходят — выводятся по цепочке
+    специальность -> кафедра -> факультет, как и у группы.
+    """
+
+    id: int
+    name: str
+    speciality_id: int
+    education_form: Optional[str] = None
+    education_type: Optional[str] = None
+    is_active: bool = True
 
 
 class EduPlanTeacherProfile(_Lenient):
@@ -187,6 +223,9 @@ class EntitySummary(BaseModel):
 class PreviewResponse(BaseModel):
     run_id: str
     generated_at: str
+    #: Разделы, попавшие в этот предпросмотр. Применение работает ровно с
+    #: ними: снимок замораживается вместе с выбором.
+    entities: list[EduPlanEntity] = Field(default_factory=list)
     summary: list[EntitySummary]
     proposals: list[Proposal]
     #: Всё, что требует ручного решения, вынесено отдельно.
@@ -224,8 +263,29 @@ class ApplyResult(BaseModel):
 
 class ApplyResponse(BaseModel):
     run_id: str
+    #: Разделы, к которым применение относилось.
+    entities: list[EduPlanEntity] = Field(default_factory=list)
     results: list[ApplyResult]
     finished_at: str
+
+
+class EntitySyncResponse(BaseModel):
+    """Итог синхронизации одного раздела — то, что показывает его карточка."""
+
+    entity: EduPlanEntity
+    run_id: str
+    finished_at: str
+    #: Сколько строк пришло из EPMOS в этом прогоне.
+    total_external: int = 0
+    created: int = 0
+    linked: int = 0
+    updated: int = 0
+    deactivated: int = 0
+    skipped: int = 0
+    #: Неоднозначные совпадения. Автоматически не применяются — их разбирают
+    #: на общем экране сопоставления.
+    requires_decision: int = 0
+    errors: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------- #

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { EntitySyncMenu } from '@/components/eduplan/EntitySyncMenu';
 import {
     Table,
     TableBody,
@@ -41,7 +42,7 @@ import {
     type ApplyResponse,
     type ApplyResult,
     type Decision,
-    type EduPlanEntity,
+    ENTITY_LABEL,
     type PreviewResponse,
     type Proposal,
     type CoursePlan,
@@ -50,16 +51,6 @@ import {
     type RunState,
 } from '@/services/eduplanService';
 import { COURSE_TYPE_OPTIONS, courseTypeLabel } from '@/services/courseTypes';
-
-const ENTITY_LABEL: Record<EduPlanEntity, string> = {
-    faculty: 'Fakultetlar',
-    kafedra: 'Kafedralar',
-    department: "Bo'limlar",
-    speciality: 'Mutaxassisliklar',
-    group: 'Guruhlar',
-    subject: 'Fanlar',
-    employee: 'Xodimlar',
-};
 
 /** Выбор администратора по конфликту: id локальной строки либо «создать новую». */
 type ConflictChoice = number | 'create' | undefined;
@@ -197,8 +188,8 @@ const EduPlanSyncPage = () => {
     return (
         <div className="space-y-6 p-6">
             <PageHeader
-                title="EduPlan bilan sinxronizatsiya"
-                description="Tashkiliy tuzilmani bir tomonlama import qilish. EduPlan tizimiga hech narsa yozilmaydi."
+                title="EPMOS bilan sinxronizatsiya"
+                description="Tashkiliy tuzilmani bir tomonlama import qilish. EPMOS tizimiga hech narsa yozilmaydi."
             />
 
             <ConnectionSettingsCard />
@@ -208,7 +199,7 @@ const EduPlanSyncPage = () => {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                         <StepBadge n={1} />
-                        Ulanish va ishga tushirish
+                        Ulanish va to'liq sinxronlash
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -231,12 +222,12 @@ const EduPlanSyncPage = () => {
                         </Notice>
                     ) : !status.reachable ? (
                         <Notice tone="destructive" icon={<XCircle className="mt-0.5 h-4 w-4 shrink-0" />}>
-                            <div className="font-medium">EduPlan bilan aloqa yo'q</div>
+                            <div className="font-medium">EPMOS bilan aloqa yo'q</div>
                             <div>{status.detail}</div>
                         </Notice>
                     ) : (
                         <Notice tone="success" icon={<CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}>
-                            <div className="font-medium">EduPlan javob bermoqda</div>
+                            <div className="font-medium">EPMOS javob bermoqda</div>
                             <div>
                                 {status.base_url}
                                 {status.active_academic_year
@@ -253,7 +244,7 @@ const EduPlanSyncPage = () => {
                             ) : (
                                 <RefreshCw className="mr-2 h-4 w-4" />
                             )}
-                            EduPlan bilan sinxronlash
+                            Hammasini sinxronlash
                         </Button>
                         <Button variant="outline" onClick={() => refetchStatus()} disabled={syncing}>
                             Ulanishni tekshirish
@@ -261,15 +252,17 @@ const EduPlanSyncPage = () => {
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                        Ma'lumotnomalar va o'qituvchilar yuklamasi bir amalda ko'chiriladi. Hech narsa
-                        o'chirilmaydi: EduPlan'dan yo'qolgan yozuvlar joyida qoladi, chunki fakultetlar,
-                        guruhlar va fanlarga test natijalari bog'langan.
+                        Bu tugma barcha ma'lumotnomalarni va o'qituvchilar yuklamasini bir amalda
+                        ko'chiradi. Bittasini alohida yangilash kerak bo'lsa — quyidagi «Bo'limlar
+                        bo'yicha sinxronlash» dan foydalaning. Hech narsa o'chirilmaydi: EPMOS'dan
+                        yo'qolgan yozuvlar joyida qoladi, chunki fakultetlar, guruhlar va fanlarga
+                        test natijalari bog'langan.
                     </p>
 
                     {syncing && (
                         <div className="text-sm text-muted-foreground">
                             {runState?.status === 'running'
-                                ? "Sinxronizatsiya ketmoqda: EduPlan o'qilmoqda va bir ma'noli o'zgarishlar qo'llanmoqda. Bu bir necha daqiqa davom etadi — sahifani yopsangiz ham progn to'xtamaydi."
+                                ? "Sinxronizatsiya ketmoqda: EPMOS o'qilmoqda va bir ma'noli o'zgarishlar qo'llanmoqda. Bu bir necha daqiqa davom etadi — sahifani yopsangiz ham progn to'xtamaydi."
                                 : "Ziddiyatlar ro'yxati tayyorlanmoqda…"}
                         </div>
                     )}
@@ -288,6 +281,8 @@ const EduPlanSyncPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <EntitySyncMenu disabled={!status?.reachable || syncing} />
 
             {/* ── 2-qadam: итог прогона ─────────────────────────────── */}
             {runResult && (
@@ -360,7 +355,7 @@ const EduPlanSyncPage = () => {
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <p className="text-sm text-muted-foreground">
-                            Har bir EduPlan yozuvi uchun uni qaysi lokal yozuvga bog'lashni tanlang yoki
+                            Har bir EPMOS yozuvi uchun uni qaysi lokal yozuvga bog'lashni tanlang yoki
                             yangisini yarating. Hal qilinmaganlari o'tkazib yuboriladi — ularga keyingi
                             sinxronizatsiyadan so'ng qaytish mumkin.
                         </p>
@@ -373,7 +368,7 @@ const EduPlanSyncPage = () => {
                                         <AlertTriangle className="h-4 w-4 text-warning" />
                                         <span className="font-medium">{p.external_name}</span>
                                         <span className="text-muted-foreground">
-                                            · {ENTITY_LABEL[p.entity]} · EduPlan #{p.external_id}
+                                            · {ENTITY_LABEL[p.entity]} · EPMOS #{p.external_id}
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -421,7 +416,7 @@ const EduPlanSyncPage = () => {
                                 onChange={(e) => setApplyDeactivations(e.target.checked)}
                             />
                             <span>
-                                EduPlan'dan yo'qolgan yozuvlar ham nofaol deb belgilansin.
+                                EPMOS'dan yo'qolgan yozuvlar ham nofaol deb belgilansin.
                                 <span className="block text-muted-foreground">
                                     Hech narsa o'chirilmaydi: fakultetlar, guruhlar va fanlarga test
                                     natijalari bog'langan.
@@ -626,7 +621,7 @@ const ConnectionSettingsCard = () => {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    EduPlan servis akkauntining login va paroli. Parol o'zgarsa — shu yerda yangilang,
+                    EPMOS servis akkauntining login va paroli. Parol o'zgarsa — shu yerda yangilang,
                     serverga kirish shart emas. Parol shifrlangan holda saqlanadi va qayta ko'rsatilmaydi.
                 </p>
                 {isLoading ? (
@@ -639,7 +634,7 @@ const ConnectionSettingsCard = () => {
                             label="Login"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            placeholder="EduPlan foydalanuvchi nomi"
+                            placeholder="EPMOS foydalanuvchi nomi"
                             autoComplete="off"
                         />
                         <Input
@@ -647,7 +642,7 @@ const ConnectionSettingsCard = () => {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder={saved?.has_password && saved.source === 'db' ? '••••••••' : 'EduPlan paroli'}
+                            placeholder={saved?.has_password && saved.source === 'db' ? '••••••••' : 'EPMOS paroli'}
                             autoComplete="new-password"
                         />
                         <Input
@@ -657,7 +652,7 @@ const ConnectionSettingsCard = () => {
                             placeholder="masalan, admin"
                         />
                         <Input
-                            label="EduPlan manzili"
+                            label="EPMOS manzili"
                             value={baseUrl}
                             onChange={(e) => setBaseUrl(e.target.value)}
                             placeholder="https://epmos.nsumt.uz/rest"

@@ -141,6 +141,18 @@ class StudentSyncApplyRequest(BaseModel):
     #: True — faqat oxirgi prognozdan keyin o'zgarganlar (`updated_at_from`).
     #: Tungi prognoz uchun: har kecha 49 sahifani aylanish shart emas.
     incremental: bool = False
+
+    # ---- Qaysi toifalar import qilinsin -------------------------------- #
+    # Admin ekranda uchta belgidan foydalanadi. Sukut bo'yicha hammasi
+    # yoqilgan: shunda eski chaqiruvlar (tungi progn, CLI) o'zgarishsiz
+    # ishlayveradi — ular bu maydonlarni umuman yubormaydi.
+    #: Bazada yo'q talabalarni yaratish.
+    include_create: bool = True
+    #: Bazada bor talabalarning ma'lumotini yangilash.
+    include_update: bool = True
+    #: Guruhi hali bog'lanmaganlarni ham import qilish. Ular guruhsiz
+    #: yoziladi, shuning uchun admin buni alohida hal qiladi.
+    include_no_group: bool = True
     #: Ommaviy yaratishga ruxsat. Birinchi to'ldirish (≈5700 talaba) — qonuniy
     #: holat, lekin u ongli bosish bo'lishi kerak, tungi prognozning nojo'ya
     #: ta'siri emas.
@@ -152,6 +164,10 @@ class StudentSyncApplyResponse(BaseModel):
     fetched: int = 0
     created: int = 0
     updated: int = 0
+    #: Nomeri yo'q yoki takrorlangan yozuvlar.
     skipped: int = 0
+    #: Admin belgini olib tashlagani uchun import qilinmaganlar. `skipped` dan
+    #: alohida: u — ma'lumot buzuq, bu — ongli qaror.
+    excluded: int = 0
     no_group: int = 0
     missing_locally: int = 0

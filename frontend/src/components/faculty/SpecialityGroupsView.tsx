@@ -18,6 +18,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { IdChip } from '@/components/common/IdChip';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4';
@@ -269,7 +270,7 @@ export const SpecialityGroupsView = ({
                     setSearch(val);
                     setCurrentPage(1);
                 }}
-                searchPlaceholder="Guruh nomi yoki HEMIS kodi..."
+                searchPlaceholder="Guruh nomi bo'yicha qidirish..."
                 totalCount={filtered.length}
                 totalLabel="Guruhlar"
                 chips={
@@ -345,7 +346,7 @@ export const SpecialityGroupsView = ({
             ) : sorted.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={8}
+                        colSpan={9}
                         title="Guruhlar topilmadi"
                         description={
                             search || educationFormFilter !== 'all' || courseLevelFilter !== 'all'
@@ -369,7 +370,8 @@ export const SpecialityGroupsView = ({
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-center font-bold text-xs">HEMIS Kodi</TableHead>
+                            <TableHead className="text-center font-bold text-xs">EPMOS ID</TableHead>
+                            <TableHead className="text-center font-bold text-xs">HEMIS ID</TableHead>
                             <TableHead className="text-center font-bold text-xs">Ta'lim Shakli</TableHead>
                             <TableHead
                                 onClick={() => handleSort('course')}
@@ -422,11 +424,15 @@ export const SpecialityGroupsView = ({
                                         </div>
                                     </TableCell>
 
-                                    {/* HEMIS Kodi */}
+                                    {/* EPMOS ID va HEMIS ID — guruhning tashqi
+                                        tizimlardagi identifikatorlari. Ilgari bu yerda
+                                        bitta «HEMIS Kodi» ustuni turardi va unda bizning
+                                        lokal `id` ko'rinardi: nom ham, qiymat ham xato edi. */}
                                     <TableCell className="text-center">
-                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground border border-border/80">
-                                            {group.external_source ? `ID: ${group.id}` : `GRP-${group.id}`}
-                                        </span>
+                                        <IdChip value={group.external_id} />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <IdChip value={group.hemis_group_id} />
                                     </TableCell>
 
                                     {/* Ta'lim Shakli */}

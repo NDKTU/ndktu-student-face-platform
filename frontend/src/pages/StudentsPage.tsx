@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
 import { type Student } from '@/services/studentService';
 import { Button } from '@/components/ui/Button';
@@ -54,7 +54,13 @@ export const StudentsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
+    // Guruhlar ro'yxatidan «Talabalarni ko'rish» shu yerga `?group_id=N` bilan
+    // olib keladi. Parametrni o'qimasak, admin butun universitet ro'yxatini
+    // ko'rardi va o'zi qaytadan guruh tanlashi kerak bo'lardi.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [selectedGroup, setSelectedGroup] = useState<string>(
+        () => searchParams.get('group_id') || 'all',
+    );
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [sortField, setSortField] = useState<SortField>('name');
@@ -73,6 +79,14 @@ export const StudentsPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    // Sahifa ochiq turganda URL o'zgarishi mumkin: guruhlar ro'yxatidan boshqa
+    // guruh bosilsa, React marshrutni almashtiradi-yu, komponentni qaytadan
+    // yaratmaydi — boshlang'ich holat esa faqat bir marta hisoblanadi.
+    useEffect(() => {
+        const fromUrl = searchParams.get('group_id') || 'all';
+        setSelectedGroup((prev) => (prev === fromUrl ? prev : fromUrl));
+    }, [searchParams]);
+
     const { hasPermission } = useAuth();
     const canReadGroup = hasPermission('read:group');
 
@@ -83,7 +97,10 @@ export const StudentsPage = () => {
         refetch,
     } = useStudents(currentPage, pageSize, debouncedSearch, undefined, parsedGroup);
 
-    const { data: groupsData } = useGroups(1, 200, '', undefined, undefined, canReadGroup);
+    // Universitetda 850 dan ortiq guruh bor: 200 talik ro'yxatda ko'pchiligi
+    // yo'q edi, va `?group_id=N` bilan kelgan guruhning nomi tanlagichda
+    // ko'rinmasdi — filtr ishlar, lekin admin qaysi guruh ekanini bilmasdi.
+    const { data: groupsData } = useGroups(1, 1000, '', undefined, undefined, canReadGroup);
 
     const rawStudents = studentsData?.students || [];
     const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
@@ -256,6 +273,18 @@ export const StudentsPage = () => {
                                 onChange={(val) => {
                                     setSelectedGroup(val);
                                     setCurrentPage(1);
+                                    // URL bilan bir xilda ushlaymiz: sahifani
+                                    // yangilaganda ham, havolani ulashganda ham
+                                    // o'sha guruh ochiladi.
+                                    setSearchParams(
+                                        (prev) => {
+                                            const next = new URLSearchParams(prev);
+                                            if (val && val !== 'all') next.set('group_id', val);
+                                            else next.delete('group_id');
+                                            return next;
+                                        },
+                                        { replace: true },
+                                    );
                                 }}
                                 placeholder="Guruh bo'yicha saralash"
                             />

@@ -351,6 +351,15 @@ class HemisStudentSync:
     async def apply(
         self, session: AsyncSession, data: StudentSyncApplyRequest
     ) -> StudentSyncApplyResponse:
+        # Hech bir toifa tanlanmagan bo'lsa, HEMIS'ga bormaymiz: 49 sahifani
+        # aylanib chiqib, keyin hammasini tashlab yuborish bir necha daqiqani
+        # behuda sarflardi.
+        if not (data.include_create or data.include_update):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hech bo'lmasa bitta toifa tanlanishi kerak: yangilar yoki yangilanadiganlar",
+            )
+
         client = await self._client(session)
 
         since: datetime | None = None
@@ -366,6 +375,31 @@ class HemisStudentSync:
 
         plan = await self._classify(session, items, incremental=since is not None)
         group_map = plan["group_map"]
+
+        # Adminning uchta belgisi. Toifalar kesishadi: guruhsiz talaba ayni
+        # paytda yangi yoki yangilanadigan ham bo'ladi, shuning uchun
+        # «guruhsiz» belgisi olib tashlansa, ular ikkala ro'yxatdan ham
+        # chiqariladi — aks holda belgi hech narsani o'zgartirmagan bo'lardi.
+        no_group = set(plan["no_group"])
+        excluded = 0
+
+        def keep(item: dict) -> bool:
+            sid = item.get("student_id_number") or ""
+            return data.include_no_group or sid not in no_group
+
+        if not data.include_no_group:
+            before = len(plan["create"]) + len(plan["update"])
+            plan["create"] = [i for i in plan["create"] if keep(i)]
+            plan["update"] = [i for i in plan["update"] if keep(i)]
+            excluded += before - len(plan["create"]) - len(plan["update"])
+
+        if not data.include_create:
+            excluded += len(plan["create"])
+            plan["create"] = []
+
+        if not data.include_update:
+            excluded += len(plan["update"])
+            plan["update"] = []
 
         if len(plan["create"]) > BULK_CREATE_THRESHOLD and not data.allow_bulk_create:
             raise HTTPException(
@@ -449,6 +483,7 @@ class HemisStudentSync:
             created=created,
             updated=updated,
             skipped=skipped,
+            excluded=excluded,
             no_group=len(plan["no_group"]),
             missing_locally=len(plan["missing"]),
         )

@@ -192,3 +192,64 @@ class Speciality(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin)
 
     def __str__(self):
         return self.name
+
+
+class Curriculum(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
+    """Oʻquv reja — EPMOS'dagi `edu-plans` ning koʻzgusi.
+
+    Maʼlumotnoma: reja qaysi mutaxassislik uchun, qaysi taʼlim shakli va
+    turida amal qiladi. Fakultet va kafedra rejaning oʻzida saqlanadi,
+    garchi ularni mutaxassislik orqali ham chiqarish mumkin boʻlsa-da:
+    EPMOS mutaxassislikni boshqa kafedraga koʻchirsa, eski rejalar oʻz
+    tarixiy egaligini yoʻqotmasligi kerak, va roʻyxatni fakultet boʻyicha
+    filtrlash uchun har safar JOIN qilish shart emas.
+    """
+
+    __tablename__ = "curriculums"
+    __table_args__ = (
+        # Boshqa spravochniklardagi kabi: nom boʻyicha unikallik faqat qoʻlda
+        # kiritilganlarga. EPMOS'da bir xil nomli ikki reja boʻlishi mumkin
+        # (masalan turli yillar uchun) va cheklov sinxronizatsiyani toʻxtatardi.
+        Index(
+            "uq_curriculums_speciality_id_name",
+            "speciality_id", "name",
+            unique=True,
+            postgresql_where=text("external_source IS NULL"),
+        ),
+        external_ref_index("curriculums"),
+    )
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    speciality_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("specialities.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    # Mutaxassislik orqali chiqariladi, lekin oʻzida saqlanadi — yuqoridagi
+    # izohga qarang. Mutaxassislik hali bogʻlanmagan boʻlsa boʻsh qoladi.
+    kafedra_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("kafedras.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    faculty_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("faculties.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+
+    #: EPMOS EducationForm: Kunduzgi | Kechki | Sirtqi
+    education_form: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    #: EPMOS EducationType: Bakalavr | Magistr
+    education_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    speciality: Mapped["Speciality | None"] = relationship("Speciality")
+    kafedra: Mapped["Kafedra | None"] = relationship("Kafedra")
+    faculty: Mapped["Faculty | None"] = relationship("Faculty")
+
+    def __str__(self):
+        return self.name

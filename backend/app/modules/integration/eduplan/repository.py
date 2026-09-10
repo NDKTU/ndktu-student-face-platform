@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Role, Teacher, User
 from app.modules.organization_structure.model import (
+    Curriculum,
     Faculty,
     Group,
     Kafedra,
@@ -180,6 +181,30 @@ class EduPlanRepository:
         row = existing or Subject(name=name)
         row.name = name
         row.kafedra_id = kafedra_id
+        self._stamp(row, external_id)
+        session.add(row)
+        await session.flush()
+        return row
+
+    async def upsert_curriculum(
+        self,
+        session: AsyncSession,
+        external_id: str,
+        name: str,
+        speciality_id: int | None,
+        kafedra_id: int | None,
+        faculty_id: int | None,
+        education_form: str | None,
+        education_type: str | None,
+        existing: Curriculum | None,
+    ) -> Curriculum:
+        row = existing or Curriculum(name=name)
+        row.name = name
+        row.speciality_id = speciality_id
+        row.kafedra_id = kafedra_id
+        row.faculty_id = faculty_id
+        row.education_form = education_form
+        row.education_type = education_type
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()

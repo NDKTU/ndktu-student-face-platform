@@ -29,6 +29,7 @@ import { GroupModal } from '@/components/group/GroupModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { IdChip } from '@/components/common/IdChip';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki';
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4';
@@ -373,7 +374,7 @@ export const GroupsPage = () => {
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Guruh nomi yoki HEMIS kodi bo'yicha..."
+                searchPlaceholder="Guruh nomi bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Guruhlar"
                 extraFilters={
@@ -472,7 +473,7 @@ export const GroupsPage = () => {
             ) : sortedGroups.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={8}
+                        colSpan={9}
                         title="Guruhlar topilmadi"
                         description={
                             searchTerm || selectedFacultyFilter !== 'all' || selectedSpecialityFilter !== 'all'
@@ -497,7 +498,8 @@ export const GroupsPage = () => {
                                 </div>
                             </TableHead>
                             <TableHead className="font-bold text-xs hidden lg:table-cell">Fakultet / Mutaxassislik</TableHead>
-                            <TableHead className="text-center font-bold text-xs">HEMIS Kodi</TableHead>
+                            <TableHead className="text-center font-bold text-xs">EPMOS ID</TableHead>
+                            <TableHead className="text-center font-bold text-xs">HEMIS ID</TableHead>
                             <TableHead className="text-center font-bold text-xs">Ta'lim Shakli</TableHead>
                             <TableHead
                                 onClick={() => handleSort('course')}
@@ -566,11 +568,16 @@ export const GroupsPage = () => {
                                         </div>
                                     </TableCell>
 
-                                    {/* HEMIS Kodi */}
+                                    {/* EPMOS ID — guruhning EPMOS'dagi identifikatori.
+                                        Ilgari bu yerda bizning lokal `id` turardi va ustun
+                                        «HEMIS Kodi» deb atalardi: nom ham, qiymat ham xato edi. */}
                                     <TableCell className="text-center">
-                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground border border-border/80">
-                                            {group.external_source ? `ID: ${group.id}` : `GRP-${group.id}`}
-                                        </span>
+                                        <IdChip value={group.external_id} />
+                                    </TableCell>
+
+                                    {/* HEMIS ID — o'sha guruhning talabalar HEMIS'idagi id si. */}
+                                    <TableCell className="text-center">
+                                        <IdChip value={group.hemis_group_id} />
                                     </TableCell>
 
                                     {/* Ta'lim Shakli */}

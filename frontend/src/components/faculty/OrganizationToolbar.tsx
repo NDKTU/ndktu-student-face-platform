@@ -95,6 +95,15 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                     <div className="relative flex-1 min-w-[220px] max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
+                            // Qidiruv maydoni hisob ma'lumoti emas: `text` da
+                            // brauzerning parol menejeri uni login maydoni deb
+                            // o'ylab, saqlangan foydalanuvchi nomini o'zi qo'yib
+                            // qo'yardi.
+                            type="search"
+                            name="search"
+                            autoComplete="off"
+                            data-1p-ignore
+                            data-lpignore="true"
                             placeholder={searchPlaceholder}
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}

@@ -25,6 +25,15 @@ class GroupCreateResponse(ExternalRefFields):
     course: Optional[int] = None
     education_shape: Optional[str] = None
     student_count: Optional[int] = None
+
+    #: Guruhning EPMOS'dagi identifikatori (`external_id`). Interfeys uni
+    #: «EPMOS ID» deb koʻrsatadi — ilgari u yerda bizning lokal `id` turardi
+    #: va «HEMIS kodi» deb atalardi, yaʼni ikki xato bir joyda edi.
+    external_id: Optional[str] = None
+    #: Oʻsha guruhning talabalar HEMIS'idagi identifikatori. EPMOS bu
+    #: bogʻlanishni oʻzi saqlaydi va biz uni koʻzgudek olamiz.
+    hemis_group_id: Optional[str] = None
+
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 

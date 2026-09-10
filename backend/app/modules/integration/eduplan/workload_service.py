@@ -74,6 +74,11 @@ class EduPlanWorkloadService:
             "workloads_total": len(raw_workloads),
             "workloads_inactive_skipped": 0,
             "unresolved_teacher": 0,
+            #: EPMOS'ning oʻzida oʻqituvchi hali biriktirilmagan qatorlar.
+            #: Bu bizning bogʻlanish muammosi emas — shunday yuklama koʻp
+            #: (hozir ~13 500), va uni "bogʻlanmadi" deb sanash adminni
+            #: yoʻqotilgan maʼlumot izlashga majbur qilardi.
+            "workloads_without_teacher": 0,
             "unresolved_subject": 0,
             "unresolved_group": 0,
             "stream_expanded": 0,
@@ -86,8 +91,16 @@ class EduPlanWorkloadService:
                 stats["workloads_inactive_skipped"] += 1
                 continue
 
-            teacher_id = teacher_by_ext.get(str(wl.teacher_id)) if wl.teacher_id else None
+            if wl.teacher_id is None:
+                # Yuklama bor, lekin uni kim oʻqishi EPMOS'da hali
+                # koʻrsatilmagan. Kutilgan holat, xato emas.
+                stats["workloads_without_teacher"] += 1
+                continue
+
+            teacher_id = teacher_by_ext.get(str(wl.teacher_id))
             if teacher_id is None:
+                # Oʻqituvchi EPMOS'da bor, bizda esa bogʻlanmagan — mana bu
+                # haqiqiy muammo: «Oʻqituvchilarni sinxronlash» kerak.
                 stats["unresolved_teacher"] += 1
                 continue
 

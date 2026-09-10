@@ -1,13 +1,3 @@
-/**
- * Dashboard.tsx — Redesigned
- *
- * Design decisions:
- * - PageHeader with greeting; logout lives in the Navbar profile dropdown.
- * - StatCard: flat border card, compact icon pill (shared component, as-is).
- * - Вместо фейкового «статуса системы» и маркетингового виджета — честная
- *   сетка быстрых ссылок на основные разделы админки. Графиков нет: хуки
- *   дашборда отдают только total-счётчики, разбивок на клиенте нет.
- */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -25,7 +15,7 @@ import {
     ArrowUpRight,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { userService } from '@/services/userService';
 import { teacherService } from '@/services/teacherService';
 import { studentService } from '@/services/studentService';
@@ -46,11 +36,11 @@ const QUICK_LINKS: { to: string; label: string; description: string; icon: React
     { to: '/questions',          label: 'Savollar banki',          description: "Test savollarini boshqarish",           icon: FileQuestion },
     { to: '/quizzes',            label: 'Testlar',                 description: "Testlarni yaratish va nazorat qilish",  icon: BookOpen },
     { to: '/results',            label: 'Natijalar',               description: "Topshirilgan testlar tahlili",          icon: CheckCircle },
-    { to: '/admin/eduplan-sync', label: 'EduPlan sinxronizatsiya', description: "Tashkiliy tuzilmani import qilish",     icon: RefreshCw },
+    { to: '/admin/eduplan-sync', label: 'EPMOS sinxronizatsiya', description: "Tashkiliy tuzilmani import qilish",     icon: RefreshCw },
 ];
 
 const Dashboard: React.FC = () => {
-    const { user, activeRole } = useAuth();
+    const { user } = useAuth();
 
     const { data: users,     isLoading: isUsersLoading }     = useQuery({ queryKey: ['dashboard-users'],     queryFn: () => userService.getUsers(1, 1) });
     const { data: teachers,  isLoading: isTeachersLoading }  = useQuery({ queryKey: ['dashboard-teachers'],  queryFn: () => teacherService.getTeachers(1, 1) });
@@ -71,29 +61,39 @@ const Dashboard: React.FC = () => {
         <div className="space-y-6">
             {/* Welcome header */}
             <PageHeader
-                title={`${getGreeting()}, ${displayNameOf(user, activeRole)}`}
+                title={`${getGreeting()}, ${displayNameOf(user)}`}
                 description="Universitet tizimidagi asosiy ko'rsatkichlar va bo'limlar."
             />
 
-            {/* Primary stats */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Foydalanuvchilar"  value={users?.total ?? 0}    icon={Users}        isLoading={isUsersLoading}    color="blue"   description="Tizimda faol" />
-                <StatCard label="Talabalar"          value={students?.total ?? 0} icon={UserCheck}    isLoading={isStudentsLoading} color="purple" description="Faol o'qiyotganlar" />
-                <StatCard label="O'qituvchilar"      value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="cyan"  description="Barcha kafedralar" />
-                <StatCard label="Faol testlar"       value={quizzes?.total ?? 0} icon={BookOpen}     isLoading={isQuizzesLoading}  color="pink"   description="Talabalar uchun ochiq" />
-            </div>
-
-            {/* Secondary stats */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard label="Savollar banki"   value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="orange" description="Jami savollar" />
-                <StatCard label="Fanlar"            value={subjects?.total ?? 0}  icon={Book}         isLoading={isSubjectsLoading}  color="green"  description="Faol kurslar" />
-                <StatCard label="Yakunlangan testlar" value={results?.total ?? 0} icon={CheckCircle}  isLoading={isResultsLoading}   color="blue"   description="Jami topshirilganlar" />
+            <div className="grid items-stretch gap-6 xl:grid-cols-[2fr_1fr]">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-6">
+                    <StatCard label="Talabalar" value={students?.total ?? 0} icon={UserCheck} isLoading={isStudentsLoading} color="orange" description="Universitet talabalari" />
+                    <StatCard label="O'qituvchilar" value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="blue" description="Barcha kafedralar" />
+                    <StatCard label="Foydalanuvchilar" value={users?.total ?? 0} icon={Users} isLoading={isUsersLoading} color="purple" description="Jami akkauntlar" />
+                    <StatCard label="Testlar" value={quizzes?.total ?? 0} icon={BookOpen} isLoading={isQuizzesLoading} color="teal" description="Jami yaratilgan testlar" />
+                    <StatCard label="Fanlar" value={subjects?.total ?? 0} icon={Book} isLoading={isSubjectsLoading} color="green" description="Fanlar katalogi" />
+                    <StatCard label="Savollar banki" value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="cyan" description="Jami savollar" />
+                </div>
+                <section className="rounded-lg bg-card shadow-[var(--surface-shadow)]">
+                    <h2 className="border-b border-border px-5 py-4 text-lg font-semibold">Test natijalari</h2>
+                    <div className="flex h-[calc(100%-61px)] flex-col items-center justify-center px-5 py-6 text-center">
+                        <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                            <CheckCircle className="h-8 w-8" />
+                        </span>
+                        {isResultsLoading ? <div className="h-10 w-24 animate-pulse rounded bg-muted" /> :
+                            <p className="text-4xl font-semibold tabular-nums">{(results?.total ?? 0).toLocaleString('uz-UZ')}</p>}
+                        <p className="mt-2 text-sm text-muted-foreground">Jami topshirilgan testlar</p>
+                        <Link to="/results" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-primary/20">
+                            Natijalarni ko'rish <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                    </div>
+                </section>
             </div>
 
             {/* Масштаб платформы одним взглядом */}
-            <div className="rounded-xl border border-border/50 bg-card p-5 shadow-sm">
-                <h2 className="mb-4 font-display text-sm font-semibold text-foreground">Platforma ko'lami</h2>
-                <div className="h-64 w-full">
+            <div className="rounded-lg bg-card shadow-[var(--surface-shadow)]">
+                <h2 className="border-b border-border px-5 py-4 text-lg font-semibold text-foreground">Platforma ko'lami</h2>
+                <div className="h-72 w-full overflow-x-auto px-2 py-5 sm:px-5">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                             data={[
@@ -110,13 +110,13 @@ const Dashboard: React.FC = () => {
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                             <XAxis
                                 dataKey="name"
-                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
                                 axisLine={{ stroke: 'var(--border)' }}
                                 tickLine={false}
-                                interval={0}
+                                interval="preserveStartEnd" minTickGap={10}
                             />
                             <YAxis
-                                tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                                tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
                                 axisLine={false}
                                 tickLine={false}
                                 width={52}
@@ -134,7 +134,11 @@ const Dashboard: React.FC = () => {
                                 }}
                                 formatter={(value) => [value ?? 0, 'Soni']}
                             />
-                            <Bar dataKey="value" fill="var(--primary)" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                            <Bar dataKey="value" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                                {['orange', 'blue', 'purple', 'green', 'cyan', 'teal', 'yellow'].map(color => (
+                                    <Cell key={color} fill={`var(--stat-${color})`} />
+                                ))}
+                            </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -142,13 +146,13 @@ const Dashboard: React.FC = () => {
 
             {/* Quick links */}
             <div>
-                <h2 className="mb-3 text-sm font-semibold text-foreground">Tezkor o'tish</h2>
+                <h2 className="mb-4 text-lg font-semibold text-foreground">Tezkor o'tish</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => (
                         <Link
                             key={to}
                             to={to}
-                            className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent"
+                            className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-4 shadow-[var(--surface-shadow)] transition-colors hover:border-primary/40 hover:bg-accent"
                         >
                             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <Icon className="h-5 w-5" />
@@ -157,7 +161,7 @@ const Dashboard: React.FC = () => {
                                 <span className="block text-sm font-medium text-foreground">{label}</span>
                                 <span className="block truncate text-xs text-muted-foreground">{description}</span>
                             </span>
-                            <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                            <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                         </Link>
                     ))}
                 </div>

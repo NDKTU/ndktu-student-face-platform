@@ -25,10 +25,12 @@ const PATH_LABELS: Record<string, string> = {
     '/teacher-ranking':     'Reyting',
     '/faculties':           'Fakultetlar',
     '/kafedras':            'Kafedralar',
+    '/specialities':        'Mutaxassisliklar',
+    '/curriculums':         "O'quv rejalar",
     '/groups':              'Guruhlar',
     '/students':            'Talabalar',
     '/admin/hemis-sync':    'HEMIS sinxronizatsiyasi',
-    '/admin/eduplan-sync':  'EduPlan sinxronizatsiyasi',
+    '/admin/eduplan-sync':  'EPMOS sinxronizatsiyasi',
     '/lessons':             'Darslar',
     '/psychology':          'Psixologiya',
     '/psychology/results':  'Psixologiya natijalari',
@@ -86,27 +88,27 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
 
     // O'qituvchi va talabada — F.I.SH, qolganlarida login: HEMIS raqami
     // ekranda hech narsa anglatmaydi.
-    const displayName = displayNameOf(user, activeRole);
+    const displayName = displayNameOf(user);
 
     const initials = initialsOf(displayName);
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-card/95 px-4 md:px-6 backdrop-blur-md transition-colors duration-200">
+        <header className="sticky top-0 z-30 flex h-[var(--navbar-height)] w-full items-center justify-between border-b border-border bg-card px-4 md:px-6 transition-colors duration-200">
             {/* Left: Sidebar Toggle & Breadcrumbs */}
-            <div className="flex items-center gap-3.5">
+            <div className="flex min-w-0 items-center gap-3.5">
                 <button
                     onClick={onMenuClick}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-200 md:hidden"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-200 md:hidden"
                     aria-label="Menyuni ochish"
                 >
                     <Menu className="h-5 w-5" />
                 </button>
 
-                {/* Breadcrumbs in Wowdash style */}
-                <nav className="flex items-center gap-2 text-sm">
+                {/* Breadcrumbs in EduDash style */}
+                <nav className="flex min-w-0 items-center gap-2 text-sm">
                     <Link
                         to="/"
-                        className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-primary transition-colors py-1 font-semibold"
+                        className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors py-1 font-semibold"
                     >
                         <Home className="h-4 w-4" />
                         <span className="hidden sm:inline">{t('Bosh sahifa')}</span>
@@ -114,27 +116,27 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                     {!isHome && (
                         <>
                             <span className="text-slate-400 select-none">/</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{pageLabel}</span>
+                            <span className="truncate font-semibold text-foreground">{pageLabel}</span>
                         </>
                     )}
                 </nav>
             </div>
 
             {/* Right: Actions & User Dropdown */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 {/* Language Switcher */}
                 <button
                     onClick={toggleLang}
-                    className="flex h-10 items-center justify-center rounded-full bg-slate-200/70 dark:bg-muted/60 px-3 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                    className="flex h-10 items-center justify-center rounded-full bg-background px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     aria-label={currentLang === 'uz' ? 'Переключить на русский' : "O'zbek tiliga o'tish"}
                 >
                     {currentLang === 'uz' ? 'UZ' : 'RU'}
                 </button>
 
-                {/* Theme Toggle Button in Wowdash style */}
+                {/* Theme Toggle Button in EduDash style */}
                 <button
                     onClick={toggleTheme}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/70 dark:bg-muted/60 text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-background text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     aria-label={theme === 'dark' ? t('Yorug\' rejim') : t('Qorong\'i rejim')}
                 >
                     {theme === 'dark'
@@ -147,7 +149,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                 <div className="relative ml-1">
                     <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}
-                        className="flex items-center gap-2.5 rounded-full border border-border bg-card p-1.5 pl-1.5 pr-3 hover:border-primary/40 hover:bg-muted/40 transition-all duration-200 shadow-sm"
+                        className="flex items-center gap-2.5 rounded-lg bg-background p-1.5 pl-1.5 pr-3 hover:border-primary/40 hover:bg-muted/40 transition-all duration-200"
                         aria-expanded={isProfileOpen}
                         aria-haspopup="menu"
                     >
@@ -159,7 +161,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                             )}
                             <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-success ring-1 ring-card" />
                         </div>
-                        <span className="hidden text-sm font-bold md:block max-w-[130px] truncate text-slate-900 dark:text-white">
+                        <span className="hidden text-sm font-bold md:block max-w-[130px] truncate text-foreground">
                             {displayName}
                         </span>
                         <ChevronDown className={cn(
@@ -175,9 +177,9 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                             <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)} aria-hidden="true" />
                             <div
                                 role="menu"
-                                className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-border bg-popover p-2 shadow-xl backdrop-blur-md animate-fade-in-up"
+                                className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-border bg-popover p-2 shadow-xl animate-fade-in-up"
                             >
-                                {/* Wowdash Style Header inside Popover */}
+                                {/* EduDash Header inside Popover */}
                                 <div className="rounded-xl bg-primary/10 p-3 mb-2">
                                     <p className="text-sm font-bold text-primary truncate">{displayName}</p>
                                     <p className="text-xs font-medium text-muted-foreground mt-0.5">
@@ -204,7 +206,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                                                     className={cn(
                                                         'flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
                                                         activeRole?.id === role.id
-                                                            ? 'bg-primary text-white font-semibold shadow-sm'
+                                                            ? 'bg-primary-strong text-white font-semibold'
                                                             : 'text-foreground hover:bg-primary/10 hover:text-primary',
                                                     )}
                                                 >

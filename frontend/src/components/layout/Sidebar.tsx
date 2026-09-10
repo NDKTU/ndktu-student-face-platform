@@ -1,48 +1,172 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { ChevronRight, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { initialsOf } from '@/lib/avatarTiles';
-import { displayNameOf } from '@/lib/userDisplay';
-import { buildSidebar } from '@/constants/resources';
+import { buildSidebar, type IconTone, type SidebarItem, type SidebarSection } from '@/constants/resources';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
+
+/**
+ * Ikonka rangi mavzudagi `--stat-*` tokenidan olinadi — to'q rejimda
+ * ular avtomatik ochroq variantga almashadi, shuning uchun bu yerda
+ * hex yozilmaydi. Rang tokeni CSS o'zgaruvchisi orqali uzatiladi:
+ * ikonka `currentColor` bilan chiziladi, plitka esa shu rangning
+ * shaffof varianti bilan bo'yaladi.
+ */
+const toneVar = (tone?: IconTone) => (tone ? `var(--stat-${tone})` : 'var(--sidebar-muted)');
+
+/** Yig'ilgan guruhlar brauzerda eslab qolinadi. */
+const COLLAPSED_KEY = 'sidebar:collapsed-groups';
+
+const readCollapsed = (): Set<string> => {
+    try {
+        const raw = localStorage.getItem(COLLAPSED_KEY);
+        return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+        return new Set();
+    }
+};
+
+/** Punkt yoki uning bolalaridan biri shu yo'lga tegishlimi. */
+const matchesPath = (item: SidebarItem, pathname: string): boolean =>
+    pathname === item.href || pathname.startsWith(item.href + '/');
 
 interface SidebarProps {
     mobileOpen: boolean;
     setMobileOpen: (open: boolean) => void;
 }
 
-/**
- * Wowdash uslubidagi zamonaviy yon panel (Sidebar).
- * Yorug' mavzuda toza oq, qorong'i mavzuda nafis to'q slate (#273142).
- * Faol sahifa yorqin moviy (#487FFF) pill bilan ajralib turadi.
- */
+/** Yakka havola — yuqori darajada ham, guruh ichida ham shu ko'rinishda. */
+const SidebarLink = ({
+    item,
+    isActive,
+    onNavigate,
+    nested = false,
+}: {
+    item: SidebarItem;
+    isActive: boolean;
+    onNavigate: () => void;
+    nested?: boolean;
+}) => {
+    const { t } = useTranslation();
+    return (
+    <Link
+        to={item.href}
+        onClick={onNavigate}
+        aria-current={isActive ? 'page' : undefined}
+        className={cn(
+            'group relative flex items-center gap-3 rounded-lg pr-3 text-sm transition-all duration-200',
+            nested ? 'h-9 pl-2 text-[13px]' : 'h-11 pl-2',
+            isActive
+                ? 'bg-sidebar-active text-sidebar-accent font-semibold'
+                : 'text-sidebar-foreground font-medium hover:bg-accent'
+        )}
+    >
+        <span
+            className={cn(
+                'flex shrink-0 items-center justify-center rounded-lg transition-all duration-200',
+                nested ? 'h-7 w-7' : 'h-8 w-8',
+                'group-hover:scale-105'
+            )}
+            style={{
+                color: toneVar(item.tone),
+                // Rang plitka foni sifatida — shaffofligi bilan yumshatiladi.
+                backgroundColor: `color-mix(in srgb, ${toneVar(item.tone)} 14%, transparent)`,
+            }}
+        >
+            <item.icon className={nested ? 'h-[15px] w-[15px]' : 'h-[17px] w-[17px]'} />
+        </span>
+        <span className="truncate">{t(item.name)}</span>
+        {isActive && (
+            <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary" />
+        )}
+    </Link>
+    );
+};
+
+/** EduDash sidebar; menu permissions and saved groups stay data-driven. */
 const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     const location = useLocation();
     const { t } = useTranslation();
     const { user, permissions, activeRole } = useAuth();
-    // O'qituvchi va talabada — F.I.SH, qolganlarida login.
-    const displayName = displayNameOf(user, activeRole);
 
+    const [query, setQuery] = useState('');
+    const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
+    const searchRef = useRef<HTMLInputElement>(null);
 
-    const sections = useMemo(() => {
+    const allSections = useMemo(() => {
         // Ko'rinish tanlangan bo'lsa — faqat o'sha rol, aks holda barchasi.
         const roleNames = (activeRole ? [activeRole] : (user?.roles ?? [])).map((r) => r.name);
         return buildSidebar(permissions, roleNames);
     }, [user, permissions, activeRole]);
 
-    // Faol bo'lim — yo'lga eng aniq mos keladigani.
+    // Faol bo'lim — yo'lga eng aniq mos keladigani (guruh bolalari ham hisobga olinadi).
     const activeHref = useMemo(() => {
-        const candidates = sections
+        const candidates = allSections
             .flatMap((section) => section.items)
-            .filter((item) =>
-                location.pathname === item.href || location.pathname.startsWith(item.href + '/'))
+            .flatMap((item) => (item.children ? [item, ...item.children] : [item]))
+            .filter((item) => matchesPath(item, location.pathname))
             .sort((a, b) => b.href.length - a.href.length);
         return candidates[0]?.href;
-    }, [sections, location.pathname]);
+    }, [allSections, location.pathname]);
+
+    // Qidiruv: bo'lim va guruhlar bo'ylab filtr. Mos kelgan guruh to'liq ochiladi.
+    const sections = useMemo<SidebarSection[]>(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return allSections;
+
+        const hit = (name: string) => t(name).toLowerCase().includes(q);
+        const result: SidebarSection[] = [];
+        for (const section of allSections) {
+            const items: SidebarItem[] = [];
+            for (const item of section.items) {
+                if (!item.children) {
+                    if (hit(item.name)) items.push(item);
+                    continue;
+                }
+                if (hit(item.name)) {
+                    items.push(item);
+                    continue;
+                }
+                const kids = item.children.filter((kid) => hit(kid.name));
+                if (kids.length) items.push({ ...item, children: kids });
+            }
+            if (items.length) result.push({ label: section.label, items });
+        }
+        return result;
+    }, [allSections, query, t]);
+
+    // Yig'ilgan holatni saqlash.
+    useEffect(() => {
+        try {
+            localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+        } catch {
+            // Shaxsiy rejimda yozib bo'lmasligi mumkin — bu holat muhim emas.
+        }
+    }, [collapsed]);
+
+    // ⌘K / Ctrl+K — qidiruvga fokus.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchRef.current?.focus();
+                searchRef.current?.select();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
+    const toggleGroup = (name: string) =>
+        setCollapsed((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
 
     return (
         <>
@@ -56,15 +180,15 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
 
             <aside
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 flex h-screen w-68 shrink-0 flex-col border-r border-border bg-card transition-transform duration-300 ease-in-out',
+                    'fixed inset-y-0 left-0 z-50 flex h-screen w-[var(--sidebar-width)] max-w-[85vw] shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out',
                     'md:static md:inset-auto md:h-auto md:self-stretch',
                     mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
                 )}
             >
                 {/* Brand Logo Header */}
-                <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border px-5">
+                <div className="flex h-[var(--navbar-height)] shrink-0 items-center justify-between border-b border-border px-5">
                     <Link to="/" className="flex items-center gap-3 overflow-hidden group">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 p-1.5 ring-1 ring-primary/20 transition-all duration-200 group-hover:scale-105">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent p-1 transition-all duration-200 group-hover:scale-105">
                             <img src={logo} alt={BRAND.shortName} className="h-full w-full object-contain" />
                         </div>
                         <div className="flex flex-col">
@@ -85,59 +209,123 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                     </button>
                 </div>
 
+                {/* Foydalanuvchi kartasi bu yerdan olib tashlangan: o'sha
+                    ma'lumot yuqori o'ng burchakdagi profil tugmasida bor va
+                    ikki joyda takrorlanishi shart emas. */}
+
+                {/* Menyu bo'ylab qidiruv */}
+                <div className="shrink-0 p-3 pb-0">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            id="sidebar-search"
+                            ref={searchRef}
+                            // `search` — bu maydon hisob ma'lumoti emas. `text` da
+                            // brauzerning parol menejeri uni login maydoni deb o'ylab,
+                            // saqlangan foydalanuvchi nomini o'zi qo'yib qo'yardi.
+                            // `name` ham ataylab «search»: to'ldirish evristikasi
+                            // aynan shu nomga qarab qaror qiladi.
+                            type="search"
+                            name="search"
+                            autoComplete="off"
+                            // Parol menejerlari (1Password, LastPass) `autoComplete`
+                            // ni e'tiborsiz qoldiradi va o'z atributlariga qaraydi.
+                            data-1p-ignore
+                            data-lpignore="true"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+                            placeholder={t('Menyudan qidirish')}
+                            aria-label={t('Menyudan qidirish')}
+                            className="h-9 w-full rounded-lg border border-border bg-background/60 pl-9 pr-3 text-[13px] font-medium text-foreground placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                        />
+                    </div>
+                </div>
+
                 {/* Navigation Menu */}
                 <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
                     <nav className="flex flex-col gap-6 px-3">
-                        {sections.filter(s => s.items.length > 0).map((section) => (
+                        {sections.map((section) => (
                             <div key={section.label} className="flex flex-col">
-                                <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted">
                                     {t(section.label)}
                                 </p>
                                 <div className="flex flex-col gap-1.5">
                                     {section.items.map((item) => {
-                                        const isActive = item.href === activeHref;
+                                        if (!item.children) {
+                                            return (
+                                                <SidebarLink
+                                                    key={item.href}
+                                                    item={item}
+                                                    isActive={item.href === activeHref}
+                                                    onNavigate={() => setMobileOpen(false)}
+                                                />
+                                            );
+                                        }
+
+                                        // Ichida faol sahifa bo'lsa yoki qidiruv ketayotgan
+                                        // bo'lsa — guruh majburan ochiq.
+                                        const hasActiveChild = item.children.some((kid) => kid.href === activeHref);
+                                        const isOpen = query.trim() !== '' || hasActiveChild || !collapsed.has(item.name);
+
                                         return (
-                                            <Link
-                                                key={item.href}
-                                                to={item.href}
-                                                onClick={() => setMobileOpen(false)}
-                                                className={cn(
-                                                    'group relative flex h-11 items-center gap-3.5 rounded-xl px-3.5 text-sm transition-all duration-200',
-                                                    isActive
-                                                        ? 'bg-primary text-white font-bold shadow-md shadow-primary/25 ring-1 ring-primary/50'
-                                                        : 'text-slate-700 dark:text-slate-300 font-semibold hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15'
+                                            <div key={item.name} className="flex flex-col">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleGroup(item.name)}
+                                                    aria-expanded={isOpen}
+                                                    className={cn(
+                                                        'group relative flex h-11 w-full items-center gap-3 rounded-lg pl-2 pr-3 text-sm transition-all duration-200',
+                                                        hasActiveChild
+                                                            ? 'bg-accent text-sidebar-accent font-semibold'
+                                                            : 'text-sidebar-foreground font-medium hover:bg-accent'
+                                                    )}
+                                                >
+                                                    <span
+                                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200 group-hover:scale-105"
+                                                        style={{
+                                                            color: toneVar(item.tone),
+                                                            backgroundColor: `color-mix(in srgb, ${toneVar(item.tone)} 14%, transparent)`,
+                                                        }}
+                                                    >
+                                                        <item.icon className="h-[17px] w-[17px]" />
+                                                    </span>
+                                                    <span className="truncate">{t(item.name)}</span>
+                                                    <ChevronRight className={cn(
+                                                        'ml-auto h-4 w-4 shrink-0 text-sidebar-muted transition-transform duration-200',
+                                                        isOpen && 'rotate-90'
+                                                    )} />
+                                                </button>
+
+                                                {isOpen && (
+                                                    <div className="mt-1 flex flex-col gap-1 border-l border-border pl-3 ml-5">
+                                                        {item.children.map((kid) => (
+                                                            <SidebarLink
+                                                                key={kid.href}
+                                                                item={kid}
+                                                                isActive={kid.href === activeHref}
+                                                                onNavigate={() => setMobileOpen(false)}
+                                                                nested
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 )}
-                                            >
-                                                <item.icon className={cn(
-                                                    'h-[19px] w-[19px] shrink-0 transition-transform duration-200 group-hover:scale-110',
-                                                    isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-primary'
-                                                )} />
-                                                <span className="truncate">{t(item.name)}</span>
-                                                {isActive && (
-                                                    <span className="ml-auto h-2 w-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                                                )}
-                                            </Link>
+                                            </div>
                                         );
                                     })}
                                 </div>
                             </div>
                         ))}
+
+                        {sections.length === 0 && (
+                            <p className="px-3 text-[13px] text-muted-foreground">
+                                {t('Hech narsa topilmadi')}
+                            </p>
+                        )}
                     </nav>
                 </div>
 
-                {/* Footer User Profile Card */}
-                <div className="shrink-0 p-3">
-                    <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/30 p-2.5 transition-all duration-200 hover:bg-muted/50">
-                        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary">
-                            {initialsOf(displayName)}
-                            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-card" />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                            <span className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{displayName}</span>
-                            <span className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">{activeRole?.name || user?.roles?.[0]?.name || t('Foydalanuvchi')}</span>
-                        </div>
-                    </div>
-                </div>
+
 
             </aside>
         </>

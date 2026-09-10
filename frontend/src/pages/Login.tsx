@@ -113,46 +113,46 @@ export const Login: React.FC = () => {
 
     return (
         <div className="flex min-h-screen bg-background">
-            {/* Левая фирменная панель — глубокий бренд-синий (скрыта на мобильных) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
+            {/* EduDash brand panel */}
+            <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-between p-12 relative overflow-hidden">
                 {/* Декоративные круги в тоне бренда */}
-                <div aria-hidden className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/5" />
-                <div aria-hidden className="absolute -bottom-48 -left-24 h-[28rem] w-[28rem] rounded-full bg-white/5" />
-                <div aria-hidden className="absolute bottom-24 right-16 h-40 w-40 rounded-full border border-white/10" />
+                <div aria-hidden className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-primary/5" />
+                <div aria-hidden className="absolute -bottom-48 -left-24 h-[28rem] w-[28rem] rounded-full bg-primary/5" />
+                <div aria-hidden className="absolute bottom-24 right-16 h-40 w-40 rounded-full border border-primary/15" />
 
                 <div className="relative z-10 flex items-center gap-3">
                     <img src={logo} alt={BRAND.shortName} className="h-11 w-11 rounded-xl bg-white/95 object-contain p-1" />
-                    <span className="font-display text-lg font-bold text-sidebar-foreground">{BRAND.shortName}</span>
+                    <span className="font-display text-lg font-bold text-foreground">{BRAND.shortName}</span>
                 </div>
 
                 <div className="relative z-10 max-w-lg space-y-6">
-                    <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-sidebar-foreground text-balance">
+                    <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-foreground text-balance">
                         {BRAND.universityName}
                     </h1>
-                    <p className="text-lg leading-relaxed text-sidebar-muted">
+                    <p className="text-lg leading-relaxed text-muted-foreground">
                         {BRAND.tagline}
                     </p>
                 </div>
 
                 <div className="relative z-10 grid grid-cols-3 gap-3">
-                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
-                        <BookOpen className="h-5 w-5 text-sidebar-accent" />
-                        <span className="text-sm font-medium text-sidebar-foreground">Onlayn testlar</span>
+                    <div className="rounded-xl bg-card/70 border border-primary/15 p-4 flex flex-col gap-2">
+                        <BookOpen className="h-5 w-5 text-accent-foreground" />
+                        <span className="text-sm font-medium text-foreground">Onlayn testlar</span>
                     </div>
-                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
-                        <Camera className="h-5 w-5 text-sidebar-accent" />
-                        <span className="text-sm font-medium text-sidebar-foreground">Yuz orqali nazorat</span>
+                    <div className="rounded-xl bg-card/70 border border-primary/15 p-4 flex flex-col gap-2">
+                        <Camera className="h-5 w-5 text-accent-foreground" />
+                        <span className="text-sm font-medium text-foreground">Yuz orqali nazorat</span>
                     </div>
-                    <div className="rounded-xl bg-white/8 border border-white/10 p-4 flex flex-col gap-2">
-                        <ShieldCheck className="h-5 w-5 text-sidebar-accent" />
-                        <span className="text-sm font-medium text-sidebar-foreground">Halol natijalar</span>
+                    <div className="rounded-xl bg-card/70 border border-primary/15 p-4 flex flex-col gap-2">
+                        <ShieldCheck className="h-5 w-5 text-accent-foreground" />
+                        <span className="text-sm font-medium text-foreground">Halol natijalar</span>
                     </div>
                 </div>
             </div>
 
             {/* Правая часть — форма входа */}
             <div className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12">
-                <div className="w-full max-w-[400px] space-y-8 relative">
+                <div className="w-full max-w-[460px] space-y-7 relative rounded-xl border border-border bg-card p-6 shadow-[var(--surface-shadow)] sm:p-9">
                     {/* Шапка только для мобильных */}
                     <div className="lg:hidden text-center mb-10">
                         <img src={logo} alt={BRAND.shortName} className="mx-auto mb-4 h-16 w-16 rounded-2xl object-contain" />
@@ -173,7 +173,7 @@ export const Login: React.FC = () => {
                             type="button"
                             onClick={() => toggleLoginType('staff')}
                             className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all ${loginType === 'staff'
-                                ? 'bg-background text-foreground shadow-sm'
+                                ? 'bg-card text-accent-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
                                 }`}
                         >
@@ -184,7 +184,7 @@ export const Login: React.FC = () => {
                             type="button"
                             onClick={() => toggleLoginType('student')}
                             className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all ${loginType === 'student'
-                                ? 'bg-background text-foreground shadow-sm'
+                                ? 'bg-card text-accent-foreground shadow-sm'
                                 : 'text-muted-foreground hover:text-foreground'
                                 }`}
                         >
@@ -210,6 +210,7 @@ export const Login: React.FC = () => {
                             <div className="space-y-4">
                                 <Input
                                     label="Foydalanuvchi nomi"
+                                    className="h-11"
                                     type="text"
                                     autoComplete="username"
                                     error={errorsStaff.username?.message?.toString()}
@@ -218,6 +219,7 @@ export const Login: React.FC = () => {
 
                                 <Input
                                     label="Parol"
+                                    className="h-11"
                                     type="password"
                                     autoComplete="current-password"
                                     error={errorsStaff.password?.message?.toString()}
@@ -240,6 +242,7 @@ export const Login: React.FC = () => {
                             <div className="space-y-4">
                                 <Input
                                     label="Talaba ID / Login"
+                                    className="h-11"
                                     type="text"
                                     autoComplete="username"
                                     error={errorsStudent.login?.message?.toString()}
@@ -248,6 +251,7 @@ export const Login: React.FC = () => {
 
                                 <Input
                                     label="Parol"
+                                    className="h-11"
                                     type="password"
                                     autoComplete="current-password"
                                     error={errorsStudent.password?.message?.toString()}

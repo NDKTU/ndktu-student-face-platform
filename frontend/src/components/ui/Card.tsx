@@ -1,7 +1,7 @@
 /**
  * Card.tsx
  *
- * Wowdash dashboard uslubidagi zamonaviy kartochka komponenti.
+ * EduDash dashboard uslubidagi zamonaviy kartochka komponenti.
  */
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card: React.FC<CardProps> = ({ className, children, ...props }) => (
     <div
-        className={cn('rounded-2xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-border/80', className)}
+        className={cn('rounded-lg border border-border/50 bg-card text-card-foreground shadow-[var(--surface-shadow)]', className)}
         {...props}
     >
         {children}
@@ -20,13 +20,13 @@ export const Card: React.FC<CardProps> = ({ className, children, ...props }) => 
 );
 
 export const CardHeader: React.FC<CardProps> = ({ className, children, ...props }) => (
-    <div className={cn('flex flex-col space-y-1.5 p-6 border-b border-border/60', className)} {...props}>
+    <div className={cn('flex flex-col space-y-1.5 px-5 py-4 border-b border-border/60', className)} {...props}>
         {children}
     </div>
 );
 
 export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({ className, children, ...props }) => (
-    <h3 className={cn('text-lg font-bold font-display leading-tight tracking-tight text-foreground', className)} {...props}>
+    <h3 className={cn('text-lg font-semibold font-display leading-tight tracking-tight text-foreground', className)} {...props}>
         {children}
     </h3>
 );

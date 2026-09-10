@@ -125,7 +125,7 @@ export const TeacherAssignmentsPage = () => {
         <div className="space-y-6">
             <PageHeader
                 title="Oʻquv yuklamasi"
-                description="EduPlan'dan koʻchirilgan yuklama: kim, qaysi guruhga, qaysi fandan dars beradi"
+                description="EPMOS'dan koʻchirilgan yuklama: kim, qaysi guruhga, qaysi fandan dars beradi"
             />
 
             <div className="flex flex-wrap items-center gap-3">
@@ -189,7 +189,7 @@ export const TeacherAssignmentsPage = () => {
                 emptyDescription={
                     search || kafedra !== 'all'
                         ? 'Tanlangan filtrlarga mos yuklama yoʻq'
-                        : "Yuklama hali koʻchirilmagan. EduPlan sinxronizatsiyasini ishga tushiring."
+                        : "Yuklama hali koʻchirilmagan. EPMOS sinxronizatsiyasini ishga tushiring."
                 }
             />
 

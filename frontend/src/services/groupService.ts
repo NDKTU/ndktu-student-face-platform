@@ -10,6 +10,17 @@ export interface Group {
     student_count?: number | null;
     created_at: string;
     updated_at: string;
+
+    /**
+     * Guruhning EPMOS'dagi ID si. Interfeysda «EPMOS ID» deb ko'rsatiladi.
+     *
+     * Bizning lokal `id` bilan adashtirmaslik kerak: sinxronizatsiya aynan
+     * shu qiymat bo'yicha mavjud guruhni topadi va dublikat yaratmaydi.
+     */
+    external_id?: string | null;
+    /** O'sha guruhning talabalar HEMIS'idagi ID si. «HEMIS ID» ustuni. */
+    hemis_group_id?: string | null;
+
     // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
     external_source?: string | null;
     synced_at?: string | null;

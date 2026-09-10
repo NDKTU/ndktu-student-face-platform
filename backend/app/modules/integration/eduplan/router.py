@@ -5,10 +5,11 @@ EduPlan нет ни одной: интеграция односторонняя.
 """
 
 import logging
+from typing import Annotated
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired, get_current_user_id
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,11 +20,15 @@ from .auth_service import eduplan_auth_service
 from .client import EduPlanClient
 from .course_builder import eduplan_course_builder
 from .schemas import (
+    ENTITY_DEPENDENCIES,
+    SYNC_ORDER,
     ApplyRequest,
     ApplyResponse,
     CoursePreviewResponse,
+    EduPlanEntity,
     EduPlanSettingsIn,
     EduPlanSettingsOut,
+    EntitySyncResponse,
     PreviewResponse,
 )
 from .service import eduplan_sync_service
@@ -136,11 +141,55 @@ async def eduplan_settings_delete(
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
 )
 async def eduplan_preview(
+    entities: Annotated[
+        list[EduPlanEntity] | None,
+        Query(description="Qaysi boʻlimlar. Boʻsh — hammasi."),
+    ] = None,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
 ):
-    """Сходить в EduPlan и показать, что изменится. Ничего не пишет."""
-    return await eduplan_sync_service.build_preview(session)
+    """Сходить в EPMOS и показать, что изменится. Ничего не пишет.
+
+    Без ``entities`` — все справочники, как раньше. Со списком читается
+    только он: экран синхронизации запускает разделы по одному.
+    """
+    return await eduplan_sync_service.build_preview(session, entities)
+
+
+@router.post(
+    "/preview/{entity}",
+    response_model=PreviewResponse,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def eduplan_preview_entity(
+    entity: EduPlanEntity,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Bitta boʻlim boʻyicha koʻrib chiqish.
+
+    Har bir boʻlim mustaqil: shu yerdan olingan ``run_id`` ni qoʻllash faqat
+    shu boʻlimga tegadi, qolganlari qayta sinxronlanmaydi.
+    """
+    return await eduplan_sync_service.build_preview(session, [entity])
+
+
+@router.get("/entities")
+async def eduplan_entities(
+    _: PermissionRequired = Depends(PermissionRequired("read:eduplan")),
+):
+    """Boʻlimlar roʻyxati va ularning bogʻliqliklari.
+
+    Interfeys shu roʻyxatdan tugmalarni yigʻadi va bogʻliqlikni koʻrsatadi:
+    kafedra fakultetsiz bogʻlanmaydi.
+    """
+    return [
+        {
+            "entity": entity.value,
+            "depends_on": [d.value for d in ENTITY_DEPENDENCIES.get(entity, ())],
+        }
+        for entity in SYNC_ORDER
+    ]
 
 
 @router.post(
@@ -155,6 +204,53 @@ async def eduplan_apply(
 ):
     """Применить разобранный администратором предпросмотр."""
     return await eduplan_sync_service.apply(session, data)
+
+
+@router.post(
+    "/sync/{entity}",
+    response_model=EntitySyncResponse,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def eduplan_sync_entity(
+    entity: EduPlanEntity,
+    apply_deactivations: bool = False,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Bitta boʻlimni sinxronlash: koʻrib chiqadi va bir maʼnolisini qoʻllaydi.
+
+    Faqat shu boʻlim EPMOS'dan oʻqiladi — qolganlari qayta sinxronlanmaydi.
+    Bogʻliqliklar (masalan kafedra uchun fakultet) qayta olib kelinmaydi,
+    ular allaqachon saqlangan koʻzgudan oʻqiladi; bogʻlanmagan ota-ona
+    boʻlsa, satr aniq xato bilan oʻtkazib yuboriladi.
+
+    Koʻp maʼnoli mosliklar (bitta nomga bir necha lokal satr) avtomatik
+    qoʻllanmaydi: ularni koʻrib chiqish ekranida admin hal qiladi.
+    """
+    preview, applied = await eduplan_sync_service.sync_entity(
+        session,
+        entity,
+        apply_deactivations=apply_deactivations,
+    )
+
+    result = next((r for r in applied.results if r.entity == entity), None)
+    total_external = next(
+        (s.total_external for s in preview.summary if s.entity == entity),
+        0,
+    )
+    return EntitySyncResponse(
+        entity=entity,
+        run_id=preview.run_id,
+        finished_at=applied.finished_at,
+        total_external=total_external,
+        created=result.created if result else 0,
+        linked=result.linked if result else 0,
+        updated=result.updated if result else 0,
+        deactivated=result.deactivated if result else 0,
+        skipped=result.skipped if result else 0,
+        requires_decision=preview.requires_decision,
+        errors=result.errors if result else [],
+    )
 
 
 @router.post(

@@ -11,7 +11,7 @@ from app.core.utils.visibility import set_hidden
 from app.modules.auth.model import User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.student.schemas import StudentListRequest, StudentListResponse
-from app.modules.organization_structure.model import Faculty, Group, Kafedra, Speciality
+from app.modules.organization_structure.model import Curriculum, Faculty, Group, Kafedra, Speciality
 
 from .faculty.repository import get_faculty_repository
 from .faculty.schemas import (
@@ -39,6 +39,12 @@ from .kafedra.schemas import (
     KafedraListRequest,
     KafedraListResponse,
     KafedraStatsResponse,
+)
+from .curriculum.repository import get_curriculum_repository
+from .curriculum.schemas import (
+    CurriculumListRequest,
+    CurriculumListResponse,
+    CurriculumResponse,
 )
 from .speciality.repository import get_speciality_repository
 from .speciality.schemas import (
@@ -514,7 +520,58 @@ async def set_speciality_visibility(
     return {"id": row.id, "is_hidden": row.is_hidden}
 
 
+curriculum_router = APIRouter(
+    tags=["Curriculum"],
+    prefix="/curriculum",
+)
+
+
+@curriculum_router.get("/", response_model=CurriculumListResponse)
+async def list_curriculums(
+    data: CurriculumListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:curriculum")),
+):
+    """Oʻquv rejalar roʻyxati.
+
+    Faqat oʻqish: rejalar EPMOS'dan koʻchiriladi va qoʻlda tahrirlanmaydi —
+    keyingi sinxronizatsiya oʻzgarishni jimgina qaytarib qoʻyardi.
+
+    Ruxsat oʻziniki (`read:curriculum`), mutaxassislikniki emas: menyu bandi
+    aynan shu nom boʻyicha chiziladi, va rejalarni koʻrsatmasdan
+    mutaxassisliklarni koʻrsatish kerak boʻlgan rol boʻlishi mumkin.
+    Ruxsatning oʻzi ilova koʻtarilganda route'lardan avtomatik topiladi va
+    Adminga beriladi (core/lifespan/discovery.py).
+    """
+    return await get_curriculum_repository.list_curriculums(
+        session=session, request=data, current_user=current_user
+    )
+
+
+@curriculum_router.get("/{curriculum_id}", response_model=CurriculumResponse)
+async def get_curriculum(
+    curriculum_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:curriculum")),
+):
+    """Bitta oʻquv reja."""
+    return await get_curriculum_repository.get_curriculum(session, curriculum_id)
+
+
+@curriculum_router.patch("/{curriculum_id}/visibility", status_code=status.HTTP_200_OK)
+async def set_curriculum_visibility(
+    curriculum_id: int,
+    data: VisibilityRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:curriculum")),
+):
+    """Oʻquv rejani boshqa rollardan yashiradi yoki qaytaradi. Faqat admin."""
+    row = await set_hidden(session, Curriculum, curriculum_id, data.is_hidden, current_user, "O'quv reja")
+    return {"id": row.id, "is_hidden": row.is_hidden}
+
+
 router.include_router(faculty_router)
 router.include_router(kafedra_router)
 router.include_router(group_router)
 router.include_router(speciality_router)
+router.include_router(curriculum_router)

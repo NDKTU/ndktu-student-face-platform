@@ -59,14 +59,14 @@ const StudentDashboardPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Hero в фирменном синем */}
-            <div className="relative overflow-hidden rounded-2xl bg-sidebar p-6 sm:p-8">
+            {/* EduDash welcome panel */}
+            <div className="relative overflow-hidden rounded-lg border border-primary/15 bg-accent p-6 sm:p-8">
                 <div aria-hidden className="absolute -top-20 -right-20 h-56 w-56 rounded-full bg-white/5" />
                 <div aria-hidden className="absolute -bottom-24 right-24 h-40 w-40 rounded-full border border-white/10" />
-                <h1 className="relative font-display text-2xl sm:text-3xl font-bold tracking-tight text-sidebar-foreground">
+                <h1 className="relative font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                     {t('Xush kelibsiz, {{name}}!', { name: firstName })}
                 </h1>
-                <p className="relative mt-1.5 text-sm sm:text-base text-sidebar-muted">
+                <p className="relative mt-1.5 text-sm sm:text-base text-muted-foreground">
                     {user?.student?.group?.name
                         ? t('{{group}} guruhi talabasi', { group: user.student.group.name })
                         : t('Talaba kabineti')}

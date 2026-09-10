@@ -1,15 +1,69 @@
 import api from './api';
 import type { CourseType } from './courseTypes';
 
-/** Сущности, которые зеркалятся из EduPlan. Значения совпадают с бэкендом. */
+/** Сущности, которые зеркалятся из EPMOS. Значения совпадают с бэкендом. */
 export type EduPlanEntity =
     | 'faculty'
     | 'kafedra'
-    | 'department'
     | 'speciality'
     | 'group'
     | 'subject'
-    | 'employee';
+    | 'teacher'
+    | 'curriculum';
+
+/**
+ * Boʻlimlar sinxronlash tartibida: bola ota-onadan keyin.
+ *
+ * Backend'dagi `SYNC_ORDER` bilan bir xil. Interfeys tugmalarni shu
+ * tartibda chizadi — admin bogʻliqlik yoʻnalishini koʻrib turadi.
+ */
+export const SYNC_ENTITIES: EduPlanEntity[] = [
+    'faculty',
+    'kafedra',
+    'speciality',
+    'group',
+    'subject',
+    'teacher',
+    'curriculum',
+];
+
+/** Har bir boʻlim nimaga tayanadi. Backend'dagi `ENTITY_DEPENDENCIES` nusxasi. */
+export const ENTITY_DEPENDENCIES: Record<EduPlanEntity, EduPlanEntity[]> = {
+    faculty: [],
+    kafedra: ['faculty'],
+    speciality: ['kafedra'],
+    group: ['speciality'],
+    subject: ['kafedra'],
+    teacher: ['kafedra'],
+    curriculum: ['speciality'],
+};
+
+export const ENTITY_LABEL: Record<EduPlanEntity, string> = {
+    faculty: 'Fakultetlar',
+    kafedra: 'Kafedralar',
+    speciality: 'Mutaxassisliklar',
+    group: 'Guruhlar',
+    subject: 'Fanlar',
+    teacher: "O'qituvchilar",
+    curriculum: "O'quv rejalar",
+};
+
+/** Bitta boʻlim sinxronlangandan keyingi natija. */
+export interface EntitySyncResponse {
+    entity: EduPlanEntity;
+    run_id: string;
+    finished_at: string;
+    /** Shu prognda EPMOS'dan nechta satr kelgani. */
+    total_external: number;
+    created: number;
+    linked: number;
+    updated: number;
+    deactivated: number;
+    skipped: number;
+    /** Koʻp maʼnoli mosliklar — avtomatik qoʻllanmaydi, admin hal qiladi. */
+    requires_decision: number;
+    errors: string[];
+}
 
 export type ProposalAction =
     | 'create'
@@ -50,6 +104,8 @@ export interface EntitySummary {
 export interface PreviewResponse {
     run_id: string;
     generated_at: string;
+    /** Shu koʻrib chiqishga kirgan boʻlimlar. Qoʻllash aynan shularga tegadi. */
+    entities: EduPlanEntity[];
     summary: EntitySummary[];
     proposals: Proposal[];
     requires_decision: number;
@@ -73,6 +129,7 @@ export interface ApplyResult {
 
 export interface ApplyResponse {
     run_id: string;
+    entities: EduPlanEntity[];
     results: ApplyResult[];
     finished_at: string;
 }
@@ -110,6 +167,12 @@ export interface WorkloadSyncResult {
     academic_year_id: number;
     workloads_total: number;
     workloads_inactive_skipped: number;
+    /**
+     * EPMOS'ning o'zida o'qituvchi hali biriktirilmagan qatorlar.
+     * Bizning bog'lanish muammosi emas — shunchaki hali tayinlanmagan yuklama.
+     */
+    workloads_without_teacher: number;
+    /** O'qituvchi EPMOS'da bor, bizda bog'lanmagan — sinxronlash kerak. */
     unresolved_teacher: number;
     unresolved_subject: number;
     unresolved_group: number;
@@ -209,6 +272,21 @@ export interface CoursePreviewResponse {
     by_type: Record<string, number>;
 }
 
+/**
+ * Sinxronlash so'rovlari uchun timeout.
+ *
+ * `api` ning umumiy chegarasi 10 soniya — oddiy so'rov uchun to'g'ri, lekin
+ * bu yerda bitta chaqiruv ichida EPMOS'dan o'nlab sahifa o'qiladi va minglab
+ * qator yoziladi: yuklama 27 000 qatorda ~15 soniya oladi. 10 soniyada uzilsa
+ * ish to'xtamaydi — backend davom etadi, admin esa «timeout of 10000ms
+ * exceeded» ko'radi va nima bo'lganini bilmaydi.
+ *
+ * Nginx bu yo'llarga 900 soniya beradi (frontend/nginx.conf), shuning uchun
+ * chegarani o'shanga moslashtiramiz: uzilish sababi tarmoq bo'lsin, sun'iy
+ * chegara emas.
+ */
+const SYNC_TIMEOUT_MS = 900_000;
+
 /** Ключ предложения — он же идентификатор решения администратора. */
 export const proposalKey = (p: Proposal) => `${p.entity}:${p.external_id}`;
 
@@ -217,8 +295,44 @@ export const eduplanService = {
         const response = await api.get<EduPlanStatus>('/integration/eduplan/status');
         return response.data;
     },
-    preview: async () => {
-        const response = await api.post<PreviewResponse>('/integration/eduplan/preview');
+    preview: async (entities?: EduPlanEntity[]) => {
+        const response = await api.post<PreviewResponse>(
+            '/integration/eduplan/preview',
+            null,
+            {
+                timeout: SYNC_TIMEOUT_MS,
+                ...(entities?.length
+                    ? { params: { entities }, paramsSerializer: { indexes: null } }
+                    : {}),
+            },
+        );
+        return response.data;
+    },
+    /** Bitta boʻlim boʻyicha koʻrib chiqish: nima oʻzgarishini koʻrsatadi, yozmaydi. */
+    previewEntity: async (entity: EduPlanEntity) => {
+        const response = await api.post<PreviewResponse>(
+            `/integration/eduplan/preview/${entity}`,
+            null,
+            { timeout: SYNC_TIMEOUT_MS },
+        );
+        return response.data;
+    },
+    /**
+     * Bitta boʻlimni sinxronlaydi: koʻrib chiqadi va bir maʼnolisini qoʻllaydi.
+     *
+     * Boshqa boʻlimlar qayta sinxronlanmaydi — EPMOS'dan faqat shu boʻlim
+     * oʻqiladi. Koʻp maʼnoli mosliklar qoʻllanmaydi, `requires_decision` da
+     * sanog\`i qaytadi.
+     */
+    syncEntity: async (entity: EduPlanEntity, applyDeactivations = false) => {
+        const response = await api.post<EntitySyncResponse>(
+            `/integration/eduplan/sync/${entity}`,
+            null,
+            {
+                timeout: SYNC_TIMEOUT_MS,
+                ...(applyDeactivations ? { params: { apply_deactivations: true } } : {}),
+            },
+        );
         return response.data;
     },
     /** Prognni fonda boshlaydi va darhol qaytadi. Natija — `runState` orqali. */
@@ -229,6 +343,18 @@ export const eduplanService = {
     /** Oxirgi prognning holati. `null` — hali progn boʻlmagan. */
     runState: async () => {
         const response = await api.get<RunState | null>('/integration/eduplan/run/status');
+        return response.data;
+    },
+    /** Yuklamalarni sinxronlash: o'qituvchi-fan-guruh biriktirmalari. */
+    syncWorkloads: async (academicYearId?: number) => {
+        const response = await api.post<WorkloadSyncResult>(
+            '/integration/eduplan/workloads',
+            null,
+            {
+                timeout: SYNC_TIMEOUT_MS,
+                ...(academicYearId ? { params: { academic_year_id: academicYearId } } : {}),
+            },
+        );
         return response.data;
     },
     getSettings: async () => {
@@ -246,6 +372,7 @@ export const eduplanService = {
     previewCourses: async () => {
         const response = await api.get<CoursePreviewResponse>(
             '/integration/eduplan/courses/preview',
+            { timeout: SYNC_TIMEOUT_MS },
         );
         return response.data;
     },
@@ -259,7 +386,7 @@ export const eduplanService = {
         const response = await api.post<CoursePreviewResponse>(
             '/integration/eduplan/courses/apply',
             null,
-            { params: archive ? { archive: true } : undefined },
+            { timeout: SYNC_TIMEOUT_MS, params: archive ? { archive: true } : undefined },
         );
         return response.data;
     },
@@ -268,7 +395,11 @@ export const eduplanService = {
         decisions: Decision[];
         apply_deactivations: boolean;
     }) => {
-        const response = await api.post<ApplyResponse>('/integration/eduplan/apply', payload);
+        const response = await api.post<ApplyResponse>(
+            '/integration/eduplan/apply',
+            payload,
+            { timeout: SYNC_TIMEOUT_MS },
+        );
         return response.data;
     },
 };

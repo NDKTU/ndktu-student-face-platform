@@ -230,6 +230,10 @@ class EduPlanClient:
         """
         return await self._paginate("/api/v1/staff/", "skip")
 
+    async def edu_plans(self) -> list[dict]:
+        """Учебные планы. Пагинация skip/limit, ответ вида {items, total}."""
+        return await self._paginate("/api/v1/edu-plans/", "skip")
+
     async def academic_years(self) -> list[dict]:
         return await self._paginate("/api/v1/academic-years/", "skip")
 

@@ -83,9 +83,25 @@ export interface StudentSyncResult {
     fetched: number;
     created: number;
     updated: number;
+    /** Nomeri yo'q yoki takrorlangan yozuvlar. */
     skipped: number;
+    /** Admin belgini olib tashlagani uchun import qilinmaganlar. */
+    excluded: number;
     no_group: number;
     missing_locally: number;
+}
+
+/**
+ * Qaysi toifalar import qilinsin.
+ *
+ * Toifalar kesishadi: guruhsiz talaba ayni paytda yangi yoki yangilanadigan
+ * ham bo'ladi. `include_no_group: false` ularni ikkala ro'yxatdan ham
+ * chiqaradi — aks holda belgi hech narsani o'zgartirmagan bo'lardi.
+ */
+export interface StudentSyncSelection {
+    include_create: boolean;
+    include_update: boolean;
+    include_no_group: boolean;
 }
 
 export const hemisService = {
@@ -132,7 +148,12 @@ export const hemisService = {
         return response.data;
     },
 
-    applyStudents: async (data: { incremental?: boolean; allow_bulk_create?: boolean }) => {
+    applyStudents: async (
+        data: {
+            incremental?: boolean;
+            allow_bulk_create?: boolean;
+        } & Partial<StudentSyncSelection>,
+    ) => {
         const response = await api.post<StudentSyncResult>('/hemis/students/apply', data, {
             timeout: 600_000,
         });

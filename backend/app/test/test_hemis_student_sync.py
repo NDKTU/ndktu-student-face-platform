@@ -259,3 +259,119 @@ async def test_unlinked_group_does_not_clear_existing(async_db, hemis_items):
 
     await async_db.refresh(student)
     assert student.group_id == group.id
+
+
+# ---------------------------------------------------------------------- #
+#  Toifalar bo'yicha tanlash
+# ---------------------------------------------------------------------- #
+#
+# Ekranda uchta belgi bor: yangilar, yangilanadiganlar, guruhsizlar.
+# Toifalar kesishadi — guruhsiz talaba ayni paytda yangi yoki yangilanadigan
+# ham bo'ladi, va aynan shu kesishuv eng oson buziladigan joy.
+
+
+@pytest.mark.asyncio
+async def test_create_can_be_skipped(async_db, hemis_items, linked_group):
+    """`include_create=False` — yangi talabalar yaratilmaydi."""
+    hemis_items.append(_item())
+
+    result = await hemis_student_sync.apply(
+        async_db, StudentSyncApplyRequest(include_create=False)
+    )
+
+    assert result.created == 0
+    assert result.excluded == 1
+    assert (
+        await async_db.execute(select(Student).where(Student.student_id_number == "319261100725"))
+    ).scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_update_can_be_skipped(async_db, hemis_items, linked_group):
+    """`include_update=False` — mavjud talaba tegilmaydi."""
+    student = await _existing_student(async_db, group_id=linked_group.id)
+    hemis_items.append(_item(full_name="Yangi Ism Sharif"))
+
+    result = await hemis_student_sync.apply(
+        async_db, StudentSyncApplyRequest(include_update=False)
+    )
+
+    assert result.updated == 0
+    assert result.excluded == 1
+    await async_db.refresh(student)
+    assert student.full_name == "Aliyev Vali"
+
+
+@pytest.mark.asyncio
+async def test_no_group_students_can_be_excluded(async_db, hemis_items, linked_group):
+    """`include_no_group=False` guruhsizni yaratmaydi, guruhlisini yaratadi.
+
+    Belgi yangi/yangilanadigan ro'yxatlarining ichidan olib tashlashi kerak:
+    guruhsiz talaba o'z-o'zicha alohida ro'yxat emas, u o'sha ikkovining
+    ichida turadi. Aks holda belgi hech narsani o'zgartirmagan bo'lardi.
+    """
+    hemis_items.append(_item())  # guruhi bog'langan
+    hemis_items.append(
+        _item(
+            student_id_number="319261100999",
+            full_name="Guruhsiz Talaba",
+            group={"id": 9999, "name": "Bog'lanmagan"},
+        )
+    )
+
+    result = await hemis_student_sync.apply(
+        async_db, StudentSyncApplyRequest(include_no_group=False)
+    )
+
+    assert result.created == 1
+    assert result.excluded == 1
+
+    created = (
+        (await async_db.execute(select(Student.student_id_number))).scalars().all()
+    )
+    assert created == ["319261100725"]
+
+
+@pytest.mark.asyncio
+async def test_no_group_included_by_default(async_db, hemis_items, linked_group):
+    """Sukut bo'yicha hammasi yoqilgan — eski chaqiruvlar o'zgarishsiz ishlaydi.
+
+    Tungi progn va CLI bu maydonlarni umuman yubormaydi.
+    """
+    hemis_items.append(
+        _item(
+            student_id_number="319261100999",
+            full_name="Guruhsiz Talaba",
+            group={"id": 9999, "name": "Bog'lanmagan"},
+        )
+    )
+
+    result = await hemis_student_sync.apply(async_db, StudentSyncApplyRequest())
+
+    assert result.created == 1
+    assert result.excluded == 0
+    student = (
+        await async_db.execute(
+            select(Student).where(Student.student_id_number == "319261100999")
+        )
+    ).scalar_one()
+    assert student.group_id is None
+
+
+@pytest.mark.asyncio
+async def test_nothing_selected_is_rejected(async_db, hemis_items, linked_group):
+    """Ikkala asosiy toifa ham o'chirilsa, HEMIS'ga umuman bormaymiz.
+
+    49 sahifani aylanib chiqib, keyin hammasini tashlash bir necha daqiqani
+    behuda sarflardi.
+    """
+    from fastapi import HTTPException
+
+    hemis_items.append(_item())
+
+    with pytest.raises(HTTPException) as exc:
+        await hemis_student_sync.apply(
+            async_db,
+            StudentSyncApplyRequest(include_create=False, include_update=False),
+        )
+    assert exc.value.status_code == 400

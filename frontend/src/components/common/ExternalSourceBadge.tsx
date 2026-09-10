@@ -8,7 +8,7 @@ export interface ExternalRefFields {
 }
 
 const SOURCE_LABEL: Record<string, string> = {
-    eduplan: 'EduPlan',
+    eduplan: 'EPMOS',
     hemis: 'HEMIS',
 };
 
