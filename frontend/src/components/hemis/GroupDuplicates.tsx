@@ -78,12 +78,19 @@ export const GroupDuplicates = () => {
                     </div>
                 ) : summary ? (
                     <>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                             <Stat label="To'dalar" value={summary.clusters} />
                             <Stat label="Arxivga tushadi" value={summary.to_archive} />
-                            <Stat label="Ko'chadigan talaba" value={summary.students_to_move} />
-                            <Stat label="Ko'chadigan kurs" value={summary.courses_to_move} />
+                            <Stat label="Talaba" value={summary.students_to_move} />
+                            <Stat label="Test" value={summary.quizzes_to_move} />
+                            <Stat label="Natija" value={summary.results_to_move} />
+                            <Stat label="Kurs" value={summary.courses_to_move} />
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                            Bu raqamlar — yo'qoladigan emas, <strong>ko'chadigan</strong> yozuvlar:
+                            hammasi qoladigan nusxaga o'tadi. Savollar guruhga umuman bog'lanmaydi,
+                            ular hech qanday tarzda tegilmaydi.
+                        </p>
 
                         <div className="max-h-[24rem] overflow-auto rounded-xl border border-border">
                             <table className="w-full text-sm">
@@ -108,7 +115,7 @@ export const GroupDuplicates = () => {
                                                     {dateLabel(row.synced_at)}
                                                 </td>
                                                 <td className="p-2 text-xs text-muted-foreground">
-                                                    {`talaba ${row.students}, kurs ${row.courses}, yuklama ${row.workloads}`}
+                                                    {`talaba ${row.students}, test ${row.quizzes}, natija ${row.results}, kurs ${row.courses}, yuklama ${row.workloads}`}
                                                 </td>
                                                 <td className="p-2">
                                                     <span
@@ -136,8 +143,9 @@ export const GroupDuplicates = () => {
                             <p className="text-muted-foreground">
                                 Oxirgi sinxronizatsiya tekkani, ya'ni EPOS hali biladigan qator.
                                 Ikkinchisi o'chirilmaydi — arxivga o'tadi, uning talabalari,
-                                kurslari, yuklamalari, darslari va davomati esa qoladigan nusxaga
-                                ko'chiriladi.
+                                testlari, natijalari, kurslari, yuklamalari, darslari va davomati
+                                esa qoladigan nusxaga ko'chiriladi. Guruh qatorining o'zi
+                                saqlanib qolgani uchun hech bir bog'langan yozuv yo'qolmaydi.
                             </p>
                         </div>
 

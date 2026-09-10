@@ -135,6 +135,8 @@ class GroupMergeService:
             courses=linked.get("course_groups", 0),
             workloads=linked.get("teacher_assignments", 0),
             lessons=linked.get("lessons", 0),
+            quizzes=linked.get("quizzes", 0),
+            results=linked.get("results", 0),
             keep=keep,
         )
 

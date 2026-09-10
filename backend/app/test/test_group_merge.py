@@ -197,3 +197,65 @@ async def test_same_name_in_another_faculty_is_not_a_duplicate(async_db, test_fa
 
     preview = await group_merge_service.preview(async_db)
     assert preview.clusters == []
+
+
+@pytest.mark.asyncio
+async def test_quizzes_and_results_move_too(async_db, duplicates, test_subject, test_user):
+    """Testlar va natijalar ham koʻchadi — bu birlashtirishning eng qoʻrqinchli joyi.
+
+    Prod bazasida eski nusxalarda 1626 test va 31313 natija osilib turgan edi:
+    ular koʻchmasa yoki guruh oʻchirilsa, butun bir semestrning baholari
+    koʻzdan yoʻqolardi.
+    """
+    from sqlalchemy import select
+
+    from app.modules.quiz.model import Quiz, Result
+
+    quiz = Quiz(
+        title="Fizika nazorat",
+        subject_id=test_subject.id,
+        group_id=duplicates["stale_id"],
+        lecturer_id=test_user["id"],
+        question_number=10,
+        duration=30,
+        pin="1",
+    )
+    async_db.add(quiz)
+    await async_db.flush()
+    async_db.add(Result(user_id=test_user["id"], quiz_id=quiz.id, group_id=duplicates["stale_id"]))
+    await async_db.commit()
+
+    result = await group_merge_service.apply(async_db)
+    assert result.moved["quizzes"] == 1
+    assert result.moved["results"] == 1
+
+    assert (await async_db.scalar(select(Quiz.group_id))) == duplicates["live_id"]
+    assert (await async_db.scalar(select(Result.group_id))) == duplicates["live_id"]
+
+
+@pytest.mark.asyncio
+async def test_preview_counts_what_will_move(async_db, duplicates, test_subject, test_user):
+    """Admin nimani koʻchirayotganini raqam bilan koʻrishi kerak.
+
+    Ilgari kartada faqat talaba va kurs koʻrsatilardi, testlar bilan natijalar
+    esa jimgina koʻchardi — shuning uchun «baholarni yoʻqotmaymizmi?» degan
+    savol tugʻilgan edi.
+    """
+    from app.modules.quiz.model import Quiz
+
+    async_db.add(
+        Quiz(
+            title="Fizika nazorat",
+            subject_id=test_subject.id,
+            group_id=duplicates["stale_id"],
+            lecturer_id=test_user["id"],
+            question_number=10,
+            duration=30,
+            pin="2",
+        )
+    )
+    await async_db.commit()
+
+    preview = await group_merge_service.preview(async_db)
+    assert preview.summary["quizzes_to_move"] == 1
+    assert preview.summary["students_to_move"] == 1

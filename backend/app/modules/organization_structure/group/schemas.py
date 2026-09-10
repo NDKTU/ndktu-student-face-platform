@@ -73,10 +73,13 @@ class GroupMergeRow(BaseModel):
     synced_at: Optional[TashkentDatetime] = None
     hemis_group_id: Optional[str] = None
     #: Bogʻlangan yozuvlar — admin nimani yoʻqotmasligini koʻrsin uchun.
+    #: Hammasi qoladigan nusxaga koʻchadi, hech biri oʻchirilmaydi.
     students: int = 0
     courses: int = 0
     workloads: int = 0
     lessons: int = 0
+    quizzes: int = 0
+    results: int = 0
     #: True — shu qator qoladi, qolganlari unga qoʻshiladi.
     keep: bool = False
 
@@ -94,11 +97,16 @@ class GroupDuplicatePreview(BaseModel):
     @computed_field
     @property
     def summary(self) -> dict[str, int]:
+        moved = lambda field: sum(  # noqa: E731 — qisqa yordamchi, faqat shu yerda
+            getattr(row, field) for c in self.clusters for row in c.merge
+        )
         return {
             "clusters": len(self.clusters),
-            "to_archive": sum(len(c.merge) for c in self.clusters),
-            "students_to_move": sum(row.students for c in self.clusters for row in c.merge),
-            "courses_to_move": sum(row.courses for c in self.clusters for row in c.merge),
+            "to_archive": len([row for c in self.clusters for row in c.merge]),
+            "students_to_move": moved("students"),
+            "courses_to_move": moved("courses"),
+            "quizzes_to_move": moved("quizzes"),
+            "results_to_move": moved("results"),
         }
 
 

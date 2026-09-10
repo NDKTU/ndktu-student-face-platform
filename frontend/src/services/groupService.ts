@@ -65,6 +65,8 @@ export interface GroupMergeRow {
     courses: number;
     workloads: number;
     lessons: number;
+    quizzes: number;
+    results: number;
     /** true — shu nusxa qoladi, qolganlari unga qo'shiladi. */
     keep: boolean;
 }
@@ -83,6 +85,8 @@ export interface GroupDuplicatePreview {
         to_archive: number;
         students_to_move: number;
         courses_to_move: number;
+        quizzes_to_move: number;
+        results_to_move: number;
     };
 }
 
