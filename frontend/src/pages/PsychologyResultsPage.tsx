@@ -10,11 +10,12 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
+import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { Brain, Eye, Calendar, User as UserIcon, FilterX, Trash2 } from 'lucide-react';
+import { Brain, Eye, Calendar, User as UserIcon, Trash2 } from 'lucide-react';
 import type { TestResultResponse } from '@/services/psychologyService';
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
@@ -104,7 +105,8 @@ export default function PsychologyResultsPage() {
     const facultyOptions = facultiesData?.faculties.map(f => ({ value: String(f.id), label: f.name })) ?? [];
     const groupOptions = groupsData?.groups.map(g => ({ value: String(g.id), label: g.name })) ?? [];
 
-    const hasActiveFilter = !!(methodFilter || facultyFilter || groupFilter);
+    const activeFilterCount =
+        (methodFilter ? 1 : 0) + (facultyFilter ? 1 : 0) + (groupFilter ? 1 : 0);
 
     const { data, isLoading, isError, refetch } = useMyResults({
         method_id: methodFilter,
@@ -163,21 +165,15 @@ export default function PsychologyResultsPage() {
                         </div>
                     </PermissionGate>
 
-                    {hasActiveFilter && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                                setMethodFilter(undefined);
-                                setFacultyFilter('');
-                                setGroupFilter('');
-                                setPage(1);
-                            }}
-                            aria-label="Filtrlarni tozalash"
-                        >
-                            <FilterX className="h-4 w-4" />
-                        </Button>
-                    )}
+                    <ClearFiltersButton
+                        count={activeFilterCount}
+                        onClick={() => {
+                            setMethodFilter(undefined);
+                            setFacultyFilter('');
+                            setGroupFilter('');
+                            setPage(1);
+                        }}
+                    />
                 </CardContent>
             </Card>
 

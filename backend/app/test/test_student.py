@@ -20,21 +20,27 @@ async def test_get_student_by_id_not_found(auth_client: AsyncClient):
     assert response.json()["detail"] == "Student not found"
 
 
-@pytest.mark.asyncio
-async def test_update_student_not_found(auth_client: AsyncClient):
-    response = await auth_client.put(
-        "/students/99999",
-        json={"first_name": "Updated Name"},
-    )
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Student not found"
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_update_student_not_found(auth_client: AsyncClient):
+#     response = await auth_client.put(
+#         "/students/99999",
+#         json={"first_name": "Updated Name"},
+#     )
+#     assert response.status_code == 404
+#     assert response.json()["detail"] == "Student not found"
 
 
-@pytest.mark.asyncio
-async def test_delete_student_not_found(auth_client: AsyncClient):
-    response = await auth_client.delete("/students/99999")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Student not found"
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_delete_student_not_found(auth_client: AsyncClient):
+#     response = await auth_client.delete("/students/99999")
+#     assert response.status_code == 404
+#     assert response.json()["detail"] == "Student not found"
 
 
 # Note: Detailed CRUD tests (Create, Update, Delete success) heavily depend on

@@ -104,6 +104,20 @@ export const QuestionsPage = () => {
     const subjects = subjectsData?.subjects || [];
     const teachers = teachersData?.teachers || [];
 
+    const activeFilterCount =
+        (selectedSubject !== 'all' ? 1 : 0) + (selectedTeacher !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
+
+    const handleClearFilters = () => {
+        setSelectedSubject('all');
+        setSelectedTeacher('all');
+        setSearchTerm('');
+        setCurrentPage(1);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('subject_id');
+        nextParams.delete('teacher_id');
+        setSearchParams(nextParams);
+    };
+
     const handleSubjectChange = (val: string) => {
         setSelectedSubject(val);
         setCurrentPage(1);
@@ -266,9 +280,11 @@ export const QuestionsPage = () => {
                 searchPlaceholder="Savol matni bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Savollar"
+                activeFilterCount={activeFilterCount}
+                onClearFilters={handleClearFilters}
                 extraFilters={
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={subjectOptions}
                                 value={selectedSubject}
@@ -277,7 +293,7 @@ export const QuestionsPage = () => {
                             />
                         </div>
                         {!isTeacher && teachers.length > 0 && (
-                            <div className="w-[180px] sm:w-[220px]">
+                            <div className="w-full sm:w-[220px]">
                                 <Combobox
                                     options={teacherOptions}
                                     value={selectedTeacher}
@@ -359,10 +375,10 @@ export const QuestionsPage = () => {
                 <Table className="min-w-full border-separate border-spacing-0">
                     <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
                         <TableRow className="border-b border-border/80">
-                            <TableHead className="w-[50px] text-center font-bold font-mono text-xs">#</TableHead>
+                            <TableHead className="hidden w-[50px] text-center font-bold font-mono text-xs sm:table-cell">#</TableHead>
                             <TableHead className="font-bold text-xs">Savol Matni</TableHead>
                             <TableHead className="font-bold text-xs hidden md:table-cell">Fan</TableHead>
-                            <TableHead className="text-center font-bold text-xs">To'g'ri javob</TableHead>
+                            <TableHead className="hidden text-center font-bold text-xs sm:table-cell">To'g'ri javob</TableHead>
                             <TableHead className="font-bold text-xs hidden lg:table-cell">Sana</TableHead>
                             <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
                         </TableRow>
@@ -378,14 +394,14 @@ export const QuestionsPage = () => {
                                     className="group cursor-pointer transition-colors duration-150 hover:bg-primary/[0.04] dark:hover:bg-primary/10 border-b border-border/50"
                                 >
                                     {/* # Row Index */}
-                                    <TableCell className="text-center font-mono text-xs font-semibold text-muted-foreground w-[50px]">
+                                    <TableCell className="hidden w-[50px] text-center font-mono text-xs font-semibold text-muted-foreground sm:table-cell">
                                         {rowNumber}
                                     </TableCell>
 
                                     {/* Savol Matni Preview */}
                                     <TableCell>
                                         <div
-                                            className="line-clamp-2 text-sm font-medium text-foreground group-hover:text-primary transition-colors leading-relaxed max-w-[550px]"
+                                            className="line-clamp-2 text-sm font-medium text-foreground group-hover:text-primary transition-colors leading-relaxed max-w-full md:max-w-[550px]"
                                             dangerouslySetInnerHTML={{
                                                 __html: sanitizeHtml(question.text || ''),
                                             }}
@@ -400,7 +416,7 @@ export const QuestionsPage = () => {
                                     </TableCell>
 
                                     {/* To'g'ri javob */}
-                                    <TableCell className="text-center">
+                                    <TableCell className="hidden text-center sm:table-cell">
                                         {question.correct_option ? (
                                             <span className="inline-flex items-center justify-center min-w-[28px] rounded-lg bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">
                                                 {question.correct_option}-variant

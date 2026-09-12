@@ -1,21 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Pencil, Plus, Trash2, ArrowRight, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle } from 'lucide-react';
-import { useKafedras, useDeleteKafedra } from '@/hooks/useReferenceData';
+import { useEffect, useState } from 'react';
+// import { /* toast */ } from 'sonner';
+import { /* Pencil, */ /* Plus, */ /* Trash2, */ ArrowRight, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle } from 'lucide-react';
+import { useKafedras, /* useDeleteKafedra */ } from '@/hooks/useReferenceData';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import type { Faculty } from '@/services/facultyService';
 import { kafedraService, type Kafedra, type KafedraStats } from '@/services/kafedraService';
 import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
 import { OrganizationToolbar } from './OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
-import { PermissionGate } from '@/components/auth/PermissionGate';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { KafedraModal } from '@/components/kafedra/KafedraModal';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
+// import { /* KafedraModal */ } from '@/components/kafedra/KafedraModal';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
 
@@ -40,20 +41,28 @@ export const FacultyKafedrasView = ({
     const [debouncedSearch, setDebouncedSearch] = useState('');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const pageSize = 15;
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedKafedra, setSelectedKafedra] = useState<Kafedra | null>(null);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [kafedraToDelete, setKafedraToDelete] = useState<Kafedra | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [selectedKafedra, setSelectedKafedra] = useState<Kafedra | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [kafedraToDelete, setKafedraToDelete] = useState<Kafedra | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [stats, setStats] = useState<Map<number, KafedraStats>>(new Map());
 
-    const deleteKafedraMutation = useDeleteKafedra();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteKafedraMutation = useDeleteKafedra();
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -67,11 +76,15 @@ export const FacultyKafedrasView = ({
         currentPage,
         pageSize,
         debouncedSearch,
-        faculty.id
+        faculty.id,
+        true,
+        // Saralash serverda: sahifaning ichida tartiblash «eng ko'p» ni
+        // birinchi sahifadan tashqarida qoldirardi.
+        { sort_by: sortField, order: sortOrder },
     );
-    const rawKafedras = kafedrasData?.kafedras || [];
+    const kafedras = kafedrasData?.kafedras || [];
     const totalPages = kafedrasData ? Math.ceil(kafedrasData.total / pageSize) : 1;
-    const totalCount = kafedrasData?.total ?? rawKafedras.length;
+    const totalCount = kafedrasData?.total ?? kafedras.length;
 
     useEffect(() => {
         kafedraService
@@ -81,6 +94,7 @@ export const FacultyKafedrasView = ({
     }, [faculty.id]);
 
     const handleSort = (field: SortField) => {
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -89,62 +103,40 @@ export const FacultyKafedrasView = ({
         }
     };
 
-    const sortedKafedras = useMemo(() => {
-        return [...rawKafedras].sort((a, b) => {
-            const statA = stats.get(a.id);
-            const statB = stats.get(b.id);
-            let valA: string | number = '';
-            let valB: string | number = '';
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleDeleteClick = (kafedra: Kafedra, e: React.MouseEvent) => {
+//         e.stopPropagation();
+//         setKafedraToDelete(kafedra);
+//         setCascadeWarnings([]);
+//         setIsDeleteModalOpen(true);
+//     };
 
-            if (sortField === 'name') {
-                valA = a.name.toLowerCase();
-                valB = b.name.toLowerCase();
-            } else if (sortField === 'speciality_count') {
-                valA = statA?.speciality_count ?? 0;
-                valB = statB?.speciality_count ?? 0;
-            } else if (sortField === 'teacher_count') {
-                valA = statA?.teacher_count ?? 0;
-                valB = statB?.teacher_count ?? 0;
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [rawKafedras, sortField, sortOrder, stats]);
-
-    const handleDeleteClick = (kafedra: Kafedra, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setKafedraToDelete(kafedra);
-        setCascadeWarnings([]);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!kafedraToDelete) return;
-        deleteKafedraMutation.mutate(
-            { id: kafedraToDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Kafedra o'chirildi");
-                    setIsDeleteModalOpen(false);
-                    setKafedraToDelete(null);
-                    setCascadeWarnings([]);
-                    refetch();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        toast.error("O'chirishda xatolik yuz berdi");
-                        setIsDeleteModalOpen(false);
-                        setKafedraToDelete(null);
-                        setCascadeWarnings([]);
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = async () => {
+//         if (!kafedraToDelete) return;
+//         deleteKafedraMutation.mutate(
+//             { id: kafedraToDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Kafedra o'chirildi");
+//                     setIsDeleteModalOpen(false);
+//                     setKafedraToDelete(null);
+//                     setCascadeWarnings([]);
+//                     refetch();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         setIsDeleteModalOpen(false);
+//                         setKafedraToDelete(null);
+//                         setCascadeWarnings([]);
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -159,6 +151,7 @@ export const FacultyKafedrasView = ({
 
     const renderActions = (kafedra: Kafedra) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {!isExternal(kafedra) && (
                 <>
                     <PermissionGate permission="update:kafedra">
@@ -189,6 +182,7 @@ export const FacultyKafedrasView = ({
                     </PermissionGate>
                 </>
             )}
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -222,6 +216,7 @@ export const FacultyKafedrasView = ({
                 searchPlaceholder="Kafedra nomi bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Kafedralar"
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:kafedra">
                         <Button
@@ -237,6 +232,7 @@ export const FacultyKafedrasView = ({
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -256,7 +252,7 @@ export const FacultyKafedrasView = ({
                         ))}
                     </CatalogGrid>
                 )
-            ) : sortedKafedras.length === 0 ? (
+            ) : kafedras.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={7}
@@ -309,7 +305,7 @@ export const FacultyKafedrasView = ({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedKafedras.map((kafedra, index) => {
+                        {kafedras.map((kafedra, index) => {
                             const item = stats.get(kafedra.id);
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const isActive = kafedra.is_active !== false;
@@ -396,7 +392,7 @@ export const FacultyKafedrasView = ({
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedKafedras.map((kafedra) => {
+                    {kafedras.map((kafedra) => {
                         const item = stats.get(kafedra.id);
                         return (
                             <CatalogCard
@@ -433,6 +429,7 @@ export const FacultyKafedrasView = ({
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {isModalOpen && (
                 <KafedraModal
                     isOpen={isModalOpen}
@@ -446,7 +443,9 @@ export const FacultyKafedrasView = ({
                     }}
                 />
             )}
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={isDeleteModalOpen}
                 onClose={() => {
@@ -478,6 +477,7 @@ export const FacultyKafedrasView = ({
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

@@ -44,38 +44,62 @@ export interface StudentListResponse {
     students: Student[];
 }
 
+export interface StudentListParams {
+    sort_by?: 'name' | 'user_id' | 'created_at';
+    order?: 'asc' | 'desc';
+}
+
 export const studentService = {
-    getStudents: async (page = 1, limit = 10, full_name?: string, user_id?: number, group_id?: number) => {
+    getStudents: async (
+        page = 1,
+        limit = 10,
+        full_name?: string,
+        user_id?: number,
+        group_id?: number,
+        params?: StudentListParams,
+    ) => {
         const response = await api.get<StudentListResponse>('/students/', {
-            params: { page, limit, search: full_name, user_id, group_id },
+            params: {
+                page,
+                limit,
+                search: full_name,
+                user_id,
+                group_id,
+                sort_by: params?.sort_by,
+                order: params?.sort_by ? (params.order ?? 'asc') : undefined,
+            },
         });
         return response.data;
     },
 
 
 
-    createStudent: async (data: StudentCreateRequest): Promise<Student> => {
-        const response = await api.post<Student>('/students/', data);
-        return response.data;
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createStudent: async (data: StudentCreateRequest): Promise<Student> => {
+    //     const response = await api.post<Student>('/students/', data);
+    //     return response.data;
+    // },
 
     getStudentById: async (id: number): Promise<Student> => {
         const response = await api.get<Student>(`/students/${id}`);
         return response.data;
     },
 
-    updateStudent: async (id: number, data: Partial<StudentCreateRequest>): Promise<Student> => {
-        const response = await api.put<Student>(`/students/${id}`, data);
-        return response.data;
-    },
-    
-    updateStudentGroup: async (id: number, group_id: number): Promise<Student> => {
-        const response = await api.put<Student>(`/students/${id}`, { group_id });
-        return response.data;
-    },
-
-    deleteStudent: async (id: number, force?: boolean): Promise<void> => {
-        const url = force ? `/students/${id}?force=true` : `/students/${id}`;
-        await api.delete(url);
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // updateStudent: async (id: number, data: Partial<StudentCreateRequest>): Promise<Student> => {
+    //     const response = await api.put<Student>(`/students/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // updateStudentGroup: async (id: number, group_id: number): Promise<Student> => {
+    //     const response = await api.put<Student>(`/students/${id}`, { group_id });
+    //     return response.data;
+    // },
+    //
+    // deleteStudent: async (id: number, force?: boolean): Promise<void> => {
+    //     const url = force ? `/students/${id}?force=true` : `/students/${id}`;
+    //     await api.delete(url);
+    // },
 };

@@ -16,7 +16,8 @@ export interface Speciality {
     synced_at?: string | null;
     is_active?: boolean;
     /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // is_hidden?: boolean;
 }
 
 export interface SpecialityPayload {
@@ -39,9 +40,10 @@ export interface SpecialityStats {
 }
 
 export const specialityService = {
-    getSpecialities: async (page = 1, limit = 100, name?: string, kafedra_id?: number, includeHidden?: boolean) => {
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    getSpecialities: async (page = 1, limit = 100, name?: string, kafedra_id?: number) => {
         const response = await api.get<SpecialityListResponse>('/speciality/', {
-            params: { page, limit, name, kafedra_id, include_hidden: includeHidden || undefined },
+            params: { page, limit, name, kafedra_id },
         });
         return response.data;
     },
@@ -58,17 +60,19 @@ export const specialityService = {
         return response.data.stats;
     },
 
-    createSpeciality: async (data: SpecialityPayload): Promise<Speciality> => {
-        const response = await api.post<Speciality>('/speciality/', data);
-        return response.data;
-    },
-
-    updateSpeciality: async (id: number, data: SpecialityPayload): Promise<Speciality> => {
-        const response = await api.put<Speciality>(`/speciality/${id}`, data);
-        return response.data;
-    },
-
-    deleteSpeciality: async (id: number, force?: boolean) => {
-        await api.delete(`/speciality/${id}`, { params: force ? { force: true } : undefined });
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createSpeciality: async (data: SpecialityPayload): Promise<Speciality> => {
+    //     const response = await api.post<Speciality>('/speciality/', data);
+    //     return response.data;
+    // },
+    //
+    // updateSpeciality: async (id: number, data: SpecialityPayload): Promise<Speciality> => {
+    //     const response = await api.put<Speciality>(`/speciality/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteSpeciality: async (id: number, force?: boolean) => {
+    //     await api.delete(`/speciality/${id}`, { params: force ? { force: true } : undefined });
+    // },
 };

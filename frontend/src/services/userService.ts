@@ -8,6 +8,13 @@ export interface UserListResponse {
     users: User[];
 }
 
+/** Foydalanuvchilar ro'yxatining server filtri va saralashi. */
+export interface UserListParams {
+    role_id?: number;
+    sort_by?: 'id' | 'username' | 'created_at';
+    order?: 'asc' | 'desc';
+}
+
 export const userService = {
     /** Profil surati: yuz nazoratida etalon sifatida shu ishlatiladi. */
     uploadAvatar: async (file: File) => {
@@ -27,9 +34,18 @@ export const userService = {
         await api.post('/user/logout');
     },
 
-    getUsers: async (page = 1, limit = 10, username?: string) => {
+    getUsers: async (page = 1, limit = 10, username?: string, params?: UserListParams) => {
         const response = await api.get<UserListResponse>('/user/', {
-            params: { page, limit, username },
+            // Rol filtri va saralash serverda: 10 mingdan ortiq foydalanuvchida
+            // sahifaning ichida filtrlash bo'sh ro'yxat berardi.
+            params: {
+                page,
+                limit,
+                username,
+                role_id: params?.role_id,
+                sort_by: params?.sort_by,
+                order: params?.sort_by ? (params.order ?? 'asc') : undefined,
+            },
         });
         return response.data;
     },

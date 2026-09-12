@@ -15,13 +15,12 @@ import {
 const ALL_SELECTED: StudentSyncSelection = {
     include_create: true,
     include_update: true,
-    include_no_group: true,
 };
 
 /**
  * Bitta toifa uchun tanlov qatori.
  *
- * Nol bo'lganda ham ko'rsatiladi, lekin o'chirilgan holatda: «guruhsiz 0 ta»
+ * Nol bo'lganda ham ko'rsatiladi, lekin o'chirilgan holatda: «yangilar 0 ta»
  * — bu foydali xabar, ro'yxatdan qator yo'qolib qolgani esa admin nimadir
  * o'tkazib yuborgandek taassurot qoldirardi.
  */
@@ -68,12 +67,11 @@ const CategoryRow = ({
  * Talabalarni HEMIS'dan import qilish.
  *
  * Avval preview — bazaga hech narsa yozmaydi va nima o'zgarishini ko'rsatadi;
- * keyin apply. Admin uchta toifadan qaysi birini import qilishni o'zi
- * tanlaydi: yangilar, yangilanadiganlar va guruhsizlar.
+ * keyin apply. Admin ikkita toifadan tanlaydi: yangilar va yangilanadiganlar.
  *
- * Toifalar kesishadi — guruhsiz talaba ayni paytda yangi yoki yangilanadigan
- * ham bo'ladi. Shuning uchun «guruhsiz» belgisi olib tashlansa, backend
- * ularni qolgan ikkala ro'yxatdan ham chiqaradi.
+ * Guruhi bizda topilmaganlar toifa emas: ularni backend har doim chetlab
+ * o'tadi, chunki guruhsiz yozuv hech bir ro'yxatda ko'rinmaydi. Ularning soni
+ * shunchaki ko'rsatiladi — bu EPOS tomonda tuzatiladigan nosozlik belgisi.
  */
 export const HemisStudentImport = () => {
     const queryClient = useQueryClient();
@@ -95,7 +93,6 @@ export const HemisStudentImport = () => {
             setSelection({
                 include_create: data.create_count > 0,
                 include_update: data.update_count > 0,
-                include_no_group: data.no_group_count > 0,
             });
         },
         onError: () => toast.error("Ma'lumotni o'qib bo'lmadi — token yoki bog'lanishni tekshiring"),
@@ -128,18 +125,12 @@ export const HemisStudentImport = () => {
     /**
      * Nechta talaba haqiqatan tegiladi.
      *
-     * Guruhsizlar alohida toifa emas — ular yangi va yangilanadiganlarning
-     * ichida turadi, shuning uchun belgisi olib tashlanganda ularni ayiramiz,
-     * qo'shmaymiz. Aks holda son haqiqatdan katta chiqardi.
+     * Guruhsizlarni ayirish shart emas: backend ularni `create_count` va
+     * `update_count` ga umuman qo'shmaydi.
      */
-    const selectedCount = (() => {
-        if (!preview) return 0;
-        let total = 0;
-        if (selection.include_create) total += preview.create_count;
-        if (selection.include_update) total += preview.update_count;
-        if (!selection.include_no_group) total -= preview.no_group_count;
-        return Math.max(0, total);
-    })();
+    const selectedCount =
+        (selection.include_create ? (preview?.create_count ?? 0) : 0) +
+        (selection.include_update ? (preview?.update_count ?? 0) : 0);
 
     const nothingSelected = !selection.include_create && !selection.include_update;
     const blocked =
@@ -175,8 +166,8 @@ export const HemisStudentImport = () => {
                 {!preview && !runPreview.isPending && (
                     <p className="text-sm text-muted-foreground">
                         «Tekshirish» HEMIS'dagi barcha faol talabalarni o'qib, nima o'zgarishini
-                        ko'rsatadi. Bazaga hech narsa yozilmaydi. Avval guruhlarni bog'lang —
-                        aks holda talabalar guruhsiz qoladi.
+                        ko'rsatadi. Bazaga hech narsa yozilmaydi. Guruhi bizda bo'lmagan
+                        talabalar import qilinmaydi.
                     </p>
                 )}
 
@@ -227,23 +218,15 @@ export const HemisStudentImport = () => {
                                 tone="bg-sky-500/15 text-sky-700 dark:text-sky-400"
                             />
 
-                            <CategoryRow
-                                label="Guruhsiz talabalar"
-                                hint="Guruhi hali bog'lanmagan — guruhsiz import bo'ladi. Belgi olib tashlansa, ular yuqoridagi ikkala toifadan ham chiqariladi."
-                                count={preview.no_group_count}
-                                checked={selection.include_no_group}
-                                onChange={toggle('include_no_group')}
-                                tone="bg-amber-500/15 text-amber-700 dark:text-amber-400"
-                            />
                         </div>
 
-                        {preview.no_group_count > 0 && selection.include_no_group && (
+                        {preview.no_group_count > 0 && (
                             <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                    {preview.no_group_count} ta talabaning guruhi hali bog'lanmagan —
-                                    ular guruhsiz import bo'ladi. Yuqoridagi «Guruhlarni bog'lash»
-                                    bo'limini oldin tugatgan ma'qul.
+                                    {preview.no_group_count} ta talabaning guruhi bizning bazamizda
+                                    yo'q — ular import qilinmaydi. Guruhlar EPOS'dan keladi, shuning
+                                    uchun avval orgstruktura sinxronizatsiyasini bajaring.
                                 </span>
                             </div>
                         )}

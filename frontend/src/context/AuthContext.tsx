@@ -108,7 +108,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const isAuthenticated = !!user;
 
-    const availableRoles = useMemo<UserRole[]>(() => user?.roles ?? [], [user]);
+    /**
+     * Ko'rinish tanlovidagi rollar tartibi.
+     *
+     * Uchta asosiy rol doim oldinda va doim bir xil ketma-ketlikda turadi:
+     * administratsiya → o'qituvchi → talaba. Bazadan kelgan tartib rollarning
+     * `id` siga bog'liq va o'rnatmadan o'rnatmaga o'zgarib ketardi, ro'yxatdagi
+     * qator esa har safar boshqa joyda chiqardi. Qolganlari (psixolog, tyutor)
+     * shundan keyin, alifbo bo'yicha.
+     */
+    const availableRoles = useMemo<UserRole[]>(() => {
+        const order = ['admin', 'teacher', 'student'];
+        const rank = (role: UserRole) => {
+            const index = order.indexOf(role.name.toLowerCase());
+            return index === -1 ? order.length : index;
+        };
+        return [...(user?.roles ?? [])].sort(
+            (a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name),
+        );
+    }, [user]);
 
     // Saqlangan tanlov foydalanuvchida qolmagan bo'lishi mumkin (rollari
     // o'zgargan) — bunday holda hech narsa toraytirilmaydi.

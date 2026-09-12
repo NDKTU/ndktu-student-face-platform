@@ -7,18 +7,11 @@ from app.modules.auth.model import Student
 
 
 @pytest_asyncio.fixture
-async def student_user_and_group(async_client, async_db, test_faculty, test_role):
-    # 1. Create a specific group for the student
-    group_payload = {"name": "StudentGroup-101", "faculty_id": test_faculty["id"]}
-    group_resp = await async_client.post("/group/", json=group_payload)
-    assert group_resp.status_code == 201
-    group_data = group_resp.json()
-
-    # 2. Create another group (mismatch)
-    other_group_payload = {"name": "OtherGroup-202", "faculty_id": test_faculty["id"]}
-    other_group_resp = await async_client.post("/group/", json=other_group_payload)
-    assert other_group_resp.status_code == 201
-    other_group_data = other_group_resp.json()
+async def student_user_and_group(async_client, async_db, make_group, test_faculty, test_role):
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qatorlar repository orqali
+    # yaratiladi: birinchisi talabaning guruhi, ikkinchisi — begona guruh.
+    group_data = await make_group("StudentGroup-101", test_faculty["id"])
+    other_group_data = await make_group("OtherGroup-202", test_faculty["id"])
 
     # 3. Create a User who will be the student
     user_payload = {

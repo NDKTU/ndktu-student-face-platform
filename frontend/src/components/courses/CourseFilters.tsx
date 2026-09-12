@@ -49,7 +49,7 @@ export const CourseFilters = ({
             <CardContent className="p-4">
                 <div className="flex flex-wrap gap-4 items-end">
                     <PermissionGate permission="read:subject">
-                        <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">Fan bo'yicha filtri</label>
                             <Combobox
                                 options={subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
@@ -62,7 +62,7 @@ export const CourseFilters = ({
                     </PermissionGate>
                     {showTeacherFilter && (
                         <PermissionGate permission="read:teacher">
-                            <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                                 <label className="text-sm font-medium">O'qituvchi bo'yicha filtri</label>
                                 <Combobox
                                     options={teachers.map(t => ({ value: (t?.user_id ?? '').toString(), label: t?.full_name ?? '' }))}
@@ -75,7 +75,7 @@ export const CourseFilters = ({
                         </PermissionGate>
                     )}
                     <PermissionGate permission="read:group">
-                        <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">Guruh bo'yicha filtri</label>
                             <Combobox
                                 options={groups.map(g => ({ value: g.id.toString(), label: g.name }))}

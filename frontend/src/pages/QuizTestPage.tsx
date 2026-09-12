@@ -568,7 +568,7 @@ const QuizTestPage = () => {
 
         return (
             <FocusOverlay>
-            <div className="flex items-center justify-center min-h-[80vh]">
+            <div className="flex items-center justify-center min-h-[80dvh]">
                 <Card className="w-full max-w-lg">
                     {showCheatingAlert && (
                         <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-4">
@@ -605,8 +605,8 @@ const QuizTestPage = () => {
                                 </div>
                             </div>
 
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-3 gap-4">
+                            {/* Stats Grid — telefonda gap kichik, aks holda uch plitka siqiladi */}
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                 <div className="rounded-lg bg-muted p-4 text-center">
                                     <div className="text-2xl font-bold">{results.total_questions}</div>
                                     <div className="text-xs text-muted-foreground mt-1">Jami</div>
@@ -735,8 +735,11 @@ const QuizTestPage = () => {
                 </div>
             </div>
 
-            {/* Question navigation dots */}
-            <div className="flex flex-wrap gap-2">
+            {/* Question navigation dots.
+                Telefonda nishon 40px (32px ni barmoq bilan aniq bosib bo'lmaydi) va
+                ro'yxat balandligi cheklangan: 50 savolli testda u ekranning yarmini
+                egallab, savolning o'zi ko'rinmay qolardi. */}
+            <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto custom-scrollbar md:max-h-none md:overflow-visible">
                 {quizData.questions.map((q, index) => {
                     const isAnswered = (answers[q.id]?.length ?? 0) > 0 || Boolean(textAnswers[q.id]?.trim());
                     const isCurrent = index === currentQuestionIndex;
@@ -745,7 +748,7 @@ const QuizTestPage = () => {
                             key={q.id}
                             onClick={() => setCurrentQuestionIndex(index)}
                             className={cn(
-                                "h-8 w-8 rounded-full text-xs font-semibold transition-all duration-200",
+                                "h-10 w-10 rounded-full text-sm font-semibold transition-all duration-200 md:h-8 md:w-8 md:text-xs",
                                 isCurrent
                                     ? "bg-primary text-primary-foreground shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_50%,transparent)] scale-105"
                                     : isAnswered
@@ -790,7 +793,7 @@ const QuizTestPage = () => {
                                 onChange={(event) => handleTextAnswer(currentQuestion.id, event.target.value)}
                                 onBlur={(event) => submitTextAnswer(currentQuestion.id, event.target.value)}
                                 placeholder="Javobingizni yozing"
-                                className="h-11 w-full rounded-xl border border-border/60 bg-background px-4 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring"
+                                className="h-12 w-full rounded-xl border border-border/60 bg-background px-4 text-base outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring md:h-11 md:text-sm"
                             />
                         )}
                         {!isFreeText && options.map((option) => {
@@ -827,10 +830,11 @@ const QuizTestPage = () => {
                 </CardContent>
             </Card>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between">
+            {/* Navigation — telefonda ustma-ust, `sm` dan yuqorida yonma-yon */}
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                     variant="outline"
+                    className="w-full sm:w-auto"
                     onClick={() => setCurrentQuestionIndex((prev: number) => prev - 1)}
                     disabled={isFirstQuestion}
                 >
@@ -838,7 +842,7 @@ const QuizTestPage = () => {
                     Oldingi
                 </Button>
 
-                <div className="flex gap-2">
+                <div className="flex w-full gap-2 sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">
                     {isLastQuestion ? (
                         <Button
                             onClick={() => handleSubmit()}

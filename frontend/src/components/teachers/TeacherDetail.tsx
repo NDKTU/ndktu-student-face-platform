@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ArrowLeft, BookOpen, ArrowRight, GraduationCap, Users } from 'lucide-react';
@@ -6,6 +7,7 @@ import type { Teacher } from '@/services/teacherService';
 import { cn } from '@/lib/utils';
 import { TeacherQuestionsList } from './TeacherQuestionsList';
 import { TeacherStudentsPanel } from './TeacherStudentsPanel';
+import { usePermission } from '@/components/auth/PermissionGate';
 
 type DetailTab = 'info' | 'courses' | 'students';
 
@@ -19,6 +21,10 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
     const [selectedSubject, setSelectedSubject] = useState<{ id: number; name: string } | null>(null);
     const [activeTab, setActiveTab] = useState<DetailTab>('info');
     const courses = teacher.courses ?? [];
+    const navigate = useNavigate();
+    // Guruh sahifasi `read:group` bilan yopilgan: huquq bo'lmasa, qator
+    // bosilmaydigan qilib ko'rsatiladi — aks holda bosish 403 ga olib borardi.
+    const canOpenGroup = usePermission('read:group');
 
     if (selectedSubject) {
         return (
@@ -158,8 +164,8 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                             <span>{teacher.kafedra?.name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <span className="font-semibold text-muted-foreground">Fakultet ID:</span>
-                            <span>{teacher.kafedra?.faculty_id || '-'}</span>
+                            <span className="font-semibold text-muted-foreground">Fakultet:</span>
+                            <span>{teacher.kafedra?.faculty?.name || '-'}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -183,7 +189,7 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                                             <BookOpen className="h-4 w-4 text-muted-foreground" />
                                             <span>{st.subject?.name || `ID: ${st.subject_id}`}</span>
                                         </div>
-                                        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
                                     </div>
                                 ))}
                             </div>
@@ -199,11 +205,30 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                     </CardHeader>
                     <CardContent>
                         {teacher.teacher_groups && teacher.teacher_groups.length > 0 ? (
-                            <ul className="list-disc list-inside space-y-1 text-sm">
+                            <div className="grid grid-cols-1 gap-2">
                                 {teacher.teacher_groups.map(gt => (
-                                    <li key={gt.group_id}>{gt.group?.name || `ID: ${gt.group_id}`}</li>
+                                    <div
+                                        key={gt.group_id}
+                                        className={cn(
+                                            'flex items-center justify-between p-3 rounded-lg border transition-colors group',
+                                            canOpenGroup && 'hover:bg-muted/50 cursor-pointer',
+                                        )}
+                                        onClick={
+                                            canOpenGroup
+                                                ? () => navigate(`/groups/${gt.group_id}/students`)
+                                                : undefined
+                                        }
+                                    >
+                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                            <Users className="h-4 w-4 text-muted-foreground" />
+                                            <span>{gt.group?.name || `ID: ${gt.group_id}`}</span>
+                                        </div>
+                                        {canOpenGroup && (
+                                            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
+                                        )}
+                                    </div>
                                 ))}
-                            </ul>
+                            </div>
                         ) : (
                             <span className="text-sm text-muted-foreground">Biriktirilgan guruhlar yo'q.</span>
                         )}

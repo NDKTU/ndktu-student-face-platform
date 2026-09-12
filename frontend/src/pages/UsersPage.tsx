@@ -22,6 +22,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useAssignRoles } from '@/hooks/useUsers';
 import { useRoles } from '@/hooks/useReferenceData';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
@@ -54,7 +55,9 @@ export const UsersPage = () => {
     const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('id');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -76,13 +79,20 @@ export const UsersPage = () => {
         isLoading: isUsersLoading,
         isError: isUsersError,
         refetch: refetchUsers,
-    } = useUsers(currentPage, pageSize, debouncedSearch);
+    } = useUsers(currentPage, pageSize, debouncedSearch, {
+        // Rol filtri va saralash serverda: sahifadagi 15 qatorni filtrlash
+        // «teacher» uchun bo'sh ro'yxat berar, sahifalash esa baribir o'nlab
+        // sahifani ko'rsatib turardi.
+        role_id: selectedRoleFilter === 'all' ? undefined : Number(selectedRoleFilter),
+        sort_by: sortField,
+        order: sortOrder,
+    });
     const { data: rolesData } = useRoles();
     const deleteUserMutation = useDeleteUser();
 
-    const rawUsers = usersData?.users || [];
+    const users = usersData?.users || [];
     const totalPages = usersData ? Math.ceil(usersData.total / pageSize) : 1;
-    const totalCount = usersData?.total ?? rawUsers.length;
+    const totalCount = usersData?.total ?? users.length;
     const roles = rolesData?.roles || [];
 
     const getRoleName = (roleId?: number) => {
@@ -96,35 +106,10 @@ export const UsersPage = () => {
         return [{ value: 'all', label: 'Barchasi' }, ...list];
     }, [roles]);
 
-    const filteredUsers = useMemo(() => {
-        if (selectedRoleFilter === 'all') return rawUsers;
-        const roleIdNum = Number(selectedRoleFilter);
-        return rawUsers.filter((u) => u.roles?.some((r) => r.id === roleIdNum));
-    }, [rawUsers, selectedRoleFilter]);
-
-    const sortedUsers = useMemo(() => {
-        return [...filteredUsers].sort((a, b) => {
-            let valA: string | number = '';
-            let valB: string | number = '';
-
-            if (sortField === 'id') {
-                valA = a.id;
-                valB = b.id;
-            } else if (sortField === 'username') {
-                valA = a.username.toLowerCase();
-                valB = b.username.toLowerCase();
-            } else if (sortField === 'created_at') {
-                valA = new Date(a.created_at).getTime();
-                valB = new Date(b.created_at).getTime();
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [filteredUsers, sortField, sortOrder]);
-
     const handleSort = (field: SortField) => {
+        // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda admin yangi
+        // tartibning o'rtasidan ko'rardi.
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -233,6 +218,12 @@ export const UsersPage = () => {
                 searchPlaceholder="Foydalanuvchi nomi bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Foydalanuvchilar"
+                activeFilterCount={(selectedRoleFilter !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0)}
+                onClearFilters={() => {
+                    setSelectedRoleFilter('all');
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                }}
                 chips={
                     roleChipOptions.length > 1 ? (
                         <FilterChipGroup
@@ -280,7 +271,7 @@ export const UsersPage = () => {
                         ))}
                     </CatalogGrid>
                 )
-            ) : sortedUsers.length === 0 ? (
+            ) : users.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
@@ -330,7 +321,7 @@ export const UsersPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedUsers.map((user, index) => {
+                        {users.map((user, index) => {
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const isActive = user.is_active !== false;
 
@@ -416,7 +407,7 @@ export const UsersPage = () => {
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedUsers.map((user) => (
+                    {users.map((user) => (
                         <CatalogCard
                             key={user.id}
                             id={user.id}

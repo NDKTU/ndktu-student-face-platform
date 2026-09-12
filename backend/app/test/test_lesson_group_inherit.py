@@ -60,22 +60,22 @@ async def test_lesson_without_date_defaults_to_today(
 
 @pytest.mark.asyncio
 async def test_several_groups_no_longer_block_lesson_creation(
-    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+    auth_client, make_group, test_teacher, test_subject, test_group, test_faculty, test_kafedra
 ):
     """Bir nechta guruhli kursda ham guruh so'ralmaydi.
 
     Ilgari bu yerda 400 qaytarilardi va o'qituvchi darsni har guruhga qayta
     yozishga majbur edi.
     """
-    second_group = await auth_client.post("/group/", json={"name": "SE-2024", "faculty_id": test_faculty["id"]})
-    assert second_group.status_code == 201
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali yaratiladi.
+    second_group = await make_group("SE-2024", test_faculty["id"])
     course_id = await _create_course(
         auth_client,
         test_teacher,
         test_subject,
         test_faculty,
         test_kafedra,
-        [test_group["id"], second_group.json()["id"]],
+        [test_group["id"], second_group["id"]],
         "Algebra",
     )
 
@@ -91,26 +91,26 @@ async def test_several_groups_no_longer_block_lesson_creation(
         "/lesson/",
         json={
             "course_id": course_id,
-            "group_id": second_group.json()["id"],
+            "group_id": second_group["id"],
             "topic": "Faqat bitta guruhga",
             "date": "2026-08-21",
         },
     )
     assert explicit.status_code == 201
-    assert explicit.json()["group_id"] == second_group.json()["id"]
+    assert explicit.json()["group_id"] == second_group["id"]
 
 
 @pytest.mark.asyncio
 async def test_foreign_group_is_still_rejected(
-    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+    auth_client, make_group, test_teacher, test_subject, test_group, test_faculty, test_kafedra
 ):
     """Kursga kirmaydigan guruhni ko'rsatib bo'lmaydi.
 
     Guruh endi ixtiyoriy, lekin ko'rsatilgani tekshiriladi: aks holda dars
     umuman begona guruhga osilib qolardi.
     """
-    outsider = await auth_client.post("/group/", json={"name": "SE-2025", "faculty_id": test_faculty["id"]})
-    assert outsider.status_code == 201
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali yaratiladi.
+    outsider = await make_group("SE-2025", test_faculty["id"])
     course_id = await _create_course(
         auth_client, test_teacher, test_subject, test_faculty, test_kafedra, [test_group["id"]], "Physics"
     )
@@ -119,7 +119,7 @@ async def test_foreign_group_is_still_rejected(
         "/lesson/",
         json={
             "course_id": course_id,
-            "group_id": outsider.json()["id"],
+            "group_id": outsider["id"],
             "topic": "Introduction",
             "date": "2026-08-21",
         },

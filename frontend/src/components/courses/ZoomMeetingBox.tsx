@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, LogOut, Radio, ScanFace, Video } from 'lucide-react';
+import { Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { zoomService } from '@/services/zoomService';
@@ -34,6 +34,8 @@ type ZoomClient = {
     join: (options: Record<string, unknown>) => Promise<void>;
     leaveMeeting: () => Promise<void>;
     on?: (event: string, callback: (payload: unknown) => void) => void;
+    /** SDK 6.x: uchrashuv davomida video o'lchamini qayta belgilash. */
+    updateVideoOptions?: (options: Record<string, unknown>) => void;
 };
 
 declare global {
@@ -96,7 +98,55 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
     const [error, setError] = useState('');
     const [faceResult, setFaceResult] = useState<FaceCheckResult | null>(null);
     const [attempts, setAttempts] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const faceCheck = useLessonFaceCheck(lessonId);
+
+    /**
+     * Video o'lchami: konteyner kengligi bo'yicha, balandligi ekranga sig'adigan
+     * qilib.
+     *
+     * Qat'iy o'lchamda SDK kartochkadan chiqib ketar va blok ichida skroll
+     * paydo bo'lardi — talaba uchrashuvni ko'rish uchun ichki oynani surib
+     * yurishga majbur edi. Pastdagi zaxira — Zoom o'z boshqaruv paneli uchun.
+     */
+    const viewSize = (fullscreen: boolean) => {
+        const width = Math.round(containerRef.current?.clientWidth ?? 0) || 960;
+        // Oddiy rejimda blok ekranning uchdan ikkisidan oshmaydi: tepada dars
+        // sarlavhasi, pastda esa konspekt va materiallar turadi. To'liq
+        // ekranda esa deyarli hammasi videoga beriladi.
+        const limit = fullscreen
+            ? Math.round(window.innerHeight - 80)
+            : Math.round(window.innerHeight * 0.62);
+        const height = Math.max(240, Math.min(Math.round((width * 9) / 16), limit));
+        return { width, height };
+    };
+
+    /** Uchrashuv davomida o'lchamni yangilaydi (to'liq ekran, oyna kattaligi). */
+    const applyViewSize = (fullscreen: boolean) => {
+        const size = viewSize(fullscreen);
+        clientRef.current?.updateVideoOptions?.({
+            viewSizes: { default: size, ribbon: size },
+        });
+    };
+
+    // To'liq ekranga o'tish/chiqishda video o'lchami ham qayta hisoblanadi:
+    // aks holda katta ekranda kichkina oyna markazda qolib ketardi.
+    useEffect(() => {
+        const onChange = () => {
+            const active = document.fullscreenElement === containerRef.current;
+            setIsFullscreen(active);
+            applyViewSize(active);
+        };
+        document.addEventListener('fullscreenchange', onChange);
+        return () => document.removeEventListener('fullscreenchange', onChange);
+    }, []);
+
+    const toggleFullscreen = async () => {
+        const element = containerRef.current;
+        if (!element) return;
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+        else await element.requestFullscreen().catch(() => undefined);
+    };
 
     // Sahifadan chiqilganda uchrashuvdan ham chiqamiz, aks holda mikrofon
     // va kamera ochiq qolib ketardi.
@@ -141,12 +191,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
             await loadZoomSdk();
             if (!window.ZoomMtgEmbedded || !containerRef.current) throw new Error('Zoom SDK topilmadi');
 
-            // O'lcham konteyner kengligidan olinadi: qat'iy 1000×600 da video
-            // kartochkadan chiqib ketar yoki yon tomonlarda qora chiziq qolardi.
-            const width = Math.round(containerRef.current.clientWidth) || 960;
-            // Bo'yi ekranga ham qarab olinadi: 16:9 keng monitorda balandlikni
-            // sahifadan tashqariga chiqarib yuborardi.
-            const height = Math.min(Math.round((width * 9) / 16), Math.round(window.innerHeight * 0.62));
+            const { width, height } = viewSize(false);
 
             const client = window.ZoomMtgEmbedded.createClient();
             clientRef.current = client;
@@ -180,6 +225,11 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 userName: user?.username ?? 'Talaba',
             });
             setState('joined');
+            // Uchrashuv sahifaning o'rtasida ochiladi — o'sha joyga olib
+            // boramiz, aks holda talaba uni qidirib skroll qilishi kerak edi.
+            requestAnimationFrame(() => {
+                containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
             if (faceCheckEnabled) faceCheck.startRandomChecks();
         } catch (cause) {
             logger.error('Zoom join failed', cause);
@@ -270,9 +320,18 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                             </span>
                         )}
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => void leave()}>
-                        <LogOut className="mr-2 h-4 w-4" /> Uchrashuvdan chiqish
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => void toggleFullscreen()}>
+                            {isFullscreen ? (
+                                <><Minimize2 className="mr-2 h-4 w-4" /> Oynaga qaytish</>
+                            ) : (
+                                <><Maximize2 className="mr-2 h-4 w-4" /> To'liq ekran</>
+                            )}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => void leave()}>
+                            <LogOut className="mr-2 h-4 w-4" /> Uchrashuvdan chiqish
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -284,10 +343,11 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 ref={containerRef}
                 className={
                     state === 'joined'
-                        // Zoom o'z tartibini o'zi chizadi (galereya, ribbon) va
-                        // balandligi kutilganidan katta chiqishi mumkin — blok
-                        // sahifani cho'zmasligi uchun cheklab, ichida skroll beramiz.
-                        ? 'max-h-[78vh] overflow-auto rounded-xl border border-border/60 bg-black'
+                        // Ichki skroll yo'q: o'lcham `viewSize` da ekranga
+                        // sig'adigan qilib berilgan, shuning uchun blokni
+                        // surib yurish kerak emas. To'liq ekranda konteyner
+                        // butun ekranni egallaydi va video markazda turadi.
+                        ? 'flex w-full items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-black'
                         : 'h-0 w-full overflow-hidden'
                 }
             />

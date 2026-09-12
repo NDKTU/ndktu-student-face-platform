@@ -303,41 +303,15 @@ async def test_update_can_be_skipped(async_db, hemis_items, linked_group):
 
 
 @pytest.mark.asyncio
-async def test_no_group_students_can_be_excluded(async_db, hemis_items, linked_group):
-    """`include_no_group=False` guruhsizni yaratmaydi, guruhlisini yaratadi.
+async def test_no_group_students_are_never_imported(async_db, hemis_items, linked_group):
+    """Guruhi bizda yo'q talaba import qilinmaydi — buni o'chirib bo'lmaydi.
 
-    Belgi yangi/yangilanadigan ro'yxatlarining ichidan olib tashlashi kerak:
-    guruhsiz talaba o'z-o'zicha alohida ro'yxat emas, u o'sha ikkovining
-    ichida turadi. Aks holda belgi hech narsani o'zgartirmagan bo'lardi.
+    Guruhsiz yozuv hech bir ro'yxatda ko'rinmaydi va hech bir testga
+    tushmaydi, shuning uchun uni yaratishdan ko'ra o'tkazib yuborgan ma'qul.
+    Toifalar kesishadi: guruhsiz talaba ayni paytda yangi ham, shuning uchun
+    u ikkala ro'yxatdan ham chiqarib tashlanishi kerak.
     """
     hemis_items.append(_item())  # guruhi bog'langan
-    hemis_items.append(
-        _item(
-            student_id_number="319261100999",
-            full_name="Guruhsiz Talaba",
-            group={"id": 9999, "name": "Bog'lanmagan"},
-        )
-    )
-
-    result = await hemis_student_sync.apply(
-        async_db, StudentSyncApplyRequest(include_no_group=False)
-    )
-
-    assert result.created == 1
-    assert result.excluded == 1
-
-    created = (
-        (await async_db.execute(select(Student.student_id_number))).scalars().all()
-    )
-    assert created == ["319261100725"]
-
-
-@pytest.mark.asyncio
-async def test_no_group_included_by_default(async_db, hemis_items, linked_group):
-    """Sukut bo'yicha hammasi yoqilgan — eski chaqiruvlar o'zgarishsiz ishlaydi.
-
-    Tungi progn va CLI bu maydonlarni umuman yubormaydi.
-    """
     hemis_items.append(
         _item(
             student_id_number="319261100999",
@@ -349,13 +323,39 @@ async def test_no_group_included_by_default(async_db, hemis_items, linked_group)
     result = await hemis_student_sync.apply(async_db, StudentSyncApplyRequest())
 
     assert result.created == 1
-    assert result.excluded == 0
-    student = (
-        await async_db.execute(
-            select(Student).where(Student.student_id_number == "319261100999")
+    assert result.no_group == 1
+
+    created = (
+        (await async_db.execute(select(Student.student_id_number))).scalars().all()
+    )
+    assert created == ["319261100725"]
+
+
+@pytest.mark.asyncio
+async def test_no_group_student_is_not_updated_either(async_db, hemis_items, linked_group):
+    """Bazada bor talaba ham, guruhi uzilgan bo'lsa, yangilanmaydi.
+
+    Aks holda guruhsizlarni chetlab o'tish faqat yaratishga tegib, tungi
+    prognoz ularning ma'lumotini baribir yangilab turardi.
+    """
+    student = await _existing_student(
+        async_db, student_id_number="319261100999", full_name="Eski Ism"
+    )
+
+    hemis_items.append(
+        _item(
+            student_id_number="319261100999",
+            full_name="Yangi Ism",
+            group={"id": 9999, "name": "Bog'lanmagan"},
         )
-    ).scalar_one()
-    assert student.group_id is None
+    )
+
+    result = await hemis_student_sync.apply(async_db, StudentSyncApplyRequest())
+
+    assert result.updated == 0
+    assert result.no_group == 1
+    await async_db.refresh(student)
+    assert student.full_name == "Eski Ism"
 
 
 @pytest.mark.asyncio

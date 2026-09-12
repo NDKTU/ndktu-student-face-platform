@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { subjectService } from '@/services/subjectService';
+import { useQuery, /* useMutation, */ /* useQueryClient */ } from '@tanstack/react-query';
+import { subjectService, type SubjectListParams } from '@/services/subjectService';
 
 export const useSubjects = (
     page = 1,
@@ -7,11 +7,13 @@ export const useSubjects = (
     search = '',
     teacher_id?: number,
     enabled: boolean = true,
-    includeHidden = false,
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // includeHidden = false,
+    sort?: SubjectListParams,
 ) => {
     return useQuery({
-        queryKey: ['subjects', page, limit, search, teacher_id, includeHidden],
-        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id, includeHidden),
+        queryKey: ['subjects', page, limit, search, teacher_id, sort],
+        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id, sort),
         placeholderData: (previousData) => previousData,
         enabled,
     });
@@ -33,34 +35,43 @@ export const useSubject = (id: number) => {
     });
 };
 
-export const useCreateSubject = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: { name: string }) => subjectService.createSubject(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['subjects'] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useCreateSubject = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: (data: { name: string }) => subjectService.createSubject(data),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['subjects'] });
+//         },
+//     });
+// };
 
-export const useUpdateSubject = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { name: string } }) =>
-            subjectService.updateSubject(id, data),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['subjects'] });
-            queryClient.invalidateQueries({ queryKey: ['subject', data.id] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useUpdateSubject = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ id, data }: { id: number; data: { name: string } }) =>
+//             subjectService.updateSubject(id, data),
+//         onSuccess: (data) => {
+//             queryClient.invalidateQueries({ queryKey: ['subjects'] });
+//             queryClient.invalidateQueries({ queryKey: ['subject', data.id] });
+//         },
+//     });
+// };
 
-export const useDeleteSubject = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, force }: { id: number; force?: boolean }) => subjectService.deleteSubject(id, force),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['subjects'] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useDeleteSubject = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ id, force }: { id: number; force?: boolean }) => subjectService.deleteSubject(id, force),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['subjects'] });
+//         },
+//     });
+// };

@@ -32,45 +32,11 @@ export interface HemisDataProbe {
     detail?: string | null;
 }
 
-export interface GroupMatchCandidate {
-    group_id: number;
-    name: string;
-}
-
-export interface GroupMatchProposal {
-    hemis_group_id: number;
-    hemis_group_name: string;
-    student_count: number;
-    kind: 'auto' | 'review' | 'unmatched' | 'already';
-    reason: 'vote' | 'name' | 'existing' | 'none';
-    group_id: number | null;
-    group_name: string | null;
-    candidates: GroupMatchCandidate[];
-}
-
-export interface GroupMatchPreview {
-    run_id: string;
-    hemis_total_students: number;
-    hemis_groups: number;
-    local_groups: number;
-    auto_count: number;
-    review_count: number;
-    unmatched_count: number;
-    already_count: number;
-    students_without_group: number;
-    proposals: GroupMatchProposal[];
-}
-
-export interface GroupMatchApplyResult {
-    linked: number;
-    skipped: number;
-    conflicts: string[];
-}
-
 export interface StudentSyncPreview {
     hemis_total: number;
     create_count: number;
     update_count: number;
+    /** Guruhi bizning bazamizda yo'q — import qilinmaydi, faqat sanaladi. */
     no_group_count: number;
     missing_locally: number;
     linked_groups: number;
@@ -94,14 +60,12 @@ export interface StudentSyncResult {
 /**
  * Qaysi toifalar import qilinsin.
  *
- * Toifalar kesishadi: guruhsiz talaba ayni paytda yangi yoki yangilanadigan
- * ham bo'ladi. `include_no_group: false` ularni ikkala ro'yxatdan ham
- * chiqaradi — aks holda belgi hech narsani o'zgartirmagan bo'lardi.
+ * Guruhi bizda yo'q talabalar bu yerda yo'q: ularni backend har doim chetlab
+ * o'tadi va `create_count`/`update_count` ga ham qo'shmaydi.
  */
 export interface StudentSyncSelection {
     include_create: boolean;
     include_update: boolean;
-    include_no_group: boolean;
 }
 
 export const hemisService = {
@@ -133,14 +97,6 @@ export const hemisService = {
         return response.data;
     },
 
-    previewGroupMatch: async () => {
-        // To'liq o'tish ~1 daqiqa: standart 10 soniyalik timeout yetmaydi.
-        const response = await api.post<GroupMatchPreview>('/hemis/groups/match/preview', undefined, {
-            timeout: 300_000,
-        });
-        return response.data;
-    },
-
     previewStudents: async () => {
         const response = await api.post<StudentSyncPreview>('/hemis/students/preview', undefined, {
             timeout: 300_000,
@@ -157,15 +113,6 @@ export const hemisService = {
         const response = await api.post<StudentSyncResult>('/hemis/students/apply', data, {
             timeout: 600_000,
         });
-        return response.data;
-    },
-
-    applyGroupMatch: async (data: {
-        run_id: string;
-        apply_auto: boolean;
-        decisions: { hemis_group_id: number; group_id: number | null }[];
-    }) => {
-        const response = await api.post<GroupMatchApplyResult>('/hemis/groups/match/apply', data);
         return response.data;
     },
 };

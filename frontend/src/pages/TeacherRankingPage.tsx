@@ -63,9 +63,10 @@ const TeacherRankTable = ({ items }: { items: TeacherRankItem[] }) => {
                 <TableRow>
                     <TableHead className="w-16 text-center">O'rin</TableHead>
                     <TableHead>O'qituvchi</TableHead>
-                    <TableHead>Kafedra</TableHead>
-                    <TableHead>Fakultet</TableHead>
-                    <TableHead className="text-right">Talabalar</TableHead>
+                    <TableHead className="hidden md:table-cell">Kafedra</TableHead>
+                    <TableHead className="hidden lg:table-cell">Fakultet</TableHead>
+                    {/* Talabalar soni telefonda o'qituvchi nomi ostida ko'rinadi */}
+                    <TableHead className="hidden text-right sm:table-cell">Talabalar</TableHead>
                     <TableHead className="text-right">O'rtacha baho</TableHead>
                 </TableRow>
             </TableHeader>
@@ -77,9 +78,9 @@ const TeacherRankTable = ({ items }: { items: TeacherRankItem[] }) => {
                             <div className="font-medium capitalize">{item.full_name}</div>
                             <div className="text-xs text-muted-foreground">{item.student_count} talaba</div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.kafedra_name ?? '—'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.faculty_name ?? '—'}</TableCell>
-                        <TableCell className="text-right text-sm">{item.student_count}</TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{item.kafedra_name ?? '—'}</TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{item.faculty_name ?? '—'}</TableCell>
+                        <TableCell className="hidden text-right text-sm sm:table-cell">{item.student_count}</TableCell>
                         <TableCell className="text-right text-sm font-medium tabular-nums">{item.avg_grade.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}
@@ -97,8 +98,8 @@ const FacultyRankTable = ({ items }: { items: FacultyRankItem[] }) => {
                 <TableRow>
                     <TableHead className="w-16 text-center">O'rin</TableHead>
                     <TableHead>Fakultet</TableHead>
-                    <TableHead className="text-right">Kafedralar</TableHead>
-                    <TableHead className="text-right">Talabalar</TableHead>
+                    <TableHead className="hidden text-right md:table-cell">Kafedralar</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Talabalar</TableHead>
                     <TableHead className="text-right">O'rtacha baho</TableHead>
                 </TableRow>
             </TableHeader>
@@ -107,8 +108,8 @@ const FacultyRankTable = ({ items }: { items: FacultyRankItem[] }) => {
                     <TableRow key={item.faculty_id} className={item.rank <= 3 ? 'bg-primary/5' : ''}>
                         <TableCell className="text-center"><RankBadge rank={item.rank} /></TableCell>
                         <TableCell className="font-medium">{item.faculty_name}</TableCell>
-                        <TableCell className="text-right text-sm">{item.kafedra_count}</TableCell>
-                        <TableCell className="text-right text-sm">{item.student_count}</TableCell>
+                        <TableCell className="hidden text-right text-sm md:table-cell">{item.kafedra_count}</TableCell>
+                        <TableCell className="hidden text-right text-sm sm:table-cell">{item.student_count}</TableCell>
                         <TableCell className="text-right text-sm font-medium tabular-nums">{item.avg_grade.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}
@@ -126,9 +127,9 @@ const KafedraRankTable = ({ items }: { items: KafedraRankItem[] }) => {
                 <TableRow>
                     <TableHead className="w-16 text-center">O'rin</TableHead>
                     <TableHead>Kafedra</TableHead>
-                    <TableHead>Fakultet</TableHead>
-                    <TableHead className="text-right">O'qituvchilar</TableHead>
-                    <TableHead className="text-right">Talabalar</TableHead>
+                    <TableHead className="hidden lg:table-cell">Fakultet</TableHead>
+                    <TableHead className="hidden text-right md:table-cell">O'qituvchilar</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Talabalar</TableHead>
                     <TableHead className="text-right">O'rtacha baho</TableHead>
                 </TableRow>
             </TableHeader>
@@ -137,9 +138,9 @@ const KafedraRankTable = ({ items }: { items: KafedraRankItem[] }) => {
                     <TableRow key={item.kafedra_id} className={item.rank <= 3 ? 'bg-primary/5' : ''}>
                         <TableCell className="text-center"><RankBadge rank={item.rank} /></TableCell>
                         <TableCell className="font-medium">{item.kafedra_name}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.faculty_name}</TableCell>
-                        <TableCell className="text-right text-sm">{item.teacher_count}</TableCell>
-                        <TableCell className="text-right text-sm">{item.student_count}</TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{item.faculty_name}</TableCell>
+                        <TableCell className="hidden text-right text-sm md:table-cell">{item.teacher_count}</TableCell>
+                        <TableCell className="hidden text-right text-sm sm:table-cell">{item.student_count}</TableCell>
                         <TableCell className="text-right text-sm font-medium tabular-nums">{item.avg_grade.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}

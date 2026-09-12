@@ -2,6 +2,7 @@ import logging
 
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
+from core.utils.sorting import order_by_clause
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Float, asc, case, cast, desc, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -48,7 +49,9 @@ class TeacherRepository:
         # SQLAlchemy to configure all mappers before every model module has
         # been imported by the app.
         return (
-            selectinload(Teacher.kafedra),
+            # Fakultet — kafedra orqali: kartochkada uning nomi ko'rsatiladi,
+            # `selectinload`siz esa async sessiyada MissingGreenlet bo'lardi.
+            selectinload(Teacher.kafedra).selectinload(Kafedra.faculty),
             selectinload(Teacher.user).selectinload(User.roles),
             selectinload(Teacher.teacher_groups).selectinload(TeacherGroup.group),
             selectinload(Teacher.teacher_subjects).selectinload(TeacherSubject.subject),
@@ -257,7 +260,18 @@ class TeacherRepository:
             stmt = stmt.where(condition)
             count_stmt = count_stmt.where(condition)
 
-        stmt = stmt.order_by(desc(Teacher.created_at))
+        sortable = {
+            "name": Teacher.full_name,
+            # Kafedra nomi bog'liq jadvalda: skalyar ichki so'rov JOIN'siz
+            # ishlaydi va `count` so'roviga tegmaydi.
+            "kafedra": select(Kafedra.name).where(Kafedra.id == Teacher.kafedra_id).scalar_subquery(),
+            "created_at": Teacher.created_at,
+        }
+        stmt = stmt.order_by(
+            *order_by_clause(
+                sortable, request.sort_by, request.order, desc(Teacher.created_at), Teacher.id
+            )
+        )
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)

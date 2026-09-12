@@ -38,13 +38,13 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
 );
 
 export const CardContent: React.FC<CardProps> = ({ className, children, ...props }) => (
-    <div className={cn('p-6', className)} {...props}>
+    <div className={cn('p-4 sm:p-6', className)} {...props}>
         {children}
     </div>
 );
 
 export const CardFooter: React.FC<CardProps> = ({ className, children, ...props }) => (
-    <div className={cn('flex items-center p-6 pt-0', className)} {...props}>
+    <div className={cn('flex items-center p-4 pt-0 sm:p-6 sm:pt-0', className)} {...props}>
         {children}
     </div>
 );

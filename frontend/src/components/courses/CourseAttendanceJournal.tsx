@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Download, Users } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { CardAction } from '@/components/ui/CardAction';
 import { Combobox } from '@/components/ui/Combobox';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -135,10 +135,13 @@ export const CourseAttendanceJournal = ({ courseId }: { courseId: number }) => {
                     sababli
                 </div>
                 {(data?.students.length ?? 0) > 0 && (
-                    <Button variant="outline" size="sm" className="ml-auto" onClick={exportExcel}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Excel
-                    </Button>
+                    <CardAction
+                        variant="outline"
+                        className="ml-auto"
+                        onClick={exportExcel}
+                        icon={<Download className="h-4 w-4" />}
+                        label="Excel"
+                    />
                 )}
             </div>
 

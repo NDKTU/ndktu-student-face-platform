@@ -113,6 +113,16 @@ class CourseListRequest(BaseModel):
     faculty_id: Optional[int] = None
     kafedra_id: Optional[int] = None
     speciality_id: Optional[int] = None
+    #: Fan, o'qituvchi, guruh yoki kurs nomi bo'yicha qidiruv. Serverda:
+    #: ilgari front faqat ochilgan sahifani qidirar, ikkinchi sahifadagi kurs
+    #: esa «topilmadi» bo'lib qolardi.
+    search: Optional[str] = None
+
+    #: subject | teacher | semester | type. Saralash ham serverda — aks holda
+    #: tartib faqat sahifa ichida ishlardi.
+    sort_by: Optional[str] = None
+    order: str = "asc"
+
     page: int = 1
     limit: int = 20
 

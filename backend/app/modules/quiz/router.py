@@ -8,8 +8,9 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.schemas import VisibilityRequest
-from app.core.utils.visibility import set_hidden
+# Yashirish funksiyasi kommentga olindi (2026-09-11) — quyidagi importlar endi kerak emas.
+# from app.core.schemas import VisibilityRequest
+# from app.core.utils.visibility import set_hidden
 from app.modules.auth.model import User
 
 from .model import Result
@@ -53,7 +54,7 @@ from .result.schemas import (
 )
 from .subject.repository import get_subject_repository
 from .subject.schemas import (
-    SubjectCreateRequest,
+#    SubjectCreateRequest,
     SubjectCreateResponse,
     SubjectListRequest,
     SubjectListResponse,
@@ -73,19 +74,22 @@ subject_router = APIRouter(
 )
 
 
-@subject_router.post(
-    "/",
-    response_model=SubjectCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def create_subject(
-    data: SubjectCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:subject")),
-):
-    result = await get_subject_repository.create_subject(session=session, data=data)
-    return result
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @subject_router.post(
+#     "/",
+#     response_model=SubjectCreateResponse,
+#     status_code=status.HTTP_201_CREATED,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def create_subject(
+#     data: SubjectCreateRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("create:subject")),
+# ):
+#     result = await get_subject_repository.create_subject(session=session, data=data)
+#     return result
 
 
 @subject_router.get("/{subject_id}", response_model=SubjectCreateResponse)
@@ -106,33 +110,39 @@ async def list_subjects(
     return await get_subject_repository.list_subjects(session=session, request=data, current_user=current_user)
 
 
-@subject_router.put(
-    "/{subject_id}",
-    response_model=SubjectCreateResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def update_subject(
-    subject_id: int,
-    data: SubjectCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:subject")),
-):
-    result = await get_subject_repository.update_subject(session=session, subject_id=subject_id, data=data)
-    return result
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @subject_router.put(
+#     "/{subject_id}",
+#     response_model=SubjectCreateResponse,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def update_subject(
+#     subject_id: int,
+#     data: SubjectCreateRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("update:subject")),
+# ):
+#     result = await get_subject_repository.update_subject(session=session, subject_id=subject_id, data=data)
+#     return result
 
 
-@subject_router.delete(
-    "/{subject_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def delete_subject(
-    subject_id: int,
-    force: bool = False,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:subject")),
-):
-    await get_subject_repository.delete_subject(session=session, subject_id=subject_id, force=force)
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @subject_router.delete(
+#     "/{subject_id}",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def delete_subject(
+#     subject_id: int,
+#     force: bool = False,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("delete:subject")),
+# ):
+#     await get_subject_repository.delete_subject(session=session, subject_id=subject_id, force=force)
 
 
 # ============================================================================
@@ -597,22 +607,25 @@ async def get_user_answers(
 #  AGGREGATE ROUTER
 # ============================================================================
 router = APIRouter()
-@subject_router.patch("/{subject_id}/visibility", status_code=status.HTTP_200_OK)
-async def set_subject_visibility(
-    subject_id: int,
-    data: VisibilityRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("update:subject")),
-):
-    """Fanni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
-
-    Yashirilgan fan yangi test yoki kurs yaratishda taklif qilinmaydi, lekin
-    undagi savollar va eski natijalar joyida qoladi.
-    """
-    from app.modules.quiz.model import Subject
-
-    row = await set_hidden(session, Subject, subject_id, data.is_hidden, current_user, "Fan")
-    return {"id": row.id, "is_hidden": row.is_hidden}
+# Yashirish (visibility) funksiyasi 2026-09-11 da kommentga olindi:
+# spravochniklar EPOS/HEMIS maʼlumoti, ularni yashirish ham qoldirilmadi.
+# Batafsil: `app/core/utils/visibility.py`.
+# @subject_router.patch("/{subject_id}/visibility", status_code=status.HTTP_200_OK)
+# async def set_subject_visibility(
+#     subject_id: int,
+#     data: VisibilityRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     current_user: User = Depends(PermissionRequired("update:subject")),
+# ):
+#     """Fanni boshqa rollardan yashiradi yoki qaytaradi. Faqat admin.
+#
+#     Yashirilgan fan yangi test yoki kurs yaratishda taklif qilinmaydi, lekin
+#     undagi savollar va eski natijalar joyida qoladi.
+#     """
+#     from app.modules.quiz.model import Subject
+#
+#     row = await set_hidden(session, Subject, subject_id, data.is_hidden, current_user, "Fan")
+#     return {"id": row.id, "is_hidden": row.is_hidden}
 
 
 router.include_router(subject_router)

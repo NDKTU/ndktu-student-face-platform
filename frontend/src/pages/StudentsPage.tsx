@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+// import { /* toast */ } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
@@ -6,10 +6,9 @@ import { type Student } from '@/services/studentService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import {
-    Pencil,
-    Trash2,
-    Download,
-    FolderEdit,
+    // Pencil,
+    // Trash2,
+    // FolderEdit,
     ArrowLeft,
     CheckCircle2,
     XCircle,
@@ -21,13 +20,13 @@ import {
     Award,
 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
-import { useStudents, useDeleteStudent } from '@/hooks/useStudents';
+import { useStudents, /* useDeleteStudent */ } from '@/hooks/useStudents';
 import { useUserResults } from '@/hooks/useResults';
 import { useGroups } from '@/hooks/useGroups';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import { useAuth } from '@/context/AuthContext';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { HemisImportModal } from '@/components/HemisImportModal';
-import { ChangeGroupModal } from '@/components/ChangeGroupModal';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
+// import { /* ChangeGroupModal */ } from '@/components/ChangeGroupModal';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
@@ -43,13 +42,15 @@ type SortField = 'name' | 'user_id' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const StudentsPage = () => {
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-    const [studentToChangeGroup, setStudentToChangeGroup] = useState<Student | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [studentToChangeGroup, setStudentToChangeGroup] = useState<Student | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [displayMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const displayMode = useCatalogView();
 
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
@@ -61,13 +62,34 @@ export const StudentsPage = () => {
     const [selectedGroup, setSelectedGroup] = useState<string>(
         () => searchParams.get('group_id') || 'all',
     );
-    const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
     const pageSize = 15;
-    const deleteMutation = useDeleteStudent();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteMutation = useDeleteStudent();
+
+    const activeFilterCount = (selectedGroup !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
+
+    const handleClearFilters = () => {
+        setSelectedGroup('all');
+        setSearchTerm('');
+        setCurrentPage(1);
+        // `group_id` URL'da ham qoladi — tozalanmasa, sahifa yangilanganda
+        // filtr qaytib kelardi.
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('group_id');
+                return next;
+            },
+            { replace: true },
+        );
+    };
 
     const parsedGroup = selectedGroup !== 'all' && selectedGroup ? parseInt(selectedGroup, 10) : undefined;
 
@@ -95,16 +117,21 @@ export const StudentsPage = () => {
         isLoading: isStudentsLoading,
         isError: isStudentsError,
         refetch,
-    } = useStudents(currentPage, pageSize, debouncedSearch, undefined, parsedGroup);
+    } = useStudents(currentPage, pageSize, debouncedSearch, undefined, parsedGroup, true, {
+        // Saralash serverda: sahifaning 15 qatorini tartiblash butun
+        // ro'yxatni tartibsiz qoldirardi.
+        sort_by: sortField,
+        order: sortOrder,
+    });
 
     // Universitetda 850 dan ortiq guruh bor: 200 talik ro'yxatda ko'pchiligi
     // yo'q edi, va `?group_id=N` bilan kelgan guruhning nomi tanlagichda
     // ko'rinmasdi — filtr ishlar, lekin admin qaysi guruh ekanini bilmasdi.
     const { data: groupsData } = useGroups(1, 1000, '', undefined, undefined, canReadGroup);
 
-    const rawStudents = studentsData?.students || [];
+    const students = studentsData?.students || [];
     const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
-    const totalCount = studentsData?.total ?? rawStudents.length;
+    const totalCount = studentsData?.total ?? students.length;
 
     const groupOptions = useMemo(() => {
         const list = (groupsData?.groups || []).map((g) => ({ value: String(g.id), label: g.name }));
@@ -112,6 +139,9 @@ export const StudentsPage = () => {
     }, [groupsData]);
 
     const handleSort = (field: SortField) => {
+        // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda
+        // yangi tartibning o'rtasidan boshlab ko'rinardi.
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -119,28 +149,6 @@ export const StudentsPage = () => {
             setSortOrder('asc');
         }
     };
-
-    const sortedStudents = useMemo(() => {
-        return [...rawStudents].sort((a, b) => {
-            let valA: string | number = '';
-            let valB: string | number = '';
-
-            if (sortField === 'name') {
-                valA = (a.full_name || '').toLowerCase();
-                valB = (b.full_name || '').toLowerCase();
-            } else if (sortField === 'user_id') {
-                valA = a.user_id;
-                valB = b.user_id;
-            } else if (sortField === 'created_at') {
-                valA = new Date(a.created_at).getTime();
-                valB = new Date(b.created_at).getTime();
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [rawStudents, sortField, sortOrder]);
 
     const handleViewStudent = (student: Student) => {
         setSelectedStudent(student);
@@ -152,29 +160,30 @@ export const StudentsPage = () => {
         setViewMode('list');
     };
 
-    const handleDelete = () => {
-        if (!studentToDelete) return;
-        deleteMutation.mutate(
-            { id: studentToDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Talaba o'chirildi");
-                    setStudentToDelete(null);
-                    setCascadeWarnings([]);
-                    refetch();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        toast.error("Talabani o'chirishda xatolik yuz berdi");
-                        setStudentToDelete(null);
-                        setCascadeWarnings([]);
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleDelete = () => {
+//         if (!studentToDelete) return;
+//         deleteMutation.mutate(
+//             { id: studentToDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Talaba o'chirildi");
+//                     setStudentToDelete(null);
+//                     setCascadeWarnings([]);
+//                     refetch();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         toast.error("Talabani o'chirishda xatolik yuz berdi");
+//                         setStudentToDelete(null);
+//                         setCascadeWarnings([]);
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -189,6 +198,7 @@ export const StudentsPage = () => {
 
     const renderActions = (student: Student) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <Button
                 variant="ghost"
                 size="sm"
@@ -230,6 +240,7 @@ export const StudentsPage = () => {
                     <Trash2 className="h-4 w-4" />
                 </Button>
             </PermissionGate>
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -264,9 +275,11 @@ export const StudentsPage = () => {
                 searchPlaceholder="Talaba F.I.SH yoki ID bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Talabalar"
+                activeFilterCount={activeFilterCount}
+                onClearFilters={handleClearFilters}
                 extraFilters={
                     <PermissionGate permission="read:group">
-                        <div className="w-[200px] sm:w-[260px]">
+                        <div className="w-full sm:w-[260px]">
                             <Combobox
                                 options={groupOptions}
                                 value={selectedGroup}
@@ -291,17 +304,6 @@ export const StudentsPage = () => {
                         </div>
                     </PermissionGate>
                 }
-                actions={
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="h-9 gap-1.5 font-semibold"
-                    >
-                        <Download className="h-4 w-4" />
-                        <span>Hemisdan Import</span>
-                    </Button>
-                }
             />
 
             {/* Content */}
@@ -321,7 +323,7 @@ export const StudentsPage = () => {
                         ))}
                     </CatalogGrid>
                 )
-            ) : sortedStudents.length === 0 ? (
+            ) : students.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
@@ -348,6 +350,7 @@ export const StudentsPage = () => {
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
+                            {/* «User ID» va «Telefon» ustunlari 2026-09-11 da yashirildi (faqat frontend; maʼlumot javobda joyida qoladi).
                             <TableHead
                                 onClick={() => handleSort('user_id')}
                                 className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
@@ -358,6 +361,7 @@ export const StudentsPage = () => {
                                 </div>
                             </TableHead>
                             <TableHead className="font-bold text-xs hidden md:table-cell">Telefon</TableHead>
+                            */}
                             <TableHead className="font-bold text-xs hidden lg:table-cell max-w-[200px]">Manzil</TableHead>
                             <TableHead
                                 onClick={() => handleSort('created_at')}
@@ -372,7 +376,7 @@ export const StudentsPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedStudents.map((student, index) => {
+                        {students.map((student, index) => {
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const displayName = student.full_name || `Talaba #${student.id}`;
 
@@ -418,19 +422,21 @@ export const StudentsPage = () => {
                                         </div>
                                     </TableCell>
 
-                                    {/* User ID */}
+                                    {/* User ID va Telefon — ustunlar 2026-09-11 da yashirildi
+                                        (faqat frontend; maʼlumot javobda joyida qoladi).
                                     <TableCell className="text-center">
                                         <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground border border-border/80">
                                             #{student.user_id}
                                         </span>
                                     </TableCell>
 
-                                    {/* Telefon */}
+                                    Telefon:
                                     <TableCell className="hidden md:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
                                             {student.phone || '—'}
                                         </span>
                                     </TableCell>
+                                    */}
 
                                     {/* Manzil */}
                                     <TableCell className="hidden lg:table-cell max-w-[200px] truncate">
@@ -458,7 +464,7 @@ export const StudentsPage = () => {
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedStudents.map((student) => {
+                    {students.map((student) => {
                         const displayName = student.full_name || `Talaba #${student.id}`;
                         return (
                             <CatalogCard
@@ -467,8 +473,10 @@ export const StudentsPage = () => {
                                 title={displayName}
                                 subtitle={
                                     <span className="flex flex-wrap items-center gap-1.5">
+                                        {/* User ID va telefon yashirilgan (2026-09-11) — jadvalda ham shunday.
                                         <span>User ID: #{student.user_id}</span>
                                         {student.phone && <span>· {student.phone}</span>}
+                                        */}
                                         {student.student_status && (
                                             <span className="badge badge-primary text-[10px]">{student.student_status}</span>
                                         )}
@@ -497,6 +505,7 @@ export const StudentsPage = () => {
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={!!studentToDelete}
                 onClose={() => {
@@ -528,15 +537,9 @@ export const StudentsPage = () => {
                 cancelText="Bekor qilish"
                 variant="danger"
             />
+            */}
 
-            <HemisImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => {
-                    setIsImportModalOpen(false);
-                    refetch();
-                }}
-            />
-
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ChangeGroupModal
                 isOpen={!!studentToChangeGroup}
                 onClose={() => {
@@ -545,6 +548,7 @@ export const StudentsPage = () => {
                 }}
                 student={studentToChangeGroup}
             />
+            */}
         </div>
     );
 };

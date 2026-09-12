@@ -1,29 +1,30 @@
-import { toast } from 'sonner';
+// import { /* toast */ } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import {
-    Plus,
-    Pencil,
-    Trash2,
-    BookOpen,
-    UsersRound,
+    // Plus,
+    // Pencil,
+    // Trash2,
+    // BookOpen,
+    // UsersRound,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
     CheckCircle2,
     ArrowRight,
-    GraduationCap,
+    // GraduationCap, — «Kurslar» ustuni bilan birga yashirildi (2026-09-11)
 } from 'lucide-react';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useTeachers, useDeleteTeacher } from '@/hooks/useTeachers';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
+import { useTeachers, /* useDeleteTeacher */ } from '@/hooks/useTeachers';
 import { useKafedras } from '@/hooks/useReferenceData';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import type { Teacher } from '@/services/teacherService';
 import { TeacherDetail } from '@/components/teachers/TeacherDetail';
-import { TeacherModal } from '@/components/teachers/TeacherModal';
-import { TeacherGroupModal } from '@/components/teachers/TeacherGroupModal';
-import { TeacherSubjectModal } from '@/components/teachers/TeacherSubjectModal';
-import { PermissionGate } from '@/components/auth/PermissionGate';
+// import { /* TeacherModal */ } from '@/components/teachers/TeacherModal';
+// import { /* TeacherGroupModal */ } from '@/components/teachers/TeacherGroupModal';
+// import { /* TeacherSubjectModal */ } from '@/components/teachers/TeacherSubjectModal';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
@@ -49,7 +50,9 @@ export const TeachersPage = () => {
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [displayMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const displayMode = useCatalogView();
 
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedKafedraFilter, setSelectedKafedraFilter] = useState<string>('all');
@@ -59,14 +62,21 @@ export const TeachersPage = () => {
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
-    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-    const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
-    const [teacherToAssign, setTeacherToAssign] = useState<Teacher | null>(null);
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
+//     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
+//     const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
+//     const [teacherToAssign, setTeacherToAssign] = useState<Teacher | null>(null);
 
     const pageSize = 15;
 
@@ -88,14 +98,18 @@ export const TeachersPage = () => {
         isLoading: isTeachersLoading,
         isError: isTeachersError,
         refetch,
-    } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedraIdNum, hasCourses);
+    } = useTeachers(currentPage, pageSize, debouncedSearch, true, kafedraIdNum, hasCourses, {
+        sort_by: sortField,
+        order: sortOrder,
+    });
 
     const { data: kafedrasData } = useKafedras(1, 200);
-    const deleteTeacherMutation = useDeleteTeacher();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteTeacherMutation = useDeleteTeacher();
 
-    const rawTeachers = teachersData?.teachers || [];
+    const teachers = teachersData?.teachers || [];
     const totalPages = teachersData ? Math.ceil(teachersData.total / pageSize) : 1;
-    const totalCount = teachersData?.total ?? rawTeachers.length;
+    const totalCount = teachersData?.total ?? teachers.length;
     const kafedras = kafedrasData?.kafedras || [];
 
     const kafedraOptions = useMemo(() => {
@@ -104,6 +118,9 @@ export const TeachersPage = () => {
     }, [kafedras]);
 
     const handleSort = (field: SortField) => {
+        // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda
+        // yangi tartibning o'rtasidan boshlab ko'rinardi.
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -111,28 +128,6 @@ export const TeachersPage = () => {
             setSortOrder('asc');
         }
     };
-
-    const sortedTeachers = useMemo(() => {
-        return [...rawTeachers].sort((a, b) => {
-            let valA: string | number = '';
-            let valB: string | number = '';
-
-            if (sortField === 'name') {
-                valA = (a.full_name || a.user?.username || '').toLowerCase();
-                valB = (b.full_name || b.user?.username || '').toLowerCase();
-            } else if (sortField === 'kafedra') {
-                valA = (a.kafedra?.name || '').toLowerCase();
-                valB = (b.kafedra?.name || '').toLowerCase();
-            } else if (sortField === 'created_at') {
-                valA = new Date(a.created_at).getTime();
-                valB = new Date(b.created_at).getTime();
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [rawTeachers, sortField, sortOrder]);
 
     const handleViewTeacher = (teacher: Teacher) => {
         setSelectedTeacher(teacher);
@@ -144,63 +139,69 @@ export const TeachersPage = () => {
         setViewMode('list');
     };
 
-    const handleEditClick = (teacher: Teacher, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedTeacher(teacher);
-        setIsModalOpen(true);
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleEditClick = (teacher: Teacher, e: React.MouseEvent) => {
+//         e.stopPropagation();
+//         setSelectedTeacher(teacher);
+//         setIsModalOpen(true);
+//     };
 
-    const handleDeleteClick = (teacher: Teacher, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setTeacherToDelete(teacher);
-        setCascadeWarnings([]);
-        setIsDeleteModalOpen(true);
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleDeleteClick = (teacher: Teacher, e: React.MouseEvent) => {
+//         e.stopPropagation();
+//         setTeacherToDelete(teacher);
+//         setCascadeWarnings([]);
+//         setIsDeleteModalOpen(true);
+//     };
 
-    const handleAssignGroupsClick = (teacher: Teacher, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setTeacherToAssign(teacher);
-        setIsGroupModalOpen(true);
-    };
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
+//     const handleAssignGroupsClick = (teacher: Teacher, e: React.MouseEvent) => {
+//         e.stopPropagation();
+//         setTeacherToAssign(teacher);
+//         setIsGroupModalOpen(true);
+//     };
 
-    const handleAssignSubjectsClick = (teacher: Teacher, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setTeacherToAssign(teacher);
-        setIsSubjectModalOpen(true);
-    };
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
+//     const handleAssignSubjectsClick = (teacher: Teacher, e: React.MouseEvent) => {
+//         e.stopPropagation();
+//         setTeacherToAssign(teacher);
+//         setIsSubjectModalOpen(true);
+//     };
 
-    const handleConfirmDelete = async () => {
-        if (!teacherToDelete) return;
-        deleteTeacherMutation.mutate(
-            { id: teacherToDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("O'qituvchi o'chirildi");
-                    setIsDeleteModalOpen(false);
-                    setTeacherToDelete(null);
-                    setCascadeWarnings([]);
-                    refetch();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        toast.error("O'chirishda xatolik yuz berdi");
-                        setIsDeleteModalOpen(false);
-                        setTeacherToDelete(null);
-                        setCascadeWarnings([]);
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = async () => {
+//         if (!teacherToDelete) return;
+//         deleteTeacherMutation.mutate(
+//             { id: teacherToDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("O'qituvchi o'chirildi");
+//                     setIsDeleteModalOpen(false);
+//                     setTeacherToDelete(null);
+//                     setCascadeWarnings([]);
+//                     refetch();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         setIsDeleteModalOpen(false);
+//                         setTeacherToDelete(null);
+//                         setCascadeWarnings([]);
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
-    const handleSuccess = () => {
-        toast.success("O'qituvchi saqlandi");
-        setIsModalOpen(false);
-        setSelectedTeacher(null);
-        refetch();
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleSuccess = () => {
+//         toast.success("O'qituvchi saqlandi");
+//         setIsModalOpen(false);
+//         setSelectedTeacher(null);
+//         refetch();
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -215,6 +216,7 @@ export const TeachersPage = () => {
 
     const renderActions = (teacher: Teacher) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
             <Button
                 variant="outline"
                 size="sm"
@@ -235,6 +237,8 @@ export const TeachersPage = () => {
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Fanlar</span>
             </Button>
+            */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <PermissionGate permission="update:teacher">
                 <Button
                     variant="ghost"
@@ -257,6 +261,7 @@ export const TeachersPage = () => {
                     <Trash2 className="h-4 w-4" />
                 </Button>
             </PermissionGate>
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -291,9 +296,20 @@ export const TeachersPage = () => {
                 searchPlaceholder="O'qituvchi F.I.SH bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="O'qituvchilar"
+                activeFilterCount={
+                    (selectedKafedraFilter !== 'all' ? 1 : 0) +
+                    (coursesFilter !== 'all' ? 1 : 0) +
+                    (searchTerm ? 1 : 0)
+                }
+                onClearFilters={() => {
+                    setSelectedKafedraFilter('all');
+                    setCoursesFilter('all');
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                }}
                 extraFilters={
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-[200px] sm:w-[260px]">
+                        <div className="w-full sm:w-[260px]">
                             <Combobox
                                 options={kafedraOptions}
                                 value={selectedKafedraFilter}
@@ -304,7 +320,7 @@ export const TeachersPage = () => {
                                 placeholder="Kafedra bo'yicha saralash"
                             />
                         </div>
-                        <div className="w-[180px] sm:w-[210px]">
+                        <div className="w-full sm:w-[210px]">
                             <Combobox
                                 options={COURSE_FILTER_OPTIONS}
                                 value={coursesFilter}
@@ -317,6 +333,7 @@ export const TeachersPage = () => {
                         </div>
                     </div>
                 }
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:teacher">
                         <Button
@@ -332,6 +349,7 @@ export const TeachersPage = () => {
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -351,10 +369,10 @@ export const TeachersPage = () => {
                         ))}
                     </CatalogGrid>
                 )
-            ) : sortedTeachers.length === 0 ? (
+            ) : teachers.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={7}
+                        colSpan={6}
                         title="O'qituvchilar topilmadi"
                         description={
                             searchTerm || selectedKafedraFilter !== 'all' || coursesFilter !== 'all'
@@ -387,7 +405,9 @@ export const TeachersPage = () => {
                                     {renderSortIcon('kafedra')}
                                 </div>
                             </TableHead>
+                            {/* «Kurslar» ustuni 2026-09-11 da yashirildi (faqat frontend; maʼlumot javobda joyida qoladi).
                             <TableHead className="font-bold text-xs">Kurslar</TableHead>
+                            */}
                             <TableHead className="font-bold text-xs hidden md:table-cell">Foydalanuvchi</TableHead>
                             <TableHead
                                 onClick={() => handleSort('created_at')}
@@ -403,7 +423,7 @@ export const TeachersPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedTeachers.map((teacher, index) => {
+                        {teachers.map((teacher, index) => {
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const displayName = teacher.full_name || teacher.user?.username || "Noma'lum";
 
@@ -452,7 +472,8 @@ export const TeachersPage = () => {
                                         )}
                                     </TableCell>
 
-                                    {/* Kurslar */}
+                                    {/* Kurslar — ustun 2026-09-11 da yashirildi
+                                        (faqat frontend; maʼlumot javobda joyida qoladi).
                                     <TableCell>
                                         {teacher.course_count ? (
                                             <div className="flex items-center gap-2">
@@ -471,6 +492,7 @@ export const TeachersPage = () => {
                                             <span className="text-xs text-muted-foreground italic">Kurs yo'q</span>
                                         )}
                                     </TableCell>
+                                    */}
 
                                     {/* Foydalanuvchi */}
                                     <TableCell className="hidden md:table-cell">
@@ -506,7 +528,7 @@ export const TeachersPage = () => {
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedTeachers.map((teacher) => {
+                    {teachers.map((teacher) => {
                         const displayName = teacher.full_name || teacher.user?.username || "Noma'lum";
                         return (
                             <CatalogCard
@@ -547,13 +569,16 @@ export const TeachersPage = () => {
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <TeacherModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 teacher={selectedTeacher}
                 onSuccess={handleSuccess}
             />
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={isDeleteModalOpen}
                 onClose={() => {
@@ -585,18 +610,23 @@ export const TeachersPage = () => {
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
 
+            {/* Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
             <TeacherGroupModal
                 isOpen={isGroupModalOpen}
                 onClose={() => setIsGroupModalOpen(false)}
                 teacher={teacherToAssign}
             />
+            */}
 
+            {/* Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
             <TeacherSubjectModal
                 isOpen={isSubjectModalOpen}
                 onClose={() => setIsSubjectModalOpen(false)}
                 teacher={teacherToAssign}
             />
+            */}
         </div>
     );
 };

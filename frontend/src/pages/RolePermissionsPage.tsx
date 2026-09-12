@@ -324,7 +324,9 @@ const RolePermissionsPage = () => {
             )}
 
             {hasChanges && !isAdminRole && (
-                <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3 md:left-14">
+                <div // `md:left-14` (3.5rem) sidebar kengligiga (--sidebar-width, 17.1875rem) mos emas edi —
+                    // panel desktopda menyu ostiga kirib turardi. `pb-safe` — telefondagi home-indikator uchun.
+                    className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3 pb-safe md:left-[var(--sidebar-width)]">
                     <div className="mx-auto max-w-screen-xl flex items-center justify-end gap-2">
                         <span className="text-sm text-muted-foreground mr-auto">O'zgartirishlar saqlanmagan</span>
                         <Button variant="outline" onClick={handleReset} disabled={assignPermissions.isPending}>

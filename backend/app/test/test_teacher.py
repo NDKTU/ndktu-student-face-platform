@@ -7,76 +7,84 @@ endpoint'i qolmadi. Shu sababli eski `test_employee.py` dagi qamrov
 import pytest
 import pytest_asyncio
 
-
-@pytest.mark.asyncio
-async def test_create_teacher_creates_user_and_profile(auth_client, test_kafedra):
-    payload = {
-        "username": "teacher_one",
-        "password": "password123",
-        "first_name": "Ali",
-        "last_name": "Valiyev",
-        "third_name": "Aliyevich",
-        "kafedra_id": test_kafedra["id"],
-        "roles": [{"name": "Admin"}],
-    }
-    response = await auth_client.post("/teacher/", json=payload)
-    assert response.status_code == 201
-    body = response.json()
-    assert body["full_name"] == "Valiyev Ali Aliyevich"
-    assert body["first_name"] == payload["first_name"]
-    assert body["kafedra_id"] == test_kafedra["id"]
-    assert body["user_id"] is not None
-    assert body["user"]["username"] == payload["username"]
-
-    # Yaratilgan hisob haqiqatan ham ishlashi kerak.
-    login_response = await auth_client.post(
-        "/user/login",
-        json={"username": payload["username"], "password": payload["password"]},
-    )
-    assert login_response.status_code == 200
-    assert "access_token" in login_response.json()
-
-
-@pytest.mark.asyncio
-async def test_create_teacher_duplicate_username(auth_client):
-    payload = {
-        "username": "teacher_dup_user",
-        "password": "password123",
-        "first_name": "Bob",
-        "last_name": "Brown",
-        "third_name": "Lee",
-        "roles": [{"name": "Admin"}],
-    }
-    first = await auth_client.post("/teacher/", json=payload)
-    assert first.status_code == 201
-
-    second_payload = {**payload, "first_name": "Different", "last_name": "Person", "third_name": "Name"}
-    second = await auth_client.post("/teacher/", json=second_payload)
-    assert second.status_code == 400
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_create_teacher_creates_user_and_profile(auth_client, test_kafedra):
+#     payload = {
+#         "username": "teacher_one",
+#         "password": "password123",
+#         "first_name": "Ali",
+#         "last_name": "Valiyev",
+#         "third_name": "Aliyevich",
+#         "kafedra_id": test_kafedra["id"],
+#         "roles": [{"name": "Admin"}],
+#     }
+#     response = await auth_client.post("/teacher/", json=payload)
+#     assert response.status_code == 201
+#     body = response.json()
+#     assert body["full_name"] == "Valiyev Ali Aliyevich"
+#     assert body["first_name"] == payload["first_name"]
+#     assert body["kafedra_id"] == test_kafedra["id"]
+#     assert body["user_id"] is not None
+#     assert body["user"]["username"] == payload["username"]
+#
+#     # Yaratilgan hisob haqiqatan ham ishlashi kerak.
+#     login_response = await auth_client.post(
+#         "/user/login",
+#         json={"username": payload["username"], "password": payload["password"]},
+#     )
+#     assert login_response.status_code == 200
+#     assert "access_token" in login_response.json()
 
 
-@pytest.mark.asyncio
-async def test_create_teacher_duplicate_full_name_is_rejected(auth_client):
-    """Bir xil `full_name` bilan ikkinchi o'qituvchi yaratilmaydi.
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_create_teacher_duplicate_username(auth_client):
+#     payload = {
+#         "username": "teacher_dup_user",
+#         "password": "password123",
+#         "first_name": "Bob",
+#         "last_name": "Brown",
+#         "third_name": "Lee",
+#         "roles": [{"name": "Admin"}],
+#     }
+#     first = await auth_client.post("/teacher/", json=payload)
+#     assert first.status_code == 201
+#
+#     second_payload = {**payload, "first_name": "Different", "last_name": "Person", "third_name": "Name"}
+#     second = await auth_client.post("/teacher/", json=second_payload)
+#     assert second.status_code == 400
 
-    Diqqat: bu tekshiruv `create_user` gacha ishlaydi, ya'ni bu test
-    tranzaksiya chegarasi haqida hech nima isbotlamaydi — u faqat nom
-    bo'yicha rad etishni tekshiradi.
-    """
-    payload = {
-        "username": "teacher_name_a",
-        "password": "password123",
-        "first_name": "Carol",
-        "last_name": "White",
-        "third_name": "Anne",
-        "roles": [{"name": "Admin"}],
-    }
-    first = await auth_client.post("/teacher/", json=payload)
-    assert first.status_code == 201
 
-    second_payload = {**payload, "username": "teacher_name_b"}
-    second = await auth_client.post("/teacher/", json=second_payload)
-    assert second.status_code == 400
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_create_teacher_duplicate_full_name_is_rejected(auth_client):
+#     """Bir xil `full_name` bilan ikkinchi o'qituvchi yaratilmaydi.
+#
+#     Diqqat: bu tekshiruv `create_user` gacha ishlaydi, ya'ni bu test
+#     tranzaksiya chegarasi haqida hech nima isbotlamaydi — u faqat nom
+#     bo'yicha rad etishni tekshiradi.
+#     """
+#     payload = {
+#         "username": "teacher_name_a",
+#         "password": "password123",
+#         "first_name": "Carol",
+#         "last_name": "White",
+#         "third_name": "Anne",
+#         "roles": [{"name": "Admin"}],
+#     }
+#     first = await auth_client.post("/teacher/", json=payload)
+#     assert first.status_code == 201
+#
+#     second_payload = {**payload, "username": "teacher_name_b"}
+#     second = await auth_client.post("/teacher/", json=second_payload)
+#     assert second.status_code == 400
 
 
 @pytest.mark.asyncio
@@ -105,54 +113,63 @@ async def test_list_teachers(auth_client, test_teacher):
     assert empty.json()["total"] == 0
 
 
-@pytest.mark.asyncio
-async def test_update_teacher_changes_names_and_kafedra(auth_client, test_teacher, test_faculty):
-    new_kafedra_response = await auth_client.post(
-        "/kafedra/", json={"name": "Another Kafedra", "faculty_id": test_faculty["id"]}
-    )
-    assert new_kafedra_response.status_code == 201
-    new_kafedra = new_kafedra_response.json()
-
-    payload = {
-        "first_name": "Johnny",
-        "last_name": "Doe",
-        "third_name": "Smith",
-        "kafedra_id": new_kafedra["id"],
-    }
-    response = await auth_client.put(f"/teacher/{test_teacher['id']}", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["kafedra_id"] == new_kafedra["id"]
-    assert data["first_name"] == "Johnny"
-    assert data["full_name"] == "Doe Johnny Smith"
-    # Hisob o'zgarmaydi: `username`/`user_id` o'sha-o'sha.
-    assert data["user_id"] == test_teacher["user_id"]
-
-
-@pytest.mark.asyncio
-async def test_update_teacher_requires_kafedra_id(auth_client, test_teacher):
-    """Regress: `kafedra_id` ixtiyoriy bo'lib qolgan edi, va uni yubormagan
-    `PUT /teacher/{id}` o'qituvchini kafedrasidan jimgina ajratib qo'yardi.
-    Birlashuvdan oldingi shartnomadagidek — majburiy, ya'ni 422."""
-    response = await auth_client.put(
-        f"/teacher/{test_teacher['id']}",
-        json={"first_name": "John", "last_name": "Doe", "third_name": "Smith"},
-    )
-    assert response.status_code == 422
-
-    # Kafedra tegilmagan holicha qoladi.
-    read_back = await auth_client.get(f"/teacher/{test_teacher['id']}")
-    assert read_back.json()["kafedra_id"] == test_teacher["kafedra_id"]
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_update_teacher_changes_names_and_kafedra(auth_client, test_teacher, test_faculty):
+#     new_kafedra_response = await auth_client.post(
+#         "/kafedra/", json={"name": "Another Kafedra", "faculty_id": test_faculty["id"]}
+#     )
+#     assert new_kafedra_response.status_code == 201
+#     new_kafedra = new_kafedra_response.json()
+#
+#     payload = {
+#         "first_name": "Johnny",
+#         "last_name": "Doe",
+#         "third_name": "Smith",
+#         "kafedra_id": new_kafedra["id"],
+#     }
+#     response = await auth_client.put(f"/teacher/{test_teacher['id']}", json=payload)
+#     assert response.status_code == 200
+#     data = response.json()
+#     assert data["kafedra_id"] == new_kafedra["id"]
+#     assert data["first_name"] == "Johnny"
+#     assert data["full_name"] == "Doe Johnny Smith"
+#     # Hisob o'zgarmaydi: `username`/`user_id` o'sha-o'sha.
+#     assert data["user_id"] == test_teacher["user_id"]
 
 
-@pytest.mark.asyncio
-async def test_delete_teacher(auth_client, test_teacher):
-    response = await auth_client.delete(f"/teacher/{test_teacher['id']}")
-    assert response.status_code == 204
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_update_teacher_requires_kafedra_id(auth_client, test_teacher):
+#     """Regress: `kafedra_id` ixtiyoriy bo'lib qolgan edi, va uni yubormagan
+#     `PUT /teacher/{id}` o'qituvchini kafedrasidan jimgina ajratib qo'yardi.
+#     Birlashuvdan oldingi shartnomadagidek — majburiy, ya'ni 422."""
+#     response = await auth_client.put(
+#         f"/teacher/{test_teacher['id']}",
+#         json={"first_name": "John", "last_name": "Doe", "third_name": "Smith"},
+#     )
+#     assert response.status_code == 422
+#
+#     # Kafedra tegilmagan holicha qoladi.
+#     read_back = await auth_client.get(f"/teacher/{test_teacher['id']}")
+#     assert read_back.json()["kafedra_id"] == test_teacher["kafedra_id"]
 
-    # Verify deletion
-    response = await auth_client.get(f"/teacher/{test_teacher['id']}")
-    assert response.status_code == 404
+
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_delete_teacher(auth_client, test_teacher):
+#     response = await auth_client.delete(f"/teacher/{test_teacher['id']}")
+#     assert response.status_code == 204
+#
+#     # Verify deletion
+#     response = await auth_client.get(f"/teacher/{test_teacher['id']}")
+#     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -359,31 +376,34 @@ async def _teacher_with_lesson(auth_client, test_teacher, test_subject, test_gro
     return lesson.json()["id"]
 
 
-@pytest.mark.asyncio
-async def test_delete_teacher_with_lessons_returns_409(
-    auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
-):
-    """O'tkazilgan dars bor o'qituvchi o'chmaydi — 500 emas, tushunarli 409.
-
-    `lessons.teacher_subject_id` ataylab RESTRICT: biriktiruv bilan birga dars
-    tarixi ham jimgina yo'q bo'lib ketmasligi kerak. Ilgari bu FK CASCADE edi
-    va darslar sezdirmay o'chib ketardi.
-    """
-    lesson_id = await _teacher_with_lesson(
-        auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
-    )
-
-    response = await auth_client.delete(f"/teacher/{test_teacher['id']}")
-    assert response.status_code == 409
-    assert "dars" in response.json()["detail"]
-
-    # `force` bu to'siqni ochmaydi: bu tasdiqlanadigan oqibat emas.
-    forced = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
-    assert forced.status_code == 409
-
-    # O'qituvchi ham, dars ham joyida.
-    assert (await auth_client.get(f"/teacher/{test_teacher['id']}")).status_code == 200
-    assert (await auth_client.get(f"/lesson/{lesson_id}")).status_code == 200
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_delete_teacher_with_lessons_returns_409(
+#     auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+# ):
+#     """O'tkazilgan dars bor o'qituvchi o'chmaydi — 500 emas, tushunarli 409.
+#
+#     `lessons.teacher_subject_id` ataylab RESTRICT: biriktiruv bilan birga dars
+#     tarixi ham jimgina yo'q bo'lib ketmasligi kerak. Ilgari bu FK CASCADE edi
+#     va darslar sezdirmay o'chib ketardi.
+#     """
+#     lesson_id = await _teacher_with_lesson(
+#         auth_client, test_teacher, test_subject, test_group, test_faculty, test_kafedra
+#     )
+#
+#     response = await auth_client.delete(f"/teacher/{test_teacher['id']}")
+#     assert response.status_code == 409
+#     assert "dars" in response.json()["detail"]
+#
+#     # `force` bu to'siqni ochmaydi: bu tasdiqlanadigan oqibat emas.
+#     forced = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
+#     assert forced.status_code == 409
+#
+#     # O'qituvchi ham, dars ham joyida.
+#     assert (await auth_client.get(f"/teacher/{test_teacher['id']}")).status_code == 200
+#     assert (await auth_client.get(f"/lesson/{lesson_id}")).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -440,7 +460,9 @@ async def test_assign_subjects_keeps_untouched_rows(
 
 
 @pytest.mark.asyncio
-async def test_assign_groups_keeps_untouched_rows(auth_client, async_db, test_teacher, test_group, test_faculty):
+async def test_assign_groups_keeps_untouched_rows(
+    auth_client, async_db, make_group, test_teacher, test_group, test_faculty
+):
     """Ro'yxatni o'zgartirmay qayta saqlash EduPlan belgilarini yo'qotmaydi.
 
     `teacher_group.id` ga hech qanday FK qaramaydi, lekin jadval
@@ -451,9 +473,8 @@ async def test_assign_groups_keeps_untouched_rows(auth_client, async_db, test_te
 
     from app.modules.organization_structure.model import TeacherGroup
 
-    second_group = await auth_client.post("/group/", json={"name": "SE-2025", "faculty_id": test_faculty["id"]})
-    assert second_group.status_code == 201
-    second_group_id = second_group.json()["id"]
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali yaratiladi.
+    second_group_id = (await make_group("SE-2025", test_faculty["id"]))["id"]
 
     assign = await auth_client.post(
         "/teacher/assign_groups",
@@ -486,15 +507,16 @@ async def test_assign_groups_keeps_untouched_rows(auth_client, async_db, test_te
 
 
 @pytest.mark.asyncio
-async def test_assign_groups_removes_only_dropped_rows(auth_client, async_db, test_teacher, test_group, test_faculty):
+async def test_assign_groups_removes_only_dropped_rows(
+    auth_client, async_db, make_group, test_teacher, test_group, test_faculty
+):
     """Ro'yxatdan chiqarilgan guruh uziladi, qolgani joyida qoladi."""
     from sqlalchemy import select
 
     from app.modules.organization_structure.model import TeacherGroup
 
-    second_group = await auth_client.post("/group/", json={"name": "SE-2026", "faculty_id": test_faculty["id"]})
-    assert second_group.status_code == 201
-    second_group_id = second_group.json()["id"]
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali yaratiladi.
+    second_group_id = (await make_group("SE-2026", test_faculty["id"]))["id"]
 
     await auth_client.post(
         "/teacher/assign_groups",
@@ -516,60 +538,82 @@ async def test_assign_groups_removes_only_dropped_rows(auth_client, async_db, te
     assert [(r.id, r.group_id) for r in rows] == [(kept_id, test_group["id"])]
 
 
-@pytest.mark.asyncio
-async def test_delete_teacher_cascades_assignments(auth_client, async_db, test_teacher, test_group, test_subject):
-    """Biriktirmalari bor o'qituvchi o'chganda ular ham ketadi.
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_delete_teacher_cascades_assignments(auth_client, async_db, test_teacher, test_group, test_subject):
+#     """Biriktirmalari bor o'qituvchi o'chganda ular ham ketadi.
+#
+#     Ular endi ORM cascade (`Teacher.teacher_groups` / `teacher_subjects` dagi
+#     `delete-orphan`) bilan o'chadi — ilgarigi qo'lda yozilgan bulk `delete()`
+#     bilan emas. Async sessiyada bu yo'l `session.delete()` ichida to'plamlarni
+#     yuklaydi, shuning uchun uni test bilan qoplash shart.
+#     """
+#     from sqlalchemy import func, select
+#
+#     from app.modules.auth.model import TeacherSubject
+#     from app.modules.organization_structure.model import TeacherGroup
+#
+#     assert (
+#         await auth_client.post(
+#             "/teacher/assign_groups",
+#             json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"]]},
+#         )
+#     ).status_code == 200
+#     assert (
+#         await auth_client.post(
+#             "/teacher/assign_subjects",
+#             json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
+#         )
+#     ).status_code == 200
+#
+#     # Biriktirma bor — tasdiqsiz o'chirmaydi.
+#     assert (await auth_client.delete(f"/teacher/{test_teacher['id']}")).status_code == 409
+#
+#     response = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
+#     assert response.status_code == 204
+#
+#     async_db.expire_all()
+#     assert (await async_db.execute(select(func.count(TeacherGroup.id)))).scalar() == 0
+#     assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0
 
-    Ular endi ORM cascade (`Teacher.teacher_groups` / `teacher_subjects` dagi
-    `delete-orphan`) bilan o'chadi — ilgarigi qo'lda yozilgan bulk `delete()`
-    bilan emas. Async sessiyada bu yo'l `session.delete()` ichida to'plamlarni
-    yuklaydi, shuning uchun uni test bilan qoplash shart.
+
+# Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/
+# oʻchirish 2026-09-11 da kommentga olindi (maʼlumot EPOS/HEMIS'dan keladi).
+# Endpoint qaytarilsa — bu testni ham kommentdan chiqarish kerak.
+# @pytest.mark.asyncio
+# async def test_delete_subject_detaches_teacher_assignment(auth_client, async_db, test_teacher, test_subject):
+#     """Fan o'chganda biriktirma uziladi (dars yo'q bo'lsa)."""
+#     from sqlalchemy import func, select
+#
+#     from app.modules.auth.model import TeacherSubject
+#
+#     assert (
+#         await auth_client.post(
+#             "/teacher/assign_subjects",
+#             json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
+#         )
+#     ).status_code == 200
+#
+#     response = await auth_client.delete(f"/subject/{test_subject.id}?force=true")
+#     assert response.status_code == 204
+#
+#     async_db.expire_all()
+#     assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0
+
+
+@pytest.mark.asyncio
+async def test_teacher_response_carries_faculty_name(auth_client, test_teacher, test_faculty):
+    """Kafedra bilan birga fakultetning nomi ham qaytadi.
+
+    Kartochkada ilgari «Fakultet ID: 2» turardi: javobda faqat `faculty_id`
+    bor edi, front esa nomni olish uchun butun fakultetlar ro'yxatini
+    yuklashi kerak bo'lardi.
     """
-    from sqlalchemy import func, select
+    response = await auth_client.get(f"/teacher/{test_teacher['id']}")
+    assert response.status_code == 200
 
-    from app.modules.auth.model import TeacherSubject
-    from app.modules.organization_structure.model import TeacherGroup
-
-    assert (
-        await auth_client.post(
-            "/teacher/assign_groups",
-            json={"teacher_id": test_teacher["id"], "group_ids": [test_group["id"]]},
-        )
-    ).status_code == 200
-    assert (
-        await auth_client.post(
-            "/teacher/assign_subjects",
-            json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
-        )
-    ).status_code == 200
-
-    # Biriktirma bor — tasdiqsiz o'chirmaydi.
-    assert (await auth_client.delete(f"/teacher/{test_teacher['id']}")).status_code == 409
-
-    response = await auth_client.delete(f"/teacher/{test_teacher['id']}?force=true")
-    assert response.status_code == 204
-
-    async_db.expire_all()
-    assert (await async_db.execute(select(func.count(TeacherGroup.id)))).scalar() == 0
-    assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0
-
-
-@pytest.mark.asyncio
-async def test_delete_subject_detaches_teacher_assignment(auth_client, async_db, test_teacher, test_subject):
-    """Fan o'chganda biriktirma uziladi (dars yo'q bo'lsa)."""
-    from sqlalchemy import func, select
-
-    from app.modules.auth.model import TeacherSubject
-
-    assert (
-        await auth_client.post(
-            "/teacher/assign_subjects",
-            json={"teacher_id": test_teacher["id"], "subject_ids": [test_subject.id]},
-        )
-    ).status_code == 200
-
-    response = await auth_client.delete(f"/subject/{test_subject.id}?force=true")
-    assert response.status_code == 204
-
-    async_db.expire_all()
-    assert (await async_db.execute(select(func.count(TeacherSubject.id)))).scalar() == 0
+    kafedra = response.json()["kafedra"]
+    assert kafedra["faculty"]["id"] == test_faculty["id"]
+    assert kafedra["faculty"]["name"] == test_faculty["name"]

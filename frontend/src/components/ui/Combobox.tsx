@@ -38,19 +38,23 @@ export function Combobox({
 
     // Handle click outside to close
     React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setOpen(false);
                 setSearchQuery("");
             }
         };
 
+        // `touchstart` ham kerak: sensorli ekranda `mousedown` kechikib keladi,
+        // shuning uchun ro'yxat barmoq bilan tashqariga bosilganda yopilmay turardi.
         if (open) {
             document.addEventListener("mousedown", handleClickOutside);
+            document.addEventListener("touchstart", handleClickOutside);
         }
 
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("touchstart", handleClickOutside);
         };
     }, [open]);
 
@@ -73,13 +77,13 @@ export function Combobox({
                 type="button"
                 onClick={() => !disabled && setOpen(!open)}
                 className={cn(
-                    "flex h-9 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-2xs transition-all duration-150 hover:border-primary/40 hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    "flex h-11 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-base md:h-9 md:text-sm text-foreground shadow-2xs transition-all duration-150 hover:border-primary/40 hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                     open && "border-primary ring-2 ring-primary/20",
                     className
                 )}
                 disabled={disabled}
             >
-                <span className="truncate text-xs font-medium">{selectedLabel}</span>
+                <span className="truncate text-sm font-medium md:text-xs">{selectedLabel}</span>
                 <ChevronsUpDown className={cn("ml-2 h-3.5 w-3.5 shrink-0 opacity-50 transition-transform duration-150", open && "rotate-180")} />
             </button>
 
@@ -89,7 +93,7 @@ export function Combobox({
                         <Search className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70" />
                         <input
                             ref={inputRef}
-                            className="flex h-8 w-full rounded-lg bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                            className="flex h-9 w-full rounded-lg bg-transparent text-base outline-none placeholder:text-muted-foreground md:h-8 md:text-xs"
                             placeholder={searchPlaceholder}
                             value={searchQuery}
                             onChange={(e) => {
@@ -99,7 +103,7 @@ export function Combobox({
                             }}
                         />
                     </div>
-                    <div className="max-h-60 overflow-auto p-1 custom-scrollbar">
+                    <div className="max-h-[45dvh] overflow-auto p-1 custom-scrollbar md:max-h-60">
                         {filteredOptions.length === 0 ? (
                             <div className="py-4 text-center text-xs text-muted-foreground">
                                 Ma'lumot topilmadi
@@ -110,7 +114,7 @@ export function Combobox({
                                     key={option.value}
                                     onClick={() => handleSelect(option.value)}
                                     className={cn(
-                                        "relative flex cursor-pointer select-none items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors duration-150 hover:bg-primary/10 hover:text-primary",
+                                        "relative flex cursor-pointer select-none items-center justify-between rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors duration-150 hover:bg-primary/10 hover:text-primary md:py-1.5 md:text-xs",
                                         value === option.value && "bg-primary/10 text-primary font-semibold"
                                     )}
                                 >

@@ -182,6 +182,102 @@ async def test_subject(async_db):
     return subject
 
 
+# Qoʻshimcha qatorlarni HTTP orqali emas, repository orqali yaratadigan fabrikalar.
+# Fakultet/guruh/mutaxassislik/fan endpointlari 2026-09-11 da kommentga olindi
+# (maʼlumot EPOS/HEMIS'dan keladi), lekin testlarga baʼzan ikkinchi guruh yoki
+# boshqa fakultet kerak — ular shu fabrikalardan olinadi.
+@pytest_asyncio.fixture
+async def make_faculty(async_db):
+    from app.modules.organization_structure.faculty.repository import get_faculty_repository
+    from app.modules.organization_structure.faculty.schemas import FacultyCreateRequest, FacultyCreateResponse
+
+    async def _make(name: str) -> dict:
+        faculty = await get_faculty_repository.create_faculty(session=async_db, data=FacultyCreateRequest(name=name))
+        return FacultyCreateResponse.model_validate(faculty).model_dump(mode="json")
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_kafedra(async_db):
+    from app.modules.organization_structure.kafedra.repository import get_kafedra_repository
+    from app.modules.organization_structure.kafedra.schemas import KafedraCreateRequest, KafedraCreateResponse
+
+    async def _make(name: str, faculty_id: int) -> dict:
+        kafedra = await get_kafedra_repository.create_kafedra(
+            session=async_db, data=KafedraCreateRequest(name=name, faculty_id=faculty_id)
+        )
+        return KafedraCreateResponse.model_validate(kafedra).model_dump(mode="json")
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_group(async_db):
+    from app.modules.organization_structure.group.repository import get_group_repository
+    from app.modules.organization_structure.group.schemas import GroupCreateRequest, GroupCreateResponse
+
+    async def _make(name: str, faculty_id: int) -> dict:
+        group = await get_group_repository.create_group(
+            session=async_db, data=GroupCreateRequest(name=name, faculty_id=faculty_id)
+        )
+        return GroupCreateResponse.model_validate(group).model_dump(mode="json")
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_speciality(async_db):
+    from app.modules.organization_structure.speciality.repository import get_speciality_repository
+    from app.modules.organization_structure.speciality.schemas import SpecialityCreateRequest, SpecialityResponse
+
+    async def _make(name: str, kafedra_id: int, education_type: str | None = None) -> dict:
+        speciality = await get_speciality_repository.create_speciality(
+            session=async_db,
+            data=SpecialityCreateRequest(name=name, kafedra_id=kafedra_id, education_type=education_type),
+        )
+        return SpecialityResponse.model_validate(speciality).model_dump(mode="json")
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_teacher(async_db):
+    from app.modules.auth.teacher.repository import get_teacher_repository
+    from app.modules.auth.teacher.schemas import TeacherCreateRequest, TeacherCreateResponse
+
+    async def _make(username: str, kafedra_id: int | None = None, roles: list[dict] | None = None) -> dict:
+        teacher = await get_teacher_repository.create_teacher(
+            session=async_db,
+            data=TeacherCreateRequest(
+                username=username,
+                password="password123",
+                first_name=username,
+                last_name="T",
+                third_name="T",
+                kafedra_id=kafedra_id,
+                roles=roles or [],
+            ),
+        )
+        return TeacherCreateResponse.model_validate(teacher).model_dump(mode="json")
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_subject(async_db):
+    from app.modules.quiz.model import Subject
+
+    async def _make(name: str) -> Subject:
+        subject = Subject(name=name)
+        async_db.add(subject)
+        await async_db.commit()
+        await async_db.refresh(subject)
+        return subject
+
+    return _make
+
+
 @pytest_asyncio.fixture
 async def make_questions(auth_client):
     """Наполняет банк вопросов преподавателя по предмету и возвращает их id.
@@ -214,41 +310,60 @@ async def make_questions(auth_client):
     return _make
 
 
+# Fakultet/kafedra/guruh/oʻqituvchi endpointlari kommentga olindi (2026-09-11):
+# bu maʼlumot EPOS/HEMIS sinxronizatsiyasidan keladi. Fixture'lar endi HTTP orqali
+# emas, sinx qanday yozsa — shunday, to'g'ridan-to'g'ri repository orqali yozadi.
+# Javob shakli o'zgarmadi: testlar avvalgidek dict kalitlarini o'qiydi.
 @pytest_asyncio.fixture
-async def test_faculty(auth_client):
-    payload = {"name": "IT Faculty"}
-    response = await auth_client.post("/faculty/", json=payload)
-    assert response.status_code == 201
-    return response.json()
+async def test_faculty(auth_client, async_db):
+    from app.modules.organization_structure.faculty.repository import get_faculty_repository
+    from app.modules.organization_structure.faculty.schemas import FacultyCreateRequest, FacultyCreateResponse
 
-
-@pytest_asyncio.fixture
-async def test_kafedra(auth_client, test_faculty):
-    payload = {"name": "Software Engineering", "faculty_id": test_faculty["id"]}
-    response = await auth_client.post("/kafedra/", json=payload)
-    assert response.status_code == 201
-    return response.json()
-
-
-@pytest_asyncio.fixture
-async def test_group(auth_client, test_faculty):
-    payload = {"name": "SE-2023", "faculty_id": test_faculty["id"]}
-    response = await auth_client.post("/group/", json=payload)
-    assert response.status_code == 201
-    return response.json()
+    faculty = await get_faculty_repository.create_faculty(
+        session=async_db, data=FacultyCreateRequest(name="IT Faculty")
+    )
+    return FacultyCreateResponse.model_validate(faculty).model_dump(mode="json")
 
 
 @pytest_asyncio.fixture
-async def test_teacher(auth_client, test_kafedra):
-    payload = {
-        "username": "teacher_fixture_user",
-        "password": "password123",
-        "first_name": "John",
-        "last_name": "Doe",
-        "third_name": "Smith",
-        "kafedra_id": test_kafedra["id"],
-        "roles": [{"name": "Admin"}],
-    }
-    response = await auth_client.post("/teacher/", json=payload)
-    assert response.status_code == 201
-    return response.json()
+async def test_kafedra(auth_client, async_db, test_faculty):
+    from app.modules.organization_structure.kafedra.repository import get_kafedra_repository
+    from app.modules.organization_structure.kafedra.schemas import KafedraCreateRequest, KafedraCreateResponse
+
+    kafedra = await get_kafedra_repository.create_kafedra(
+        session=async_db,
+        data=KafedraCreateRequest(name="Software Engineering", faculty_id=test_faculty["id"]),
+    )
+    return KafedraCreateResponse.model_validate(kafedra).model_dump(mode="json")
+
+
+@pytest_asyncio.fixture
+async def test_group(auth_client, async_db, test_faculty):
+    from app.modules.organization_structure.group.repository import get_group_repository
+    from app.modules.organization_structure.group.schemas import GroupCreateRequest, GroupCreateResponse
+
+    group = await get_group_repository.create_group(
+        session=async_db,
+        data=GroupCreateRequest(name="SE-2023", faculty_id=test_faculty["id"]),
+    )
+    return GroupCreateResponse.model_validate(group).model_dump(mode="json")
+
+
+@pytest_asyncio.fixture
+async def test_teacher(auth_client, async_db, test_kafedra):
+    from app.modules.auth.teacher.repository import get_teacher_repository
+    from app.modules.auth.teacher.schemas import TeacherCreateRequest, TeacherCreateResponse
+
+    teacher = await get_teacher_repository.create_teacher(
+        session=async_db,
+        data=TeacherCreateRequest(
+            username="teacher_fixture_user",
+            password="password123",
+            first_name="John",
+            last_name="Doe",
+            third_name="Smith",
+            kafedra_id=test_kafedra["id"],
+            roles=[{"name": "Admin"}],
+        ),
+    )
+    return TeacherCreateResponse.model_validate(teacher).model_dump(mode="json")

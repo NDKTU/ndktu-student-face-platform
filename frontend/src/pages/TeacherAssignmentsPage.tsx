@@ -7,6 +7,7 @@ import type { TeacherAssignment } from '@/services/teacherAssignmentService';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
+import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
 
@@ -84,6 +85,7 @@ export const TeacherAssignmentsPage = () => {
         {
             key: 'subject',
             header: 'Fan',
+            hideBelow: 'sm',
             cell: (row) => <span className="truncate">{row.subject_name}</span>,
         },
         {
@@ -129,7 +131,7 @@ export const TeacherAssignmentsPage = () => {
             />
 
             <div className="flex flex-wrap items-center gap-3">
-                <div className="relative min-w-[220px] flex-1 max-w-sm">
+                <div className="relative w-full flex-1 sm:min-w-[220px] sm:max-w-sm">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={search}
@@ -157,7 +159,7 @@ export const TeacherAssignmentsPage = () => {
                 )}
 
                 {loadTypeOptions.length > 1 && (
-                    <div className="w-[200px]">
+                    <div className="w-full sm:w-[200px]">
                         <Combobox
                             options={loadTypeOptions}
                             value={loadType}
@@ -175,6 +177,19 @@ export const TeacherAssignmentsPage = () => {
                         Jami: {data.total}
                     </span>
                 )}
+
+                <ClearFiltersButton
+                    className="ml-auto"
+                    count={
+                        (search ? 1 : 0) + (kafedra !== 'all' ? 1 : 0) + (loadType !== 'all' ? 1 : 0)
+                    }
+                    onClick={() => {
+                        setSearch('');
+                        setKafedra('all');
+                        setLoadType('all');
+                        setPage(1);
+                    }}
+                />
             </div>
 
             <DataTable
@@ -184,6 +199,20 @@ export const TeacherAssignmentsPage = () => {
                 isLoading={isLoading}
                 isError={isError}
                 onRetry={refetch}
+                // Telefonda jadval 960px edi — yuklama kartochka bo'lib chiqadi.
+                renderCard={(row) => (
+                    <div className="rounded-xl border border-border bg-card p-3">
+                        <p className="font-medium text-foreground">{row.teacher_name}</p>
+                        {row.kafedra_name && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">{row.kafedra_name}</p>
+                        )}
+                        <p className="mt-2 text-sm text-foreground">{row.subject_name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {row.group_name}
+                            {row.load_types.length > 0 && ` · ${row.load_types.join(', ')}`}
+                        </p>
+                    </div>
+                )}
                 emptyIcon={<ClipboardList className="h-8 w-8" />}
                 emptyTitle="Yuklama topilmadi"
                 emptyDescription={

@@ -58,9 +58,10 @@ class SpecialityResponse(ExternalRefFields):
 
 
 class SpecialityListRequest(BaseModel):
+    # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
     # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
     # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
-    include_hidden: bool = False
+    # include_hidden: bool = False
 
     name: Optional[str] = None
     kafedra_id: Optional[int] = None

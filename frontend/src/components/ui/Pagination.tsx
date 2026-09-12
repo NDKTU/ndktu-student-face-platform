@@ -1,5 +1,6 @@
 import { Button } from './Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface PaginationProps {
     currentPage: number;
@@ -14,19 +15,22 @@ export const Pagination = ({
     onPageChange,
     isLoading = false,
 }: PaginationProps) => {
+    // Telefonda 5 ta raqam + ikki strelka sig'maydi — 3 tasi ko'rsatiladi.
+    const maxVisiblePages = useIsMobile() ? 3 : 5;
+
     if (totalPages <= 1) return null;
 
     const getPageNumbers = () => {
         const pages = [];
-        const maxVisiblePages = 5;
+        const half = Math.floor(maxVisiblePages / 2);
 
         if (totalPages <= maxVisiblePages) {
             for (let i = 1; i <= totalPages; i++) {
                 pages.push(i);
             }
         } else {
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, currentPage + 2);
+            let startPage = Math.max(1, currentPage - half);
+            let endPage = Math.min(totalPages, currentPage + half);
 
             if (startPage === 1) {
                 endPage = Math.min(totalPages, maxVisiblePages);
@@ -42,7 +46,7 @@ export const Pagination = ({
     };
 
     return (
-        <div className="flex items-center justify-center space-x-2 py-4">
+        <div className="flex flex-wrap items-center justify-center gap-2 py-4">
             <Button
                 variant="outline"
                 size="sm"

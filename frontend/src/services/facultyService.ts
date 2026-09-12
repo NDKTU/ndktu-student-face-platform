@@ -10,7 +10,8 @@ export interface Faculty {
     synced_at?: string | null;
     is_active?: boolean;
     /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // is_hidden?: boolean;
 }
 
 export interface FacultyListResponse {
@@ -28,10 +29,10 @@ export interface FacultyStats {
 }
 
 export const facultyService = {
-    getFaculties: async (page = 1, limit = 100, name?: string, includeHidden?: boolean) => {
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    getFaculties: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<FacultyListResponse>('/faculty/', {
-            // include_hidden faqat adminda ishlaydi — serverda tekshiriladi.
-            params: { page, limit, name, include_hidden: includeHidden || undefined },
+            params: { page, limit, name },
         });
         return response.data;
     },
@@ -46,18 +47,20 @@ export const facultyService = {
         return response.data;
     },
 
-    createFaculty: async (data: { name: string }) => {
-        const response = await api.post('/faculty/', data);
-        return response.data;
-    },
-
-    updateFaculty: async (id: number, data: { name: string }) => {
-        const response = await api.put(`/faculty/${id}`, data);
-        return response.data;
-    },
-
-    deleteFaculty: async (id: number, force?: boolean) => {
-        const url = force ? `/faculty/${id}?force=true` : `/faculty/${id}`;
-        await api.delete(url);
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createFaculty: async (data: { name: string }) => {
+    //     const response = await api.post('/faculty/', data);
+    //     return response.data;
+    // },
+    //
+    // updateFaculty: async (id: number, data: { name: string }) => {
+    //     const response = await api.put(`/faculty/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteFaculty: async (id: number, force?: boolean) => {
+    //     const url = force ? `/faculty/${id}?force=true` : `/faculty/${id}`;
+    //     await api.delete(url);
+    // },
 };

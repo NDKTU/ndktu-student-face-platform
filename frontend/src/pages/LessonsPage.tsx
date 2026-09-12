@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
 import { Combobox } from '@/components/ui/Combobox';
+import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -187,6 +188,10 @@ export default function LessonsPage() {
                             placeholder="Barchasi"
                         />
                     </div>
+                    <ClearFiltersButton
+                        count={filterGroupId ? 1 : 0}
+                        onClick={() => { setFilterGroupId(''); setPage(1); }}
+                    />
                 </div>
             )}
 
@@ -214,7 +219,7 @@ export default function LessonsPage() {
                             tabIndex={0}
                             onClick={() => navigate(`/lessons/${lesson.id}`)}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/lessons/${lesson.id}`); } }}
-                            className="group flex cursor-pointer flex-col rounded-2xl border border-border/60 bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                            className="group flex min-w-0 cursor-pointer flex-col rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md sm:p-5"
                         >
                             <div className="flex items-start gap-3">
                                 <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${tileFor(lesson.id)}`}>

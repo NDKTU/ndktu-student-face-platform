@@ -21,10 +21,13 @@ export const Button: React.FC<ButtonProps> = ({
     children,
     ...props
 }) => {
+    // `touch-target` (src/index.css) faqat `pointer: coarse` da ishlaydi: barmoq
+    // uchun eng kichik nishon 44px bo'ladi, sichqoncha bilan esa jadval
+    // qatoridagi ixcham 32px tugmalar avvalgidek qoladi.
     const base =
         'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold ' +
         'transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
-        'disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] cursor-pointer';
+        'disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] cursor-pointer touch-target';
 
     const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
         primary:   'bg-primary-strong text-primary-foreground hover:bg-primary-strong/90',

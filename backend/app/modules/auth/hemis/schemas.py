@@ -126,7 +126,7 @@ class StudentSyncPreviewResponse(BaseModel):
     hemis_total: int = 0
     create_count: int = 0
     update_count: int = 0
-    #: Guruhi hali bog'lanmaganlar — ular guruhsiz import bo'ladi.
+    #: Guruhi bizda topilmaganlar — ular import qilinmaydi.
     no_group_count: int = 0
     #: Bizda bor, lekin HEMIS faollari orasida yo'q. Hech kim o'chirilmaydi —
     #: faqat ro'yxat, qarorni admin qabul qiladi.
@@ -143,16 +143,13 @@ class StudentSyncApplyRequest(BaseModel):
     incremental: bool = False
 
     # ---- Qaysi toifalar import qilinsin -------------------------------- #
-    # Admin ekranda uchta belgidan foydalanadi. Sukut bo'yicha hammasi
-    # yoqilgan: shunda eski chaqiruvlar (tungi progn, CLI) o'zgarishsiz
+    # Admin ekranda ikkita belgidan foydalanadi. Sukut bo'yicha ikkalasi ham
+    # yoqilgan: shunda eski chaqiruvlar (tungi prognoz, CLI) o'zgarishsiz
     # ishlayveradi — ular bu maydonlarni umuman yubormaydi.
     #: Bazada yo'q talabalarni yaratish.
     include_create: bool = True
     #: Bazada bor talabalarning ma'lumotini yangilash.
     include_update: bool = True
-    #: Guruhi hali bog'lanmaganlarni ham import qilish. Ular guruhsiz
-    #: yoziladi, shuning uchun admin buni alohida hal qiladi.
-    include_no_group: bool = True
     #: Ommaviy yaratishga ruxsat. Birinchi to'ldirish (≈5700 talaba) — qonuniy
     #: holat, lekin u ongli bosish bo'lishi kerak, tungi prognozning nojo'ya
     #: ta'siri emas.
@@ -166,8 +163,9 @@ class StudentSyncApplyResponse(BaseModel):
     updated: int = 0
     #: Nomeri yo'q yoki takrorlangan yozuvlar.
     skipped: int = 0
-    #: Admin belgini olib tashlagani uchun import qilinmaganlar. `skipped` dan
-    #: alohida: u — ma'lumot buzuq, bu — ongli qaror.
+    #: Admin toifani tanlamagani uchun import qilinmaganlar. `skipped` dan
+    #: alohida: u — ma'lumot buzuq, bu — ongli qaror. Guruhi yo'qlar bu yerga
+    #: kirmaydi, ular `no_group` da sanaladi.
     excluded: int = 0
     no_group: int = 0
     missing_locally: int = 0

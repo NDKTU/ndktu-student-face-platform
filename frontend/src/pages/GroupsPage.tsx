@@ -1,13 +1,13 @@
-import { toast } from 'sonner';
+// import { /* toast */ } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
 import { type Group } from '@/services/groupService';
 import { Button } from '@/components/ui/Button';
 import {
-    Plus,
-    Pencil,
-    Trash2,
+    // Plus,
+    // Pencil,
+    // Trash2,
     Users,
     ArrowUpDown,
     ArrowUp,
@@ -15,17 +15,19 @@ import {
     CheckCircle2,
     XCircle,
 } from 'lucide-react';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useGroups, useDeleteGroup } from '@/hooks/useGroups';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
+import { useGroups, /* useDeleteGroup */ } from '@/hooks/useGroups';
 import { useFaculties, useSpecialities } from '@/hooks/useReferenceData';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import { Combobox } from '@/components/ui/Combobox';
-import { PermissionGate, usePermission } from '@/components/auth/PermissionGate';
+import { /* PermissionGate, */ usePermission } from '@/components/auth/PermissionGate';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
-import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
+// Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+// import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
-import { GroupModal } from '@/components/group/GroupModal';
+// import { /* GroupModal */ } from '@/components/group/GroupModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -39,7 +41,8 @@ type SortOrder = 'asc' | 'desc';
 export const GroupsPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
-    const [showHidden, setShowHidden] = useState(false);
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+//     const [showHidden, setShowHidden] = useState(false);
     const navigate = useNavigate();
     // `read:student` bo'lsa — universitetning to'liq talabalar sahifasi (filtr
     // bilan), bo'lmasa — faqat shu guruh sahifasi. O'qituvchida `read:student`
@@ -60,18 +63,25 @@ export const GroupsPage = () => {
     const [courseLevelFilter, setCourseLevelFilter] = useState<CourseLevelFilter>('all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 15;
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -93,20 +103,29 @@ export const GroupsPage = () => {
     const facultyIdNum = selectedFacultyFilter === 'all' ? undefined : Number(selectedFacultyFilter);
     const specialityIdNum = selectedSpecialityFilter === 'all' ? undefined : Number(selectedSpecialityFilter);
 
+    // Filtrlar va saralash — serverda. Ilgari ular ochilgan sahifaning 15
+    // qatoriga qo'llanardi: «1-kurs» tanlansa, jadvalda uch qator qolar,
+    // «Guruhlar: 683» esa o'zgarmas va sahifalarning ko'pi bo'm-bo'sh edi.
     const {
         data: groupsData,
         isLoading: isGroupsLoading,
         isError: isGroupsError,
         refetch,
-    } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdNum, specialityIdNum, true, showHidden);
+    } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdNum, specialityIdNum, true, {
+        course: courseLevelFilter === 'all' ? undefined : Number(courseLevelFilter),
+        education_shape: educationFormFilter === 'all' ? undefined : educationFormFilter,
+        sort_by: sortField,
+        order: sortOrder,
+    });
 
     const { data: facultiesData } = useFaculties();
     const { data: specialitiesData } = useSpecialities(1, 200);
-    const deleteGroupMutation = useDeleteGroup();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteGroupMutation = useDeleteGroup();
 
-    const rawGroups = groupsData?.groups || [];
+    const groups = groupsData?.groups || [];
     const totalPages = groupsData ? Math.ceil(groupsData.total / pageSize) : 1;
-    const totalCount = groupsData?.total ?? rawGroups.length;
+    const totalCount = groupsData?.total ?? groups.length;
     const faculties = facultiesData?.faculties || [];
     const specialities = specialitiesData?.specialities || [];
 
@@ -170,7 +189,33 @@ export const GroupsPage = () => {
         [specialities, selectedSpecialityFilter]
     );
 
+    // Filtrlarni tozalash. Qidiruv ham shu yerga kiradi: admin uchun u ham
+    // filtr, va uni alohida o'chirish kerakligi kutilmagan bo'lardi.
+    const activeFilterCount =
+        (selectedFacultyFilter !== 'all' ? 1 : 0) +
+        (selectedSpecialityFilter !== 'all' ? 1 : 0) +
+        (educationFormFilter !== 'all' ? 1 : 0) +
+        (courseLevelFilter !== 'all' ? 1 : 0) +
+        (searchTerm ? 1 : 0);
+
+    const handleClearFilters = () => {
+        setSelectedFacultyFilter('all');
+        setSelectedSpecialityFilter('all');
+        setEducationFormFilter('all');
+        setCourseLevelFilter('all');
+        setSearchTerm('');
+        setCurrentPage(1);
+        // URL ham tozalanadi: aks holda sahifa yangilanganda filtr qaytib kelardi.
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('faculty_id');
+        nextParams.delete('speciality_id');
+        setSearchParams(nextParams);
+    };
+
     const handleSort = (field: SortField) => {
+        // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda admin
+        // to'satdan yangi tartibning o'rtasidan boshlab ko'rardi.
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -179,73 +224,39 @@ export const GroupsPage = () => {
         }
     };
 
-    const filtered = useMemo(() => {
-        return rawGroups.filter((group) => {
-            const matchesForm =
-                educationFormFilter === 'all' ||
-                (group.education_shape && group.education_shape.toLowerCase().includes(educationFormFilter.toLowerCase()));
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleDeleteClick = (group: Group) => {
+//         setGroupToDelete(group);
+//         setCascadeWarnings([]);
+//         setIsDeleteModalOpen(true);
+//     };
 
-            const matchesCourse =
-                courseLevelFilter === 'all' ||
-                (group.course !== undefined && group.course !== null && String(group.course) === courseLevelFilter);
-
-            return matchesForm && matchesCourse;
-        });
-    }, [rawGroups, educationFormFilter, courseLevelFilter]);
-
-    const sortedGroups = useMemo(() => {
-        return [...filtered].sort((a, b) => {
-            let valA: string | number = '';
-            let valB: string | number = '';
-
-            if (sortField === 'name') {
-                valA = a.name.toLowerCase();
-                valB = b.name.toLowerCase();
-            } else if (sortField === 'course') {
-                valA = a.course ?? 0;
-                valB = b.course ?? 0;
-            } else if (sortField === 'student_count') {
-                valA = a.student_count ?? 0;
-                valB = b.student_count ?? 0;
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [filtered, sortField, sortOrder]);
-
-    const handleDeleteClick = (group: Group) => {
-        setGroupToDelete(group);
-        setCascadeWarnings([]);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!groupToDelete) return;
-        deleteGroupMutation.mutate(
-            { id: groupToDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Guruh o'chirildi");
-                    setIsDeleteModalOpen(false);
-                    setGroupToDelete(null);
-                    setCascadeWarnings([]);
-                    refetch();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        toast.error("O'chirishda xatolik yuz berdi");
-                        setIsDeleteModalOpen(false);
-                        setGroupToDelete(null);
-                        setCascadeWarnings([]);
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = async () => {
+//         if (!groupToDelete) return;
+//         deleteGroupMutation.mutate(
+//             { id: groupToDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Guruh o'chirildi");
+//                     setIsDeleteModalOpen(false);
+//                     setGroupToDelete(null);
+//                     setCascadeWarnings([]);
+//                     refetch();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         setIsDeleteModalOpen(false);
+//                         setGroupToDelete(null);
+//                         setCascadeWarnings([]);
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -286,6 +297,7 @@ export const GroupsPage = () => {
 
     const renderActions = (group: Group) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {!isExternal(group) && (
                 <>
                     <PermissionGate permission="update:group">
@@ -319,12 +331,15 @@ export const GroupsPage = () => {
                     </PermissionGate>
                 </>
             )}
+            */}
+            {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
             <VisibilityButton
                 entity="group"
                 row={group}
                 label={group.name}
                 className="h-8 w-8 p-0"
             />
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -377,10 +392,12 @@ export const GroupsPage = () => {
                 searchPlaceholder="Guruh nomi bo'yicha qidirish..."
                 totalCount={totalCount}
                 totalLabel="Guruhlar"
+                activeFilterCount={activeFilterCount}
+                onClearFilters={handleClearFilters}
                 extraFilters={
                     <>
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={facultyOptions}
                                 value={selectedFacultyFilter}
@@ -388,7 +405,7 @@ export const GroupsPage = () => {
                                 placeholder="Fakultet bo'yicha"
                             />
                         </div>
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={specialityOptions}
                                 value={selectedSpecialityFilter}
@@ -397,7 +414,9 @@ export const GroupsPage = () => {
                             />
                         </div>
                     </div>
+                        {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                         <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
+                        */}
                     </>
                 }
                 chips={
@@ -436,6 +455,7 @@ export const GroupsPage = () => {
                         />
                     </div>
                 }
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:group">
                         <Button
@@ -451,6 +471,7 @@ export const GroupsPage = () => {
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -470,7 +491,7 @@ export const GroupsPage = () => {
                         ))}
                     </div>
                 )
-            ) : sortedGroups.length === 0 ? (
+            ) : groups.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={9}
@@ -524,7 +545,7 @@ export const GroupsPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedGroups.map((group, index) => {
+                        {groups.map((group, index) => {
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const isActive = group.is_active !== false;
                             const specName = getSpecialityName(group.speciality_id);
@@ -549,7 +570,9 @@ export const GroupsPage = () => {
                                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                 <ExternalSourceBadge row={group} />
                                                 <InactiveBadge row={group} />
+                                                {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                                 <HiddenBadge row={group} />
+                                                */}
                                             </div>
                                         </div>
                                     </TableCell>
@@ -624,7 +647,7 @@ export const GroupsPage = () => {
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedGroups.map((group) => (
+                    {groups.map((group) => (
                         <CatalogCard
                             key={group.id}
                             id={group.id}
@@ -638,7 +661,9 @@ export const GroupsPage = () => {
                                         <span>{group.education_shape || 'Guruh'}</span>
                                         <ExternalSourceBadge row={group} />
                                         <InactiveBadge row={group} />
+                                        {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                         <HiddenBadge row={group} />
+                                        */}
                                     </span>
                                 </div>
                             }
@@ -664,6 +689,7 @@ export const GroupsPage = () => {
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {isModalOpen && (
                 <GroupModal
                     isOpen={isModalOpen}
@@ -679,7 +705,9 @@ export const GroupsPage = () => {
                     }}
                 />
             )}
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={isDeleteModalOpen}
                 onClose={() => {
@@ -711,6 +739,7 @@ export const GroupsPage = () => {
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

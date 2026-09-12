@@ -20,7 +20,9 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest_asyncio.fixture
-async def visibility_fixture(async_client, auth_client, async_db, test_faculty, test_kafedra):
+async def visibility_fixture(
+    async_client, auth_client, async_db, make_group, make_teacher, test_faculty, test_kafedra
+):
     from app.modules.auth.model import Permission, Role
     from app.modules.quiz.model import Quiz, Subject
 
@@ -32,26 +34,14 @@ async def visibility_fixture(async_client, auth_client, async_db, test_faculty, 
     async_db.add(Role(name="Teacher", permissions=permissions))
     await async_db.commit()
 
+    # POST /teacher/ va /group/ kommentga olindi (EPOS/HEMIS maʼlumoti) — qatorlar
+    # repository orqali yaratiladi. Id'lar joylashuvi avvalgidek: A ning `user_id`
+    # si B ning `teachers.id` siga teng bo'lishi kerak, shuning uchun tartib muhim.
     async def _make_teacher(username: str) -> dict:
-        response = await auth_client.post(
-            "/teacher/",
-            json={
-                "username": username,
-                "password": "password123",
-                "first_name": username,
-                "last_name": "T",
-                "third_name": "T",
-                "kafedra_id": test_kafedra["id"],
-                "roles": [{"name": "Teacher"}],
-            },
-        )
-        assert response.status_code == 201
-        return response.json()
+        return await make_teacher(username, test_kafedra["id"], [{"name": "Teacher"}])
 
     async def _make_group(name: str) -> dict:
-        response = await auth_client.post("/group/", json={"name": name, "faculty_id": test_faculty["id"]})
-        assert response.status_code == 201
-        return response.json()
+        return await make_group(name, test_faculty["id"])
 
     teacher_a = await _make_teacher("visibility_teacher_a")
     teacher_b = await _make_teacher("visibility_teacher_b")

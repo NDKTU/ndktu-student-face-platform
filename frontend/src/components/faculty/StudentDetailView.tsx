@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { CheckCircle2, FolderEdit, XCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle2, /* FolderEdit, */ XCircle, ArrowRight } from 'lucide-react';
 import { useUserResults } from '@/hooks/useResults';
-import { ChangeGroupModal } from '@/components/ChangeGroupModal';
+// import { /* ChangeGroupModal */ } from '@/components/ChangeGroupModal';
 import type { Faculty } from '@/services/facultyService';
 import type { Group } from '@/services/groupService';
 import type { Student } from '@/services/studentService';
@@ -38,7 +38,8 @@ export const StudentDetailView = ({
     onBackToStudents,
 }: StudentDetailViewProps) => {
     const navigate = useNavigate();
-    const [moveOpen, setMoveOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [moveOpen, setMoveOpen] = useState(false);
     const [resultsPage, setResultsPage] = useState(1);
     const resultsPageSize = 5;
     const {
@@ -126,6 +127,7 @@ export const StudentDetailView = ({
                 onBack={onBackToStudents}
                 title={student.full_name || `Talaba #${student.id}`}
                 description={`${faculty.name} · ${group.name} · Talaba shaxsiy va akademik profili`}
+                /* EPOS/HEMIS maʼlumoti: «Boshqa guruhga o'tkazish» 2026-09-11 da kommentga olindi.
                 actions={
                     <Button
                         variant="outline"
@@ -137,6 +139,7 @@ export const StudentDetailView = ({
                         <span>Boshqa guruhga o'tkazish</span>
                     </Button>
                 }
+                */
             />
 
             <div className="grid gap-5 md:grid-cols-2">
@@ -222,12 +225,14 @@ export const StudentDetailView = ({
                 </CardContent>
             </Card>
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ChangeGroupModal
                 isOpen={moveOpen}
                 onClose={() => setMoveOpen(false)}
                 student={student}
                 onSuccess={onBackToStudents}
             />
+            */}
         </div>
     );
 };

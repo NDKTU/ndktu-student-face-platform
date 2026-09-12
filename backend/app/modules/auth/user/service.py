@@ -8,7 +8,7 @@ from core.redis_client import redis_client
 from core.utils.password_hash import verify_and_migrate
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -111,12 +111,18 @@ class UserService:
         user = await self.get_user_by_username(session, data.username)
         from app.modules.integration.eduplan.auth_service import eduplan_auth_service
 
+        # EPMOS loginning registriga e'tibor beradi ("MM001" bilan "mm001" —
+        # boshqa-boshqa). Bizda esa aynan EPMOS yozgan ko'rinish saqlanadi,
+        # shuning uchun tashqariga foydalanuvchi yozgani emas, bazadagisi
+        # yuboriladi — xodim loginni kichik harf bilan yozsa ham kiradi.
+        external_username = user.username if user else data.username
+
         # EPOS'dan kelgan hisob uchun haqiqat manbai — EPOS. Mahalliy xesh
         # avval tekshirilganda, o'qituvchi EPOS'da parolini almashtirgach ham
         # eski parol bizda ishlayverardi.
         if user and user.auth_source == "eduplan":
             try:
-                access_token = await eduplan_auth_service.login(session, data.username, data.password)
+                access_token = await eduplan_auth_service.login(session, external_username, data.password)
                 return UserLoginResponse(type="Bearer", access_token=access_token)
             except HTTPException as exc:
                 # 401 — parol haqiqatan noto'g'ri, mahalliy xeshga o'tmaymiz.
@@ -147,7 +153,7 @@ class UserService:
 
         # EduPlan SSO: hali bizda yo'q xodimlar shu yerdan kiradi.
         try:
-            access_token = await eduplan_auth_service.login(session, data.username, data.password)
+            access_token = await eduplan_auth_service.login(session, external_username, data.password)
             return UserLoginResponse(type="Bearer", access_token=access_token)
         except HTTPException as exc:
             # Mahalliy hisob uchun EduPlan xabarini ko'rsatish chalg'itadi:
@@ -231,9 +237,23 @@ class UserService:
         return result.scalar_one_or_none()
 
     async def get_user_by_username(self, session: AsyncSession, username: str):
-        stmt = select(User).where(User.username == username).options(selectinload(User.roles))
+        """Loginni registrga bog'liq bo'lmagan holda topadi.
+
+        Bazada loginlar EPMOS'dagi ko'rinishida saqlanadi ("MM001"), foydalanuvchi
+        esa uni kichik harflar bilan yozishi mumkin. Qat'iy taqqoslashda bunday
+        xodim umuman topilmas, mahalliy xesh tekshirilmasdan qolardi.
+
+        `scalars().first()`: nazariy jihatdan "MM001" va "mm001" yonma-yon
+        turishi mumkin, va bunday holat butun kirishni xatoga uchratmasligi kerak.
+        """
+        stmt = (
+            select(User)
+            .where(func.lower(User.username) == username.strip().lower())
+            .options(selectinload(User.roles))
+            .order_by(User.id)
+        )
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
 
 auth_service = UserService()

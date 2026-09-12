@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { usePreviewEntity, useSyncEntity, useSyncWorkloads } from '@/hooks/useEduPlan';
+import { usePreviewEntity, usePreviewWorkloads, useSyncEntity, useSyncWorkloads } from '@/hooks/useEduPlan';
 import {
     ENTITY_DEPENDENCIES,
     ENTITY_LABEL,
@@ -223,17 +223,32 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
  * Yuklamalar kartasi.
  *
  * Ma'lumotnomalardan farqli: yuklama yangi satr yaratmaydi, faqat
- * allaqachon bog'langan o'qituvchi, fan va guruhlarni bir-biriga ulaydi.
- * Shuning uchun ikkilanish ham, ko'rib chiqish ham yo'q — bir bosishda
- * qo'llanadi, natijada esa nimasi bog'lanmagani ko'rsatiladi.
+ * allaqachon bog'langan o'qituvchi, fan va guruhlarni bir-biriga ulaydi —
+ * shuning uchun bu yerda ikkilanish (conflict) yo'q.
+ *
+ * «Ko'rish» esa bor: backend prognni oxirigacha bajarib, tranzaksiyani
+ * qaytaradi, shuning uchun sonlar haqiqiy qo'llashdagi bilan bir xil.
+ * 27 000 dan ortiq qator o'qiladigan og'ir amaldan oldin nima o'zgarishini
+ * ko'rib olish mumkin.
  */
 const WorkloadCard = ({ disabled }: { disabled: boolean }) => {
     const mutation = useSyncWorkloads();
+    const previewMutation = usePreviewWorkloads();
     const [result, setResult] = useState<WorkloadSyncResult | null>(null);
+
+    const busy = mutation.isPending || previewMutation.isPending;
 
     const run = async () => {
         try {
             setResult(await mutation.mutateAsync());
+        } catch {
+            setResult(null);
+        }
+    };
+
+    const runPreview = async () => {
+        try {
+            setResult(await previewMutation.mutateAsync());
         } catch {
             setResult(null);
         }
@@ -253,20 +268,42 @@ const WorkloadCard = ({ disabled }: { disabled: boolean }) => {
                         O'qituvchilar, Fanlar, Guruhlar allaqachon bog'langan bo'lishi kerak
                     </div>
                 </div>
-                <Button size="sm" onClick={run} disabled={disabled || mutation.isPending}>
-                    {mutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                    )}
-                    Yuklamalarni sinxronlash
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={runPreview} disabled={disabled || busy}>
+                        {previewMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Ko'rish
+                    </Button>
+                    <Button size="sm" onClick={run} disabled={disabled || busy}>
+                        {mutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                        )}
+                        Yuklamalarni sinxronlash
+                    </Button>
+                </div>
             </div>
 
             {mutation.isPending && (
                 <div className="mt-2 text-sm text-muted-foreground">
                     Yuklama o'qilmoqda va biriktirmalar tuzilmoqda… Bu eng og'ir bo'lim:
                     27 000 dan ortiq qator o'qiladi, odatda 15–30 soniya oladi.
+                </div>
+            )}
+
+            {previewMutation.isPending && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                    Yuklama o'qilmoqda — nima o'zgarishi hisoblanmoqda. Hech narsa yozilmaydi,
+                    lekin vaqti sinxronlash bilan bir xil: 15–30 soniya.
+                </div>
+            )}
+
+            {previewMutation.isError && (
+                <div className="mt-2 flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Ko'rib chiqib bo'lmadi: {errorText(previewMutation.error)}</span>
                 </div>
             )}
 
@@ -303,6 +340,13 @@ const WorkloadCard = ({ disabled }: { disabled: boolean }) => {
                             {result.workloads_without_teacher} qatorda EPMOS'ning o'zida o'qituvchi hali
                             biriktirilmagan — ular o'tkazib yuborildi. Bu xato emas: o'qituvchi
                             tayinlangach, keyingi sinxronlashda o'zi qo'shiladi.
+                        </div>
+                    )}
+
+                    {result.dry_run && (
+                        <div className="text-xs text-muted-foreground">
+                            Bu faqat ko'rsatuv — hech narsa yozilmadi. Qo'llash uchun «Yuklamalarni
+                            sinxronlash» tugmasini bosing.
                         </div>
                     )}
                 </div>

@@ -147,6 +147,26 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         }
     }, [collapsed]);
 
+    // Drawer ochiq bo'lsa: Escape yopadi, fon esa scroll qilinmaydi.
+    // Telefonda fon scroll qulflanmasa, menyu ustidan sahifa surilib ketadi
+    // va yopilgandan keyin foydalanuvchi boshqa joyda turadi.
+    useEffect(() => {
+        if (!mobileOpen) return;
+
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMobileOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            document.body.style.overflow = previous;
+        };
+    }, [mobileOpen, setMobileOpen]);
+
     // ⌘K / Ctrl+K — qidiruvga fokus.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -180,7 +200,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
 
             <aside
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 flex h-screen w-[var(--sidebar-width)] max-w-[85vw] shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out',
+                    'fixed inset-y-0 left-0 z-50 flex h-dvh w-[var(--sidebar-width)] max-w-[85vw] shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out',
                     'md:static md:inset-auto md:h-auto md:self-stretch',
                     mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
                 )}

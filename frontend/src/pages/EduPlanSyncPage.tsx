@@ -63,15 +63,18 @@ const errorText = (e: unknown) => {
 };
 
 const EduPlanSyncPage = () => {
+    // `status` hali ham kerak: «Bo'limlar bo'yicha sinxronlash» EPMOS bilan aloqa
+    // yo'q bo'lsa bloklanadi. Qolgan maydonlarni faqat olib tashlangan 1-qadam
+    // bloki ishlatardi.
     const {
         data: status,
-        isLoading: statusLoading,
+        // isLoading: statusLoading,
         // Сорванный запрос и «интеграция не настроена» — разные вещи: во
         // втором случае надо править настройки, в первом — смотреть, почему
         // не отвечает наш собственный backend. Раньше оба показывались как
         // «Integratsiya sozlanmagan» с пустым пояснением.
-        isError: statusFailed,
-        refetch: refetchStatus,
+        // isError: statusFailed,
+        // refetch: refetchStatus,
     } = useEduPlanStatus();
     const runMutation = useEduPlanRun();
     const previewMutation = useEduPlanPreview();
@@ -93,24 +96,25 @@ const EduPlanSyncPage = () => {
     );
     const unresolved = conflicts.filter((p) => choices[proposalKey(p)] === undefined).length;
 
-    /**
-     * Синхронизация одним действием: справочники и нагрузка сразу. Однозначные
-     * предложения применяются автоматически, конфликты — нет: связать группу
-     * вслепую означает оторвать студентов и историю результатов от нужной строки.
-     *
-     * Если конфликты остались, догружаем свежий предпросмотр — только он содержит
-     * сами конфликты и кандидатов. Повторно применять `run_id` прогона нельзя:
-     * предложения в нём заморожены и продублировали бы уже созданные строки.
-     */
-    const runSync = async () => {
-        setApplyResult(null);
-        setPreview(null);
-        setChoices({});
-        setRunResult(null);
-
-        // Javob — natija emas, boshlangʻich holat. Natijani kuzatuvchi oladi.
-        setRunState(await runMutation.mutateAsync());
-    };
+    // Faqat olib tashlangan «Hammasini sinxronlash» tugmasi chaqirardi.
+//     /**
+//      * Синхронизация одним действием: справочники и нагрузка сразу. Однозначные
+//      * предложения применяются автоматически, конфликты — нет: связать группу
+//      * вслепую означает оторвать студентов и историю результатов от нужной строки.
+//      *
+//      * Если конфликты остались, догружаем свежий предпросмотр — только он содержит
+//      * сами конфликты и кандидатов. Повторно применять `run_id` прогона нельзя:
+//      * предложения в нём заморожены и продублировали бы уже созданные строки.
+//      */
+//     const runSync = async () => {
+//         setApplyResult(null);
+//         setPreview(null);
+//         setChoices({});
+//         setRunResult(null);
+//
+//         // Javob — natija emas, boshlangʻich holat. Natijani kuzatuvchi oladi.
+//         setRunState(await runMutation.mutateAsync());
+//     };
 
     /** Progn tugagach: keshni yangilash va ziddiyatlar boʻlsa ularni yuklash. */
     const finishRun = async (summary: RunResponse) => {
@@ -194,7 +198,11 @@ const EduPlanSyncPage = () => {
 
             <ConnectionSettingsCard />
 
-            {/* ── 1-qadam: состояние подключения и запуск ───────────── */}
+            {/* 1-qadam — «Ulanish va to'liq sinxronlash» bloki 2026-09-12 da frontenddan olib
+                tashlandi. Sinxronizatsiya endi faqat quyidagi «Bo'limlar bo'yicha
+                sinxronlash» orqali qilinadi. Backend tegilmagan: `POST /api/integration/
+                eduplan/run` joyida qoladi (cron va CLI shundan foydalanadi), prognning
+                natijasi esa pastdagi «Nima ko'chirildi» blokida avvalgidek ko'rinadi.
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -281,6 +289,7 @@ const EduPlanSyncPage = () => {
                     )}
                 </CardContent>
             </Card>
+            */}
 
             <EntitySyncMenu disabled={!status?.reachable || syncing} />
 

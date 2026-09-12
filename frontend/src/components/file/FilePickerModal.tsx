@@ -99,7 +99,7 @@ export const FilePickerModal = ({
                     />
                 </div>
 
-                <div className="max-h-[50vh] min-h-[200px] overflow-y-auto rounded-lg border border-border p-2">
+                <div className="max-h-[50dvh] min-h-[200px] overflow-y-auto rounded-lg border border-border p-2">
                     {isLoading ? (
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                             {Array.from({ length: 6 }).map((_, index) => (

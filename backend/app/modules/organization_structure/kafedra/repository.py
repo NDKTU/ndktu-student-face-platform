@@ -2,14 +2,16 @@ import logging
 
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
+from core.utils.sorting import order_by_clause
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.visibility import apply_visibility
-from app.modules.auth.model import User
-from app.modules.organization_structure.model import Kafedra
+# Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+# from app.core.utils.visibility import apply_visibility
+from app.modules.auth.model import Teacher, User
+from app.modules.organization_structure.model import Kafedra, Speciality
 
 from .schemas import (
     KafedraCreateRequest,
@@ -110,7 +112,8 @@ class KafedraRepository:
         self, session: AsyncSession, request: KafedraListRequest, current_user: User
     ) -> KafedraListResponse:
         stmt = select(Kafedra)
-        stmt = apply_visibility(stmt, Kafedra, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # stmt = apply_visibility(stmt, Kafedra, current_user, request.include_hidden)
 
         if request.name:
             stmt = stmt.where(Kafedra.name.ilike(f"%{request.name}%"))
@@ -118,14 +121,32 @@ class KafedraRepository:
         if request.faculty_id:
             stmt = stmt.where(Kafedra.faculty_id == request.faculty_id)
 
-        stmt = stmt.order_by(desc(Kafedra.created_at))
+        # Sanoqlar bo'yicha saralash ham serverda: ular kartochkada
+        # ko'rinadigan ustunlar, va faqat sahifa ichida tartiblansa, ro'yxat
+        # «eng ko'p» ni birinchi sahifadan tashqarida qoldirardi.
+        sortable = {
+            "name": Kafedra.name,
+            "created_at": Kafedra.created_at,
+            "speciality_count": select(func.count(Speciality.id))
+            .where(Speciality.kafedra_id == Kafedra.id)
+            .scalar_subquery(),
+            "teacher_count": select(func.count(Teacher.id))
+            .where(Teacher.kafedra_id == Kafedra.id)
+            .scalar_subquery(),
+        }
+        stmt = stmt.order_by(
+            *order_by_clause(
+                sortable, request.sort_by, request.order, desc(Kafedra.created_at), Kafedra.id
+            )
+        )
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
         kafedras = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Kafedra)
-        count_stmt = apply_visibility(count_stmt, Kafedra, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # count_stmt = apply_visibility(count_stmt, Kafedra, current_user, request.include_hidden)
         if request.name:
             count_stmt = count_stmt.where(Kafedra.name.ilike(f"%{request.name}%"))
         if request.faculty_id:

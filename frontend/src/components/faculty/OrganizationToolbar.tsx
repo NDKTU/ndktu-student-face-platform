@@ -1,6 +1,7 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { FilterX, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 
 export interface FilterChipOption<T extends string = string> {
@@ -63,6 +64,37 @@ export function FilterChipGroup<T extends string = string>({
     );
 }
 
+/**
+ * «Filtrlarni tozalash» tugmasi.
+ *
+ * Alohida eksport qilinadi, chunki filtrlari `OrganizationToolbar` dan
+ * tashqarida turgan sahifalar ham bor (`/results`, `/lessons`), tugma esa
+ * hamma joyda bir xil ko'rinishi kerak.
+ */
+export const ClearFiltersButton: React.FC<{
+    onClick: () => void;
+    /** Nechta filtr yoqilgani. 0 bo'lsa tugma umuman chizilmaydi. */
+    count?: number;
+    className?: string;
+}> = ({ onClick, count = 0, className }) => {
+    if (count <= 0) return null;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/80 bg-background px-2.5 py-1.5',
+                'text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground hover:bg-muted',
+                className,
+            )}
+        >
+            <FilterX className="h-3.5 w-3.5" />
+            <span>Tozalash</span>
+            <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-bold text-primary">{count}</span>
+        </button>
+    );
+};
+
 interface OrganizationToolbarProps {
     search: string;
     onSearchChange: (val: string) => void;
@@ -72,6 +104,11 @@ interface OrganizationToolbarProps {
     chips?: React.ReactNode;
     extraFilters?: React.ReactNode;
     actions?: React.ReactNode;
+    /** Nechta filtr yoqilgani — telefondagi «Filtrlar» tugmasidagi belgicha
+     *  va «Tozalash» tugmasi uchun. */
+    activeFilterCount?: number;
+    /** Berilsa, filtr yoqilgan paytda «Tozalash» tugmasi chiqadi. */
+    onClearFilters?: () => void;
     className?: string;
 }
 
@@ -84,15 +121,26 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
     chips,
     extraFilters,
     actions,
+    activeFilterCount = 0,
+    onClearFilters,
     className,
 }) => {
+    // Telefonda filtrlar bitta tugma ortiga yig'iladi: `/results` da 7 ta filtr
+    // butun birinchi ekranni egallab, ma'lumot ko'rinmay qolardi. `md` dan
+    // yuqorida hech narsa o'zgarmaydi — filtrlar avvalgidek qatorda turadi.
+    const [filtersOpen, setFiltersOpen] = React.useState(false);
+    const hasFilters = Boolean(extraFilters || chips);
+    const clearButton = onClearFilters ? (
+        <ClearFiltersButton count={activeFilterCount} onClick={onClearFilters} />
+    ) : null;
+
     return (
         <div className={cn('flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-3.5 shadow-sm', className)}>
             {/* Top Toolbar Row */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-1 flex-wrap items-center gap-2.5">
                     {/* Search Bar */}
-                    <div className="relative flex-1 min-w-[220px] max-w-md">
+                    <div className="relative min-w-0 flex-1 sm:min-w-[220px] sm:max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             // Qidiruv maydoni hisob ma'lumoti emas: `text` da
@@ -107,7 +155,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                             placeholder={searchPlaceholder}
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
-                            className="pl-9 pr-8 h-9 text-xs sm:text-sm bg-background border-border/80"
+                            className="pl-9 pr-8 bg-background border-border/80 md:h-9 md:text-sm"
                         />
                         {search && (
                             <button
@@ -121,7 +169,30 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                         )}
                     </div>
 
-                    {extraFilters}
+                    {/* Telefonda filtrlar varaq ichida (pastda), bu yerda esa faqat tugma. */}
+                    {hasFilters && (
+                        <button
+                            type="button"
+                            onClick={() => setFiltersOpen(true)}
+                            className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/80 bg-background px-3 text-sm font-semibold text-foreground md:hidden"
+                        >
+                            <SlidersHorizontal className="h-4 w-4" />
+                            <span>Filtrlar</span>
+                            {activeFilterCount > 0 && (
+                                <span className="rounded-full bg-primary/15 px-1.5 text-xs font-bold text-primary">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
+
+                    {extraFilters && (
+                        <div className="hidden flex-wrap items-center gap-2.5 md:flex">{extraFilters}</div>
+                    )}
+
+                    {/* Chiplar bo'lsa, tugma pastki qatorning oxirida turadi —
+                        u yerda filtrlarning hammasi ko'rinib turadi. */}
+                    {!chips && <div className="hidden md:flex">{clearButton}</div>}
 
                     {/* Total Count Badge */}
                     {totalCount !== undefined && (
@@ -141,9 +212,34 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
 
             {/* Bottom Chips / Secondary Filter Row if present */}
             {chips && (
-                <div className="flex flex-wrap items-center gap-3 border-t border-border/50 pt-2.5 text-xs">
+                <div className="hidden flex-wrap items-center gap-3 border-t border-border/50 pt-2.5 text-xs md:flex">
                     {chips}
+                    {clearButton && <div className="ml-auto">{clearButton}</div>}
                 </div>
+            )}
+
+            {/* Telefondagi filtrlar varag'i. `Modal` `md` dan pastda pastdan
+                chiqadigan bottom sheet bo'lib ochiladi (components/ui/Modal.tsx). */}
+            {hasFilters && (
+                <Modal isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrlar">
+                    <div className="flex flex-col gap-5 [&>*]:w-full [&_[class*='w-[']]:w-full">
+                        {extraFilters}
+                        {chips && <div className="flex flex-col gap-3 border-t border-border/50 pt-4">{chips}</div>}
+                        {onClearFilters && activeFilterCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClearFilters();
+                                    setFiltersOpen(false);
+                                }}
+                                className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border/80 bg-background text-sm font-semibold text-foreground"
+                            >
+                                <FilterX className="h-4 w-4" />
+                                Filtrlarni tozalash
+                            </button>
+                        )}
+                    </div>
+                </Modal>
             )}
         </div>
     );

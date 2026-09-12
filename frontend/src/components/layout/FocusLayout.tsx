@@ -16,7 +16,7 @@ const FocusLayout = () => {
     const { t } = useTranslation();
 
     return (
-        <div className="flex min-h-screen flex-col bg-background">
+        <div className="flex min-h-dvh flex-col bg-background">
             <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-6">
                 <div className="flex items-center gap-2.5">
                     <img src={logo} alt={BRAND.shortName} className="h-8 w-8 rounded-lg object-contain" />

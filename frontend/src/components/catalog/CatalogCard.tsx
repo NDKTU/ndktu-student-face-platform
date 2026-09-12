@@ -36,7 +36,10 @@ export const CatalogCard = ({ id, title, subtitle, metrics, footer, actions, onC
                 }
             }}
             className={cn(
-                'grid-stagger-card group flex min-h-44 flex-col rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all duration-200',
+                // `min-w-0` shart: grid elementining standart `min-width: auto` si
+                // uzun nom yoki teglar tufayli kartochkani ekrandan chiqarib yuborardi
+                // (360px ekranda kartochka 441px bo'lib ketgan edi).
+                'grid-stagger-card group flex min-h-44 min-w-0 flex-col rounded-2xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-200 sm:p-5',
                 interactive && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 className,
             )}
@@ -46,12 +49,23 @@ export const CatalogCard = ({ id, title, subtitle, metrics, footer, actions, onC
                     {initialsOf(title)}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h2 className="font-display font-semibold leading-snug text-foreground group-hover:text-primary transition-colors">{title}</h2>
+                    <h2 className="font-display font-semibold leading-snug text-foreground break-words group-hover:text-primary transition-colors">{title}</h2>
                     {subtitle && <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>}
                 </div>
-                {actions && <div onClick={(event) => event.stopPropagation()}>{actions}</div>}
                 {interactive && <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />}
             </div>
+
+            {/* Amal tugmalari sarlavha bilan bitta qatorda emas, alohida qatorda.
+                Ilgari ular yonma-yon turardi va uzun nomli kartochkada sarlavhaga
+                ~40px qolib, matn har qatorda bitta harfdan chiqib ketardi. */}
+            {actions && (
+                <div
+                    className="mt-3 flex flex-wrap items-center gap-1.5"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {actions}
+                </div>
+            )}
 
             <dl className={cn('mt-4 grid gap-2 border-t border-border/60 pt-4', metrics.length >= 3 ? 'grid-cols-3' : 'grid-cols-2')}>
                 {metrics.map((metric) => (

@@ -55,7 +55,7 @@ async def _complete_quiz(auth_client, *, subject_id: int, group_id: int, lecture
 
 @pytest.mark.asyncio
 async def test_filter_results_by_faculty_and_kafedra(
-    auth_client, test_subject, test_group, test_faculty, test_kafedra, test_teacher
+    auth_client, make_faculty, make_kafedra, test_subject, test_group, test_faculty, test_kafedra, test_teacher
 ):
     await _complete_quiz(
         auth_client,
@@ -78,15 +78,13 @@ async def test_filter_results_by_faculty_and_kafedra(
     assert by_kafedra.json()["total"] == 1
 
     # Чужие факультет и кафедра результат не показывают.
-    other_faculty = await auth_client.post("/faculty/", json={"name": "Boshqa fakultet"})
-    assert other_faculty.status_code == 201
-    other_kafedra = await auth_client.post(
-        "/kafedra/", json={"name": "Boshqa kafedra", "faculty_id": other_faculty.json()["id"]}
-    )
-    assert other_kafedra.status_code == 201
+    # POST /faculty/ va /kafedra/ kommentga olindi (EPOS maʼlumoti) — qatorlar
+    # repository orqali yaratiladi.
+    other_faculty = await make_faculty("Boshqa fakultet")
+    other_kafedra = await make_kafedra("Boshqa kafedra", other_faculty["id"])
 
-    assert (await auth_client.get("/result/", params={"faculty_id": other_faculty.json()["id"]})).json()["total"] == 0
-    assert (await auth_client.get("/result/", params={"kafedra_id": other_kafedra.json()["id"]})).json()["total"] == 0
+    assert (await auth_client.get("/result/", params={"faculty_id": other_faculty["id"]})).json()["total"] == 0
+    assert (await auth_client.get("/result/", params={"kafedra_id": other_kafedra["id"]})).json()["total"] == 0
 
     # Оба фильтра вместе — пересечение, а не объединение.
     both_match = await auth_client.get(
@@ -94,6 +92,6 @@ async def test_filter_results_by_faculty_and_kafedra(
     )
     assert both_match.json()["total"] == 1
     mixed = await auth_client.get(
-        "/result/", params={"faculty_id": test_faculty["id"], "kafedra_id": other_kafedra.json()["id"]}
+        "/result/", params={"faculty_id": test_faculty["id"], "kafedra_id": other_kafedra["id"]}
     )
     assert mixed.json()["total"] == 0

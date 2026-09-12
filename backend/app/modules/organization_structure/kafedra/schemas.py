@@ -30,12 +30,19 @@ class KafedraCreateResponse(ExternalRefFields):
 
 
 class KafedraListRequest(BaseModel):
+    # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
     # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
     # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
-    include_hidden: bool = False
+    # include_hidden: bool = False
 
     name: Optional[str] = None
     faculty_id: Optional[int] = None
+
+    #: name. Saralash serverda; kafedra kartochkasidagi sanoqlar bo'yicha
+    #: saralash esa frontda qoladi — ular alohida statistika so'rovidan
+    #: keladi va butun ro'yxat uchun birdan o'qiladi.
+    sort_by: Optional[str] = None
+    order: str = "asc"
 
     page: int = 1
 

@@ -24,6 +24,8 @@ export function QuizVideoMonitoring({
     const warningsRef = useRef(0);
     const lastWarningTimeRef = useRef(0);
     const [showWarningText, setShowWarningText] = useState(false);
+    // Sensorli ekranda hover yo'q — holat paneli bosish bilan ochiladi.
+    const [statusOpen, setStatusOpen] = useState(false);
     const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleViolation = useCallback((imageData: string, type: 'multiple' | 'different') => {
@@ -76,7 +78,14 @@ export function QuizVideoMonitoring({
     const hasError = !!state.error;
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 group">
+        // `bottom-6` telefonda home-indikator chizig'i ustiga tushardi —
+        // `mb-safe` uni ko'taradi. `onClick` esa holat panelini ochadi: u
+        // ilgari faqat hoverga bog'langan edi va sensorli ekranda umuman
+        // ochilmasdi.
+        <div
+            className="group fixed bottom-6 right-6 z-50 mb-safe"
+            onClick={() => setStatusOpen((v) => !v)}
+        >
             {/* Hidden video to ensure events fire reliably in all browsers */}
             <video ref={videoRef} className="hidden" playsInline muted autoPlay />
 
@@ -140,8 +149,13 @@ export function QuizVideoMonitoring({
                     </div>
                 )}
 
-                {/* Hover Status Details */}
-                <div className="absolute right-full mr-4 bottom-0 w-44 pointer-events-none opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0">
+                {/* Status Details — sichqonchada hoverda, sensorli ekranda bosilganda */}
+                <div
+                    className={cn(
+                        'absolute right-full mr-4 bottom-0 w-44 pointer-events-none transition-all duration-500 md:opacity-0 md:translate-x-4 md:group-hover:opacity-100 md:group-hover:translate-x-0',
+                        statusOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4',
+                    )}
+                >
                     <div className="bg-card/95 backdrop-blur-md rounded-xl p-3 shadow-xl border border-border">
                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/60">
                             {hasError ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <UserCheck className="h-3.5 w-3.5 text-primary" />}

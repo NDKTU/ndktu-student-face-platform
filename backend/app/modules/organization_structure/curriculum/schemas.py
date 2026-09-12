@@ -26,7 +26,8 @@ class CurriculumResponse(ExternalRefFields):
 class CurriculumListRequest(BaseModel):
     # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
     # yozuv koʻrinmaydi.
-    include_hidden: bool = False
+    # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+    # include_hidden: bool = False
 
     name: Optional[str] = None
     speciality_id: Optional[int] = None

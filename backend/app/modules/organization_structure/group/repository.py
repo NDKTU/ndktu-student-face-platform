@@ -3,12 +3,13 @@ import re
 
 from core.utils.external_guard import ensure_editable
 from fastapi import HTTPException, status
-from sqlalchemy import case, desc, func, or_, select
+from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.visibility import apply_visibility
+# Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+# from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Teacher, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher
 from app.modules.organization_structure.model import Group, TeacherGroup
@@ -100,11 +101,50 @@ class GroupRepository:
 
         return group
 
+    #: Saralash mumkin bo'lgan ustunlar. Front nomni satr sifatida yuboradi,
+    #: shuning uchun ro'yxat yopiq: begona qiymat sukut tartibga tushadi.
+    _SORTABLE = {
+        "name": Group.name,
+        "course": Group.course,
+        "student_count": Group.student_count,
+    }
+
+    @staticmethod
+    def _apply_filters(stmt, request: GroupListRequest):
+        """Ro'yxat va sanoq uchun umumiy filtrlar.
+
+        Bitta joyda turadi, chunki ikkita so'rov ajralib ketsa, jadvalda bir
+        nechta qator, «jami» da esa butun baza ko'rinardi — ekranda aynan shu
+        ko'rinardi.
+        """
+        if request.name:
+            stmt = stmt.where(Group.name.ilike(f"%{request.name}%"))
+        if request.faculty_id:
+            stmt = stmt.where(Group.faculty_id == request.faculty_id)
+        if request.speciality_id:
+            stmt = stmt.where(Group.speciality_id == request.speciality_id)
+        if request.course is not None:
+            stmt = stmt.where(Group.course == request.course)
+        if request.education_shape:
+            stmt = stmt.where(Group.education_shape.ilike(f"%{request.education_shape}%"))
+        return stmt
+
+    def _order_by(self, request: GroupListRequest):
+        column = self._SORTABLE.get(request.sort_by or "")
+        if column is None:
+            return (desc(Group.created_at),)
+        direction = desc if request.order == "desc" else asc
+        # Ikkilamchi `id` — sahifalar orasida barqaror tartib uchun: `course`
+        # va `student_count` da teng qiymatlar ko'p, ularsiz bir xil qator
+        # ikkinchi sahifada qayta chiqishi mumkin edi.
+        return (direction(column), Group.id)
+
     async def list_groups(
         self, session: AsyncSession, request: GroupListRequest, current_user: User
     ) -> GroupListResponse:
         stmt = select(Group)
-        stmt = apply_visibility(stmt, Group, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # stmt = apply_visibility(stmt, Group, current_user, request.include_hidden)
 
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
@@ -142,16 +182,9 @@ class GroupRepository:
                 TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == request.teacher_id))
             )
 
-        if request.name:
-            stmt = stmt.where(Group.name.ilike(f"%{request.name}%"))
+        stmt = self._apply_filters(stmt, request)
 
-        if request.faculty_id:
-            stmt = stmt.where(Group.faculty_id == request.faculty_id)
-
-        if request.speciality_id:
-            stmt = stmt.where(Group.speciality_id == request.speciality_id)
-
-        stmt = stmt.order_by(desc(Group.created_at))
+        stmt = stmt.order_by(*self._order_by(request))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
@@ -159,7 +192,8 @@ class GroupRepository:
 
         # --- Count query ---
         count_stmt = select(func.count()).select_from(Group)
-        count_stmt = apply_visibility(count_stmt, Group, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # count_stmt = apply_visibility(count_stmt, Group, current_user, request.include_hidden)
 
         if is_admin:
             pass
@@ -177,12 +211,7 @@ class GroupRepository:
             count_stmt = count_stmt.join(TeacherGroup, Group.id == TeacherGroup.group_id).where(
                 TeacherGroup.teacher_id.in_(select(Teacher.id).where(Teacher.user_id == request.teacher_id))
             )
-        if request.name:
-            count_stmt = count_stmt.where(Group.name.ilike(f"%{request.name}%"))
-        if request.faculty_id:
-            count_stmt = count_stmt.where(Group.faculty_id == request.faculty_id)
-        if request.speciality_id:
-            count_stmt = count_stmt.where(Group.speciality_id == request.speciality_id)
+        count_stmt = self._apply_filters(count_stmt, request)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0

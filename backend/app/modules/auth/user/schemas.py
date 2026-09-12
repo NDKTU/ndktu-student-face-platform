@@ -107,6 +107,15 @@ class UserListRequest(BaseModel):
     page: int = 1
     limit: int = 10
     username: str | None = None
+    #: Rol bo'yicha filtr. Serverda, chunki 10 mingdan ortiq foydalanuvchida
+    #: sahifaga kelgan 15 qatorni filtrlash «topilmadi» degan bo'sh ro'yxat
+    #: bergan, sahifalash esa baribir o'nlab sahifani ko'rsatib turgan.
+    role_id: int | None = None
+
+    #: id | username | created_at. Saralash ham serverda: aks holda tartib
+    #: faqat ochilgan sahifa ichida ishlardi.
+    sort_by: str | None = None
+    order: str = "asc"
 
     @property
     def offset(self) -> int:
@@ -194,7 +203,12 @@ class UserLoginRequest(BaseModel):
     def validate_username(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Username cannot be empty")
-        return value.strip().lower()
+        # Registr o'zgartirilmaydi: login EPMOS'ga aynan shu ko'rinishda
+        # uzatiladi, u yerda esa registr muhim. Kichik harfga keltirilganda
+        # harfli loginlar ("MM001", "SIM002" — bazada 312 ta shunday xodim)
+        # EPMOS'dan 400 olardi. Mahalliy qidiruv registrga bog'liq emas
+        # (`UserService.get_user_by_username`).
+        return value.strip()
 
     @field_validator("password", mode="before")
     def validate_password(cls, value: str) -> str:

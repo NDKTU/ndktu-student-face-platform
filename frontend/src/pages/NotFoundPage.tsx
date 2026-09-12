@@ -6,7 +6,7 @@ const NotFoundPage = () => {
     const { t } = useTranslation();
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 text-center">
+        <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-4 text-center">
             <p className="font-display text-8xl font-bold tracking-tight text-primary">404</p>
             <div>
                 <h1 className="text-xl font-semibold text-foreground">{t('Sahifa topilmadi')}</h1>

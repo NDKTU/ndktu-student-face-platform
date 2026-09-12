@@ -7,7 +7,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.visibility import apply_visibility
+# Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+# from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import User
 from app.modules.organization_structure.model import Faculty
 
@@ -68,7 +69,8 @@ class FacultyRepository:
         self, session: AsyncSession, request: FacultyListRequest, current_user: User
     ) -> FacultyListResponse:
         stmt = select(Faculty)
-        stmt = apply_visibility(stmt, Faculty, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # stmt = apply_visibility(stmt, Faculty, current_user, request.include_hidden)
 
         if request.name:
             stmt = stmt.where(Faculty.name.ilike(f"%{request.name}%"))
@@ -80,7 +82,8 @@ class FacultyRepository:
         faculties = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Faculty)
-        count_stmt = apply_visibility(count_stmt, Faculty, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # count_stmt = apply_visibility(count_stmt, Faculty, current_user, request.include_hidden)
         if request.name:
             count_stmt = count_stmt.where(Faculty.name.ilike(f"%{request.name}%"))
 

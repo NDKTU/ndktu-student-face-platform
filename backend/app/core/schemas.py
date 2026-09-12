@@ -33,16 +33,18 @@ class ExternalRefFields(BaseModel):
     synced_at: TashkentDatetime | None = None
     is_active: bool = True
 
-    # Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki
-    # («manbada hali bormi»), bu esa adminning qarori.
-    is_hidden: bool = False
+    # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py`).
+    # Bazadagi `is_hidden` ustuni joyida qoldi, lekin javobga chiqmaydi.
+    # # Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki
+    # # («manbada hali bormi»), bu esa adminning qarori.
+    # is_hidden: bool = False
 
 
-class VisibilityRequest(BaseModel):
-    """Spravochnik yozuvini yashirish yoki qaytarish.
-
-    Faqat admin uchun. `is_active` dan farqli — u sinxronizatsiyaniki, bu esa
-    adminning qaroridir; ikkalasidan biri yoqilgan boʻlsa yozuv koʻrinmaydi.
-    """
-
-    is_hidden: bool
+# class VisibilityRequest(BaseModel):
+#     """Spravochnik yozuvini yashirish yoki qaytarish.
+#
+#     Faqat admin uchun. `is_active` dan farqli — u sinxronizatsiyaniki, bu esa
+#     adminning qaroridir; ikkalasidan biri yoqilgan boʻlsa yozuv koʻrinmaydi.
+#     """
+#
+#     is_hidden: bool

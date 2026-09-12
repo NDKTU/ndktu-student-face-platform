@@ -2,6 +2,7 @@ import logging
 from datetime import date, datetime
 
 from fastapi import HTTPException, status
+from core.utils.sorting import order_by_clause
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -65,7 +66,16 @@ class StudentRepository:
         if request.group_id is not None:
             stmt = stmt.where(Student.group_id == request.group_id)
 
-        stmt = stmt.order_by(desc(Student.created_at))
+        sortable = {
+            "name": Student.full_name,
+            "user_id": Student.user_id,
+            "created_at": Student.created_at,
+        }
+        stmt = stmt.order_by(
+            *order_by_clause(
+                sortable, request.sort_by, request.order, desc(Student.created_at), Student.id
+            )
+        )
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)

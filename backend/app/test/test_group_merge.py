@@ -181,16 +181,16 @@ async def test_non_latin_suffix_is_a_different_group(async_db, test_faculty):
 
 
 @pytest.mark.asyncio
-async def test_same_name_in_another_faculty_is_not_a_duplicate(async_db, test_faculty, auth_client):
+async def test_same_name_in_another_faculty_is_not_a_duplicate(async_db, make_faculty, test_faculty, auth_client):
     from app.modules.organization_structure.model import Group
 
-    other = await auth_client.post("/faculty/", json={"name": "Mining Faculty"})
-    assert other.status_code == 201
+    # POST /faculty/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali yaratiladi.
+    other = await make_faculty("Mining Faculty")
 
     async_db.add_all(
         [
             Group(name="101-24 KM", faculty_id=test_faculty["id"], external_source="eduplan", synced_at=ESKI),
-            Group(name="101-24 KM", faculty_id=other.json()["id"], external_source="eduplan", synced_at=YANGI),
+            Group(name="101-24 KM", faculty_id=other["id"], external_source="eduplan", synced_at=YANGI),
         ]
     )
     await async_db.commit()

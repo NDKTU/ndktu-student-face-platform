@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
+import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -50,6 +51,22 @@ export const CurriculumsPage = () => {
         }, 350);
         return () => clearTimeout(timer);
     }, [search]);
+
+    const activeFilterCount =
+        (search ? 1 : 0) +
+        (faculty !== 'all' ? 1 : 0) +
+        (kafedra !== 'all' ? 1 : 0) +
+        (form !== 'all' ? 1 : 0) +
+        (type !== 'all' ? 1 : 0);
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setFaculty('all');
+        setKafedra('all');
+        setForm('all');
+        setType('all');
+        setPage(1);
+    };
 
     const { data: facultiesData } = useFaculties();
     // Filtr ro'yxati tanlangan fakultetga qisqaradi…
@@ -184,11 +201,18 @@ export const CurriculumsPage = () => {
                         </div>
                     </div>
 
-                    {data && (
-                        <div className="text-sm text-muted-foreground">
-                            Jami: {data.total} ta reja
-                        </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {data && (
+                            <div className="text-sm text-muted-foreground">
+                                Jami: {data.total} ta reja
+                            </div>
+                        )}
+                        <ClearFiltersButton
+                            className="ml-auto"
+                            count={activeFilterCount}
+                            onClick={handleClearFilters}
+                        />
+                    </div>
                 </CardContent>
             </Card>
 
@@ -211,10 +235,10 @@ export const CurriculumsPage = () => {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Reja nomi</TableHead>
-                                        <TableHead>Fakultet</TableHead>
-                                        <TableHead>Kafedra</TableHead>
-                                        <TableHead>Shakl</TableHead>
-                                        <TableHead>Daraja</TableHead>
+                                        <TableHead className="hidden md:table-cell">Fakultet</TableHead>
+                                        <TableHead className="hidden lg:table-cell">Kafedra</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Shakl</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Daraja</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -250,18 +274,18 @@ export const CurriculumsPage = () => {
                                                         <InactiveBadge row={row} />
                                                     </div>
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="hidden md:table-cell">
                                                     {row.faculty_id
                                                         ? facultyName.get(row.faculty_id) ?? '—'
                                                         : '—'}
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="hidden lg:table-cell">
                                                     {row.kafedra_id
                                                         ? kafedraName.get(row.kafedra_id) ?? '—'
                                                         : '—'}
                                                 </TableCell>
-                                                <TableCell>{row.education_form ?? '—'}</TableCell>
-                                                <TableCell>{row.education_type ?? '—'}</TableCell>
+                                                <TableCell className="hidden sm:table-cell">{row.education_form ?? '—'}</TableCell>
+                                                <TableCell className="hidden sm:table-cell">{row.education_type ?? '—'}</TableCell>
                                             </TableRow>
                                         ))
                                     )}

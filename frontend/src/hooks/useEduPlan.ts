@@ -131,6 +131,15 @@ export const useSyncWorkloads = () => {
     });
 };
 
+/**
+ * Yuklamani koʻrib chiqish: sinxronlash bilan bir xil hisob, faqat yozilmaydi.
+ * Kesh yangilanmaydi — hech narsa oʻzgarmagan.
+ */
+export const usePreviewWorkloads = () =>
+    useMutation({
+        mutationFn: () => eduplanService.previewWorkloads(),
+    });
+
 /** Bitta boʻlim boʻyicha koʻrib chiqish: nima oʻzgarishini koʻrsatadi, yozmaydi. */
 export const usePreviewEntity = (entity: EduPlanEntity) =>
     useMutation({

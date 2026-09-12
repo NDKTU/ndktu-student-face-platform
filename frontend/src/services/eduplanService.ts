@@ -181,6 +181,8 @@ export interface WorkloadSyncResult {
     created: number;
     updated: number;
     deactivated: number;
+    /** `true` — bu faqat koʻrsatuv edi, baza oʻzgarmadi. */
+    dry_run?: boolean;
 }
 
 /**
@@ -343,6 +345,22 @@ export const eduplanService = {
     /** Oxirgi prognning holati. `null` — hali progn boʻlmagan. */
     runState: async () => {
         const response = await api.get<RunState | null>('/integration/eduplan/run/status');
+        return response.data;
+    },
+    /**
+     * Yuklamani koʻrib chiqish: xuddi shu hisob, lekin bazaga yozilmaydi.
+     * Backend prognni oxirigacha bajaradi va tranzaksiyani qaytaradi, shuning
+     * uchun «qoʻshiladi/yangilanadi» sonlari haqiqiy.
+     */
+    previewWorkloads: async (academicYearId?: number) => {
+        const response = await api.post<WorkloadSyncResult>(
+            '/integration/eduplan/workloads/preview',
+            null,
+            {
+                timeout: SYNC_TIMEOUT_MS,
+                ...(academicYearId ? { params: { academic_year_id: academicYearId } } : {}),
+            },
+        );
         return response.data;
     },
     /** Yuklamalarni sinxronlash: o'qituvchi-fan-guruh biriktirmalari. */

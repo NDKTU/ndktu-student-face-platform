@@ -15,7 +15,6 @@ import {
     ArrowUp,
     ArrowDown,
     Archive,
-    X,
 } from 'lucide-react';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
@@ -23,6 +22,7 @@ import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useTeachers } from '@/hooks/useTeachers';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import type { Course } from '@/services/courseService';
 import { CourseModal } from '@/components/courses/CourseModal';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
@@ -33,6 +33,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Combobox } from '@/components/ui/Combobox';
 import { COURSE_TYPE_OPTIONS, courseTypeLabel, type CourseType } from '@/services/courseTypes';
+import { SEMESTER_OPTIONS } from '@/utils/semester';
 
 type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -65,7 +66,9 @@ export const CoursesPage = () => {
 
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
 
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -74,6 +77,9 @@ export const CoursesPage = () => {
     const [filterGroupId, setFilterGroupId] = useState<string>('all');
     const [filterTeacherId, setFilterTeacherId] = useState<string>('all');
     const [filterCourseType, setFilterCourseType] = useState<string>('all');
+    // Semestr — kuzgi (1) yoki bahorgi (2). Filtrlash serverda: `semester_number`
+    // `CourseListRequest` da allaqachon bor, sahifada esa faqat saralash bor edi.
+    const [filterSemester, setFilterSemester] = useState<string>('all');
     // Arxiv — EPOS yuklamasidan yo'qolgan kurslar. Ular o'chirilmaydi (jurnal
     // ularga bog'langan), lekin faol ro'yxatda ham turmasligi kerak.
     const [showArchived, setShowArchived] = useState(false);
@@ -93,6 +99,7 @@ export const CoursesPage = () => {
     const parsedTeacherId = filterTeacherId !== 'all' && filterTeacherId ? Number(filterTeacherId) : undefined;
     const parsedCourseType =
         filterCourseType !== 'all' && filterCourseType ? (filterCourseType as CourseType) : undefined;
+    const parsedSemester = filterSemester !== 'all' && filterSemester ? Number(filterSemester) : undefined;
 
     const {
         data: coursesData,
@@ -106,7 +113,11 @@ export const CoursesPage = () => {
         subjectId: parsedSubjectId,
         groupId: parsedGroupId,
         courseType: parsedCourseType,
+        semesterNumber: parsedSemester,
         isActive: showArchived ? false : undefined,
+        search: debouncedSearch,
+        sortBy: sortField,
+        order: sortOrder,
     });
 
     // Filtrlar serverda qidiradi, mijozda emas. Ilgari birinchi 500 satr
@@ -151,9 +162,9 @@ export const CoursesPage = () => {
 
     const deleteCourseMutation = useDeleteCourse();
 
-    const rawCourses = coursesData?.courses || [];
+    const courses = coursesData?.courses || [];
     const totalPages = coursesData ? Math.ceil(coursesData.total / pageSize) : 1;
-    const totalCount = coursesData?.total ?? rawCourses.length;
+    const totalCount = coursesData?.total ?? courses.length;
 
     const allSubjects = allSubjectsData?.subjects || [];
     const allGroups = allGroupsData?.groups || [];
@@ -182,13 +193,14 @@ export const CoursesPage = () => {
 
     // Filtrlarning bir qismi serverga ketadi, bir qismi (qidiruv) mijozda
     // ishlaydi — tozalash tugmasi ikkalasini ham nolga qaytaradi.
-    const hasActiveFilters =
-        Boolean(searchTerm)
-        || filterSubjectId !== 'all'
-        || filterGroupId !== 'all'
-        || filterTeacherId !== 'all'
-        || filterCourseType !== 'all'
-        || showArchived;
+    const activeFilterCount =
+        (searchTerm ? 1 : 0)
+        + (filterSubjectId !== 'all' ? 1 : 0)
+        + (filterGroupId !== 'all' ? 1 : 0)
+        + (filterTeacherId !== 'all' ? 1 : 0)
+        + (filterCourseType !== 'all' ? 1 : 0)
+        + (filterSemester !== 'all' ? 1 : 0)
+        + (showArchived ? 1 : 0);
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -196,6 +208,7 @@ export const CoursesPage = () => {
         setFilterGroupId('all');
         setFilterTeacherId('all');
         setFilterCourseType('all');
+        setFilterSemester('all');
         setShowArchived(false);
         // Combobox tanlangan qiymatni alohida eslab qoladi — u ham tozalanadi,
         // aks holda ro'yxat bo'shab, tanlov nomi ekranda qolib ketardi.
@@ -213,7 +226,14 @@ export const CoursesPage = () => {
         [],
     );
 
+    const semesterOptions = useMemo(
+        () => [{ value: 'all', label: 'Barcha semestrlar' }, ...SEMESTER_OPTIONS],
+        [],
+    );
+
     const handleSort = (field: SortField) => {
+        // Tartib o'zgargach birinchi sahifaga qaytamiz.
+        setCurrentPage(1);
         if (sortField === field) {
             setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -221,42 +241,6 @@ export const CoursesPage = () => {
             setSortOrder('asc');
         }
     };
-
-    const filteredCourses = useMemo(() => {
-        if (!debouncedSearch) return rawCourses;
-        const q = debouncedSearch.toLowerCase();
-        return rawCourses.filter((c) => {
-            const subjectName = (c.subject?.name || '').toLowerCase();
-            const teacherName = (c.teacher?.full_name || c.teacher?.username || '').toLowerCase();
-            const groupNames = (c.groups || []).map((g) => g.name.toLowerCase()).join(' ');
-            return subjectName.includes(q) || teacherName.includes(q) || groupNames.includes(q);
-        });
-    }, [rawCourses, debouncedSearch]);
-
-    const sortedCourses = useMemo(() => {
-        return [...filteredCourses].sort((a, b) => {
-            let valA: string | number = '';
-            let valB: string | number = '';
-
-            if (sortField === 'subject') {
-                valA = (a.subject?.name || '').toLowerCase();
-                valB = (b.subject?.name || '').toLowerCase();
-            } else if (sortField === 'teacher') {
-                valA = (a.teacher?.full_name || a.teacher?.username || '').toLowerCase();
-                valB = (b.teacher?.full_name || b.teacher?.username || '').toLowerCase();
-            } else if (sortField === 'type') {
-                valA = courseTypeLabel(a.course_type)?.toLowerCase() || '';
-                valB = courseTypeLabel(b.course_type)?.toLowerCase() || '';
-            } else if (sortField === 'semester') {
-                valA = a.semester_number ?? 0;
-                valB = b.semester_number ?? 0;
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [filteredCourses, sortField, sortOrder]);
 
     const handleCreateCourse = () => {
         setSelectedCourse(null);
@@ -357,9 +341,11 @@ export const CoursesPage = () => {
                 searchPlaceholder="Kurs, fan yoki o'qituvchi bo'yicha..."
                 totalCount={totalCount}
                 totalLabel="Kurslar"
+                activeFilterCount={activeFilterCount}
+                onClearFilters={clearFilters}
                 extraFilters={
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={subjectOptions}
                                 value={filterSubjectId}
@@ -375,7 +361,7 @@ export const CoursesPage = () => {
                                 searchPlaceholder="Fan nomi..."
                             />
                         </div>
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={groupOptions}
                                 value={filterGroupId}
@@ -403,6 +389,18 @@ export const CoursesPage = () => {
                                 searchPlaceholder="Tur..."
                             />
                         </div>
+                        <div className="w-full sm:w-[190px]">
+                            <Combobox
+                                options={semesterOptions}
+                                value={filterSemester}
+                                onChange={(val) => {
+                                    setFilterSemester(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Semestr bo'yicha"
+                                searchPlaceholder="Semestr..."
+                            />
+                        </div>
                         <Button
                             variant={showArchived ? 'primary' : 'outline'}
                             size="sm"
@@ -417,7 +415,7 @@ export const CoursesPage = () => {
                             <span>Arxiv</span>
                         </Button>
                         {isAdmin && (
-                            <div className="w-[180px] sm:w-[220px]">
+                            <div className="w-full sm:w-[220px]">
                                 <Combobox
                                     options={teacherOptions}
                                     value={filterTeacherId}
@@ -433,17 +431,6 @@ export const CoursesPage = () => {
                                     searchPlaceholder="F.I.SH..."
                                 />
                             </div>
-                        )}
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-9 gap-1.5 text-muted-foreground"
-                                onClick={clearFilters}
-                            >
-                                <X className="h-4 w-4" />
-                                <span>Tozalash</span>
-                            </Button>
                         )}
                     </div>
                 }
@@ -478,7 +465,7 @@ export const CoursesPage = () => {
                         ))}
                     </CatalogGrid>
                 )
-            ) : sortedCourses.length === 0 ? (
+            ) : courses.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={7}
@@ -542,7 +529,7 @@ export const CoursesPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedCourses.map((course, index) => {
+                        {courses.map((course, index) => {
                             const rowNumber = (currentPage - 1) * pageSize + index + 1;
                             const subjectName = course.subject?.name || `Fan #${course.subject_id}`;
                             const teacherName =
@@ -619,7 +606,7 @@ export const CoursesPage = () => {
             ) : (
                 /* Grid / Card View */
                 <CatalogGrid>
-                    {sortedCourses.map((course) => {
+                    {courses.map((course) => {
                         const subjectName = course.subject?.name || `Fan #${course.subject_id}`;
                         const teacherName = course.teacher?.full_name || course.teacher?.username || '—';
                         return (

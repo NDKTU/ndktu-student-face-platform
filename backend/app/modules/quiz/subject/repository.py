@@ -2,11 +2,13 @@ import logging
 
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
+from core.utils.sorting import order_by_clause
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.visibility import apply_visibility
+# Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+# from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Teacher, TeacherSubject, User
 from app.modules.quiz.model import Subject
 
@@ -59,7 +61,8 @@ class SubjectRepository:
         self, session: AsyncSession, request: SubjectListRequest, current_user: User
     ) -> SubjectListResponse:
         stmt = select(Subject)
-        stmt = apply_visibility(stmt, Subject, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # stmt = apply_visibility(stmt, Subject, current_user, request.include_hidden)
 
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
@@ -92,14 +95,20 @@ class SubjectRepository:
         if request.name:
             stmt = stmt.where(Subject.name.ilike(f"%{request.name}%"))
 
-        stmt = stmt.order_by(desc(Subject.created_at))
+        sortable = {"id": Subject.id, "name": Subject.name, "created_at": Subject.created_at}
+        stmt = stmt.order_by(
+            *order_by_clause(
+                sortable, request.sort_by, request.order, desc(Subject.created_at), Subject.id
+            )
+        )
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
         subjects = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Subject)
-        count_stmt = apply_visibility(count_stmt, Subject, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # count_stmt = apply_visibility(count_stmt, Subject, current_user, request.include_hidden)
 
         if is_admin:
             pass

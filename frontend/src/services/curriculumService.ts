@@ -24,8 +24,9 @@ export interface Curriculum {
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;
-    /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
+    // is_hidden?: boolean;
 }
 
 export interface CurriculumListResponse {
@@ -44,14 +45,15 @@ export interface CurriculumFilters {
     faculty_id?: number;
     education_form?: string;
     education_type?: string;
-    includeHidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // includeHidden?: boolean;
 }
 
 export const curriculumService = {
     getCurriculums: async (filters: CurriculumFilters = {}) => {
-        const { includeHidden, page = 1, limit = 50, ...rest } = filters;
+        const { page = 1, limit = 50, ...rest } = filters;
         const response = await api.get<CurriculumListResponse>('/curriculum/', {
-            params: { page, limit, ...rest, include_hidden: includeHidden || undefined },
+            params: { page, limit, ...rest },
         });
         return response.data;
     },
@@ -61,11 +63,12 @@ export const curriculumService = {
         return response.data;
     },
 
-    setVisibility: async (id: number, isHidden: boolean) => {
-        const response = await api.patch<{ id: number; is_hidden: boolean }>(
-            `/curriculum/${id}/visibility`,
-            { is_hidden: isHidden },
-        );
-        return response.data;
-    },
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // setVisibility: async (id: number, isHidden: boolean) => {
+    //     const response = await api.patch<{ id: number; is_hidden: boolean }>(
+    //         `/curriculum/${id}/visibility`,
+    //         { is_hidden: isHidden },
+    //     );
+    //     return response.data;
+    // },
 };

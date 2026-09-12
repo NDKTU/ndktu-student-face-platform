@@ -1,12 +1,12 @@
-import { toast } from 'sonner';
+// import { /* toast */ } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import {
-    Plus,
-    Pencil,
-    Trash2,
+    // Plus,
+    // Pencil,
+    // Trash2,
     ArrowRight,
     ArrowUpDown,
     ArrowUp,
@@ -14,19 +14,20 @@ import {
     CheckCircle2,
     XCircle,
 } from 'lucide-react';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
-import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
+// Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+// import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
 import { facultyService, type Faculty, type FacultyStats } from '@/services/facultyService';
 import { kafedraService, type Kafedra } from '@/services/kafedraService';
 import { specialityService, type Speciality } from '@/services/specialityService';
 import { groupService, type Group } from '@/services/groupService';
 import { studentService, type Student } from '@/services/studentService';
-import { PermissionGate } from '@/components/auth/PermissionGate';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
-import { FacultyModal } from '@/components/faculty/FacultyModal';
+// import { /* FacultyModal */ } from '@/components/faculty/FacultyModal';
 import { FacultyKafedrasView } from '@/components/faculty/FacultyKafedrasView';
 import { KafedraSpecialitiesView } from '@/components/faculty/KafedraSpecialitiesView';
 import { SpecialityGroupsView } from '@/components/faculty/SpecialityGroupsView';
@@ -38,6 +39,7 @@ import { CatalogCard } from '@/components/catalog/CatalogCard';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { logger } from '@/utils/logger';
 import { cn } from '@/lib/utils';
+import { useCatalogView } from '@/hooks/useCatalogView';
 
 type SortField = 'name' | 'kafedra_count' | 'speciality_count' | 'student_count';
 type SortOrder = 'asc' | 'desc';
@@ -51,20 +53,24 @@ export const FacultyPage = () => {
     const [stats, setStats] = useState<Map<number, FacultyStats>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
-    const [showHidden, setShowHidden] = useState(false);
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+//     const [showHidden, setShowHidden] = useState(false);
     const [isError, setIsError] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [facultyToDelete, setFacultyToDelete] = useState<Faculty | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS maʼlumoti: fakultet yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga olindi.
+    //     const [isModalOpen, setIsModalOpen] = useState(false);
+    //     const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+    //     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    //     const [facultyToDelete, setFacultyToDelete] = useState<Faculty | null>(null);
+    //     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -200,7 +206,7 @@ export const FacultyPage = () => {
             setIsLoading(true);
             setIsError(false);
             const [data, statsList] = await Promise.all([
-                facultyService.getFaculties(currentPage, pageSize, debouncedSearch, showHidden),
+                facultyService.getFaculties(currentPage, pageSize, debouncedSearch),
                 facultyService.getFacultyStats().catch(() => [] as FacultyStats[]),
             ]);
             setFaculties(data.faculties);
@@ -226,7 +232,7 @@ export const FacultyPage = () => {
         if (hierarchyLevel === 'faculties') {
             void fetchData();
         }
-    }, [currentPage, debouncedSearch, hierarchyLevel, showHidden]);
+    }, [currentPage, debouncedSearch, hierarchyLevel]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -264,45 +270,46 @@ export const FacultyPage = () => {
         });
     }, [faculties, sortField, sortOrder, stats]);
 
-    const handleDeleteClick = (faculty: Faculty) => {
-        setFacultyToDelete(faculty);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!facultyToDelete) return;
-        try {
-            await facultyService.deleteFaculty(facultyToDelete.id, cascadeWarnings.length > 0);
-            setFaculties((prev) => prev.filter((item) => item.id !== facultyToDelete.id));
-            toast.success("Fakultet o'chirildi");
-            setIsDeleteModalOpen(false);
-            setFacultyToDelete(null);
-            setCascadeWarnings([]);
-        } catch (error: any) {
-            if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                setCascadeWarnings(error.response.data.detail.warnings || []);
-            } else {
-                logger.error("Fakultetni o'chirishda xatolik", error);
-                toast.error("O'chirishda xatolik yuz berdi");
-                setIsDeleteModalOpen(false);
-                setFacultyToDelete(null);
-                setCascadeWarnings([]);
-            }
-        }
-    };
-
-    const handleSuccess = (savedFaculty?: Faculty) => {
-        setIsModalOpen(false);
-        if (savedFaculty) {
-            if (selectedFaculty) {
-                setFaculties((prev) => prev.map((f) => (f.id === savedFaculty.id ? savedFaculty : f)));
-            } else {
-                setFaculties((prev) => [...prev, savedFaculty]);
-            }
-        } else {
-            fetchData();
-        }
-    };
+    // EPOS maʼlumoti: fakultet yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga olindi.
+    //     const handleDeleteClick = (faculty: Faculty) => {
+    //         setFacultyToDelete(faculty);
+    //         setIsDeleteModalOpen(true);
+    //     };
+    //
+    //     const handleConfirmDelete = async () => {
+    //         if (!facultyToDelete) return;
+    //         try {
+    //             await facultyService.deleteFaculty(facultyToDelete.id, cascadeWarnings.length > 0);
+    //             setFaculties((prev) => prev.filter((item) => item.id !== facultyToDelete.id));
+    //             toast.success("Fakultet o'chirildi");
+    //             setIsDeleteModalOpen(false);
+    //             setFacultyToDelete(null);
+    //             setCascadeWarnings([]);
+    //         } catch (error: any) {
+    //             if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+    //                 setCascadeWarnings(error.response.data.detail.warnings || []);
+    //             } else {
+    //                 logger.error("Fakultetni o'chirishda xatolik", error);
+    //                 toast.error("O'chirishda xatolik yuz berdi");
+    //                 setIsDeleteModalOpen(false);
+    //                 setFacultyToDelete(null);
+    //                 setCascadeWarnings([]);
+    //             }
+    //         }
+    //     };
+    //
+    //     const handleSuccess = (savedFaculty?: Faculty) => {
+    //         setIsModalOpen(false);
+    //         if (savedFaculty) {
+    //             if (selectedFaculty) {
+    //                 setFaculties((prev) => prev.map((f) => (f.id === savedFaculty.id ? savedFaculty : f)));
+    //             } else {
+    //                 setFaculties((prev) => [...prev, savedFaculty]);
+    //             }
+    //         } else {
+    //             fetchData();
+    //         }
+    //     };
 
     // Navigation Handlers with URL synchronization
     const navigateToKafedras = (faculty: Faculty) => {
@@ -480,6 +487,7 @@ export const FacultyPage = () => {
 
     const renderActions = (faculty: Faculty) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS ma'lumoti: tahrirlash/o'chirish 2026-09-11 da kommentga olindi.
             {!isExternal(faculty) && (
                 <>
                     <PermissionGate permission="update:faculty">
@@ -513,6 +521,8 @@ export const FacultyPage = () => {
                     </PermissionGate>
                 </>
             )}
+            */}
+            {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
             <VisibilityButton
                 entity="faculty"
                 row={faculty}
@@ -520,6 +530,7 @@ export const FacultyPage = () => {
                 onDone={fetchData}
                 className="h-8 w-8 p-0"
             />
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -548,7 +559,10 @@ export const FacultyPage = () => {
                 searchPlaceholder="Fakultet nomi bo'yicha qidirish..."
                 totalCount={faculties.length}
                 totalLabel="Fakultetlar"
+                /* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                 extraFilters={<ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />}
+                */
+                /* EPOS ma'lumoti: "Qo'shish" tugmasi 2026-09-11 da kommentga olindi.
                 actions={
                     <PermissionGate permission="create:faculty">
                         <Button
@@ -564,6 +578,7 @@ export const FacultyPage = () => {
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -676,7 +691,9 @@ export const FacultyPage = () => {
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <ExternalSourceBadge row={faculty} />
                                                     <InactiveBadge row={faculty} />
+                                                    {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                                     <HiddenBadge row={faculty} />
+                                                    */}
                                                 </div>
                                             </div>
                                         </div>
@@ -742,7 +759,9 @@ export const FacultyPage = () => {
                                         <span>Fakultet</span>
                                         <ExternalSourceBadge row={faculty} />
                                         <InactiveBadge row={faculty} />
+                                        {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                         <HiddenBadge row={faculty} />
+                                        */}
                                     </span>
                                 }
                                 metrics={[
@@ -769,6 +788,7 @@ export const FacultyPage = () => {
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi — entity platformada yaratilmaydi/oʻzgartirilmaydi/oʻchirilmaydi.
             <FacultyModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
@@ -807,6 +827,7 @@ export const FacultyPage = () => {
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

@@ -10,7 +10,8 @@ export interface Subject {
     synced_at?: string | null;
     is_active?: boolean;
     /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // is_hidden?: boolean;
 }
 
 export interface SubjectListResponse {
@@ -36,12 +37,30 @@ export interface TeacherAssignedSubjectsResponse {
     subject_teachers: TeacherSubjectTeacherInfo[];
 }
 
+export interface SubjectListParams {
+    sort_by?: 'id' | 'name' | 'created_at';
+    order?: 'asc' | 'desc';
+}
+
 export const subjectService = {
-    getSubjects: async (page = 1, limit = 10, search = '', teacher_id?: number, includeHidden?: boolean) => {
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    getSubjects: async (
+        page = 1,
+        limit = 10,
+        search = '',
+        teacher_id?: number,
+        sort?: SubjectListParams,
+    ) => {
         const params: any = { page, limit };
-        if (includeHidden) params.include_hidden = true;
+        // if (includeHidden) params.include_hidden = true;
         if (search) params.name = search;
         if (teacher_id) params.teacher_id = teacher_id;
+        // Saralash serverda: sahifa ichida tartiblash butun ro'yxatni
+        // tartibsiz qoldirardi.
+        if (sort?.sort_by) {
+            params.sort_by = sort.sort_by;
+            params.order = sort.order ?? 'asc';
+        }
 
         const response = await api.get<SubjectListResponse>('/subject/', { params });
         return response.data;
@@ -57,18 +76,20 @@ export const subjectService = {
         return response.data;
     },
 
-    createSubject: async (data: { name: string }) => {
-        const response = await api.post('/subject/', data);
-        return response.data;
-    },
-
-    updateSubject: async (id: number, data: { name: string }) => {
-        const response = await api.put(`/subject/${id}`, data);
-        return response.data;
-    },
-
-    deleteSubject: async (id: number, force?: boolean) => {
-        const url = force ? `/subject/${id}?force=true` : `/subject/${id}`;
-        await api.delete(url);
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createSubject: async (data: { name: string }) => {
+    //     const response = await api.post('/subject/', data);
+    //     return response.data;
+    // },
+    //
+    // updateSubject: async (id: number, data: { name: string }) => {
+    //     const response = await api.put(`/subject/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteSubject: async (id: number, force?: boolean) => {
+    //     const url = force ? `/subject/${id}?force=true` : `/subject/${id}`;
+    //     await api.delete(url);
+    // },
 };

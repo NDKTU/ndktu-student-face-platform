@@ -1,9 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, /* useMutation, */ /* useQueryClient */ } from '@tanstack/react-query';
 import {
     teacherService,
-    type TeacherCreateRequest,
+    // type TeacherCreateRequest,
+    type TeacherListParams,
     type TeacherStudentsParams,
-    type TeacherUpdateRequest,
+    // type TeacherUpdateRequest,
 } from '@/services/teacherService';
 
 export const useTeachers = (
@@ -13,10 +14,12 @@ export const useTeachers = (
     enabled: boolean = true,
     kafedra_id?: number,
     has_courses?: boolean,
+    params?: TeacherListParams,
 ) => {
     return useQuery({
-        queryKey: ['teachers', page, limit, full_name, kafedra_id, has_courses],
-        queryFn: () => teacherService.getTeachers(page, limit, full_name, kafedra_id, has_courses),
+        queryKey: ['teachers', page, limit, full_name, kafedra_id, has_courses, params],
+        queryFn: () =>
+            teacherService.getTeachers(page, limit, full_name, kafedra_id, has_courses, params),
         placeholderData: (previousData) => previousData,
         enabled,
     });
@@ -41,59 +44,74 @@ export const useTeacher = (id: number) => {
     });
 };
 
-export const useCreateTeacher = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: TeacherCreateRequest) => teacherService.createTeacher(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useCreateTeacher = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: (data: TeacherCreateRequest) => teacherService.createTeacher(data),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//         },
+//     });
+// };
 
-export const useUpdateTeacher = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: TeacherUpdateRequest }) =>
-            teacherService.updateTeacher(id, data),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-            queryClient.invalidateQueries({ queryKey: ['teacher', data.id] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useUpdateTeacher = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ id, data }: { id: number; data: TeacherUpdateRequest }) =>
+//             teacherService.updateTeacher(id, data),
+//         onSuccess: (data) => {
+//             queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//             queryClient.invalidateQueries({ queryKey: ['teacher', data.id] });
+//         },
+//     });
+// };
 
-export const useDeleteTeacher = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, force }: { id: number; force?: boolean }) => teacherService.deleteTeacher(id, force),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        },
-    });
-}
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useDeleteTeacher = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ id, force }: { id: number; force?: boolean }) => teacherService.deleteTeacher(id, force),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//         },
+//     });
+// }
 
-export const useAssignGroups = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ teacher_id, group_ids }: { teacher_id: number; group_ids: number[] }) =>
-            teacherService.assignGroups(teacher_id, group_ids),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useAssignGroups = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ teacher_id, group_ids }: { teacher_id: number; group_ids: number[] }) =>
+//             teacherService.assignGroups(teacher_id, group_ids),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//         },
+//     });
+// };
 
-export const useAssignSubjects = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ teacher_id, subject_ids }: { teacher_id: number; subject_ids: number[] }) =>
-            teacherService.assignSubjects(teacher_id, subject_ids),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        },
-    });
-};
+// EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+// olindi — backendda ham bu endpointlar kommentda. Qaytarish uchun kommentni
+// olib tashlash kifoya.
+// export const useAssignSubjects = () => {
+//     const queryClient = useQueryClient();
+//     return useMutation({
+//         mutationFn: ({ teacher_id, subject_ids }: { teacher_id: number; subject_ids: number[] }) =>
+//             teacherService.assignSubjects(teacher_id, subject_ids),
+//         onSuccess: () => {
+//             queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//         },
+//     });
+// };
 
 export const useTeacherAssignedGroups = (userId?: number) => {
     return useQuery({

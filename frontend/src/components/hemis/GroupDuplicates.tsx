@@ -14,8 +14,8 @@ const dateLabel = (value?: string | null) => (value ? value.slice(0, 10) : '—'
  *
  * EPOS guruhning `external_id` sini almashtirsa, zerkalo uni tanimay yangi
  * qator yaratadi va eskisi talabalari, kurslari, yuklamalari bilan yonida
- * qolaveradi. Shundan keyin guruhlarni bog'lash ekranida har bir nomga
- * ikkita bir xil nomzod chiqadi va bog'lash to'xtaydi.
+ * qolaveradi. Talabalar o'sha ikkitasining qaysi biriga tushishi esa
+ * `hemis_group_id` qaysinisida turganiga bog'liq bo'lib qoladi.
  */
 export const GroupDuplicates = () => {
     const queryClient = useQueryClient();
@@ -40,7 +40,6 @@ export const GroupDuplicates = () => {
             setConfirming(false);
             queryClient.invalidateQueries({ queryKey: ['group-duplicates'] });
             queryClient.invalidateQueries({ queryKey: ['groups'] });
-            queryClient.invalidateQueries({ queryKey: ['hemis-group-match'] });
         },
         onError: (error: any) => {
             toast.error(error?.response?.data?.detail || 'Birlashtirishda xatolik');

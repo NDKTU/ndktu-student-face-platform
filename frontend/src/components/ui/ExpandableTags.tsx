@@ -16,7 +16,7 @@ export const ExpandableTags = ({ items, limit = 5 }: { items: TagItem[]; limit?:
     const displayedItems = expanded ? items : items.slice(0, limit);
 
     return (
-        <div className="flex flex-wrap gap-1 max-w-[300px]">
+        <div className="flex flex-wrap gap-1 max-w-full sm:max-w-[300px]">
             {displayedItems.map(item => (
                 <span key={item.id} className="inline-flex items-center rounded-full border border-border/50 px-2.5 py-0.5 text-xs font-semibold text-foreground bg-background">
                     {item.name}

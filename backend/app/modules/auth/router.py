@@ -48,7 +48,7 @@ from .student.schemas import (
     StudentListRequest,
     StudentListResponse,
     StudentResponse,
-    StudentUpdateRequest,
+#    StudentUpdateRequest,
     StudentWithUserListResponse,
 )
 from .teacher_assignment.repository import get_teacher_assignment_repository
@@ -59,7 +59,7 @@ from .teacher.schemas import (
     KafedraRankingResponse,
     TeacherAssignedGroupsResponse,
     TeacherAssignedSubjectsResponse,
-    TeacherCreateRequest,
+#    TeacherCreateRequest,
     TeacherCreateResponse,
     TeacherGroupAssignRequest,
     TeacherListRequest,
@@ -69,7 +69,7 @@ from .teacher.schemas import (
     TeacherStudentListRequest,
     TeacherStudentListResponse,
     TeacherSubjectAssignRequest,
-    TeacherUpdateRequest,
+#    TeacherUpdateRequest,
 )
 from .user.repository import get_user_repository
 from .user.schemas import (
@@ -391,33 +391,39 @@ async def get_student(
     return await student_repository.get_student(session, student_id)
 
 
-@student_router.put(
-    "/{student_id}",
-    response_model=StudentResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def update_student(
-    student_id: int,
-    data: StudentUpdateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:student")),
-):
-    result = await student_repository.update_student(session, student_id, data)
-    return result
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @student_router.put(
+#     "/{student_id}",
+#     response_model=StudentResponse,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def update_student(
+#     student_id: int,
+#     data: StudentUpdateRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("update:student")),
+# ):
+#     result = await student_repository.update_student(session, student_id, data)
+#     return result
 
 
-@student_router.delete(
-    "/{student_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def delete_student(
-    student_id: int,
-    force: bool = False,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:student")),
-):
-    await student_repository.delete_student(session, student_id, force)
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @student_router.delete(
+#     "/{student_id}",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def delete_student(
+#     student_id: int,
+#     force: bool = False,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("delete:student")),
+# ):
+#     await student_repository.delete_student(session, student_id, force)
 
 
 # ============================================================================
@@ -429,32 +435,38 @@ teacher_router = APIRouter(
 )
 
 
-@teacher_router.post(
-    "/",
-    response_model=TeacherCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def create_teacher(
-    data: TeacherCreateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("create:teacher")),
-):
-    result = await get_teacher_repository.create_teacher(session=session, data=data)
-    return result
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @teacher_router.post(
+#     "/",
+#     response_model=TeacherCreateResponse,
+#     status_code=status.HTTP_201_CREATED,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def create_teacher(
+#     data: TeacherCreateRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("create:teacher")),
+# ):
+#     result = await get_teacher_repository.create_teacher(session=session, data=data)
+#     return result
 
 
-@teacher_router.post(
-    "/upload_image",
-    status_code=status.HTTP_200_OK,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def upload_teacher_image(
-    file: UploadFile = File(...),
-    _: PermissionRequired = Depends(PermissionRequired("create:teacher")),
-):
-    url = await get_teacher_repository.upload_image(file=file)
-    return {"url": url}
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @teacher_router.post(
+#     "/upload_image",
+#     status_code=status.HTTP_200_OK,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def upload_teacher_image(
+#     file: UploadFile = File(...),
+#     _: PermissionRequired = Depends(PermissionRequired("create:teacher")),
+# ):
+#     url = await get_teacher_repository.upload_image(file=file)
+#     return {"url": url}
 
 
 # "/me" "/{teacher_id}" dan oldin turishi shart, aks holda "me" path
@@ -512,33 +524,39 @@ async def list_teachers(
     return await get_teacher_repository.list_teachers(session=session, request=data)
 
 
-@teacher_router.put(
-    "/{teacher_id}",
-    response_model=TeacherCreateResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def update_teacher(
-    teacher_id: int,
-    data: TeacherUpdateRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:teacher")),
-):
-    result = await get_teacher_repository.update_teacher(session=session, teacher_id=teacher_id, data=data)
-    return result
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @teacher_router.put(
+#     "/{teacher_id}",
+#     response_model=TeacherCreateResponse,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def update_teacher(
+#     teacher_id: int,
+#     data: TeacherUpdateRequest,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("update:teacher")),
+# ):
+#     result = await get_teacher_repository.update_teacher(session=session, teacher_id=teacher_id, data=data)
+#     return result
 
 
-@teacher_router.delete(
-    "/{teacher_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
-)
-async def delete_teacher(
-    teacher_id: int,
-    force: bool = False,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:teacher")),
-):
-    await get_teacher_repository.delete_teacher(session=session, teacher_id=teacher_id, force=force)
+# EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
+# kommentga olindi — entity platformada yaratilmaydi, oʻzgartirilmaydi va
+# oʻchirilmaydi. Qaytarish kerak boʻlsa — kommentni olib tashlash kifoya.
+# @teacher_router.delete(
+#     "/{teacher_id}",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+# )
+# async def delete_teacher(
+#     teacher_id: int,
+#     force: bool = False,
+#     session: AsyncSession = Depends(db_helper.session_getter),
+#     _: PermissionRequired = Depends(PermissionRequired("delete:teacher")),
+# ):
+#     await get_teacher_repository.delete_teacher(session=session, teacher_id=teacher_id, force=force)
 
 
 @teacher_router.post(

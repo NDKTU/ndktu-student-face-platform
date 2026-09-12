@@ -21,6 +21,7 @@ import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
 import { HomeworkSubmissionBox } from '@/components/courses/HomeworkSubmissionBox';
 import { Button } from '@/components/ui/Button';
+import { CardAction } from '@/components/ui/CardAction';
 import { formatDateTime } from '@/utils/date';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -168,8 +169,8 @@ export default function LessonDetailPage() {
             <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Dars videosi</CardTitle>
                 {canManageContent && (
                     video
-                        ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(video.id)}><Trash2 className="mr-2 h-4 w-4" /> Videoni olib tashlash</Button>
-                        : <Button size="sm" onClick={() => setContentKinds(['video'])}><Plus className="mr-2 h-4 w-4" /> YouTube havolasi</Button>
+                        ? <CardAction variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(video.id)} icon={<Trash2 className="h-4 w-4" />} label="Videoni olib tashlash" />
+                        : <CardAction onClick={() => setContentKinds(['video'])} icon={<Plus className="h-4 w-4" />} label="YouTube havolasi" />
                 )}
             </CardHeader><CardContent>
                 {embedUrl ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe className="h-full w-full" src={embedUrl} title={video?.title ?? lesson.topic} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
@@ -178,16 +179,16 @@ export default function LessonDetailPage() {
             </CardContent></Card>
 
             {(scripts.length > 0 || canManageContent) && <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Dars skripti / konspekti</CardTitle>
-                {canManageContent && <Button size="sm" variant="outline" onClick={() => setContentKinds(['text'])}><Plus className="mr-2 h-4 w-4" /> Konspekt qo'shish</Button>}
+                {canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['text'])} icon={<Plus className="h-4 w-4" />} label="Konspekt qo'shish" />}
             </CardHeader><CardContent className="space-y-4">{scripts.length === 0 ? <p className="text-sm text-muted-foreground">Konspekt qo'shilmagan.</p> : scripts.map((item) => <div key={item.id} className="relative rounded-xl bg-muted/40 p-4"><p className="whitespace-pre-wrap text-sm leading-7">{item.text_content}</p>{canManageContent && <DeleteButton onClick={() => deleteResource.mutate(item.id)} />}</div>)}</CardContent></Card>}
 
             <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Qo'shimcha materiallar</CardTitle>
-                {canManageContent && <Button size="sm" variant="outline" onClick={() => setContentKinds(['file', 'link'])}><Plus className="mr-2 h-4 w-4" /> Material qo'shish</Button>}
+                {canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['file', 'link'])} icon={<Plus className="h-4 w-4" />} label="Material qo'shish" />}
             </CardHeader><CardContent>
                 {extras.length === 0 ? <p className="text-sm text-muted-foreground">Hozircha kitob, hujjat yoki qo'shimcha havola yo'q.</p> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border/60 p-4">{item.resource_type === 'file' ? <FileText className="h-5 w-5 text-primary" /> : <LinkIcon className="h-5 w-5 text-primary" />}<a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: item.title } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-medium hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 text-muted-foreground" />{canManageContent && <button onClick={() => deleteResource.mutate(item.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
             </CardContent></Card>
 
-            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Uy vazifasi</CardTitle>{canManageHomework && !homework && <Button size="sm" onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Uy vazifasi</Button>}</CardHeader><CardContent>
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Uy vazifasi</CardTitle>{canManageHomework && !homework && <CardAction onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }} icon={<Plus className="h-4 w-4" />} label="Uy vazifasi" />}</CardHeader><CardContent>
                 {!homework ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : (() => { const assignment = homework; return <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {formatDateTime(assignment.deadline)}</p>{/* Kim bergani faqat vazifani boshqaradiganlarga: talabaga muddat muhim, xizmat ma'lumoti emas. */}{canManageHomework && <p className="mt-1 text-xs text-muted-foreground">Bergan: {assignment.created_by_name || "noma'lum"} · {formatDateTime(assignment.created_at)}</p>}{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>; })()}
             </CardContent></Card>
 
@@ -195,30 +196,30 @@ export default function LessonDetailPage() {
                 <div className="flex flex-wrap gap-2">
                     {canAddQuestion && (
                         <>
-                            <Button
-                                size="sm"
+                            <CardAction
                                 variant="outline"
                                 // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
                                 // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
                                 onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
-                            >
-                                <FileQuestion className="mr-2 h-4 w-4" /> Savol qo'shish
-                            </Button>
-                            <Button
-                                size="sm"
+                                icon={<FileQuestion className="h-4 w-4" />}
+                                label="Savol qo'shish"
+                            />
+                            <CardAction
                                 variant="outline"
                                 onClick={() => setExcelOpen(true)}
                                 disabled={!lessonSubjectId}
                                 title={lessonSubjectId ? undefined : 'Darsning fani aniqlanmadi'}
-                            >
-                                <Upload className="mr-2 h-4 w-4" /> Excel'dan yuklash
-                            </Button>
+                                icon={<Upload className="h-4 w-4" />}
+                                label="Excel'dan yuklash"
+                            />
                         </>
                     )}
                     {canManageQuiz && (
-                        <Button size="sm" onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}>
-                            <Plus className="mr-2 h-4 w-4" /> Test yaratish
-                        </Button>
+                        <CardAction
+                            onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}
+                            icon={<Plus className="h-4 w-4" />}
+                            label="Test yaratish"
+                        />
                     )}
                 </div>
             </CardHeader><CardContent>

@@ -346,7 +346,7 @@ export const FilesPage = () => {
                                     type="button"
                                     aria-label={`«${folder.name}» papkasini oʻchirish`}
                                     onClick={() => handleDeleteFolder(folder.id, folder.name)}
-                                    className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded hover:bg-muted"
+                                    className="opacity-100 transition-opacity focus-visible:opacity-100 p-1 rounded hover:bg-muted md:opacity-0 md:group-hover:opacity-100"
                                 >
                                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                                 </button>
@@ -378,6 +378,30 @@ export const FilesPage = () => {
                         isError={isError}
                         onRetry={refetch}
                         onRowClick={(row) => setDetailId(row.id)}
+                        // Telefonda jadval 546px edi (ekran 360px) — `renderCard`
+                        // bilan har bir fayl alohida kartochka bo'lib chiqadi.
+                        renderCard={(row) => (
+                            <button
+                                type="button"
+                                onClick={() => setDetailId(row.id)}
+                                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left"
+                            >
+                                {IMAGE_EXT.test(row.url) ? (
+                                    <img src={row.url} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded object-cover border border-border" />
+                                ) : (
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-muted">
+                                        <FileText className="h-5 w-5 text-muted-foreground" />
+                                    </span>
+                                )}
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate font-medium text-foreground">{row.title}</span>
+                                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                                        {formatSize(row.size_bytes)}
+                                        {row.usage_count > 0 && ` · ${row.usage_count} ta joyda`}
+                                    </span>
+                                </span>
+                            </button>
+                        )}
                         emptyIcon={<ImageIcon className="h-8 w-8" />}
                         emptyTitle={search ? 'Hech narsa topilmadi' : 'Kutubxona hozircha boʻsh'}
                         emptyDescription={

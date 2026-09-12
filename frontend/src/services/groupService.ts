@@ -26,7 +26,8 @@ export interface Group {
     synced_at?: string | null;
     is_active?: boolean;
     /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // is_hidden?: boolean;
 }
 
 export interface GroupListResponse {
@@ -107,6 +108,14 @@ export interface GroupMergeResult {
     moved: Record<string, number>;
 }
 
+/** Guruhlar ro'yxatining qo'shimcha server filtrlari va saralashi. */
+export interface GroupListParams {
+    course?: number;
+    education_shape?: string;
+    sort_by?: 'name' | 'course' | 'student_count';
+    order?: 'asc' | 'desc';
+}
+
 export const groupService = {
     /** Takrorlangan guruhlar ro'yxati. Hech nima yozmaydi. */
     previewDuplicates: async (): Promise<GroupDuplicatePreview> => {
@@ -122,13 +131,30 @@ export const groupService = {
         return response.data;
     },
 
-    getGroups: async (page = 1, limit = 10, search = '', teacher_id?: number, faculty_id?: number, speciality_id?: number, includeHidden?: boolean) => {
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    getGroups: async (
+        page = 1,
+        limit = 10,
+        search = '',
+        teacher_id?: number,
+        faculty_id?: number,
+        speciality_id?: number,
+        extra?: GroupListParams,
+    ) => {
         const params: any = { page, limit };
-        if (includeHidden) params.include_hidden = true;
+        // if (includeHidden) params.include_hidden = true;
         if (search) params.name = search;
         if (teacher_id) params.teacher_id = teacher_id;
         if (faculty_id) params.faculty_id = faculty_id;
         if (speciality_id) params.speciality_id = speciality_id;
+        // Kurs va ta'lim shakli — serverda: sahifaga kelgan 15 qatorni
+        // filtrlash «683 tadan 3 tasi» degan ro'yxatni berardi.
+        if (extra?.course) params.course = extra.course;
+        if (extra?.education_shape) params.education_shape = extra.education_shape;
+        if (extra?.sort_by) {
+            params.sort_by = extra.sort_by;
+            params.order = extra.order ?? 'asc';
+        }
 
         const response = await api.get<GroupListResponse>('/group/', { params });
         return response.data;
@@ -139,25 +165,27 @@ export const groupService = {
         return response.data;
     },
 
-    createGroup: async (data: { name: string; faculty_id: number }) => {
-        const response = await api.post('/group/', data);
-        return response.data;
-    },
-
-    updateGroup: async (id: number, data: { name: string; faculty_id: number }) => {
-        const response = await api.put(`/group/${id}`, data);
-        return response.data;
-    },
-
-    deleteGroup: async (id: number, force?: boolean) => {
-        const url = force ? `/group/${id}?force=true` : `/group/${id}`;
-        await api.delete(url);
-    },
-
-    getDeleteInfo: async (id: number): Promise<{ students_count: number; results_count: number }> => {
-        const response = await api.get<{ students_count: number; results_count: number }>(`/group/${id}/delete-info`);
-        return response.data;
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createGroup: async (data: { name: string; faculty_id: number }) => {
+    //     const response = await api.post('/group/', data);
+    //     return response.data;
+    // },
+    //
+    // updateGroup: async (id: number, data: { name: string; faculty_id: number }) => {
+    //     const response = await api.put(`/group/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteGroup: async (id: number, force?: boolean) => {
+    //     const url = force ? `/group/${id}?force=true` : `/group/${id}`;
+    //     await api.delete(url);
+    // },
+    //
+    // getDeleteInfo: async (id: number): Promise<{ students_count: number; results_count: number }> => {
+    //     const response = await api.get<{ students_count: number; results_count: number }>(`/group/${id}/delete-info`);
+    //     return response.data;
+    // },
 
     getGroupStudents: async (groupId: number, page = 1, limit = 200, search?: string): Promise<GroupStudentListResponse> => {
         const params: Record<string, unknown> = { page, limit };

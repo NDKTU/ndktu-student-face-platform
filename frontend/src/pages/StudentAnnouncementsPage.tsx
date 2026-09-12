@@ -73,7 +73,11 @@ export default function StudentAnnouncementsPage() {
                     description="Yangi e'lon chiqqanda u shu yerda va bosh sahifada ko'rinadi."
                 />
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
+                // `items-start`: grid qatordagi kartochkalarni bir xil
+                // balandlikka cho'zardi, natijada bannerli e'lon yonidagi
+                // qisqa e'lon yarmigacha bo'm-bo'sh turardi. Endi har
+                // kartochka o'z matniga qarab balandlikda qoladi.
+                <div className="grid items-start gap-4 sm:grid-cols-2">
                     {rows.map((announcement) => (
                         <AnnouncementCard
                             key={announcement.id}

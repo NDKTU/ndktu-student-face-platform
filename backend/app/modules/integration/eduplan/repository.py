@@ -17,11 +17,12 @@ import secrets
 from core.mixins.external_ref import SOURCE_EDUPLAN
 from core.mixins.time_stamp_mixin import utcnow_naive
 from core.utils.password_hash import hash_password_async
-from sqlalchemy import func, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Role, Teacher, User
+from app.modules.auth.model import Teacher, User, UserRole
+from app.modules.auth.user.repository import get_user_repository
 from app.modules.organization_structure.model import (
     Curriculum,
     Faculty,
@@ -233,11 +234,41 @@ class EduPlanRepository:
     async def _ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
         if any(r.name.lower() == role_name for r in user.roles):
             return
-        role = (await session.execute(select(Role).where(func.lower(Role.name) == role_name))).scalar_one_or_none()
-        if role is None:
-            logger.warning("Роль %r отсутствует, пользователю %s не назначена", role_name, user.username)
-            return
+        # Роль заводим, если её ещё нет: на свежей базе строки `roles` может
+        # не быть вовсе, и раньше прогон молча оставлял преподавателя вообще
+        # без ролей — он входил и упирался в 403 на каждом экране.
+        role = await get_user_repository.get_or_create_role(session, role_name)
         user.roles.append(role)
+
+    async def ensure_teacher_role(self, session: AsyncSession) -> int:
+        """Доводит роль `teacher` всем преподавателям, у кого её нет.
+
+        Нужно рядом с `upsert_teacher`, потому что тот отрабатывает только по
+        изменившимся строкам: у преподавателя, приехавшего прошлым прогоном,
+        предложение будет `unchanged`, и роль ему никто не выдаст. Пишем одним
+        INSERT, а не через `user.roles`: людей тысячи, и загружать каждого с
+        `selectinload` ради одной связи незачем.
+        """
+        role = await get_user_repository.get_or_create_role(session, "teacher")
+
+        # Явный flush: сессия создана с `autoflush=False`, и роли, выданные
+        # через ORM в этом же прогоне, иначе не попали бы в подзапрос — тот
+        # выдал бы их повторно (на `user_roles` нет уникального индекса).
+        await session.flush()
+
+        granted = (
+            select(UserRole.user_id)
+            .where(UserRole.role_id == role.id, UserRole.user_id == Teacher.user_id)
+            .exists()
+        )
+        stmt = select(Teacher.user_id).where(Teacher.user_id.is_not(None), ~granted).distinct()
+        user_ids = list((await session.execute(stmt)).scalars().all())
+        if not user_ids:
+            return 0
+
+        await session.execute(insert(UserRole), [{"user_id": uid, "role_id": role.id} for uid in user_ids])
+        logger.info("EduPlan: роль teacher выдана %d пользователям", len(user_ids))
+        return len(user_ids)
 
     async def upsert_teacher(
         self,

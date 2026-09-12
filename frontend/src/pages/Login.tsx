@@ -112,7 +112,7 @@ export const Login: React.FC = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="flex min-h-dvh bg-background">
             {/* EduDash brand panel */}
             <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-between p-12 relative overflow-hidden">
                 {/* Декоративные круги в тоне бренда */}

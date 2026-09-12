@@ -11,7 +11,8 @@ export interface Kafedra {
     synced_at?: string | null;
     is_active?: boolean;
     /** Admin yashirgan. `is_active` dan alohida: u sinxronizatsiyaniki. */
-    is_hidden?: boolean;
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    // is_hidden?: boolean;
 }
 
 export interface KafedraListResponse {
@@ -27,10 +28,31 @@ export interface KafedraStats {
     teacher_count: number;
 }
 
+export interface KafedraListParams {
+    sort_by?: 'name' | 'speciality_count' | 'teacher_count';
+    order?: 'asc' | 'desc';
+}
+
 export const kafedraService = {
-    getKafedras: async (page = 1, limit = 100, name?: string, faculty_id?: number, includeHidden?: boolean) => {
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+    getKafedras: async (
+        page = 1,
+        limit = 100,
+        name?: string,
+        faculty_id?: number,
+        sort?: KafedraListParams,
+    ) => {
         const response = await api.get<KafedraListResponse>('/kafedra/', {
-            params: { page, limit, name, faculty_id, include_hidden: includeHidden || undefined },
+            params: {
+                page,
+                limit,
+                name,
+                faculty_id,
+                // Saralash serverda — sanoq ustunlari ham: aks holda «eng
+                // ko'p» birinchi sahifadan tashqarida qolardi.
+                sort_by: sort?.sort_by,
+                order: sort?.sort_by ? (sort.order ?? 'asc') : undefined,
+            },
         });
         return response.data;
     },
@@ -47,18 +69,20 @@ export const kafedraService = {
         return response.data.stats;
     },
 
-    createKafedra: async (data: { name: string; faculty_id: number }) => {
-        const response = await api.post('/kafedra/', data);
-        return response.data;
-    },
-
-    updateKafedra: async (id: number, data: { name: string; faculty_id: number }) => {
-        const response = await api.put(`/kafedra/${id}`, data);
-        return response.data;
-    },
-
-    deleteKafedra: async (id: number, force?: boolean) => {
-        const url = force ? `/kafedra/${id}?force=true` : `/kafedra/${id}`;
-        await api.delete(url);
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createKafedra: async (data: { name: string; faculty_id: number }) => {
+    //     const response = await api.post('/kafedra/', data);
+    //     return response.data;
+    // },
+    //
+    // updateKafedra: async (id: number, data: { name: string; faculty_id: number }) => {
+    //     const response = await api.put(`/kafedra/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteKafedra: async (id: number, force?: boolean) => {
+    //     const url = force ? `/kafedra/${id}?force=true` : `/kafedra/${id}`;
+    //     await api.delete(url);
+    // },
 };

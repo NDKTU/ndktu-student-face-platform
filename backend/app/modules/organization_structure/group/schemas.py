@@ -43,14 +43,29 @@ class GroupCreateResponse(ExternalRefFields):
 
 
 class GroupListRequest(BaseModel):
+    # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
     # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
     # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
-    include_hidden: bool = False
+    # include_hidden: bool = False
 
     name: Optional[str] = None
     faculty_id: Optional[int] = None
     speciality_id: Optional[int] = None
     teacher_id: Optional[int] = None
+
+    #: Kurs (1..4) va ta'lim shakli — ro'yxat ekranidagi filtrlar. Ular
+    #: serverda qo'llanadi: ilgari front faqat ochilgan sahifani filtrlardi,
+    #: shuning uchun «1-kurs» 683 tadan 15 tasini ko'rib, uchtasini
+    #: ko'rsatardi va sahifalar bo'm-bo'sh chiqardi.
+    course: Optional[int] = None
+    #: EPOS satrining yozilishi turlicha ("Kunduzgi"/"kunduzgi"), shuning
+    #: uchun taqqoslash registrga bog'liq emas.
+    education_shape: Optional[str] = None
+
+    #: name | course | student_count. Saralash ham serverda: aks holda
+    #: tartib faqat ochilgan sahifa ichida ishlardi.
+    sort_by: Optional[str] = None
+    order: str = "asc"
 
     page: int = 1
 

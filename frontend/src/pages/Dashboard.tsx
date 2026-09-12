@@ -15,6 +15,7 @@ import {
     ArrowUpRight,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { userService } from '@/services/userService';
 import { teacherService } from '@/services/teacherService';
@@ -41,6 +42,8 @@ const QUICK_LINKS: { to: string; label: string; description: string; icon: React
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
+    // Diagramma o'qining kengligi class bilan boshqarilmaydi — son sifatida uzatiladi.
+    const isNarrow = useIsMobile();
 
     const { data: users,     isLoading: isUsersLoading }     = useQuery({ queryKey: ['dashboard-users'],     queryFn: () => userService.getUsers(1, 1) });
     const { data: teachers,  isLoading: isTeachersLoading }  = useQuery({ queryKey: ['dashboard-teachers'],  queryFn: () => teacherService.getTeachers(1, 1) });
@@ -119,7 +122,8 @@ const Dashboard: React.FC = () => {
                                 tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
                                 axisLine={false}
                                 tickLine={false}
-                                width={52}
+                                // Telefonda 52px o'qqa ketadigan joy diagrammaning 15% i edi.
+                                width={isNarrow ? 34 : 52}
                                 allowDecimals={false}
                                 tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
                             />

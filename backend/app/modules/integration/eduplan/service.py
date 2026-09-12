@@ -491,6 +491,12 @@ class EduPlanSyncService:
                         speciality_kafedra=speciality_kafedra,
                         result=results[entity],
                     )
+            if EduPlanEntity.teacher in entities:
+                # Роль выдаём всем преподавателям, а не только тронутым в этом
+                # прогоне: у приехавшего раньше предложение будет `unchanged`,
+                # и `upsert_teacher` до него не дойдёт — а без роли человек
+                # входит в систему и упирается в 403 на каждом экране.
+                await eduplan_repository.ensure_teacher_role(session)
             await session.commit()
         except Exception:
             await session.rollback()

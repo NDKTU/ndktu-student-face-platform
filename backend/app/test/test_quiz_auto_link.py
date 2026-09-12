@@ -45,7 +45,6 @@ async def setup_questions_and_quiz(auth_client, async_db, test_subject, test_use
 
     # Q3: Mismatch Subject (User matches)
     # Create another subject
-    await auth_client.post("/subject/", json={"name": "Other Subject"})
     from app.modules.quiz.model import Subject
 
     s2 = Subject(name="Other Subject")

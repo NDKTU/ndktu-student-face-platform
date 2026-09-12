@@ -1,4 +1,13 @@
-"""Adminning «yashirish» bayrogʻi.
+"""Adminning «yashirish» bayrogʻi — 2026-09-11 dan boshlab ISHLATILMAYDI.
+
+Yashirish funksiyasi (API, UI, filtrlar) kommentga olindi: qarang
+``app/core/utils/visibility.py``. Mixin ataylab joyida qoldirildi —
+jadvallardagi ``is_hidden`` ustuni bazada turibdi va model undan voz kechsa,
+keyingi ``alembic autogenerate`` uni tashlashni taklif qilib yuborardi.
+Ustunning qiymati hamma joyda ``false``.
+
+Quyidagi izoh funksiya ishlagan davrdagi sababni saqlaydi.
+
 
 Nega ``is_active`` dan alohida. ``is_active`` ning egasi bor — EduPlan
 sinxronizatsiyasi: EPOS'dan yoʻqolgan satr oʻchirilmaydi, `is_active = False`

@@ -4,7 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.visibility import apply_visibility
+# Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+# from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import User
 from app.modules.organization_structure.model import Curriculum
 
@@ -38,8 +39,10 @@ class CurriculumRepository:
         stmt = select(Curriculum)
         count_stmt = select(func.count()).select_from(Curriculum)
 
-        stmt = apply_visibility(stmt, Curriculum, current_user, request.include_hidden)
-        count_stmt = apply_visibility(count_stmt, Curriculum, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # stmt = apply_visibility(stmt, Curriculum, current_user, request.include_hidden)
+        # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
+        # count_stmt = apply_visibility(count_stmt, Curriculum, current_user, request.include_hidden)
 
         # Фильтры по родителям берутся из полей самого плана, а не через JOIN:
         # факультет и кафедра проставлены на строке при синхронизации.

@@ -254,6 +254,23 @@ async def eduplan_sync_entity(
 
 
 @router.post(
+    "/workloads/preview",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+)
+async def eduplan_preview_workloads(
+    academic_year_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
+):
+    """Нагрузка «на сухую»: считает те же числа, но ничего не пишет.
+
+    Прогон идёт полностью, включая запись в сессию, и в конце откатывается —
+    поэтому «создано/обновлено/деактивировано» здесь настоящие, а не оценка.
+    """
+    return await eduplan_workload_service.sync(session, academic_year_id, dry_run=True)
+
+
+@router.post(
     "/workloads",
     dependencies=[Depends(RateLimiter(times=3, seconds=60))],
 )

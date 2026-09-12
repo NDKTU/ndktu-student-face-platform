@@ -112,6 +112,9 @@ export default function AnnouncementsPage() {
         {
             key: 'registrations',
             header: "Ro'yxat",
+            // Telefonda «Ro'yxat» ustuni yashiriladi: e'lon sarlavhasi va amallar
+            // uchun joy qoladi (jadval 472px edi, ekran 360px).
+            hideBelow: 'md',
             cell: (row) =>
                 row.registration_enabled ? (
                     <button

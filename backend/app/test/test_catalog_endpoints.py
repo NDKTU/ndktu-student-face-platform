@@ -10,12 +10,11 @@ async def test_catalog_and_analytics_endpoints(
     test_group,
     test_subject,
     make_questions,
+    make_speciality,
 ):
-    speciality_response = await auth_client.post(
-        "/speciality/",
-        json={"name": "Software systems", "kafedra_id": test_kafedra["id"]},
-    )
-    assert speciality_response.status_code == 201
+    # POST /speciality/ kommentga olindi (EPOS maʼlumoti) — qator repository orqali
+    # yaratiladi, statistika endpointlari esa avvalgidek tekshiriladi.
+    await make_speciality("Software systems", test_kafedra["id"])
 
     kafedra_stats = await auth_client.get("/kafedra/stats", params={"faculty_id": test_faculty["id"]})
     assert kafedra_stats.status_code == 200

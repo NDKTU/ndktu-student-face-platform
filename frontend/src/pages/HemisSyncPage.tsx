@@ -13,7 +13,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { hemisService } from '@/services/hemisService';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
-import { HemisGroupMatch } from '@/components/hemis/HemisGroupMatch';
+import { HemisDataToken } from '@/components/hemis/HemisDataToken';
 import { GroupDuplicates } from '@/components/hemis/GroupDuplicates';
 import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
 
@@ -114,16 +114,16 @@ const HemisSyncPage = () => {
 
     // Login/parolsiz kirilganda bu sahifa endi xato emas: bitta talabaning
     // sehrgari o'sha parametrlar bilan ochiladi, ularsiz esa ommaviy
-    // vositalar — token va guruhlarni bog'lash — ko'rsatiladi.
+    // vositalar — token va talabalar importi — ko'rsatiladi.
     if (!login || !password) {
         return (
             <div className="space-y-5">
                 <PageHeader
                     title="HEMIS sinxronizatsiyasi"
-                    description="Ma'lumot API tokeni va guruhlarni bog'lash. Bitta talabani sinxronlash talabalar sahifasidan ochiladi."
+                    description="Ma'lumot API tokeni va talabalar importi. Bitta talabani sinxronlash talabalar sahifasidan ochiladi."
                 />
                 <GroupDuplicates />
-                <HemisGroupMatch />
+                <HemisDataToken />
                 <HemisStudentImport />
             </div>
         );
@@ -134,7 +134,7 @@ const HemisSyncPage = () => {
         const desc = isComplete ? "Ma'lumotlar saqlandi, yo'naltirilmoqda..." : "Hemis tizimi bilan xavfsiz aloqa o'rnatilmoqda...";
         const step = isComplete ? 2 : isSyncing ? 1 : 0;
         return (
-            <div className="min-h-[70vh] flex flex-col items-center justify-center gap-10 -mt-12">
+            <div className="min-h-[70dvh] flex flex-col items-center justify-center gap-10 -mt-12">
                 <StepIndicator current={step} />
                 <div className="relative">
                     {isComplete ? (

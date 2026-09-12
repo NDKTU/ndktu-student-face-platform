@@ -9,12 +9,15 @@
 * **Ключ сопоставления — `student_id_number`.** У всех наших студентов он
   уникален и совпадает с `username`; идентификаторы HEMIS (`id`, `meta_id`)
   меняются между системами, номер студента — нет.
-* **Группы не создаются.** Оргструктура — зеркало EPOS, и HEMIS в ней ничего
-  не заводит. Если группа ещё не привязана (`groups.hemis_group_id`), студент
-  импортируется без группы и попадает в отчёт.
-* **Существующую группу не обнуляем.** Непривязанная группа HEMIS — это наша
-  недоделка в сопоставлении, а не повод отобрать у студента группу, которая
-  уже проставлена.
+* **Группы не создаются, и студент без группы не импортируется.**
+  Оргструктура — зеркало EPOS, и HEMIS в ней ничего не заводит. Если группа
+  HEMIS не привязана (`groups.hemis_group_id`), студента пропускаем целиком:
+  безгрупповая запись не видна ни в одном списке по группам, не попадает ни в
+  один тест и существует только как мусор, который потом некому разобрать.
+  Такие люди считаются отдельно и показываются в отчёте — чинится это на
+  стороне EPOS, откуда приезжает `hemis_group_id`.
+* **Существующую группу не обнуляем.** Пропуск касается импорта; у того, кому
+  группа уже проставлена, отбирать её непривязанность HEMIS не должна.
 * **Пустое значение из HEMIS ничего не затирает.** Списочный API беднее
   личного `/account/me`: `phone` в нём `null`, а `avg_gpa` — ноль у всех.
   Безусловная запись стёрла бы тысячи телефонов и средних баллов, которые
@@ -210,11 +213,16 @@ class HemisStudentSync:
             if sid:
                 unique[sid] = item
 
+        # Группу, которой нет в нашем зеркале, импортировать некуда, поэтому
+        # такой студент не попадает ни в одну из рабочих выборок — ни здесь,
+        # ни в предпросмотре. Так `create_count`/`update_count` показывают
+        # ровно то, что произойдёт, а не число с вычетом где-то в интерфейсе.
         to_create, to_update, no_group = [], [], []
         for sid, item in unique.items():
             hemis_group = str((item.get("group") or {}).get("id") or "")
             if hemis_group not in group_map:
                 no_group.append(sid)
+                continue
             (to_update if sid in existing else to_create).append(item)
 
         # При инкрементальном прогоне выдача — лишь изменившиеся, и «нет в
@@ -376,22 +384,10 @@ class HemisStudentSync:
         plan = await self._classify(session, items, incremental=since is not None)
         group_map = plan["group_map"]
 
-        # Adminning uchta belgisi. Toifalar kesishadi: guruhsiz talaba ayni
-        # paytda yangi yoki yangilanadigan ham bo'ladi, shuning uchun
-        # «guruhsiz» belgisi olib tashlansa, ular ikkala ro'yxatdan ham
-        # chiqariladi — aks holda belgi hech narsani o'zgartirmagan bo'lardi.
-        no_group = set(plan["no_group"])
+        # Безгрупповых в `plan` уже нет — `_classify` не кладёт их ни в одну
+        # выборку. Они считаются отдельно (`no_group`), а `excluded` остаётся
+        # про сознательный выбор администратора.
         excluded = 0
-
-        def keep(item: dict) -> bool:
-            sid = item.get("student_id_number") or ""
-            return data.include_no_group or sid not in no_group
-
-        if not data.include_no_group:
-            before = len(plan["create"]) + len(plan["update"])
-            plan["create"] = [i for i in plan["create"] if keep(i)]
-            plan["update"] = [i for i in plan["update"] if keep(i)]
-            excluded += before - len(plan["create"]) - len(plan["update"])
 
         if not data.include_create:
             excluded += len(plan["create"])

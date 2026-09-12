@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { ArrowRight, ChevronRight, FolderEdit } from 'lucide-react';
+import { ArrowRight, ChevronRight, /* FolderEdit */ } from 'lucide-react';
 import { useStudents } from '@/hooks/useStudents';
-import { ChangeGroupModal } from '@/components/ChangeGroupModal';
+// import { /* ChangeGroupModal */ } from '@/components/ChangeGroupModal';
 import type { Faculty } from '@/services/facultyService';
 import type { Kafedra } from '@/services/kafedraService';
 import type { Speciality } from '@/services/specialityService';
@@ -40,7 +40,8 @@ export const GroupStudentsView = ({
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [studentToMove, setStudentToMove] = useState<Student | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [studentToMove, setStudentToMove] = useState<Student | null>(null);
 
     const pageSize = 15;
 
@@ -121,6 +122,7 @@ export const GroupStudentsView = ({
             className: 'text-right pr-4',
             cell: (student) => (
                 <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                     <Button
                         variant="ghost"
                         size="sm"
@@ -133,6 +135,7 @@ export const GroupStudentsView = ({
                     >
                         <FolderEdit className="h-4 w-4" />
                     </Button>
+                    */}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -192,6 +195,7 @@ export const GroupStudentsView = ({
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1">
+                                        {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -203,6 +207,7 @@ export const GroupStudentsView = ({
                                         >
                                             <FolderEdit className="h-4 w-4" />
                                         </Button>
+                                        */}
                                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                 </div>
@@ -221,6 +226,7 @@ export const GroupStudentsView = ({
                 />
             )}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ChangeGroupModal
                 isOpen={!!studentToMove}
                 onClose={() => setStudentToMove(null)}
@@ -230,6 +236,7 @@ export const GroupStudentsView = ({
                     refetch();
                 }}
             />
+            */}
         </div>
     );
 };

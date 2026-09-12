@@ -39,7 +39,21 @@ logger = logging.getLogger(__name__)
 
 
 class EduPlanWorkloadService:
-    async def sync(self, session: AsyncSession, academic_year_id: int | None = None) -> dict:
+    async def sync(
+        self,
+        session: AsyncSession,
+        academic_year_id: int | None = None,
+        *,
+        dry_run: bool = False,
+    ) -> dict:
+        """Импортировать нагрузку. При ``dry_run`` ничего не сохраняется.
+
+        Предпросмотр считает те же самые числа, что и обычный прогон: расчёт
+        идёт до конца, включая ``_persist`` и ``_deactivate_missing``, и только
+        в конце транзакция откатывается вместо коммита. Иначе «создано» и
+        «обновлено» пришлось бы считать вторым, отдельно написанным кодом — он
+        неизбежно разошёлся бы с настоящим прогоном.
+        """
         async with EduPlanClient(await effective_config(session)) as client:
             if academic_year_id is None:
                 years = await client.academic_years()
@@ -141,7 +155,10 @@ class EduPlanWorkloadService:
             set(collapsed),
         )
 
-        await session.commit()
+        if dry_run:
+            await session.rollback()
+        else:
+            await session.commit()
 
         stats.update(
             {
@@ -149,9 +166,14 @@ class EduPlanWorkloadService:
                 "created": created,
                 "updated": updated,
                 "deactivated": deactivated,
+                "dry_run": dry_run,
             }
         )
-        logger.info("EduPlan: нагрузка импортирована, %s", stats)
+        logger.info(
+            "EduPlan: нагрузка %s, %s",
+            "просмотрена (dry-run)" if dry_run else "импортирована",
+            stats,
+        )
         return stats
 
     # ------------------------------------------------------------------ #

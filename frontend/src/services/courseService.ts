@@ -85,6 +85,10 @@ export interface CourseListFilters {
     specialityId?: number;
     /** `false` — arxiv. Yuborilmasa faqat faol kurslar. */
     isActive?: boolean;
+    /** Fan, o'qituvchi, guruh yoki kurs nomi bo'yicha qidiruv — serverda. */
+    search?: string;
+    sortBy?: 'subject' | 'teacher' | 'semester' | 'type';
+    order?: 'asc' | 'desc';
 }
 
 export interface CourseListResponse {
@@ -124,6 +128,13 @@ export const courseService = {
         if (filters.specialityId) params.speciality_id = filters.specialityId;
         // Yuborilmasa server faqat faol kurslarni qaytaradi.
         if (filters.isActive === false) params.is_active = false;
+        // Qidiruv va saralash ham serverda: ilgari ular ochilgan sahifaning
+        // ichida ishlar, ikkinchi sahifadagi kurs esa «topilmadi» bo'lardi.
+        if (filters.search?.trim()) params.search = filters.search.trim();
+        if (filters.sortBy) {
+            params.sort_by = filters.sortBy;
+            params.order = filters.order ?? 'asc';
+        }
 
         const response = await api.get<CourseListResponse>('/course/', { params });
         return response.data;

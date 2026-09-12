@@ -255,6 +255,28 @@
     font-family: 'JetBrains Mono Variable', 'Fira Code', monospace;
   }
 
+  /* --- Mobil utilitalar -------------------------------------------------
+     Telefonda «notch» va home-indikator ostiga tushib qolmaslik uchun.
+     `viewport-fit=cover` index.html da yoqilgan, usiz env() nolga teng.     */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--pb-safe-extra, 0px));
+  }
+  .pt-safe {
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--pt-safe-extra, 0px));
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Barmoq uchun eng kichik nishon. Sensorli qurilmadagina qo'llanadi:
+     sichqoncha bilan ishlaganda 32px tugmalar ixcham ko'rinishni saqlaydi. */
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
   /* Thin overlay-style scrollbar for the sidebar and tab strips */
   .custom-scrollbar {
     scrollbar-width: thin;

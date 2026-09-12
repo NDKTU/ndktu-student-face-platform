@@ -7,9 +7,10 @@ from sqlalchemy.orm import selectinload
 
 from app.core.enums import course_type_label, semester_label
 from app.core.utils.course_access import ROLE_MAIN, can_manage, can_own, manageable_course_ids
+from app.core.utils.sorting import order_by_clause
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson
-from app.modules.organization_structure.model import Group, Kafedra
+from app.modules.organization_structure.model import Group, Kafedra, TeacherGroup
 from app.modules.quiz.model import Subject
 
 from .schemas import (
@@ -377,6 +378,8 @@ class CourseRepository:
         # degan savolga ikki manbadan javob berish kerak boʻlmasligi uchun.
         session.add(CourseTeacher(course_id=course.id, user_id=data.teacher_id, role=ROLE_MAIN))
 
+        await self._link_teacher_scope(session, data.teacher_id, data.subject_id, group_ids)
+
         try:
             await session.commit()
         except Exception as e:
@@ -447,12 +450,50 @@ class CourseRepository:
         if request.group_id:
             sub = select(CourseGroup.course_id).where(CourseGroup.group_id == request.group_id)
             filters.append(Course.id.in_(sub))
+        if request.search:
+            # Qidiruv kursning o'zida emas, unga bog'liq nomlarda: ekranda
+            # admin aynan fan, o'qituvchi va guruh nomini ko'rib turadi.
+            pattern = f"%{request.search.strip()}%"
+            filters.append(
+                or_(
+                    Course.name.ilike(pattern),
+                    select(Subject.id)
+                    .where(Subject.id == Course.subject_id, Subject.name.ilike(pattern))
+                    .exists(),
+                    select(User.id)
+                    .where(User.id == Course.teacher_id, User.username.ilike(pattern))
+                    .exists(),
+                    select(Teacher.id)
+                    .where(Teacher.user_id == Course.teacher_id, Teacher.full_name.ilike(pattern))
+                    .exists(),
+                    select(CourseGroup.id)
+                    .join(Group, Group.id == CourseGroup.group_id)
+                    .where(CourseGroup.course_id == Course.id, Group.name.ilike(pattern))
+                    .exists(),
+                )
+            )
 
         for f in filters:
             stmt = stmt.where(f)
             count_stmt = count_stmt.where(f)
 
-        stmt = stmt.order_by(desc(Course.id)).offset(request.offset).limit(request.limit)
+        # Fan va o'qituvchi — bog'liq jadvallarda, shuning uchun skalyar
+        # ichki so'rov: JOIN qo'shsak, `count` ham o'zgarishi kerak bo'lardi.
+        sortable = {
+            "subject": select(Subject.name).where(Subject.id == Course.subject_id).scalar_subquery(),
+            "teacher": select(Teacher.full_name)
+            .where(Teacher.user_id == Course.teacher_id)
+            .scalar_subquery(),
+            "semester": Course.semester_number,
+            "type": Course.course_type,
+        }
+        stmt = (
+            stmt.order_by(
+                *order_by_clause(sortable, request.sort_by, request.order, desc(Course.id), Course.id)
+            )
+            .offset(request.offset)
+            .limit(request.limit)
+        )
         courses = (await session.execute(stmt)).scalars().all()
         total = (await session.execute(count_stmt)).scalar() or 0
 
@@ -528,6 +569,11 @@ class CourseRepository:
                 session, course.subject_id, final_group_ids, course.semester_number, course.course_type
             )
 
+        # Yaratishdagi kabi: yangi fan yoki yangi guruh paydo boʻlsa, ular
+        # oʻqituvchiga ham biriktiriladi. Kursdan olib tashlangani esa
+        # uzilmaydi — bu satrlar faqat shu kursga tegishli emas.
+        await self._link_teacher_scope(session, course.teacher_id, course.subject_id, final_group_ids)
+
         try:
             await session.commit()
         except Exception as e:
@@ -552,6 +598,69 @@ class CourseRepository:
 
     async def get_course_orm(self, session: AsyncSession, course_id: int) -> Course:
         return await self._load_with_relations(session, course_id)
+
+    async def _link_teacher_scope(
+        self,
+        session: AsyncSession,
+        teacher_user_id: int,
+        subject_id: int,
+        group_ids: list[int],
+    ) -> None:
+        """Kurs oʻqituvchiga fan va guruhlarni ham biriktiradi.
+
+        Kurs bu uchlikni allaqachon bilib turadi, lekin oʻqituvchining kirish
+        huquqi ``teacher_subject`` va ``teacher_group`` dan oʻqiladi: darslar,
+        testlar va natijalar koʻrinishi oʻshalarga tayanadi. Biriktirilmasa,
+        oʻqituvchi oʻzi uchun ochilgan kursning guruhini ham koʻrmasdi va uni
+        admin qoʻlda ikkinchi marta biriktirishi kerak boʻlardi.
+
+        Hech narsa oʻchirilmaydi: bu satrlar bitta kursga tegishli emas, ular
+        boshqa kurslardan, EPOS yuklamasidan yoki adminning qoʻlidan kelgan
+        boʻlishi mumkin.
+
+        ``courses.teacher_id`` — bu ``users.id``, ikkala jadval esa
+        ``teachers.id`` ga qaraydi, shuning uchun avval oʻqituvchi satri
+        topiladi. Satr yoʻq boʻlsa (masalan, kursni admin oʻziga ochgan),
+        jimgina chetlab oʻtamiz — kurs yaratilishi buzilmasligi kerak.
+        """
+        teacher = (
+            await session.execute(select(Teacher).where(Teacher.user_id == teacher_user_id))
+        ).scalar_one_or_none()
+        if teacher is None:
+            logger.info(
+                "Kurs foydalanuvchisi %s oʻqituvchi sifatida roʻyxatda yoʻq — "
+                "fan va guruhlar biriktirilmadi",
+                teacher_user_id,
+            )
+            return
+
+        has_subject = await session.scalar(
+            select(TeacherSubject.id).where(
+                TeacherSubject.teacher_id == teacher.id,
+                TeacherSubject.subject_id == subject_id,
+            )
+        )
+        if has_subject is None:
+            session.add(TeacherSubject(teacher_id=teacher.id, subject_id=subject_id))
+
+        if group_ids:
+            linked = set(
+                (
+                    await session.execute(
+                        select(TeacherGroup.group_id).where(
+                            TeacherGroup.teacher_id == teacher.id,
+                            TeacherGroup.group_id.in_(group_ids),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for group_id in group_ids:
+                if group_id not in linked:
+                    session.add(TeacherGroup(teacher_id=teacher.id, group_id=group_id))
+
+        await session.flush()
 
     async def get_or_create_teacher_subject_for_course(self, session: AsyncSession, course: Course) -> TeacherSubject:
         teacher_stmt = select(Teacher).where(Teacher.user_id == course.teacher_id)

@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Pencil, Plus, Trash2, ArrowRight, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle, GraduationCap } from 'lucide-react';
+// import { /* toast */ } from 'sonner';
+import { /* Pencil, */ /* Plus, */ /* Trash2, */ ArrowRight, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle, GraduationCap } from 'lucide-react';
 import type { Faculty } from '@/services/facultyService';
 import type { Kafedra } from '@/services/kafedraService';
 import { specialityService, type Speciality, type SpecialityStats } from '@/services/specialityService';
-import { useDeleteSpeciality } from '@/hooks/useReferenceData';
+// import { /* useDeleteSpeciality */ } from '@/hooks/useReferenceData';
 import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
 import { OrganizationToolbar, FilterChipGroup } from './OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
-import { PermissionGate } from '@/components/auth/PermissionGate';
-import { SpecialityModal } from '@/components/speciality/SpecialityModal';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
+// import { /* SpecialityModal */ } from '@/components/speciality/SpecialityModal';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { useCatalogView } from '@/hooks/useCatalogView';
 
 type DegreeFilter = 'all' | 'Bakalavr' | 'Magistr';
 type SortField = 'name' | 'code' | 'group_count' | 'student_count';
@@ -36,7 +37,9 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     const [degreeFilter, setDegreeFilter] = useState<DegreeFilter>('all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -45,12 +48,17 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
     const [isError, setIsError] = useState(false);
     const pageSize = 15;
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selected, setSelected] = useState<Speciality | null>(null);
-    const [toDelete, setToDelete] = useState<Speciality | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [selected, setSelected] = useState<Speciality | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [toDelete, setToDelete] = useState<Speciality | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
-    const deleteSpeciality = useDeleteSpeciality();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteSpeciality = useDeleteSpeciality();
 
     const load = async () => {
         setIsLoading(true);
@@ -132,33 +140,35 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
         return sorted.slice(start, start + pageSize);
     }, [sorted, currentPage, pageSize]);
 
-    const closeDeleteDialog = () => {
-        setToDelete(null);
-        setCascadeWarnings([]);
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const closeDeleteDialog = () => {
+//         setToDelete(null);
+//         setCascadeWarnings([]);
+//     };
 
-    const handleConfirmDelete = () => {
-        if (!toDelete) return;
-        deleteSpeciality.mutate(
-            { id: toDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Mutaxassislik o'chirildi");
-                    closeDeleteDialog();
-                    void load();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        const detail = error.response?.data?.detail;
-                        toast.error(typeof detail === 'string' ? detail : "O'chirishda xatolik yuz berdi");
-                        closeDeleteDialog();
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = () => {
+//         if (!toDelete) return;
+//         deleteSpeciality.mutate(
+//             { id: toDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Mutaxassislik o'chirildi");
+//                     closeDeleteDialog();
+//                     void load();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         const detail = error.response?.data?.detail;
+//                         toast.error(typeof detail === 'string' ? detail : "O'chirishda xatolik yuz berdi");
+//                         closeDeleteDialog();
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -173,6 +183,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
 
     const renderActions = (speciality: Speciality) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {!isExternal(speciality) && (
                 <>
                     <PermissionGate permission="update:speciality">
@@ -207,6 +218,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                     </PermissionGate>
                 </>
             )}
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -260,6 +272,12 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                 searchPlaceholder="Mutaxassislik nomi yoki kodi bo'yicha..."
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
+                activeFilterCount={(degreeFilter !== 'all' ? 1 : 0) + (search ? 1 : 0)}
+                onClearFilters={() => {
+                    setDegreeFilter('all');
+                    setSearch('');
+                    setCurrentPage(1);
+                }}
                 chips={
                     <FilterChipGroup<DegreeFilter>
                         label="Ta'lim darajasi"
@@ -275,6 +293,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                         ]}
                     />
                 }
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:speciality">
                         <Button
@@ -290,6 +309,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -312,7 +332,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
             ) : sorted.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={8}
+                        colSpan={7}
                         title="Mutaxassisliklar topilmadi"
                         description={
                             search
@@ -327,6 +347,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                     <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
                         <TableRow className="border-b border-border/80">
                             <TableHead className="w-[50px] text-center font-bold font-mono text-xs">#</TableHead>
+                            {/* EPMOS kodi hozircha koʻrsatilmaydi — «Kodi» ustuni 2026-09-11 da yashirildi (faqat frontend, maʼlumot joyida qoladi).
                             <TableHead
                                 onClick={() => handleSort('code')}
                                 className="w-[120px] group cursor-pointer select-none font-bold text-xs hover:text-foreground"
@@ -336,6 +357,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                     {renderSortIcon('code')}
                                 </div>
                             </TableHead>
+                            */}
                             <TableHead
                                 onClick={() => handleSort('name')}
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
@@ -385,7 +407,8 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                         {rowNumber}
                                     </TableCell>
 
-                                    {/* Kodi */}
+                                    {/* Kodi — EPMOS kodi hozircha koʻrsatilmaydi, ustun 2026-09-11 da yashirildi
+                                        (faqat frontend; maʼlumot bazada va javobda joyida qoladi).
                                     <TableCell className="w-[120px]">
                                         {speciality.external_id ? (
                                             <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-bold text-foreground border border-border/80">
@@ -395,6 +418,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                                             <span className="text-xs text-muted-foreground">—</span>
                                         )}
                                     </TableCell>
+                                    */}
 
                                     {/* Mutaxassislik Nomi */}
                                     <TableCell>
@@ -497,6 +521,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {isModalOpen && (
                 <SpecialityModal
                     isOpen={isModalOpen}
@@ -510,7 +535,9 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                     }}
                 />
             )}
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={Boolean(toDelete)}
                 onClose={closeDeleteDialog}
@@ -538,6 +565,7 @@ export const KafedraSpecialitiesView = ({ faculty, kafedra, onBack, onOpenSpecia
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

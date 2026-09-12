@@ -88,7 +88,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
                     id={inputId}
                     type={inputType}
                     className={cn(
-                        'flex h-9 w-full rounded-lg border border-input bg-card px-3 py-1 text-sm',
+                        // Telefonda 44px balandlik va 16px shrift: 16px dan kichik shriftda
+                        // iOS Safari fokusda sahifani zumlab yuboradi. `md` dan yuqorida
+                        // avvalgi ixcham o'lcham qoladi.
+                        'flex h-11 w-full rounded-lg border border-input bg-card px-3 py-1 text-base md:h-9 md:text-sm',
                         'placeholder:text-muted-foreground',
                         'transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -120,7 +123,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
                 )}
 
                 {isNumber && (
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
+                    // 14px balandlikdagi tugmalarni barmoq bilan bosib bo'lmaydi —
+                    // telefonda yashiriladi, native klaviatura yetarli.
+                    <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 flex-col md:flex">
                         <button
                             type="button"
                             tabIndex={-1}

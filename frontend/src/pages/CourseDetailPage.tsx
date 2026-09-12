@@ -16,6 +16,7 @@ import { useCourse } from '@/hooks/useCourses';
 import { useDeleteLesson, useLessons } from '@/hooks/useLessons';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
+import { CardAction } from '@/components/ui/CardAction';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -215,9 +216,11 @@ export default function CourseDetailPage() {
                     <div className="flex items-center justify-between gap-3 px-0.5">
                         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Darslar</h2>
                         {canCreateLessons && (
-                            <Button onClick={openNewLesson}>
-                                <Plus className="h-4 w-4" /> Dars qo'shish
-                            </Button>
+                            <CardAction
+                                onClick={openNewLesson}
+                                icon={<Plus className="h-4 w-4" />}
+                                label="Dars qo'shish"
+                            />
                         )}
                     </div>
 

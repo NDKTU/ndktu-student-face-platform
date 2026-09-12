@@ -37,6 +37,7 @@ export interface Teacher {
         id: number;
         name: string;
         faculty_id?: number;
+        faculty?: { id: number; name: string };
     };
     user?: TeacherUserInfo;
     teacher_groups?: { group_id: number; group: { id: number; name: string } }[];
@@ -132,10 +133,30 @@ export interface TeacherStudentsParams {
     include_inactive_groups?: boolean;
 }
 
+export interface TeacherListParams {
+    sort_by?: 'name' | 'kafedra' | 'created_at';
+    order?: 'asc' | 'desc';
+}
+
 export const teacherService = {
-    getTeachers: async (page = 1, limit = 10, full_name?: string, kafedra_id?: number, has_courses?: boolean) => {
+    getTeachers: async (
+        page = 1,
+        limit = 10,
+        full_name?: string,
+        kafedra_id?: number,
+        has_courses?: boolean,
+        params?: TeacherListParams,
+    ) => {
         const response = await api.get<TeacherListResponse>('/teacher/', {
-            params: { page, limit, full_name, kafedra_id, has_courses },
+            params: {
+                page,
+                limit,
+                full_name,
+                kafedra_id,
+                has_courses,
+                sort_by: params?.sort_by,
+                order: params?.sort_by ? (params.order ?? 'asc') : undefined,
+            },
         });
         return response.data;
     },
@@ -151,30 +172,34 @@ export const teacherService = {
         return response.data;
     },
 
-    createTeacher: async (data: TeacherCreateRequest) => {
-        const response = await api.post('/teacher/', data);
-        return response.data;
-    },
+    // EPOS/HEMIS maʼlumoti: yaratish/tahrirlash/oʻchirish 2026-09-11 da kommentga
+    // olindi — backendda ham bu endpointlar kommentda.
+    // createTeacher: async (data: TeacherCreateRequest) => {
+    //     const response = await api.post('/teacher/', data);
+    //     return response.data;
+    // },
+    //
+    // updateTeacher: async (id: number, data: TeacherUpdateRequest) => {
+    //     const response = await api.put(`/teacher/${id}`, data);
+    //     return response.data;
+    // },
+    //
+    // deleteTeacher: async (id: number, force?: boolean) => {
+    //     const url = force ? `/teacher/${id}?force=true` : `/teacher/${id}`;
+    //     await api.delete(url);
+    // },
 
-    updateTeacher: async (id: number, data: TeacherUpdateRequest) => {
-        const response = await api.put(`/teacher/${id}`, data);
-        return response.data;
-    },
-
-    deleteTeacher: async (id: number, force?: boolean) => {
-        const url = force ? `/teacher/${id}?force=true` : `/teacher/${id}`;
-        await api.delete(url);
-    },
-
-    assignGroups: async (teacher_id: number, group_ids: number[]) => {
-        const response = await api.post('/teacher/assign_groups', { teacher_id, group_ids });
-        return response.data;
-    },
-
-    assignSubjects: async (teacher_id: number, subject_ids: number[]) => {
-        const response = await api.post('/teacher/assign_subjects', { teacher_id, subject_ids });
-        return response.data;
-    },
+    // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi.
+    // Backend endpointlari ataylab joyida qoldi — ularga tegilmagan.
+    // assignGroups: async (teacher_id: number, group_ids: number[]) => {
+    //     const response = await api.post('/teacher/assign_groups', { teacher_id, group_ids });
+    //     return response.data;
+    // },
+    //
+    // assignSubjects: async (teacher_id: number, subject_ids: number[]) => {
+    //     const response = await api.post('/teacher/assign_subjects', { teacher_id, subject_ids });
+    //     return response.data;
+    // },
 
     getAssignedGroups: async (userId: number): Promise<TeacherAssignedGroupsResponse> => {
         const response = await api.get<TeacherAssignedGroupsResponse>(`/teacher/assigned_groups/by-user/${userId}`);

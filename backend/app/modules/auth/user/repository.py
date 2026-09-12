@@ -1,6 +1,7 @@
 import logging
 
 from core.utils.lesson_guard import ensure_no_lessons
+from core.utils.sorting import order_by_clause
 from core.utils.password_hash import hash_password_async
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import desc, func, select
@@ -9,7 +10,16 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.utils.image_upload import save_image
-from app.modules.auth.model import Permission, Role, RolePermission, Student, Teacher, TeacherSubject, User
+from app.modules.auth.model import (
+    Permission,
+    Role,
+    RolePermission,
+    Student,
+    Teacher,
+    TeacherSubject,
+    User,
+    UserRole,
+)
 
 from .schemas import (
     UserCreateRequest,
@@ -80,6 +90,27 @@ class UserRepository:
 
         return user
 
+    #: Saralash mumkin bo'lgan ustunlar. Mijoz nomni satr bilan yuboradi,
+    #: shuning uchun ro'yxat yopiq.
+    _SORTABLE = {"id": User.id, "username": User.username, "created_at": User.created_at}
+
+    @staticmethod
+    def _list_filters(stmt, request: UserListRequest):
+        """Ro'yxat va sanoq uchun umumiy filtrlar — bitta joyda.
+
+        Ikkita so'rov ajralib ketsa, jadval bo'sh, «jami» esa butun bazani
+        ko'rsatgan bo'lardi: ekranda aynan shu ko'rinardi.
+        """
+        if request.username:
+            stmt = stmt.where(User.username.ilike(f"%{request.username}%"))
+        if request.role_id:
+            stmt = stmt.where(
+                select(UserRole.id)
+                .where(UserRole.user_id == User.id, UserRole.role_id == request.role_id)
+                .exists()
+            )
+        return stmt
+
     async def list_users(self, session: AsyncSession, request: UserListRequest) -> UserListResponse:
         # 1. Запрос на получение моделей
         stmt = select(User).options(
@@ -88,19 +119,19 @@ class UserRepository:
             selectinload(User.student).selectinload(Student.group),
         )
 
-        if request.username:
-            stmt = stmt.where(User.username.ilike(f"%{request.username}%"))
-
-        stmt = stmt.order_by(desc(User.created_at))
+        stmt = self._list_filters(stmt, request)
+        stmt = stmt.order_by(
+            *order_by_clause(
+                self._SORTABLE, request.sort_by, request.order, desc(User.created_at), User.id
+            )
+        )
         stmt = stmt.offset(request.offset).limit(request.limit)
 
         result = await session.execute(stmt)
         users = result.scalars().all()
 
         # 2. Запрос на общее количество
-        count_stmt = select(func.count()).select_from(User)
-        if request.username:
-            count_stmt = count_stmt.where(User.username.ilike(f"%{request.username}%"))
+        count_stmt = self._list_filters(select(func.count()).select_from(User), request)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -318,8 +349,20 @@ class UserRepository:
         return result_refresh.scalar_one()
 
     async def find_by_username(self, session: AsyncSession, username: str) -> User | None:
-        stmt = select(User).where(User.username == username).options(selectinload(User.roles))
-        return (await session.execute(stmt)).scalar_one_or_none()
+        """Registrga bog'liq bo'lmagan qidiruv.
+
+        EPMOS orqali kirishda muhim: xodim loginini kichik harflar bilan yozsa
+        ham, bazadagi "MM001" topilishi kerak. Qat'iy taqqoslashda
+        `_save_eduplan_user` uni topolmay, o'sha odam uchun ikkinchi hisob
+        yaratib yuborardi.
+        """
+        stmt = (
+            select(User)
+            .where(func.lower(User.username) == username.strip().lower())
+            .options(selectinload(User.roles))
+            .order_by(User.id)
+        )
+        return (await session.execute(stmt)).scalars().first()
 
     async def get_or_create_for_hemis(self, session: AsyncSession, username: str, plain_password: str) -> User:
         hashed = await hash_password_async(plain_password)
@@ -337,30 +380,41 @@ class UserRepository:
         await session.refresh(user, attribute_names=["roles"])
         return user
 
-    async def ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
+    async def get_or_create_role(self, session: AsyncSession, role_name: str) -> Role:
+        """Роль по имени; если её нет — заводит.
+
+        Отдельно от `ensure_role`, потому что синхронизациям роль нужна сама
+        по себе: они выдают её пачке пользователей одним INSERT, а не через
+        `user.roles`.
+        """
         normalized_name = role_name.strip().lower()
         role_stmt = select(Role).where(func.lower(Role.name) == normalized_name).options(selectinload(Role.permissions))
         role = (await session.execute(role_stmt)).scalar_one_or_none()
-        if not role:
-            role = Role(name=normalized_name)
-            session.add(role)
+        if role:
+            return role
+
+        role = Role(name=normalized_name)
+        session.add(role)
+        await session.flush()
+
+        # Newly-created roles start with only the "user:me" permission so a
+        # freshly provisioned account can at least fetch its own profile
+        # instead of 403-ing immediately after login. An Admin grants the
+        # rest via the Roles/Permissions UI.
+        perm_stmt = select(Permission).where(Permission.name == "user:me")
+        permission = (await session.execute(perm_stmt)).scalar_one_or_none()
+        if permission:
+            # Пишем связь напрямую через RolePermission, а не через
+            # `role.permissions.append(...)`: у только что созданного
+            # `role` коллекция `permissions` не инициализирована, и
+            # первое обращение к ней после flush уйдёт в ленивую
+            # подгрузку, которая в async-сессии падает MissingGreenlet.
+            session.add(RolePermission(role_id=role.id, permission_id=permission.id))
             await session.flush()
+        return role
 
-            # Newly-created roles start with only the "user:me" permission so a
-            # freshly provisioned account can at least fetch its own profile
-            # instead of 403-ing immediately after login. An Admin grants the
-            # rest via the Roles/Permissions UI.
-            perm_stmt = select(Permission).where(Permission.name == "user:me")
-            permission = (await session.execute(perm_stmt)).scalar_one_or_none()
-            if permission:
-                # Пишем связь напрямую через RolePermission, а не через
-                # `role.permissions.append(...)`: у только что созданного
-                # `role` коллекция `permissions` не инициализирована, и
-                # первое обращение к ней после flush уйдёт в ленивую
-                # подгрузку, которая в async-сессии падает MissingGreenlet.
-                session.add(RolePermission(role_id=role.id, permission_id=permission.id))
-                await session.flush()
-
+    async def ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
+        role = await self.get_or_create_role(session, role_name)
         if role not in user.roles:
             user.roles.append(role)
 

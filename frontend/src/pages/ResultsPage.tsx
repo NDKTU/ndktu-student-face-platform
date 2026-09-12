@@ -13,9 +13,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import {
     Loader2, FileText, X, FileSpreadsheet, Trash2,
     AlertTriangle, BookOpen, Calendar,
-    ChevronRight, Eye, ShieldAlert,
+    ChevronRight, Eye, ShieldAlert, SlidersHorizontal,
 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
+import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -105,7 +106,7 @@ const ResultCard = ({ result, onClick }: ResultCardProps) => {
                         {new Date(result.created_at).toLocaleDateString('uz-UZ')}
                     </span>
                 </div>
-                <div className="flex items-center gap-1 text-[11px] text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 text-[11px] text-primary font-medium opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                     Ko'rish <ChevronRight className="h-3 w-3" />
                 </div>
             </div>
@@ -235,6 +236,8 @@ const ResultsPage = () => {
 
     const results    = resultsData?.results || [];
     const totalPages = resultsData ? Math.ceil(resultsData.total / pageSize) : 1;
+
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const hasActiveFilters = !!(selectedFaculty || selectedKafedra || selectedGroup || selectedSubject || selectedQuiz || selectedGrade || usernameSearch || sortDir !== 'desc');
 
@@ -392,6 +395,120 @@ const ResultsPage = () => {
         });
     }
 
+    // Filtr maydonlari bir marta yoziladi: `md` dan yuqorida kartochka ichida,
+    // telefonda esa «Filtrlar» varag'i ichida ko'rsatiladi.
+    const filterFields = (
+        <div className="flex flex-wrap gap-3 items-end">
+            {isAdminOrTeacher && (
+                <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Talaba</label>
+                    <Input
+                        placeholder="Ism yoki login..."
+                        value={usernameSearch}
+                        onChange={e => setUsernameSearch(e.target.value)}
+                    />
+                </div>
+            )}
+
+            {isAdminOrTeacher && (
+                <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Talabaning fakulteti">Fakultet</label>
+                    <Combobox
+                        options={facultyOptions}
+                        value={selectedFaculty}
+                        onChange={val => setSelectedFaculty(val || '')}
+                        placeholder="Barcha fakultetlar"
+                        searchPlaceholder="Qidirish..."
+                    />
+                </div>
+            )}
+
+            {isAdminOrTeacher && (
+                <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Testni yaratgan o'qituvchining kafedrasi">Kafedra</label>
+                    <Combobox
+                        options={kafedraOptions}
+                        value={selectedKafedra}
+                        onChange={val => setSelectedKafedra(val || '')}
+                        placeholder="Barcha kafedralar"
+                        searchPlaceholder="Qidirish..."
+                    />
+                </div>
+            )}
+
+            {isAdminOrTeacher && (
+                <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guruh</label>
+                    <Combobox
+                        options={groups.map(g => ({ value: String(g.id), label: g.name }))}
+                        value={selectedGroup}
+                        onChange={val => setSelectedGroup(val || '')}
+                        placeholder="Barcha guruhlar"
+                        searchPlaceholder="Qidirish..."
+                    />
+                </div>
+            )}
+
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fan</label>
+                <Combobox
+                    options={subjectOptions}
+                    value={selectedSubject}
+                    onChange={setSelectedSubject}
+                    placeholder="Barcha fanlar"
+                    searchPlaceholder="Qidirish..."
+                />
+            </div>
+
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Test</label>
+                <Combobox
+                    options={quizOptions}
+                    value={selectedQuiz}
+                    onChange={setSelectedQuiz}
+                    placeholder="Barcha testlar"
+                    searchPlaceholder="Qidirish..."
+                />
+            </div>
+
+            <div className="flex w-full flex-col gap-1.5 sm:w-[140px]">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ball</label>
+                <Combobox
+                    options={[
+                        { value: '5', label: "5 — A'lo" },
+                        { value: '4', label: '4 — Yaxshi' },
+                        { value: '3', label: '3 — Qoniqarli' },
+                        { value: '2', label: '2 — Qoniqarsiz' },
+                    ]}
+                    value={selectedGrade}
+                    onChange={setSelectedGrade}
+                    placeholder="Barcha"
+                    searchPlaceholder="Qidirish..."
+                />
+            </div>
+
+            <div className="flex w-full flex-col gap-1.5 sm:w-[160px]">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saralash</label>
+                <Combobox
+                    options={[
+                        { value: 'desc', label: 'Oxirgi avval' },
+                        { value: 'asc', label: 'Eski avval' },
+                    ]}
+                    value={sortDir}
+                    onChange={val => setSortDir(val as 'desc' | 'asc')}
+                    placeholder="Saralash..."
+                />
+            </div>
+
+            {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="self-end">
+                    <X className="mr-1.5 h-3.5 w-3.5" />
+                    Tozalash
+                </Button>
+            )}
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             {/* Page header */}
@@ -416,120 +533,28 @@ const ResultsPage = () => {
                 <HeroStats results={results} total={resultsData.total} />
             )}
 
-            {/* Filters */}
-            <Card>
+            {/* Filters — telefonda «Filtrlar» varag'i ichida, `md` dan yuqorida avvalgidek kartochkada */}
+            <Card className="hidden md:block">
                 <CardContent className="p-4">
-                    <div className="flex flex-wrap gap-3 items-end">
-                        {isAdminOrTeacher && (
-                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
-                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Talaba</label>
-                                <Input
-                                    placeholder="Ism yoki login..."
-                                    value={usernameSearch}
-                                    onChange={e => setUsernameSearch(e.target.value)}
-                                />
-                            </div>
-                        )}
-
-                        {isAdminOrTeacher && (
-                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Talabaning fakulteti">Fakultet</label>
-                                <Combobox
-                                    options={facultyOptions}
-                                    value={selectedFaculty}
-                                    onChange={val => setSelectedFaculty(val || '')}
-                                    placeholder="Barcha fakultetlar"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            </div>
-                        )}
-
-                        {isAdminOrTeacher && (
-                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Testni yaratgan o'qituvchining kafedrasi">Kafedra</label>
-                                <Combobox
-                                    options={kafedraOptions}
-                                    value={selectedKafedra}
-                                    onChange={val => setSelectedKafedra(val || '')}
-                                    placeholder="Barcha kafedralar"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            </div>
-                        )}
-
-                        {isAdminOrTeacher && (
-                            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guruh</label>
-                                <Combobox
-                                    options={groups.map(g => ({ value: String(g.id), label: g.name }))}
-                                    value={selectedGroup}
-                                    onChange={val => setSelectedGroup(val || '')}
-                                    placeholder="Barcha guruhlar"
-                                    searchPlaceholder="Qidirish..."
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fan</label>
-                            <Combobox
-                                options={subjectOptions}
-                                value={selectedSubject}
-                                onChange={setSelectedSubject}
-                                placeholder="Barcha fanlar"
-                                searchPlaceholder="Qidirish..."
-                            />
-                        </div>
-
-                        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Test</label>
-                            <Combobox
-                                options={quizOptions}
-                                value={selectedQuiz}
-                                onChange={setSelectedQuiz}
-                                placeholder="Barcha testlar"
-                                searchPlaceholder="Qidirish..."
-                            />
-                        </div>
-
-                        <div className="flex w-full flex-col gap-1.5 sm:w-[140px]">
-                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ball</label>
-                            <Combobox
-                                options={[
-                                    { value: '5', label: "5 — A'lo" },
-                                    { value: '4', label: '4 — Yaxshi' },
-                                    { value: '3', label: '3 — Qoniqarli' },
-                                    { value: '2', label: '2 — Qoniqarsiz' },
-                                ]}
-                                value={selectedGrade}
-                                onChange={setSelectedGrade}
-                                placeholder="Barcha"
-                                searchPlaceholder="Qidirish..."
-                            />
-                        </div>
-
-                        <div className="flex w-full flex-col gap-1.5 sm:w-[160px]">
-                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saralash</label>
-                            <Combobox
-                                options={[
-                                    { value: 'desc', label: 'Oxirgi avval' },
-                                    { value: 'asc', label: 'Eski avval' },
-                                ]}
-                                value={sortDir}
-                                onChange={val => setSortDir(val as 'desc' | 'asc')}
-                                placeholder="Saralash..."
-                            />
-                        </div>
-
-                        {hasActiveFilters && (
-                            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="self-end">
-                                <X className="mr-1.5 h-3.5 w-3.5" />
-                                Tozalash
-                            </Button>
-                        )}
-                    </div>
+                    {filterFields}
                 </CardContent>
             </Card>
+
+            <div className="md:hidden">
+                <Button variant="outline" className="w-full" onClick={() => setFiltersOpen(true)}>
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    Filtrlar
+                    {hasActiveFilters && (
+                        <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
+                            yoqilgan
+                        </span>
+                    )}
+                </Button>
+            </div>
+
+            <Modal isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrlar">
+                {filterFields}
+            </Modal>
 
             {/* Content */}
             {isStudent ? (

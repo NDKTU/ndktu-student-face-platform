@@ -6,10 +6,19 @@ from app.core.schemas import ExternalRefFields, TashkentDatetime
 from app.modules.auth.user.schemas import RoleRequest, RoleResponse
 
 
+class TeacherFacultyInfo(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TeacherKafedraInfo(BaseModel):
     id: int
     name: str
     faculty_id: Optional[int] = None
+    #: Fakultetning o'zi: kartochkada raqam emas, nom ko'rsatiladi, front esa
+    #: buning uchun butun fakultetlar ro'yxatini yuklamasligi kerak.
+    faculty: Optional[TeacherFacultyInfo] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -180,6 +189,11 @@ class TeacherListRequest(BaseModel):
     #: True — faqat kursi bor o'qituvchilar. Filtr SQL darajasida qo'llanadi,
     #: aks holda `total` sahifalashda yolg'on ko'rsatardi.
     has_courses: Optional[bool] = None
+
+    #: name | kafedra | created_at. Saralash serverda, aks holda tartib faqat
+    #: ochilgan sahifa ichida ishlardi.
+    sort_by: Optional[str] = None
+    order: str = "asc"
 
     page: int = 1
 

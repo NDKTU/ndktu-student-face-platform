@@ -8,6 +8,7 @@ import { PlayCircle, Brain, User, Clock, Trophy, ChevronRight, Megaphone } from 
 import { useAnnouncementFeed } from '@/hooks/useAnnouncements';
 import { AnnouncementCard } from '@/components/announcement/AnnouncementCard';
 import { MyAttendanceCard } from '@/components/courses/MyAttendanceCard';
+import { UpcomingHomeworkCard } from '@/components/courses/UpcomingHomeworkCard';
 
 /**
  * Кабинет студента — главная страница вместо редиректа на профиль:
@@ -95,6 +96,10 @@ const StudentDashboardPage = () => {
             {/* E'lonlar — bosh sahifada ko'zga tashlanishi uchun testlardan oldin */}
             {/* Davomat — huquq bo'lsa. Hech narsa belgilanmagan bo'lsa
                 komponentning o'zi hech nima ko'rsatmaydi. */}
+            {/* Muddati yaqinlashgan vazifalar — davomatdan ham, e'londan ham
+                oldin: bu talaba bugun qiladigan ish. */}
+            {hasPermission('read:homework') && <UpcomingHomeworkCard />}
+
             {hasPermission('attendance:me') && <MyAttendanceCard />}
 
             {canSeeAnnouncements && (isLoadingAnnouncements || announcements.length > 0) && (
@@ -112,7 +117,10 @@ const StudentDashboardPage = () => {
                             <Skeleton className="h-40 w-full rounded-2xl" />
                         </div>
                     ) : (
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        // `items-start` — e'lonlar sahifasidagi bilan bir xil sabab:
+                        // bannerli e'lon yonidagi qisqa e'lon cho'zilib, yarmi
+                        // bo'm-bo'sh turardi.
+                        <div className="grid items-start gap-4 sm:grid-cols-2">
                             {announcements.map((announcement) => (
                                 <AnnouncementCard key={announcement.id} announcement={announcement} compact />
                             ))}

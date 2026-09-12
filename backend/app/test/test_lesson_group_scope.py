@@ -13,10 +13,10 @@ import pytest_asyncio
 
 
 @pytest_asyncio.fixture
-async def course_with_two_groups(auth_client, test_teacher, test_subject, test_faculty, test_kafedra):
-    first = await auth_client.post("/group/", json={"name": "LS-101", "faculty_id": test_faculty["id"]})
-    second = await auth_client.post("/group/", json={"name": "LS-102", "faculty_id": test_faculty["id"]})
-    assert first.status_code == 201 and second.status_code == 201
+async def course_with_two_groups(auth_client, make_group, test_teacher, test_subject, test_faculty, test_kafedra):
+    # POST /group/ kommentga olindi (EPOS maʼlumoti) — qatorlar repository orqali yaratiladi.
+    first = await make_group("LS-101", test_faculty["id"])
+    second = await make_group("LS-102", test_faculty["id"])
 
     course = await auth_client.post(
         "/course/",
@@ -25,7 +25,7 @@ async def course_with_two_groups(auth_client, test_teacher, test_subject, test_f
             "subject_id": test_subject.id,
             "course_type": "lecture",
             "teacher_id": test_teacher["user_id"],
-            "group_ids": [first.json()["id"], second.json()["id"]],
+            "group_ids": [first["id"], second["id"]],
             "faculty_id": test_faculty["id"],
             "kafedra_id": test_kafedra["id"],
         },
@@ -42,7 +42,7 @@ async def course_with_two_groups(auth_client, test_teacher, test_subject, test_f
         "/lesson/",
         json={
             "course_id": course.json()["id"],
-            "group_id": second.json()["id"],
+            "group_id": second["id"],
             "topic": "Faqat LS-102 uchun",
             "date": "2026-08-21",
         },
@@ -51,8 +51,8 @@ async def course_with_two_groups(auth_client, test_teacher, test_subject, test_f
 
     return {
         "course_id": course.json()["id"],
-        "first_group_id": first.json()["id"],
-        "second_group_id": second.json()["id"],
+        "first_group_id": first["id"],
+        "second_group_id": second["id"],
     }
 
 

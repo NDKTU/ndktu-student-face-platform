@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+// import { /* toast */ } from 'sonner';
 import {
-    Pencil,
-    Plus,
-    Trash2,
+    // Pencil,
+    // Plus,
+    // Trash2,
     ArrowRight,
     ArrowUpDown,
     ArrowUp,
@@ -14,15 +14,17 @@ import {
     GraduationCap,
 } from 'lucide-react';
 import { specialityService, type Speciality, type SpecialityStats } from '@/services/specialityService';
-import { useDeleteSpeciality, useFaculties, useKafedras } from '@/hooks/useReferenceData';
+import { /* useDeleteSpeciality, */ useFaculties, useKafedras } from '@/hooks/useReferenceData';
+import { useCatalogView } from '@/hooks/useCatalogView';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
-import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
+// Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+// import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
 import { OrganizationToolbar, FilterChipGroup } from '@/components/faculty/OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
-import { PermissionGate } from '@/components/auth/PermissionGate';
-import { SpecialityModal } from '@/components/speciality/SpecialityModal';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
+// import { /* SpecialityModal */ } from '@/components/speciality/SpecialityModal';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Combobox } from '@/components/ui/Combobox';
@@ -37,7 +39,8 @@ type SortOrder = 'asc' | 'desc';
 export const SpecialitiesPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
-    const [showHidden, setShowHidden] = useState(false);
+    // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
+//     const [showHidden, setShowHidden] = useState(false);
     const navigate = useNavigate();
 
     const facultyIdParam = searchParams.get('faculty_id');
@@ -50,7 +53,9 @@ export const SpecialitiesPage = () => {
     const [degreeFilter, setDegreeFilter] = useState<DegreeFilter>('all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -61,10 +66,14 @@ export const SpecialitiesPage = () => {
     const [stats, setStats] = useState<Map<number, SpecialityStats>>(new Map());
     const pageSize = 15;
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selected, setSelected] = useState<Speciality | null>(null);
-    const [toDelete, setToDelete] = useState<Speciality | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [selected, setSelected] = useState<Speciality | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [toDelete, setToDelete] = useState<Speciality | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
     const { data: facultiesData } = useFaculties();
     const { data: kafedrasData } = useKafedras(
@@ -73,7 +82,8 @@ export const SpecialitiesPage = () => {
         undefined,
         selectedFaculty !== 'all' ? Number(selectedFaculty) : undefined
     );
-    const deleteSpeciality = useDeleteSpeciality();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteSpeciality = useDeleteSpeciality();
 
     const faculties = facultiesData?.faculties || [];
     const kafedras = kafedrasData?.kafedras || [];
@@ -102,7 +112,7 @@ export const SpecialitiesPage = () => {
         try {
             const kafedraIdNum = selectedKafedra !== 'all' ? Number(selectedKafedra) : undefined;
             const [list, counters] = await Promise.all([
-                specialityService.getSpecialities(1, 1000, debouncedSearch, kafedraIdNum, showHidden),
+                specialityService.getSpecialities(1, 1000, debouncedSearch, kafedraIdNum),
                 specialityService.getSpecialityStats(kafedraIdNum),
             ]);
             setSpecialities(list.specialities);
@@ -116,7 +126,7 @@ export const SpecialitiesPage = () => {
 
     useEffect(() => {
         void loadData();
-    }, [selectedKafedra, debouncedSearch, showHidden]);
+    }, [selectedKafedra, debouncedSearch]);
 
     // Handle faculty change
     const handleFacultyChange = (fId: string) => {
@@ -224,33 +234,35 @@ export const SpecialitiesPage = () => {
         return sorted.slice(start, start + pageSize);
     }, [sorted, currentPage, pageSize]);
 
-    const closeDeleteDialog = () => {
-        setToDelete(null);
-        setCascadeWarnings([]);
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const closeDeleteDialog = () => {
+//         setToDelete(null);
+//         setCascadeWarnings([]);
+//     };
 
-    const handleConfirmDelete = () => {
-        if (!toDelete) return;
-        deleteSpeciality.mutate(
-            { id: toDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Mutaxassislik o'chirildi");
-                    closeDeleteDialog();
-                    void loadData();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        const detail = error.response?.data?.detail;
-                        toast.error(typeof detail === 'string' ? detail : "O'chirishda xatolik yuz berdi");
-                        closeDeleteDialog();
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = () => {
+//         if (!toDelete) return;
+//         deleteSpeciality.mutate(
+//             { id: toDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Mutaxassislik o'chirildi");
+//                     closeDeleteDialog();
+//                     void loadData();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         const detail = error.response?.data?.detail;
+//                         toast.error(typeof detail === 'string' ? detail : "O'chirishda xatolik yuz berdi");
+//                         closeDeleteDialog();
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -282,6 +294,7 @@ export const SpecialitiesPage = () => {
 
     const renderActions = (speciality: Speciality) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {!isExternal(speciality) && (
                 <>
                     <PermissionGate permission="update:speciality">
@@ -316,6 +329,8 @@ export const SpecialitiesPage = () => {
                     </PermissionGate>
                 </>
             )}
+            */}
+            {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
             <VisibilityButton
                 entity="speciality"
                 row={speciality}
@@ -323,6 +338,7 @@ export const SpecialitiesPage = () => {
                 onDone={loadData}
                 className="h-8 w-8 p-0"
             />
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -369,10 +385,27 @@ export const SpecialitiesPage = () => {
                 searchPlaceholder="Mutaxassislik nomi yoki kodi bo'yicha..."
                 totalCount={filtered.length}
                 totalLabel="Mutaxassisliklar"
+                activeFilterCount={
+                    (selectedFaculty !== 'all' ? 1 : 0) +
+                    (selectedKafedra !== 'all' ? 1 : 0) +
+                    (degreeFilter !== 'all' ? 1 : 0) +
+                    (search ? 1 : 0)
+                }
+                onClearFilters={() => {
+                    setSelectedFaculty('all');
+                    setSelectedKafedra('all');
+                    setDegreeFilter('all');
+                    setSearch('');
+                    setCurrentPage(1);
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.delete('faculty_id');
+                    nextParams.delete('kafedra_id');
+                    setSearchParams(nextParams);
+                }}
                 extraFilters={
                     <>
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={facultyOptions}
                                 value={selectedFaculty}
@@ -380,7 +413,7 @@ export const SpecialitiesPage = () => {
                                 placeholder="Fakultetni tanlang"
                             />
                         </div>
-                        <div className="w-[180px] sm:w-[220px]">
+                        <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={kafedraOptions}
                                 value={selectedKafedra}
@@ -389,7 +422,9 @@ export const SpecialitiesPage = () => {
                             />
                         </div>
                     </div>
+                        {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                         <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
+                        */}
                     </>
                 }
                 chips={
@@ -407,6 +442,7 @@ export const SpecialitiesPage = () => {
                         ]}
                     />
                 }
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:speciality">
                         <Button
@@ -422,6 +458,7 @@ export const SpecialitiesPage = () => {
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -444,7 +481,7 @@ export const SpecialitiesPage = () => {
             ) : sorted.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
-                        colSpan={8}
+                        colSpan={7}
                         title="Mutaxassisliklar topilmadi"
                         description={
                             search || selectedFaculty !== 'all' || selectedKafedra !== 'all'
@@ -459,6 +496,7 @@ export const SpecialitiesPage = () => {
                     <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
                         <TableRow className="border-b border-border/80">
                             <TableHead className="w-[50px] text-center font-bold font-mono text-xs">#</TableHead>
+                            {/* EPMOS kodi hozircha koʻrsatilmaydi — «Kodi» ustuni 2026-09-11 da yashirildi (faqat frontend, maʼlumot joyida qoladi).
                             <TableHead
                                 onClick={() => handleSort('code')}
                                 className="w-[120px] group cursor-pointer select-none font-bold text-xs hover:text-foreground"
@@ -468,6 +506,7 @@ export const SpecialitiesPage = () => {
                                     {renderSortIcon('code')}
                                 </div>
                             </TableHead>
+                            */}
                             <TableHead
                                 onClick={() => handleSort('name')}
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
@@ -518,7 +557,8 @@ export const SpecialitiesPage = () => {
                                         {rowNumber}
                                     </TableCell>
 
-                                    {/* Kodi */}
+                                    {/* Kodi — EPMOS kodi hozircha koʻrsatilmaydi, ustun 2026-09-11 da yashirildi
+                                        (faqat frontend; maʼlumot bazada va javobda joyida qoladi).
                                     <TableCell className="w-[120px]">
                                         {speciality.external_id ? (
                                             <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-bold text-foreground border border-border/80">
@@ -528,6 +568,7 @@ export const SpecialitiesPage = () => {
                                             <span className="text-xs text-muted-foreground">—</span>
                                         )}
                                     </TableCell>
+                                    */}
 
                                     {/* Mutaxassislik Nomi */}
                                     <TableCell>
@@ -538,7 +579,9 @@ export const SpecialitiesPage = () => {
                                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                 <ExternalSourceBadge row={speciality} />
                                                 <InactiveBadge row={speciality} />
+                                                {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                                 <HiddenBadge row={speciality} />
+                                                */}
                                             </div>
                                         </div>
                                     </TableCell>
@@ -613,7 +656,9 @@ export const SpecialitiesPage = () => {
                                         {subtitleParts.length > 0 ? subtitleParts.join(' · ') : 'Mutaxassislik'}
                                         <ExternalSourceBadge row={speciality} />
                                         <InactiveBadge row={speciality} />
+                                        {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                         <HiddenBadge row={speciality} />
+                                        */}
                                     </span>
                                 }
                                 onClick={() => navigate(`/groups?speciality_id=${speciality.id}`)}
@@ -639,6 +684,7 @@ export const SpecialitiesPage = () => {
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {isModalOpen && (
                 <SpecialityModal
                     isOpen={isModalOpen}
@@ -652,7 +698,9 @@ export const SpecialitiesPage = () => {
                     }}
                 />
             )}
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={Boolean(toDelete)}
                 onClose={closeDeleteDialog}
@@ -680,6 +728,7 @@ export const SpecialitiesPage = () => {
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

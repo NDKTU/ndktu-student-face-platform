@@ -1,24 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Pencil, Plus, Trash2, Users, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle } from 'lucide-react';
+// import { /* toast */ } from 'sonner';
+import { /* Pencil, */ /* Plus, */ /* Trash2, */ Users, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, XCircle } from 'lucide-react';
 import type { Faculty } from '@/services/facultyService';
 import type { Kafedra } from '@/services/kafedraService';
 import type { Speciality } from '@/services/specialityService';
 import { groupService, type Group } from '@/services/groupService';
-import { useDeleteGroup } from '@/hooks/useGroups';
+// import { /* useDeleteGroup */ } from '@/hooks/useGroups';
 import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
 import { OrganizationToolbar, FilterChipGroup } from './OrganizationToolbar';
 import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
-import { PermissionGate } from '@/components/auth/PermissionGate';
-import { GroupModal } from '@/components/group/GroupModal';
-import { ExternalSourceBadge, InactiveBadge, isExternal } from '@/components/common/ExternalSourceBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+// import { /* PermissionGate */ } from '@/components/auth/PermissionGate';
+// import { /* GroupModal */ } from '@/components/group/GroupModal';
+import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
+// import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { IdChip } from '@/components/common/IdChip';
+import { useCatalogView } from '@/hooks/useCatalogView';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4';
@@ -46,7 +47,9 @@ export const SpecialityGroupsView = ({
     const [courseLevelFilter, setCourseLevelFilter] = useState<CourseLevelFilter>('all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
-    const [viewMode] = useState<'table' | 'grid'>('table');
+    // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
+    // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
+    const viewMode = useCatalogView();
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -55,12 +58,17 @@ export const SpecialityGroupsView = ({
     const [isError, setIsError] = useState(false);
     const pageSize = 15;
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-    const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
-    const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [isModalOpen, setIsModalOpen] = useState(false);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
 
-    const deleteGroupMutation = useDeleteGroup();
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const deleteGroupMutation = useDeleteGroup();
 
     const load = async () => {
         setIsLoading(true);
@@ -136,32 +144,34 @@ export const SpecialityGroupsView = ({
         return sorted.slice(start, start + pageSize);
     }, [sorted, currentPage, pageSize]);
 
-    const closeDeleteDialog = () => {
-        setGroupToDelete(null);
-        setCascadeWarnings([]);
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const closeDeleteDialog = () => {
+//         setGroupToDelete(null);
+//         setCascadeWarnings([]);
+//     };
 
-    const handleConfirmDelete = () => {
-        if (!groupToDelete) return;
-        deleteGroupMutation.mutate(
-            { id: groupToDelete.id, force: cascadeWarnings.length > 0 },
-            {
-                onSuccess: () => {
-                    toast.success("Guruh o'chirildi");
-                    closeDeleteDialog();
-                    void load();
-                },
-                onError: (error: any) => {
-                    if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
-                        setCascadeWarnings(error.response.data.detail.warnings || []);
-                    } else {
-                        toast.error("O'chirishda xatolik yuz berdi");
-                        closeDeleteDialog();
-                    }
-                },
-            }
-        );
-    };
+    // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
+//     const handleConfirmDelete = () => {
+//         if (!groupToDelete) return;
+//         deleteGroupMutation.mutate(
+//             { id: groupToDelete.id, force: cascadeWarnings.length > 0 },
+//             {
+//                 onSuccess: () => {
+//                     toast.success("Guruh o'chirildi");
+//                     closeDeleteDialog();
+//                     void load();
+//                 },
+//                 onError: (error: any) => {
+//                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
+//                         setCascadeWarnings(error.response.data.detail.warnings || []);
+//                     } else {
+//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         closeDeleteDialog();
+//                     }
+//                 },
+//             }
+//         );
+//     };
 
     const renderSortIcon = (field: SortField) => {
         if (sortField !== field) {
@@ -176,6 +186,7 @@ export const SpecialityGroupsView = ({
 
     const renderActions = (group: Group) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {!isExternal(group) && (
                 <>
                     <PermissionGate permission="update:group">
@@ -210,6 +221,7 @@ export const SpecialityGroupsView = ({
                     </PermissionGate>
                 </>
             )}
+            */}
             <Button
                 variant="ghost"
                 size="sm"
@@ -273,6 +285,17 @@ export const SpecialityGroupsView = ({
                 searchPlaceholder="Guruh nomi bo'yicha qidirish..."
                 totalCount={filtered.length}
                 totalLabel="Guruhlar"
+                activeFilterCount={
+                    (educationFormFilter !== 'all' ? 1 : 0) +
+                    (courseLevelFilter !== 'all' ? 1 : 0) +
+                    (search ? 1 : 0)
+                }
+                onClearFilters={() => {
+                    setEducationFormFilter('all');
+                    setCourseLevelFilter('all');
+                    setSearch('');
+                    setCurrentPage(1);
+                }}
                 chips={
                     <div className="flex flex-wrap items-center gap-4 w-full">
                         {/* Education Form Chips */}
@@ -309,6 +332,7 @@ export const SpecialityGroupsView = ({
                         />
                     </div>
                 }
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:group">
                         <Button
@@ -324,6 +348,7 @@ export const SpecialityGroupsView = ({
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -513,6 +538,7 @@ export const SpecialityGroupsView = ({
             )}
 
             {/* Modals */}
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             {isModalOpen && (
                 <GroupModal
                     isOpen={isModalOpen}
@@ -528,7 +554,9 @@ export const SpecialityGroupsView = ({
                     }}
                 />
             )}
+            */}
 
+            {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ConfirmDialog
                 isOpen={Boolean(groupToDelete)}
                 onClose={closeDeleteDialog}
@@ -556,6 +584,7 @@ export const SpecialityGroupsView = ({
                 confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
                 cancelText="Bekor qilish"
             />
+            */}
         </div>
     );
 };

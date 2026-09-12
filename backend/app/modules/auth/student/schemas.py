@@ -77,6 +77,11 @@ class StudentListRequest(BaseModel):
     user_id: int | None = None
     group_id: int | None = None
 
+    #: name | user_id | created_at. Saralash serverda: sahifa ichida
+    #: tartiblash butun ro'yxatni tartibsiz qoldirardi.
+    sort_by: str | None = None
+    order: str = "asc"
+
     @property
     def offset(self) -> int:
         return (self.page - 1) * self.limit

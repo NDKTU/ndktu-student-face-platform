@@ -127,7 +127,6 @@ const QuestionFormPage = () => {
         }
     }, [question, reset]);
 
-    const [addAnother, setAddAnother] = useState(false);
 
     const uploaderConfig = useMemo(() => ({
         url: `${API_BASE_URL}/question/upload_image`,
@@ -167,7 +166,10 @@ const QuestionFormPage = () => {
             readonly: false,
             placeholder: 'Savol matnini kiriting...',
             minHeight: 140,
-            toolbarAdaptive: false,
+            // `true`: Jodit toolbarni ekran kengligiga qarab yig'adi (buttonsMD/SM/XS
+            // to'plamlari quyida yozilgan). `false` da telefonda tugmalar qatori
+            // yon tomonga chiqib ketardi.
+            toolbarAdaptive: true,
             buttons: [
                 'bold', 'italic', 'underline', 'strikethrough', '|',
                 'superscript', 'subscript', '|',
@@ -208,7 +210,10 @@ const QuestionFormPage = () => {
             placeholder: 'Variant matnini kiriting...',
             minHeight: 70,
             height: 80,
-            toolbarAdaptive: false,
+            // `true`: Jodit toolbarni ekran kengligiga qarab yig'adi (buttonsMD/SM/XS
+            // to'plamlari quyida yozilgan). `false` da telefonda tugmalar qatori
+            // yon tomonga chiqib ketardi.
+            toolbarAdaptive: true,
             buttons: [
                 'bold', 'italic', '|',
                 'superscript', 'subscript', '|',
@@ -252,7 +257,15 @@ const QuestionFormPage = () => {
 
     const correctOption = watch('correct_option');
 
-    const onSubmit = (data: QuestionFormValues) => {
+    /**
+     * `keepOpen` — «Saqlash va yangisini qo'shish» tugmasi uchun.
+     *
+     * Ilgari bu bayroq `useState` da turardi va tugma uni submitdan oldingi
+     * qatorda o'rnatardi: holat keyingi renderda yangilanadi, `onSubmit` esa
+     * allaqachon eski qiymatni yopib olgan bo'lardi. Natijada ikkala tugma
+     * bir xil ishlardi — ikkalasi ham sahifadan chiqib ketardi.
+     */
+    const onSubmit = (data: QuestionFormValues, keepOpen = false) => {
         if (!user) {
             toast.error('Avtorizatsiyadan o\'tilmagan');
             return;
@@ -316,7 +329,7 @@ const QuestionFormPage = () => {
         // on this page, so there's no stale id left referencing the old version.
         const onSuccess = () => {
             toast.success(isEditMode ? 'Savol yangilandi' : 'Savol yaratildi');
-            if (!isEditMode && addAnother) {
+            if (!isEditMode && keepOpen) {
                 reset({
                     subject_id: data.subject_id,
                     question_type: data.question_type,
@@ -333,7 +346,10 @@ const QuestionFormPage = () => {
                     { text: '', correct: true },
                     { text: '', correct: false },
                 ]);
-                setAddAnother(false);
+                // Yangi savol formaning boshidan boshlanadi: uzun variant
+                // kartochkalaridan keyin foydalanuvchi matn maydonini
+                // qidirib qolmasin.
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 navigate(returnTo || '/questions');
             }
@@ -452,7 +468,10 @@ const QuestionFormPage = () => {
         <div className="space-y-6 w-full mx-auto pb-10">
 
             <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/questions')}>
+                {/* Savol darsdan ochilgan bo'lsa, «Orqaga» o'sha darsga
+                    qaytaradi: `return_to` aynan shuning uchun berilgan, lekin
+                    faqat saqlashdan keyin ishlatilardi. */}
+                <Button variant="ghost" size="sm" onClick={() => navigate(returnTo || '/questions')}>
                     <ArrowLeft className="h-4 w-4 mr-1.5" />
                     Orqaga
                 </Button>
@@ -466,7 +485,7 @@ const QuestionFormPage = () => {
 
             <Card className="shadow-sm border-border/80">
                 <CardContent className="pt-6">
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <form onSubmit={handleSubmit((values) => onSubmit(values))} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-foreground">Fan</label>
@@ -699,7 +718,7 @@ const QuestionFormPage = () => {
                         )}
 
                         <div className="flex flex-wrap items-center justify-end gap-3 pt-5 border-t border-border/80">
-                            <Button type="button" variant="outline" onClick={() => navigate('/questions')}>
+                            <Button type="button" variant="outline" onClick={() => navigate(returnTo || '/questions')}>
                                 Bekor qilish
                             </Button>
                             {!isEditMode && (
@@ -707,19 +726,12 @@ const QuestionFormPage = () => {
                                     type="button"
                                     variant="secondary"
                                     disabled={isSubmitting}
-                                    onClick={() => {
-                                        setAddAnother(true);
-                                        handleSubmit(onSubmit)();
-                                    }}
+                                    onClick={() => handleSubmit((values) => onSubmit(values, true))()}
                                 >
                                     Saqlash va yangisini qo'shish
                                 </Button>
                             )}
-                            <Button
-                                type="submit"
-                                isLoading={isSubmitting}
-                                onClick={() => setAddAnother(false)}
-                            >
+                            <Button type="submit" isLoading={isSubmitting}>
                                 {isEditMode ? 'Savolni yangilash' : 'Savol yaratish'}
                             </Button>
                         </div>
