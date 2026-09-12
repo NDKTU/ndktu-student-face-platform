@@ -9,7 +9,7 @@ from fastapi_limiter import FastAPILimiter
 from sqlalchemy import text
 
 from .admin_user import ensure_admin_user
-from .assignment import assign_admin_permissions
+from .assignment import assign_admin_permissions, seed_role_permissions
 from .discovery import discover_permissions
 from .permissions import sync_permissions
 from .roles import sync_admin_role
@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 #: Ishga tushishdagi urugʻlantirish bir vaqtda bitta jarayonda ketsin.
 #:
-#: Nega kerak. ``sync_admin_role``, ``ensure_admin_user`` va
-#: ``assign_admin_permissions`` «tekshir, keyin qoʻsh» naqshida yozilgan.
+#: Nega kerak. ``sync_admin_role``, ``ensure_admin_user``,
+#: ``assign_admin_permissions`` va ``seed_role_permissions`` «tekshir,
+#: keyin qoʻsh» naqshida yozilgan.
 #: Bir nechta worker barobar koʻtarilganda boʻsh bazada ikkovi ham «Admin
 #: roli yoʻq» deb koʻradi va ikkovi ham qoʻshadi — ``roles.name`` UNIQUE
 #: boʻlgani uchun biri ``UniqueViolation`` bilan yiqiladi.
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 #: Bu jimgina sodir boʻladi va hech qayerda bilinmaydi.
 #:
 #: ``sync_permissions`` allaqachon ``ON CONFLICT DO NOTHING`` bilan
-#: himoyalangan; qulf qolgan uchtasi uchun.
+#: himoyalangan; qulf qolgan toʻrttasi uchun.
 SEED_LOCK_KEY = "startup:seed:lock"
 #: Urugʻlantirish sekundning ichida tugaydi; TTL faqat jarayon oʻrtada
 #: oʻlib qolsa qulf abadiy qolib ketmasligi uchun.
@@ -113,7 +114,11 @@ async def _seed_admin_locked(app: FastAPI) -> None:
             await assign_admin_permissions(session, discovered_permissions, existing_perms, admin_role)
             await ensure_admin_user(session, admin_role)
 
-            logger.info("Admin role/permissions initialization complete.")
+            # O'qituvchi va talaba rollari: yetishmaganini qo'shadi, hech
+            # narsa olib tashlamaydi (izohlar `defaults.py` da).
+            await seed_role_permissions(session, existing_perms)
+
+            logger.info("Role/permission initialization complete.")
 
         except Exception as e:
             logger.exception(f"Error initializing database: {e}")
