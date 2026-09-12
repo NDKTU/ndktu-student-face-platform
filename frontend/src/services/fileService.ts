@@ -39,6 +39,8 @@ export interface LibraryFolder {
     name: string;
     parent_id: number | null;
     file_count: number;
+    /** Birinchi yuklashda avtomatik ochilgan shaxsiy papka. */
+    is_personal: boolean;
 }
 
 export interface FileListParams {
@@ -66,6 +68,17 @@ export const fileService = {
 
     get: async (id: number) => {
         const response = await api.get<LibraryFileDetail>(`/file/${id}`);
+        return response.data;
+    },
+
+    /**
+     * Kursning kutubxonasi: shu kursda ishlatilayotgan barcha fayllar.
+     *
+     * Shaxsiy kutubxonadan farqli — bu ro'yxat kursni ko'ra oladigan har
+     * kimga ochiq (talabaga ham), chunki bu kursning o'quv materiali.
+     */
+    listByCourse: async (courseId: number) => {
+        const response = await api.get<FileListResponse>(`/file/course/${courseId}`);
         return response.data;
     },
 

@@ -81,6 +81,22 @@ async def upload_file(
     return await get_file_repository.upload(session, file, user, folder_id)
 
 
+@router.get("/course/{course_id}", response_model=FileListResponse)
+async def list_course_files(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(PermissionRequired("read:lesson")),
+):
+    """Kursning kutubxonasi: shu kursda ishlatilayotgan barcha fayllar.
+
+    Ruxsat darsniki (`read:lesson`), faylniki emas: bu roʻyxat kursning
+    materiali va uni kursni koʻra oladigan har kim koʻrishi kerak —
+    talaba ham. `read:file` esa shaxsiy kutubxonaning huquqi va
+    talabada u yoʻq.
+    """
+    return await get_file_repository.list_course_files(session, course_id)
+
+
 @router.get("/", response_model=FileListResponse)
 async def list_files(
     request: FileListRequest = Depends(),

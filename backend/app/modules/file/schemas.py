@@ -76,6 +76,9 @@ class FolderResponse(BaseModel):
     name: str
     parent_id: Optional[int] = None
     file_count: int = 0
+    #: Birinchi yuklashda avtomatik ochilgan shaxsiy papka. Interfeys uni
+    #: roʻyxat boshida va oʻz belgisi bilan koʻrsatadi.
+    is_personal: bool = False
 
 
 class FolderListResponse(BaseModel):

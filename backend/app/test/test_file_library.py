@@ -6,6 +6,7 @@ va rasm deb atalgan begona faylning oʻtib ketishi.
 """
 
 import tempfile
+from datetime import date
 
 import pytest
 from httpx import AsyncClient
@@ -132,3 +133,187 @@ async def test_folder_delete_keeps_its_files(auth_client: AsyncClient, temp_uplo
     still_there = await auth_client.get(f"/file/{file_id}")
     assert still_there.status_code == 200
     assert still_there.json()["folder_id"] is None
+
+
+# ---------------------------------------------------------------------- #
+#  Shaxsiy papka
+# ---------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_first_upload_creates_a_personal_folder(auth_client: AsyncClient, temp_uploads):
+    """Papka ko'rsatilmasa, fayl shaxsiy papkaga tushadi — ildizga emas.
+
+    Ilgari papkasiz yuklangan fayl ildizda yotardi va kutubxonaning ildizi
+    hamma yuklaganidan iborat aralash ro'yxatga aylanardi.
+    """
+    files = {"file": ("maruza.png", PNG, "image/png")}
+    created = await auth_client.post("/file/upload", files=files)
+    assert created.status_code == 201
+
+    folder_id = created.json()["folder_id"]
+    assert folder_id is not None
+
+    folders = (await auth_client.get("/file/folder/")).json()["items"]
+    personal = [f for f in folders if f["is_personal"]]
+    assert len(personal) == 1
+    assert personal[0]["id"] == folder_id
+
+
+@pytest.mark.asyncio
+async def test_second_upload_reuses_the_same_personal_folder(
+    auth_client: AsyncClient, temp_uploads
+):
+    """Ikkinchi yuklash yangi «shaxsiy» papka yaratmaydi.
+
+    Papkani nom bo'yicha izlash ishonchsiz bo'lardi: foydalanuvchi nomini
+    o'zgartirsa, har safar yangi papka paydo bo'lardi. Shuning uchun
+    `is_personal` belgisi bor.
+    """
+    await auth_client.post("/file/upload", files={"file": ("bir.png", PNG, "image/png")})
+    await auth_client.post(
+        "/file/upload", files={"file": ("ikki.png", PNG + b"boshqa", "image/png")}
+    )
+
+    folders = (await auth_client.get("/file/folder/")).json()["items"]
+    assert len([f for f in folders if f["is_personal"]]) == 1
+
+
+@pytest.mark.asyncio
+async def test_explicit_folder_wins_over_personal(auth_client: AsyncClient, temp_uploads):
+    """Papka aniq ko'rsatilsa, shaxsiy papkaga majburlanmaydi."""
+    folder = await auth_client.post("/file/folder/", json={"name": "Ma'ruzalar"})
+    assert folder.status_code == 201
+    target = folder.json()["id"]
+    assert folder.json()["is_personal"] is False
+
+    created = await auth_client.post(
+        f"/file/upload?folder_id={target}",
+        files={"file": ("maruza.png", PNG, "image/png")},
+    )
+    assert created.status_code == 201
+    assert created.json()["folder_id"] == target
+
+
+# ---------------------------------------------------------------------- #
+#  Kurs kutubxonasi
+# ---------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_course_library_collects_files_used_in_the_course(
+    auth_client: AsyncClient, async_db, temp_uploads, test_kafedra, test_subject, test_teacher
+):
+    """Kursda ishlatilayotgan fayl kurs kutubxonasida ko'rinadi.
+
+    Bog'lanish `file_usages` orqali: darsga material biriktirilishi bilan u
+    shu ro'yxatda paydo bo'ladi va alohida jadval kerak emas.
+    """
+    from app.modules.course.model import Course, Resource
+
+    course = Course(
+        name="Test kursi",
+        kafedra_id=test_kafedra["id"],
+        subject_id=test_subject.id,
+        teacher_id=test_teacher["id"],
+    )
+    async_db.add(course)
+    await async_db.flush()
+
+    uploaded = await auth_client.post(
+        "/file/upload", files={"file": ("material.png", PNG, "image/png")}
+    )
+    file_id = uploaded.json()["id"]
+
+    # Kurs darajasidagi material: `lesson_id` bo'sh, `course_id` bor.
+    resource = Resource(course_id=course.id, title="Material", resource_type="file")
+    async_db.add(resource)
+    await async_db.flush()
+
+    attached = await auth_client.post(
+        f"/file/{file_id}/attach",
+        json={"entity_type": "resource", "entity_id": resource.id},
+    )
+    assert attached.status_code == 200
+
+    listed = await auth_client.get(f"/file/course/{course.id}")
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["items"]] == [file_id]
+
+
+@pytest.mark.asyncio
+async def test_course_library_includes_lesson_attached_files(
+    auth_client: AsyncClient, async_db, temp_uploads, test_kafedra, test_subject, test_teacher
+):
+    """Darsga biriktirilgan material ham kurs kutubxonasida ko'rinadi.
+
+    Aynan shu holat eng ko'p uchraydi va eng oson o'tkazib yuboriladi:
+    darsga qo'shilgan material `course_id` ni to'ldirmaydi (u `NULL` bo'lib
+    qoladi), faqat `lesson_id` ni. Shuning uchun so'rov darslar orqali ham
+    izlashi shart — aks holda kutubxona bo'sh ko'rinadi.
+    """
+    from app.modules.auth.model import TeacherSubject
+    from app.modules.course.model import Course, Lesson, Resource
+
+    course = Course(
+        name="Darsli kurs",
+        kafedra_id=test_kafedra["id"],
+        subject_id=test_subject.id,
+        teacher_id=test_teacher["id"],
+    )
+    # Dars «o'qituvchi-fan» juftligiga tayanadi, shuning uchun u ham kerak.
+    link = TeacherSubject(teacher_id=test_teacher["id"], subject_id=test_subject.id)
+    async_db.add_all([course, link])
+    await async_db.flush()
+
+    lesson = Lesson(
+        course_id=course.id,
+        teacher_subject_id=link.id,
+        topic="1-dars",
+        date=date(2026, 9, 12),
+    )
+    async_db.add(lesson)
+    await async_db.flush()
+
+    uploaded = await auth_client.post(
+        "/file/upload", files={"file": ("dars-materiali.png", PNG + b"dars", "image/png")}
+    )
+    file_id = uploaded.json()["id"]
+
+    # `course_id` ATAYLAB berilmaydi — darsga qo'shilgan material shunday
+    # saqlanadi.
+    resource = Resource(lesson_id=lesson.id, title="Dars materiali", resource_type="file")
+    async_db.add(resource)
+    await async_db.flush()
+
+    await auth_client.post(
+        f"/file/{file_id}/attach",
+        json={"entity_type": "resource", "entity_id": resource.id},
+    )
+
+    listed = await auth_client.get(f"/file/course/{course.id}")
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["items"]] == [file_id]
+
+
+@pytest.mark.asyncio
+async def test_course_library_is_empty_for_unrelated_course(
+    auth_client: AsyncClient, async_db, temp_uploads, test_kafedra, test_subject, test_teacher
+):
+    """Boshqa kursning fayllari bu kursga tushmaydi."""
+    from app.modules.course.model import Course
+
+    course = Course(
+        name="Bo'sh kurs",
+        kafedra_id=test_kafedra["id"],
+        subject_id=test_subject.id,
+        teacher_id=test_teacher["id"],
+    )
+    async_db.add(course)
+    await async_db.flush()
+
+    await auth_client.post("/file/upload", files={"file": ("x.png", PNG, "image/png")})
+
+    listed = await auth_client.get(f"/file/course/{course.id}")
+    assert listed.status_code == 200
+    assert listed.json()["items"] == []

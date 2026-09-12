@@ -19,6 +19,18 @@ export const useFile = (id: number | null) => useQuery({
     enabled: id !== null,
 });
 
+/**
+ * Kursning kutubxonasi: shu kursda ishlatilayotgan fayllar.
+ *
+ * Kesh kaliti kurs bo'yicha, `files` ostida: darsga fayl biriktirilganda
+ * `invalidateAll` bu ro'yxatni ham yangilaydi.
+ */
+export const useCourseFiles = (courseId: number, enabled = true) => useQuery({
+    queryKey: [FILES_KEY, 'course', courseId],
+    queryFn: () => fileService.listByCourse(courseId),
+    enabled,
+});
+
 export const useFileFolders = () => useQuery({
     queryKey: [FOLDERS_KEY],
     queryFn: () => fileService.listFolders(),

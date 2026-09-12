@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import User
-from app.modules.course.model import Homework, Resource
+from app.modules.course.model import Homework, Lesson, Resource
 from app.modules.quiz.model import Question
 from app.modules.file.model import FileBlob, FileFolder, FileUsage, StoredFile
 from app.modules.file.schemas import (
@@ -158,6 +158,47 @@ class FileRepository:
 
     # ─── Yuklash ──────────────────────────────────────────────────────
 
+    async def _personal_folder_id(self, session: AsyncSession, user: User) -> int:
+        """Foydalanuvchining shaxsiy papkasi; yoʻq boʻlsa yaratiladi.
+
+        Nega kerak. Ilgari papka koʻrsatilmasa fayl ildizda yotardi, va
+        kutubxonaning ildizi hamma yuklaganidan iborat aralash roʻyxatga
+        aylanardi. Endi har kimning oʻz papkasi bor va u birinchi yuklashda
+        oʻzi paydo boʻladi — admin qoʻlda tartib solishi shart emas.
+
+        Nom F.I.SH boʻyicha, chunki login — HEMIS/EPMOS raqami va u roʻyxatda
+        hech nima anglatmaydi. Papkaning egasi `owner_user_id` bilan
+        aniqlanadi, shuning uchun bir xil ismli ikki xodim bir-birining
+        papkasiga tushib qolmaydi.
+        """
+        from app.modules.auth.model import Teacher
+
+        existing = await session.scalar(
+            select(FileFolder.id).where(
+                FileFolder.owner_user_id == user.id,
+                FileFolder.parent_id.is_(None),
+                FileFolder.is_personal.is_(True),
+            )
+        )
+        if existing is not None:
+            return existing
+
+        full_name = await session.scalar(
+            select(Teacher.full_name).where(Teacher.user_id == user.id)
+        )
+        name = (full_name or user.username or "Mening fayllarim").strip()[:120]
+
+        folder = FileFolder(
+            owner_user_id=user.id,
+            parent_id=None,
+            name=name,
+            is_personal=True,
+        )
+        session.add(folder)
+        await session.flush()
+        logger.info("Fayl kutubxonasi: %s uchun shaxsiy papka yaratildi (%s)", user.username, name)
+        return folder.id
+
     async def upload(
         self,
         session: AsyncSession,
@@ -167,6 +208,9 @@ class FileRepository:
     ) -> FileResponse:
         if folder_id is not None:
             await self._get_owned_folder(session, folder_id, user)
+        else:
+            # Papka koʻrsatilmagan — shaxsiy papkaga tushadi, ildizga emas.
+            folder_id = await self._personal_folder_id(session, user)
 
         stored = await store_upload(
             session,
@@ -231,6 +275,91 @@ class FileRepository:
             total=total,
             page=request.page,
             size=request.size,
+        )
+
+    async def list_course_files(
+        self, session: AsyncSession, course_id: int
+    ) -> FileListResponse:
+        """Kursning kutubxonasi: shu kursda ishlatilayotgan barcha fayllar.
+
+        Yangi jadval kerak emas — bogʻlanish allaqachon ``file_usages`` da
+        yozilgan. Ikki manba boʻyicha yigʻiladi:
+
+        * ``resource`` — dars materiallari, konspektlar, qoʻshimcha fayllar;
+        * ``homework`` — uy vazifasiga biriktirilgan ilovalar.
+
+        Kursga tegishlilik ikki yoʻl bilan aniqlanadi, va ikkovi ham kerak:
+
+        * ``course_id`` bevosita — kurs darajasidagi material (``lesson_id``
+          boʻsh);
+        * ``lesson_id`` orqali — darsga biriktirilgani. Darsga qoʻshilgan
+          material ``course_id`` ni ATAYLAB toʻldirmaydi (u ``NULL`` boʻlib
+          qoladi), shuning uchun faqat ``course_id`` boʻyicha izlash
+          kutubxonani boʻsh koʻrsatardi — aslida esa eng koʻp fayl aynan
+          darslarda.
+
+        Topshirilgan ishlar (``submission``) ataylab kirmaydi: ular
+        talabalarning shaxsiy ishlari va kurs materiali emas.
+        """
+        course_lessons = select(Lesson.id).where(Lesson.course_id == course_id)
+
+        used_in_course = (
+            select(FileUsage.file_id)
+            .join(
+                Resource,
+                and_(Resource.id == FileUsage.entity_id, FileUsage.entity_type == "resource"),
+            )
+            .where(
+                or_(
+                    Resource.course_id == course_id,
+                    Resource.lesson_id.in_(course_lessons),
+                )
+            )
+        ).union(
+            select(FileUsage.file_id)
+            .join(
+                Homework,
+                and_(Homework.id == FileUsage.entity_id, FileUsage.entity_type == "homework"),
+            )
+            .where(
+                or_(
+                    Homework.course_id == course_id,
+                    Homework.lesson_id.in_(course_lessons),
+                )
+            )
+        )
+
+        rows = (
+            (
+                await session.execute(
+                    select(StoredFile)
+                    .where(
+                        StoredFile.is_active.is_(True),
+                        StoredFile.id.in_(used_in_course),
+                    )
+                    .options(selectinload(StoredFile.blob))
+                    .order_by(StoredFile.title)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        counts = dict(
+            (
+                await session.execute(
+                    select(FileUsage.file_id, func.count())
+                    .where(FileUsage.file_id.in_([r.id for r in rows] or [0]))
+                    .group_by(FileUsage.file_id)
+                )
+            ).all()
+        )
+
+        return FileListResponse(
+            items=[self._to_response(r, counts.get(r.id, 0)) for r in rows],
+            total=len(rows),
+            page=1,
+            size=len(rows),
         )
 
     async def get_file(self, session: AsyncSession, file_id: int, user: User) -> FileDetailResponse:
@@ -365,7 +494,11 @@ class FileRepository:
         stmt = select(FileFolder)
         if not _is_admin(user):
             stmt = stmt.where(FileFolder.owner_user_id == user.id)
-        folders = (await session.scalars(stmt.order_by(FileFolder.name))).all()
+        # Shaxsiy papka roʻyxat boshida: odam koʻpincha oʻz fayllarini
+        # izlaydi, qoʻlda yaratganlari esa nom boʻyicha keyin keladi.
+        folders = (
+            await session.scalars(stmt.order_by(FileFolder.is_personal.desc(), FileFolder.name))
+        ).all()
 
         counts = dict(
             (
@@ -379,7 +512,11 @@ class FileRepository:
 
         return [
             FolderResponse(
-                id=f.id, name=f.name, parent_id=f.parent_id, file_count=counts.get(f.id, 0)
+                id=f.id,
+                name=f.name,
+                parent_id=f.parent_id,
+                file_count=counts.get(f.id, 0),
+                is_personal=f.is_personal,
             )
             for f in folders
         ]
@@ -394,7 +531,13 @@ class FileRepository:
         session.add(folder)
         await session.commit()
         await session.refresh(folder)
-        return FolderResponse(id=folder.id, name=folder.name, parent_id=folder.parent_id, file_count=0)
+        return FolderResponse(
+            id=folder.id,
+            name=folder.name,
+            parent_id=folder.parent_id,
+            file_count=0,
+            is_personal=folder.is_personal,
+        )
 
     async def update_folder(
         self, session: AsyncSession, folder_id: int, data: FolderUpdateRequest, user: User
@@ -416,7 +559,11 @@ class FileRepository:
         await session.refresh(folder)
         count = await self._folder_file_count(session, folder.id)
         return FolderResponse(
-            id=folder.id, name=folder.name, parent_id=folder.parent_id, file_count=count
+            id=folder.id,
+            name=folder.name,
+            parent_id=folder.parent_id,
+            file_count=count,
+            is_personal=folder.is_personal,
         )
 
     async def _folder_file_count(self, session: AsyncSession, folder_id: int) -> int:

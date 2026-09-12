@@ -4,6 +4,7 @@ import {
     FileText,
     FolderPlus,
     Folder,
+    FolderHeart,
     Image as ImageIcon,
     Link2,
     Pencil,
@@ -31,16 +32,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
+import { formatSize } from '@/utils/fileSize';
 
 const PAGE_SIZE = 30;
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
-
-const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 /** Ishlatilish turini oʻqiladigan soʻzga aylantiradi. */
 const USAGE_LABEL: Record<string, string> = {
@@ -335,7 +331,14 @@ export const FilesPage = () => {
                                         : 'text-muted-foreground hover:bg-muted',
                                 )}
                             >
-                                <Folder className="h-4 w-4 shrink-0" />
+                                {/* Shaxsiy papka boshqa ikonka bilan: u
+                                    birinchi yuklashda o'zi ochilgan va
+                                    qo'lda yaratilganlardan farq qiladi. */}
+                                {folder.is_personal ? (
+                                    <FolderHeart className="h-4 w-4 shrink-0 text-primary" />
+                                ) : (
+                                    <Folder className="h-4 w-4 shrink-0" />
+                                )}
                                 <span className="truncate">{folder.name}</span>
                                 <span className="ml-auto text-xs tabular-nums opacity-70">
                                     {folder.file_count}

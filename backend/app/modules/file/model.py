@@ -65,6 +65,15 @@ class FileFolder(Base, IdIntPk, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
 
+    # Birinchi yuklashda avtomatik yaratilgan shaxsiy papka. Qoʻlda
+    # yaratilganidan ajratilishi kerak: uni oʻchirish yoki nomini
+    # oʻzgartirish taqiqlanmaydi, lekin keyingi yuklash aynan shu papkani
+    # topishi shart — aks holda har safar yangi "shaxsiy" papka paydo
+    # boʻlardi.
+    is_personal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     owner: Mapped["User"] = relationship("User")
     parent: Mapped["FileFolder | None"] = relationship("FileFolder", remote_side="FileFolder.id")
 

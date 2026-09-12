@@ -15,15 +15,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
+import { formatSize } from '@/utils/fileSize';
 
 const PAGE_SIZE = 24;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
-
-const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 export interface FilePickerModalProps {
     isOpen: boolean;
