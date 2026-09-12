@@ -863,7 +863,10 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                 )}
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <div className="-mx-6 -mb-4 flex justify-end gap-2 border-t border-border/60 px-6 pt-4">
+                {/* `-mx-6` chiziqni modal chetigacha yetkazadi, lekin pastdan
+                    `-mb-4` qo'yilmaydi: u modalning o'z `py-4` ini bekor qilib,
+                    tugmalarni oynaning tubiga yopishtirib qo'yardi. */}
+                <div className="-mx-6 flex justify-end gap-2 border-t border-border/60 px-6 pt-4">
                     <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
                     <Button onClick={() => void submit()} disabled={saving}>
                         {saving && <Loader2 className="h-4 w-4 animate-spin" />}

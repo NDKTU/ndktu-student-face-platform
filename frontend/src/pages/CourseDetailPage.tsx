@@ -5,6 +5,8 @@ import {
     ArrowLeft,
     BookOpen,
     ChevronRight,
+    ClipboardCheck,
+    FolderOpen,
     Clock3,
     GripVertical,
     Pencil,
@@ -23,6 +25,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
 import { CourseAttendanceJournal } from '@/components/courses/CourseAttendanceJournal';
+import { TabBar, type TabDef } from '@/components/ui/TabBar';
+import { CourseFileLibrary } from '@/components/courses/CourseFileLibrary';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
 import { courseTypeLabel } from '@/services/courseTypes';
@@ -36,6 +40,9 @@ export default function CourseDetailPage() {
     // Jurnal o'qituvchi va adminniki: talabada `read:attendance` yo'q.
     const canReadAttendance = hasPermission('read:attendance');
 
+    // Ochilganda doim darslar: kursga kirgan o'qituvchi avval nima o'tilganini
+    // ko'rishi kerak, jurnal esa alohida qadam.
+    const [tab, setTab] = useState<'lessons' | 'attendance' | 'library'>('lessons');
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
@@ -77,6 +84,28 @@ export default function CourseDetailPage() {
     const canCreateLessons = hasPermission('create:lesson') && !isArchived;
     const canUpdateLessons = hasPermission('update:lesson') && !isArchived;
     const canDeleteLessons = hasPermission('delete:lesson') && !isArchived;
+
+    // ── Tablar ───────────────────────────────────────────────────────────
+    //
+    // Ilgari darslar va davomat jurnali ketma-ket turardi: uzun kursda jurnal
+    // ekran pastida qolib, uni topish uchun butun dars ro'yxatini aylanish
+    // kerak bo'lardi. Huquqi bo'lmagan tab chizilmaydi (talabada jurnal yo'q),
+    // bitta tab qolganda esa panel umuman ko'rinmaydi.
+    const tabs: TabDef<'lessons' | 'attendance' | 'library'>[] = [
+        ...(canReadLessons
+            ? [{ id: 'lessons' as const, label: 'Darslar', icon: <BookOpen className="h-4 w-4" /> }]
+            : []),
+        ...(canReadAttendance
+            ? [{ id: 'attendance' as const, label: 'Davomat jurnali', icon: <ClipboardCheck className="h-4 w-4" /> }]
+            : []),
+        // Kutubxona darslar bilan bir huquqda: u kursning materiali va
+        // kursni ko'ra oladigan har kimga (talabaga ham) ochiq.
+        ...(canReadLessons
+            ? [{ id: 'library' as const, label: 'Kutubxona', icon: <FolderOpen className="h-4 w-4" /> }]
+            : []),
+    ];
+    // Tanlangan tab huquq bilan yo'qolib qolgan bo'lsa, birinchisiga qaytamiz.
+    const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id ?? 'lessons';
 
     const openNewLesson = () => {
         setEditingLesson(null);
@@ -211,7 +240,9 @@ export default function CourseDetailPage() {
                 </div>
             </section>
 
-            {canReadLessons && (
+            <TabBar tabs={tabs} active={activeTab} onChange={setTab} />
+
+            {activeTab === 'lessons' && canReadLessons && (
                 <section className="space-y-3">
                     <div className="flex items-center justify-between gap-3 px-0.5">
                         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Darslar</h2>
@@ -246,11 +277,22 @@ export default function CourseDetailPage() {
                 </section>
             )}
 
-            {canReadAttendance && (
+            {activeTab === 'attendance' && canReadAttendance && (
                 <section className="space-y-3">
                     <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Davomat jurnali</h2>
                     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
                         <CourseAttendanceJournal courseId={course.id} />
+                    </div>
+                </section>
+            )}
+
+            {activeTab === 'library' && canReadLessons && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Kurs kutubxonasi
+                    </h2>
+                    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                        <CourseFileLibrary courseId={course.id} />
                     </div>
                 </section>
             )}

@@ -32,6 +32,7 @@ import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { FileSourceField } from '@/components/file/FileSourceField';
 import type { LibraryFile } from '@/services/fileService';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 function youtubeEmbedUrl(url?: string | null) {
@@ -59,6 +60,9 @@ export default function LessonDetailPage() {
     // Kontent bitta umumiy oynada emas, har bir blokda alohida qo'shiladi:
     // o'qituvchi «video qo'shaman» deb kirsa, unga fayl/konspekt tanlash
     // kerak emas. `contentKinds` — o'sha blok uchun ruxsat etilgan turlar.
+    // Ochilganda doim dars ma'lumoti: o'qituvchi avval nimani o'qitayotganini
+    // ko'rishi kerak, jurnal esa alohida qadam.
+    const [tab, setTab] = useState<'info' | 'attendance' | 'grading'>('info');
     const [contentKinds, setContentKinds] = useState<ResourceType[] | null>(null);
     const [homeworkOpen, setHomeworkOpen] = useState(false);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
@@ -108,6 +112,28 @@ export default function LessonDetailPage() {
     const lessonSubjectId = lesson.teacher_subject?.subject_id;
     const lessonSubjectName = lesson.teacher_subject?.subject?.name;
 
+    // ── Tablar ───────────────────────────────────────────────────────────
+    //
+    // Ilgari sakkizta karta ketma-ket turardi va Davomat yuqoridan ikkinchi
+    // bo'lib chiqardi: o'qituvchi darsga kirishi bilan jurnalni ko'rar, dars
+    // mazmuni esa pastda qolardi. Endi birinchi tab — darsning o'zi.
+    const canSeeAttendance = canManageContent && hasPermission('read:attendance');
+    // Baholash tab'i: testlar va uy vazifasi ishlarini tekshirish. Talabada
+    // ham testlar ko'rinadi (u ularni ishlaydi), shuning uchun shart
+    // `canSeeQuizzes` ni ham hisobga oladi.
+    const canSeeGrading = canSeeQuizzes || canGrade;
+
+    const tabs: TabDef<'info' | 'attendance' | 'grading'>[] = [
+        { id: 'info', label: "Dars ma'lumoti", icon: <BookOpen className="h-4 w-4" /> },
+        ...(canSeeAttendance
+            ? [{ id: 'attendance' as const, label: 'Davomat', icon: <ClipboardCheck className="h-4 w-4" /> }]
+            : []),
+        ...(canSeeGrading
+            ? [{ id: 'grading' as const, label: 'Baholash', icon: <ListChecks className="h-4 w-4" /> }]
+            : []),
+    ];
+    const activeTab = tabs.some((t) => t.id === tab) ? tab : 'info';
+
     return (
         <div className="space-y-6">
             <div className="space-y-2">
@@ -116,6 +142,11 @@ export default function LessonDetailPage() {
                 {lesson.description && <p className="max-w-4xl text-sm leading-6 text-foreground/80">{lesson.description}</p>}
             </div>
 
+            <TabBar tabs={tabs} active={activeTab} onChange={setTab} />
+
+            {/* ── Dars ma'lumoti ──────────────────────────────────────── */}
+            {activeTab === 'info' && (
+            <div className="space-y-6">
             {(zoom?.link_url || canManageContent) && (
                 <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Jonli dars (Zoom)</CardTitle>
                     {canManageContent && (
@@ -151,21 +182,6 @@ export default function LessonDetailPage() {
                 </CardContent></Card>
             )}
 
-            {/* Davomat — faqat darsni boshqaradiganlarga va faqat huquqi
-                borlarga: talaba o'z jurnalini bu yerda ko'rmaydi. */}
-            {canManageContent && hasPermission('read:attendance') && (
-                <Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Davomat</CardTitle></CardHeader><CardContent>
-                    <LessonAttendancePanel lessonId={lesson.id} />
-                </CardContent></Card>
-            )}
-
-            {/* Yuz nazorati jurnali — faqat darsni boshqaradiganlarga. */}
-            {canManageContent && zoom?.link_url && lesson.face_check_enabled && (
-                <Card><CardHeader><CardTitle>Yuz nazorati</CardTitle></CardHeader><CardContent>
-                    <LessonFaceCheckReport lessonId={lesson.id} />
-                </CardContent></Card>
-            )}
-
             <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Dars videosi</CardTitle>
                 {canManageContent && (
                     video
@@ -191,6 +207,44 @@ export default function LessonDetailPage() {
             <Card><CardHeader className="flex-row items-center justify-between"><CardTitle>Uy vazifasi</CardTitle>{canManageHomework && !homework && <CardAction onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }} icon={<Plus className="h-4 w-4" />} label="Uy vazifasi" />}</CardHeader><CardContent>
                 {!homework ? <p className="text-sm text-muted-foreground">Bu dars uchun uy vazifasi berilmagan.</p> : (() => { const assignment = homework; return <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {formatDateTime(assignment.deadline)}</p>{/* Kim bergani faqat vazifani boshqaradiganlarga: talabaga muddat muhim, xizmat ma'lumoti emas. */}{canManageHomework && <p className="mt-1 text-xs text-muted-foreground">Bergan: {assignment.created_by_name || "noma'lum"} · {formatDateTime(assignment.created_at)}</p>}{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>; })()}
             </CardContent></Card>
+
+            </div>
+            )}
+
+            {/* ── Davomat ─────────────────────────────────────────────── */}
+            {activeTab === 'attendance' && canSeeAttendance && (
+                <div className="space-y-6">
+                    <Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Davomat</CardTitle></CardHeader><CardContent>
+                        <LessonAttendancePanel lessonId={lesson.id} />
+                    </CardContent></Card>
+
+                    {/* Yuz nazorati jurnali — davomat bilan bir kesimda: ikkovi
+                        ham «kim darsda bo'ldi» degan savolga javob beradi. */}
+                    {zoom?.link_url && lesson.face_check_enabled && (
+                        <Card><CardHeader><CardTitle className="flex items-center gap-2"><ScanFace className="h-4 w-4" /> Yuz nazorati</CardTitle></CardHeader><CardContent>
+                            <LessonFaceCheckReport lessonId={lesson.id} />
+                        </CardContent></Card>
+                    )}
+                </div>
+            )}
+
+            {/* ── Baholash ────────────────────────────────────────────── */}
+            {activeTab === 'grading' && (
+            <div className="space-y-6">
+            {/* Uy vazifasi ishlari. Vazifaning o'zi «Dars ma'lumoti» da qoladi
+                — u dars mazmunining bir qismi; bu yerda esa tekshirishga
+                kirish, ya'ni baholash ishi. */}
+            {canGrade && homework && (
+                <Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Uy vazifasi ishlari</CardTitle></CardHeader><CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        «{homework.title}» — topshirilgan ishlarni ko'rib, baho qo'yish.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/homework/${homework.id}/submissions`)}>
+                        <ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish
+                        {homework.stats ? ` (${homework.stats.submitted})` : ''}
+                    </Button>
+                </CardContent></Card>
+            )}
 
             {canSeeQuizzes && <Card><CardHeader className="flex-row items-center justify-between gap-3"><CardTitle>Testlar</CardTitle>
                 <div className="flex flex-wrap gap-2">
@@ -252,6 +306,8 @@ export default function LessonDetailPage() {
                     </div>
                 )}
             </CardContent></Card>}
+            </div>
+            )}
 
             <ContentModal kinds={contentKinds} onClose={() => setContentKinds(null)} lessonId={lesson.id} />
             <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
