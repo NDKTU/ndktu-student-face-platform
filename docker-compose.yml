@@ -27,8 +27,11 @@ services:
     cpuset: "${CPUSET:-0-7}"
     restart: always
     env_file: ./.env
-    ports:
-      - "8001:8000"
+    # Tashqi port ataylab yo'q: unga hech kim murojaat qilmaydi. Backend
+    # `http://face-detection:8000` orqali (app_network ichidan), brauzer esa
+    # nginx orqali (`/v1/video/stream`) boradi. 8001 ni chiqarish faqat
+    # serverni bo'lishgan ikkinchi loyiha bilan to'qnashuvga olib kelardi va
+    # butun deploy'ni «port is already allocated» bilan to'xtatardi.
     volumes:
       - ${UPLOADS_PATH:-./backend/uploads}:/face/uploads:ro
     networks:

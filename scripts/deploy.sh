@@ -112,8 +112,14 @@ $COMPOSE build frontend
 echo ""
 echo "🗄️  [2/3] Applying database migrations..."
 $COMPOSE up -d --no-build database redis
+# Foydalanuvchi nomi konteynerning O'Z muhitidan olinadi. Bu yerda
+# `${POSTGRES_USER:-postgres}` ishlatilardi, lekin skript `.env` ni
+# yuklamaydi: o'zgaruvchi bo'sh chiqib, `postgres` degan mavjud bo'lmagan
+# rolga ulanishga urinilardi. Natijada tekshiruv 30 marta ham o'tmay,
+# deploy 60 soniya behuda kutar va bazada `FATAL: role "postgres" does not
+# exist` xatolari qolib ketardi.
 for i in $(seq 1 30); do
-    if docker exec database pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then break; fi
+    if docker exec database sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > /dev/null 2>&1; then break; fi
     sleep 2
 done
 
