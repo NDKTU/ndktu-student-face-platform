@@ -77,6 +77,15 @@ export const HemisDataToken = () => {
                     <div className="w-full sm:w-[360px]">
                         <Input
                             type="password"
+                            // Bu maydon hisob paroli emas — API tokeni. Himoyasiz
+                            // qoldirilsa, brauzer uni login formasi deb o'ylab
+                            // saqlangan foydalanuvchi nomini sahifadagi boshqa
+                            // maydonga (masalan, yon menyu qidiruviga) qo'yib
+                            // yuboradi. `new-password` shu evristikani to'xtatadi.
+                            autoComplete="new-password"
+                            name="hemis-data-token"
+                            data-1p-ignore
+                            data-lpignore="true"
                             value={token}
                             onChange={(e) => setToken(e.target.value)}
                             placeholder="Yangi tokenni qo'ying"

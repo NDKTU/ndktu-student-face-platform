@@ -19,10 +19,17 @@ const toneVar = (tone?: IconTone) => (tone ? `var(--stat-${tone})` : 'var(--side
 
 /** Yig'ilgan guruhlar brauzerda eslab qolinadi. */
 const COLLAPSED_KEY = 'sidebar:collapsed-groups';
+/**
+ * Qo'lda ochilgan guruhlar. Ikkinchi ro'yxat kerak, chunki «hech qachon
+ * tegilmagan» va «qo'lda ochilgan» holatlar farqlanishi shart: birinchisida
+ * faol sahifani ko'rsatish uchun guruh o'zi ochiladi, ikkinchisida esa
+ * foydalanuvchi qarori ustun turadi.
+ */
+const EXPANDED_KEY = 'sidebar:expanded-groups';
 
-const readCollapsed = (): Set<string> => {
+const readSet = (key: string): Set<string> => {
     try {
-        const raw = localStorage.getItem(COLLAPSED_KEY);
+        const raw = localStorage.getItem(key);
         return new Set(raw ? (JSON.parse(raw) as string[]) : []);
     } catch {
         return new Set();
@@ -93,7 +100,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
     const { user, permissions, activeRole } = useAuth();
 
     const [query, setQuery] = useState('');
-    const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
+    const [collapsed, setCollapsed] = useState<Set<string>>(() => readSet(COLLAPSED_KEY));
+    const [expanded, setExpanded] = useState<Set<string>>(() => readSet(EXPANDED_KEY));
     const searchRef = useRef<HTMLInputElement>(null);
 
     const allSections = useMemo(() => {
@@ -138,14 +146,15 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         return result;
     }, [allSections, query, t]);
 
-    // Yig'ilgan holatni saqlash.
+    // Yig'ilgan/ochilgan holatni saqlash.
     useEffect(() => {
         try {
             localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+            localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
         } catch {
             // Shaxsiy rejimda yozib bo'lmasligi mumkin — bu holat muhim emas.
         }
-    }, [collapsed]);
+    }, [collapsed, expanded]);
 
     // Drawer ochiq bo'lsa: Escape yopadi, fon esa scroll qilinmaydi.
     // Telefonda fon scroll qulflanmasa, menyu ustidan sahifa surilib ketadi
@@ -180,13 +189,24 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    const toggleGroup = (name: string) =>
+    /**
+     * Guruhni ochish/yopish. Har ikki ro'yxat birga yangilanadi, shunda
+     * «qo'lda yopilgan» holat faol bola bo'lsa ham kuchda qoladi.
+     */
+    const toggleGroup = (name: string, isOpen: boolean) => {
         setCollapsed((prev) => {
             const next = new Set(prev);
-            if (next.has(name)) next.delete(name);
+            if (isOpen) next.add(name);
+            else next.delete(name);
+            return next;
+        });
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (isOpen) next.delete(name);
             else next.add(name);
             return next;
         });
+    };
 
     return (
         <>
@@ -283,16 +303,21 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
                                             );
                                         }
 
-                                        // Ichida faol sahifa bo'lsa yoki qidiruv ketayotgan
-                                        // bo'lsa — guruh majburan ochiq.
+                                        // Ichida faol sahifa bor guruh o'zi ochiladi, lekin
+                                        // foydalanuvchi uni qo'lda yopa oladi — yopiq holatda
+                                        // ham bosh tugma faol ko'rinishda qolaveradi.
+                                        // Qidiruv paytida esa natija ko'rinishi uchun ochiq.
                                         const hasActiveChild = item.children.some((kid) => kid.href === activeHref);
-                                        const isOpen = query.trim() !== '' || hasActiveChild || !collapsed.has(item.name);
+                                        const isOpen =
+                                            query.trim() !== '' ||
+                                            expanded.has(item.name) ||
+                                            !collapsed.has(item.name);
 
                                         return (
                                             <div key={item.name} className="flex flex-col">
                                                 <button
                                                     type="button"
-                                                    onClick={() => toggleGroup(item.name)}
+                                                    onClick={() => toggleGroup(item.name, isOpen)}
                                                     aria-expanded={isOpen}
                                                     className={cn(
                                                         'group relative flex h-11 w-full items-center gap-3 rounded-lg pl-2 pr-3 text-sm transition-all duration-200',

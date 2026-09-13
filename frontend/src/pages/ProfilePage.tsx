@@ -372,6 +372,7 @@ const ProfilePage = () => {
                                 <label className="text-sm font-medium">Joriy parol <span className="text-destructive">*</span></label>
                                 <Input
                                     type="password"
+                                    autoComplete="current-password"
                                     placeholder="Tasdiqlash uchun joriy parolingizni kiriting"
                                     {...register('current_password')}
                                 />
@@ -384,6 +385,7 @@ const ProfilePage = () => {
                                 <label className="text-sm font-medium">Yangi Login (Username)</label>
                                 <Input
                                     type="text"
+                                    autoComplete="username"
                                     placeholder="Ixtiyoriy: Yangi login nomini kiriting"
                                     {...register('new_username')}
                                 />
@@ -396,6 +398,7 @@ const ProfilePage = () => {
                                 <label className="text-sm font-medium">Yangi Parol</label>
                                 <Input
                                     type="password"
+                                    autoComplete="new-password"
                                     placeholder="Ixtiyoriy: Yangi parolni kiriting (min. 4 ta belgi)"
                                     {...register('new_password')}
                                 />
