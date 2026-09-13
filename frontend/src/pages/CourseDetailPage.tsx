@@ -146,32 +146,42 @@ export default function CourseDetailPage() {
             // ichma-ich <button> esa yaroqsiz HTML.
             <div
                 key={lesson.id}
-                className="group flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-primary/[0.02] sm:px-4"
+                className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-border/60 bg-card px-3 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-6px_rgba(16,24,40,0.18)] sm:px-4"
             >
-                <GripVertical className="hidden h-4 w-4 shrink-0 text-muted-foreground/40 sm:block" />
+                {/* Chap chetdagi urg'u chizig'i — faqat hover'da chiqadi va
+                    qatorni ro'yxat ichida ajratib ko'rsatadi. */}
+                <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 w-0.5 origin-top scale-y-0 bg-primary transition-transform duration-200 group-hover:scale-y-100"
+                />
+                <GripVertical className="hidden h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 transition-colors group-hover:text-muted-foreground/60 sm:block" />
                 <button
                     type="button"
                     onClick={() => navigate(`/lessons/${lesson.id}`)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
+                {/* Tartib raqami: dumaloq va kontrastli — ro'yxatda ko'z avval
+                    shunga tushadi, hover'da esa to'liq primary rangga o'tadi. */}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold tabular-nums text-primary ring-1 ring-inset ring-primary/20 transition-all duration-200 group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
                     {index + 1}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{lesson.topic}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">{lesson.topic}</span>
                 {video && (
-                    <span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${
-                        isYoutube ? 'bg-red-50 text-red-600 dark:bg-red-950/30' : 'bg-primary/10 text-primary'
+                    <span className={`hidden shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset sm:inline-flex ${
+                        isYoutube
+                            ? 'bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400'
+                            : 'bg-primary/10 text-primary ring-primary/20'
                     }`}>
                         {isYoutube ? 'YouTube' : 'Video dars'}
                     </span>
                 )}
                 {lesson.duration_minutes && (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-medium tabular-nums text-muted-foreground">
                         <Clock3 className="h-3.5 w-3.5" />
                         {lesson.duration_minutes} daq
                     </span>
                 )}
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary" />
                 </button>
                 {canUpdateLessons && (
                     <Button
@@ -270,7 +280,7 @@ export default function CourseDetailPage() {
                             />
                         </div>
                     ) : (
-                        <div className="space-y-2 rounded-2xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
+                        <div className="space-y-2.5">
                             {lessons.map(renderLesson)}
                         </div>
                     )}
