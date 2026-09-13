@@ -77,7 +77,7 @@ async def _hold_seed_lock(redis_client) -> bool:
 async def _seed_admin(app: FastAPI) -> None:
     """
     Seed the Admin role/permissions and the bootstrap admin user using dynamic
-    route discovery. Only "Admin" is auto-seeded — see defaults.py.
+    route discovery. Teacher/student baselines are also seeded — see defaults.py.
     """
     from core.redis_client import redis_client
 
@@ -103,15 +103,14 @@ async def _seed_admin_locked(app: FastAPI) -> None:
             logger.info(f"Discovered {len(discovered_permissions)} permissions: {discovered_permissions}")
 
             if not discovered_permissions:
-                logger.warning("No permissions discovered! Check your routes.")
-                return
+                logger.warning("No permissions discovered! Assigning existing database permissions.")
 
             await reset_sequences(session)
 
             existing_perms = await sync_permissions(session, discovered_permissions)
             admin_role, _ = await sync_admin_role(session)
 
-            await assign_admin_permissions(session, discovered_permissions, existing_perms, admin_role)
+            await assign_admin_permissions(session, existing_perms, admin_role)
             await ensure_admin_user(session, admin_role)
 
             # O'qituvchi va talaba rollari: yetishmaganini qo'shadi, hech
