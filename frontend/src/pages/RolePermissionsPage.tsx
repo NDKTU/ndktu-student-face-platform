@@ -15,12 +15,9 @@ import { useAssignPermissions } from '@/hooks/useReferenceData';
 import { logger } from '@/utils/logger';
 import {
     RESOURCES,
-    ACTIONS,
-    ACTION_LABELS,
-    labelFor,
     parsePermission,
-    type Action,
 } from '@/constants/resources';
+import { permissionDisplay, permissionGroupLabel as labelFor } from '@/constants/permissionDisplay';
 import { useAuth } from '@/context/AuthContext';
 
 interface PermissionMap {
@@ -66,7 +63,7 @@ const RolePermissionsPage = () => {
     const permMap: PermissionMap = useMemo(() => {
         const map: PermissionMap = {};
         for (const p of allPermissions) {
-            const { action, resource } = parsePermission(p.name);
+            const { resource, key: action } = permissionDisplay(p.name);
             (map[resource] ??= {})[action] = p;
         }
         return map;
@@ -111,7 +108,7 @@ const RolePermissionsPage = () => {
             } else {
                 // turning off => revoke all CRUD for this resource
                 for (const action of Object.values(actions)) {
-                    if (action) next.delete(action.id);
+                    if (action && parsePermission(action.name).resource === resource) next.delete(action.id);
                 }
             }
             return next;
@@ -239,7 +236,7 @@ const RolePermissionsPage = () => {
                                         {Icon && <Icon className="h-4 w-4" />}
                                         {labelFor(resource)}
                                     </span>
-                                    <span className="flex items-center gap-2">
+                                    <span className="flex items-center gap-2" title={actions.read?.name}>
                                         <span className="text-xs text-muted-foreground">Sahifa ko'rinadi</span>
                                         <Switch
                                             checked={readOn}
@@ -251,25 +248,26 @@ const RolePermissionsPage = () => {
                             </CardHeader>
                             <CardContent className="pt-0">
                                 <div className="grid grid-cols-2 gap-2">
-                                    {ACTIONS.filter((a) => a !== 'read').map((action: Action) => {
-                                        const perm = actions[action];
+                                    {Object.entries(actions).filter(([action]) => action !== 'read').map(([action, perm]) => {
                                         if (!perm) return null;
                                         const checked = selectedIds.has(perm.id);
+                                        const disabled = isAdminRole || (!readOn && permissionDisplay(perm.name).requiresRead);
                                         return (
                                             <label
                                                 key={action}
+                                                title={perm.name}
                                                 className={`flex items-center gap-2 rounded-md border border-border/60 px-2.5 py-1.5 text-sm ${
-                                                    !readOn || isAdminRole ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/30'
+                                                    disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/30'
                                                 }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                                     checked={checked}
-                                                    disabled={!readOn || isAdminRole}
+                                                    disabled={disabled}
                                                     onChange={(e) => togglePermission(perm, e.target.checked)}
                                                 />
-                                                <span>{ACTION_LABELS[action]}</span>
+                                                <span>{permissionDisplay(perm.name).label}</span>
                                             </label>
                                         );
                                     })}
@@ -282,7 +280,7 @@ const RolePermissionsPage = () => {
 
             {otherResources.length > 0 && (
                 <div>
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/70 mb-3">Boshqa ruxsatlar</h2>
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/70 mb-3">Qo‘shimcha amallar</h2>
                     <div className="grid gap-4 md:grid-cols-2">
                         {otherResources.map((resource) => {
                             const actions = permMap[resource] ?? {};
@@ -299,6 +297,7 @@ const RolePermissionsPage = () => {
                                                 return (
                                                     <label
                                                         key={action}
+                                                        title={perm.name}
                                                         className={`flex items-center gap-2 rounded-md border border-border/60 px-2.5 py-1.5 text-sm ${
                                                             isAdminRole ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/30'
                                                         }`}
@@ -310,7 +309,7 @@ const RolePermissionsPage = () => {
                                                             disabled={isAdminRole}
                                                             onChange={(e) => togglePermission(perm, e.target.checked)}
                                                         />
-                                                        <span className="font-mono text-xs">{perm.name}</span>
+                                                        <span>{permissionDisplay(perm.name).label}</span>
                                                     </label>
                                                 );
                                             })}
