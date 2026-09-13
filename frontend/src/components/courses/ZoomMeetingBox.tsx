@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
@@ -6,13 +6,14 @@ import { zoomService } from '@/services/zoomService';
 import { useLessonFaceCheck } from '@/hooks/useLessonFaceCheck';
 import type { FaceCheckResult } from '@/services/faceCheckService';
 import { logger } from '@/utils/logger';
+import './ZoomMeetingBox.css';
 
 /**
  * Zoom Meeting SDK (Component View) — uchrashuv saytdan chiqmasdan ochiladi.
  *
  * SDK npm paketi sifatida emas, Zoom CDN'idan yuklanadi: `@zoom/meetingsdk`
- * peer sifatida React 18 ni talab qiladi, loyihada esa React 19. CDN bundli
- * o'z React'ini ichida olib yuradi, shuning uchun ziddiyat yo'q.
+ * peer sifatida React 18 ni talab qiladi, loyihada esa React 19.
+ * CDN vendor fayllari SDK uchun alohida global React yuklaydi.
  */
 const ZOOM_SDK_VERSION = '6.2.0';
 const ZOOM_CDN = `https://source.zoom.us/${ZOOM_SDK_VERSION}`;
@@ -92,6 +93,8 @@ const MAX_JOIN_ATTEMPTS = 3;
 
 export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: Props) => {
     const { user } = useAuth();
+    const shellRef = useRef<HTMLDivElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const clientRef = useRef<ZoomClient | null>(null);
     const [state, setState] = useState<'idle' | 'verifying' | 'joining' | 'joined'>('idle');
@@ -101,51 +104,53 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
     const [isFullscreen, setIsFullscreen] = useState(false);
     const faceCheck = useLessonFaceCheck(lessonId);
 
-    /**
-     * Video o'lchami: konteyner kengligi bo'yicha, balandligi ekranga sig'adigan
-     * qilib.
-     *
-     * Qat'iy o'lchamda SDK kartochkadan chiqib ketar va blok ichida skroll
-     * paydo bo'lardi — talaba uchrashuvni ko'rish uchun ichki oynani surib
-     * yurishga majbur edi. Pastdagi zaxira — Zoom o'z boshqaruv paneli uchun.
-     */
-    const viewSize = (fullscreen: boolean) => {
-        const width = Math.round(containerRef.current?.clientWidth ?? 0) || 960;
-        // Oddiy rejimda blok ekranning uchdan ikkisidan oshmaydi: tepada dars
-        // sarlavhasi, pastda esa konspekt va materiallar turadi. To'liq
-        // ekranda esa deyarli hammasi videoga beriladi.
-        const limit = fullscreen
-            ? Math.round(window.innerHeight - 80)
-            : Math.round(window.innerHeight * 0.62);
-        const height = Math.max(240, Math.min(Math.round((width * 9) / 16), limit));
-        return { width, height };
-    };
-
-    /** Uchrashuv davomida o'lchamni yangilaydi (to'liq ekran, oyna kattaligi). */
-    const applyViewSize = (fullscreen: boolean) => {
-        const size = viewSize(fullscreen);
-        clientRef.current?.updateVideoOptions?.({
-            viewSizes: { default: size, ribbon: size },
-        });
-    };
-
-    // To'liq ekranga o'tish/chiqishda video o'lchami ham qayta hisoblanadi:
-    // aks holda katta ekranda kichkina oyna markazda qolib ketardi.
-    useEffect(() => {
-        const onChange = () => {
-            const active = document.fullscreenElement === containerRef.current;
-            setIsFullscreen(active);
-            applyViewSize(active);
+    // Zoom's video dimensions exclude its header and toolbar. Measure the
+    // available stage, and keep ribbon sizing separate from speaker/gallery.
+    const viewSizes = useCallback(() => {
+        const viewport = viewportRef.current;
+        const width = Math.max(240, Math.min(1440, (viewport?.clientWidth || 960) - 24));
+        const availableHeight = Math.max(135, (viewport?.clientHeight || 600) - 120);
+        return {
+            default: { width, height: Math.min(720, availableHeight, Math.round(width * 9 / 16)) },
+            ribbon: { width: Math.min(316, width), height: Math.min(720, availableHeight) },
         };
+    }, []);
+
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
 
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (!viewport || state !== 'joined') return;
+        let frame = 0;
+        const resize = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                clientRef.current?.updateVideoOptions?.({ viewSizes: viewSizes() });
+            });
+        };
+        const observer = new ResizeObserver(resize);
+        observer.observe(viewport);
+        resize();
+        return () => {
+            observer.disconnect();
+            cancelAnimationFrame(frame);
+        };
+    }, [state, viewSizes]);
+
     const toggleFullscreen = async () => {
-        const element = containerRef.current;
+        const element = shellRef.current;
         if (!element) return;
-        if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
-        else await element.requestFullscreen().catch(() => undefined);
+        try {
+            if (document.fullscreenElement === element) await document.exitFullscreen();
+            else if (element.requestFullscreen) await element.requestFullscreen();
+            else setError("Bu brauzer to'liq ekran rejimini qo'llamaydi. Zoom ilovasida ochishingiz mumkin.");
+        } catch {
+            setError("To'liq ekranni ochib bo'lmadi. Qayta urinib ko'ring.");
+        }
     };
 
     // Sahifadan chiqilganda uchrashuvdan ham chiqamiz, aks holda mikrofon
@@ -161,6 +166,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
         await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
         clientRef.current = null;
         faceCheck.stop();
+        if (document.fullscreenElement === shellRef.current) await document.exitFullscreen().catch(() => undefined);
         setState('idle');
     };
 
@@ -191,8 +197,6 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
             await loadZoomSdk();
             if (!window.ZoomMtgEmbedded || !containerRef.current) throw new Error('Zoom SDK topilmadi');
 
-            const { width, height } = viewSize(false);
-
             const client = window.ZoomMtgEmbedded.createClient();
             clientRef.current = client;
             await client.init({
@@ -202,10 +206,8 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 customize: {
                     video: {
                         isResizable: false,
-                        // Ikkala ko'rinish uchun bir xil o'lcham: SDK «ribbon»
-                        // rejimiga o'tganda blok bo'yiga cho'zilib, kartochkadan
-                        // chiqib ketardi.
-                        viewSizes: { default: { width, height }, ribbon: { width, height } },
+                        popper: { disableDraggable: true },
+                        viewSizes: viewSizes(),
                     },
                 },
             });
@@ -214,6 +216,8 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 const stateName = (payload as { state?: string })?.state;
                 if (stateName === 'Closed' || stateName === 'Fail') {
                     clientRef.current = null;
+                    faceCheck.stop();
+                    if (document.fullscreenElement === shellRef.current) void document.exitFullscreen().catch(() => undefined);
                     setState('idle');
                 }
             });
@@ -244,22 +248,24 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                         ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}. Zoom ilovasida ochib ko'ring.`
                         : "Uchrashuvga qo'shilib bo'lmadi. Zoom ilovasida ochib ko'ring."),
             );
+            await clientRef.current?.leaveMeeting().catch(() => undefined);
+            clientRef.current = null;
             setState('idle');
         }
     };
 
     return (
-        <div className="space-y-3">
-            {state !== 'joined' ? (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 py-8 text-center">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div ref={shellRef} className="zoom-meeting-shell min-w-0 rounded-2xl border border-border/60 bg-card shadow-sm">
+            {state === 'idle' || state === 'verifying' ? (
+                <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 px-4 py-10 text-center sm:px-8 sm:py-14">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
                         {state === 'verifying' ? <ScanFace className="h-5 w-5" /> : <Video className="h-5 w-5" />}
                     </span>
                     <div className="space-y-1">
-                        <p className="text-sm font-semibold">
+                        <p className="text-lg font-semibold tracking-tight">
                             {state === 'verifying' ? 'Shaxsingiz tekshirilmoqda' : "Dars jonli efirda o'tadi"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
                             {state === 'verifying'
                                 ? 'Kameraga qarab turing — bu bir necha soniya oladi.'
                                 : faceCheckEnabled
@@ -284,15 +290,13 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                         </p>
                     )}
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button onClick={() => void join()} disabled={state === 'joining' || state === 'verifying'}>
-                            {state === 'joining' || state === 'verifying'
+                        <Button onClick={() => void join()} disabled={state === 'verifying'}>
+                            {state === 'verifying'
                                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 : <Video className="mr-2 h-4 w-4" />}
                             {state === 'verifying'
                                 ? 'Tekshirilmoqda...'
-                                : state === 'joining'
-                                    ? 'Ulanmoqda...'
-                                    : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
+                                : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
                         </Button>
                         {/* SDK ishlamaydigan brauzerlar uchun (ayniqsa mobil) zaxira yo'l. */}
                         <a
@@ -306,10 +310,11 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="zoom-meeting-header flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
-                            <Radio className="h-3.5 w-3.5 animate-pulse" /> Efirdasiz
+                            {state === 'joining' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radio className="h-3.5 w-3.5" />}
+                            {state === 'joining' ? 'Ulanmoqda...' : 'Jonli dars'}
                         </span>
                         {faceCheckEnabled && (
                             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -320,7 +325,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button variant="outline" size="sm" onClick={() => void toggleFullscreen()}>
                             {isFullscreen ? (
                                 <><Minimize2 className="mr-2 h-4 w-4" /> Oynaga qaytish</>
@@ -328,29 +333,34 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                                 <><Maximize2 className="mr-2 h-4 w-4" /> To'liq ekran</>
                             )}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => void leave()}>
+                        <Button variant="outline" size="sm" disabled={state === 'joining'} onClick={() => void leave()}>
                             <LogOut className="mr-2 h-4 w-4" /> Uchrashuvdan chiqish
                         </Button>
                     </div>
                 </div>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
 
-            {/* SDK shu konteynerga chiziladi; u doim DOM'da turishi kerak,
-                shuning uchun yashirilganda ham o'chirilmaydi. */}
+            {/* Keep the SDK mounted and measurable while joining, including
+                its audio prompts and waiting room. Scroll only if SDK panels
+                need more room than a small screen can provide. */}
             <div
-                ref={containerRef}
-                className={
-                    state === 'joined'
-                        // Ichki skroll yo'q: o'lcham `viewSize` da ekranga
-                        // sig'adigan qilib berilgan, shuning uchun blokni
-                        // surib yurish kerak emas. To'liq ekranda konteyner
-                        // butun ekranni egallaydi va video markazda turadi.
-                        ? 'flex w-full items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-black'
-                        : 'h-0 w-full overflow-hidden'
-                }
-            />
+                ref={viewportRef}
+                className="zoom-meeting-viewport"
+                hidden={state !== 'joined' && state !== 'joining'}
+                aria-label="Zoom jonli dars oynasi"
+            >
+                <div ref={containerRef} className="zoom-meeting-root" />
+            </div>
+            {(state === 'joined' || state === 'joining') && (
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+                    <span>Ovoz va kamerani Zoom panelidan boshqaring</span>
+                    <a href={joinUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">
+                        Zoom ilovasida ochish ↗
+                    </a>
+                </div>
+            )}
         </div>
     );
 };

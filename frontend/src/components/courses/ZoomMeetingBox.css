@@ -1,0 +1,46 @@
+.zoom-meeting-shell {
+    width: 100%;
+    isolation: isolate;
+}
+
+.zoom-meeting-viewport {
+    position: relative;
+    height: clamp(360px, 68dvh, 840px);
+    min-width: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #475569 #0f172a;
+    background: radial-gradient(ellipse at top, #1e293b, #020617);
+}
+
+.zoom-meeting-root {
+    position: relative;
+    width: calc(100% - 24px);
+    max-width: 1440px;
+    min-width: 240px;
+    min-height: calc(100% - 24px);
+    margin: 12px auto;
+}
+
+.zoom-meeting-shell:fullscreen {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    overflow: auto;
+}
+
+.zoom-meeting-shell:fullscreen .zoom-meeting-viewport {
+    flex: 1;
+    min-height: 200px;
+    height: auto;
+}
+
+@media (max-width: 640px) {
+    .zoom-meeting-viewport {
+        height: clamp(360px, 65dvh, 640px);
+    }
+}
