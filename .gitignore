@@ -111,3 +111,7 @@ questions_images_2/
 *.tar.gz
 *.sql
 *.xlsx
+# Zoom Meeting SDK media kutubxonalari (~59 MB): audio/video dekodlash uchun
+# WASM va worklet fayllari. Ular `@zoom/meetingsdk` paketidan `npm run
+# sync-zoom-lib` orqali ko'chiriladi, shuning uchun repozitoriyda saqlanmaydi.
+frontend/public/lib/

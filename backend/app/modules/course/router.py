@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
+from core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi_limiter.depends import RateLimiter
@@ -274,7 +275,11 @@ async def delete_lesson(
 @lesson_router.post(
     "/{lesson_id}/face-check",
     response_model=FaceCheckResponse,
-    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+    # Kalit foydalanuvchi bo'yicha: bitta auditoriyadagi talabalar umumiy NAT
+    # IP orqasida bo'ladi va IP bo'yicha cheklov ularni bir-birining limitini
+    # yeyishga majbur qilardi. Daqiqada bir tekshiruv + qayta urinishlar uchun
+    # 10 ta zaxira bilan yetarli.
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
 )
 async def lesson_face_check(
     lesson_id: int,

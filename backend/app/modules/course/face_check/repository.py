@@ -9,6 +9,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.face_absence import (
+    FAILED_STATUSES,
+    build_absence_spans,
+    spans_total_seconds,
+)
 from app.core.utils.lesson_access import is_admin as user_is_admin
 from app.core.utils.lesson_access import is_lesson_teacher
 from app.core.utils.lesson_scope import covers_group
@@ -16,7 +21,7 @@ from app.modules.auth.model import Student, User
 from app.modules.course.model import Lesson, LessonFaceCheck
 
 from .schemas import (
-    FaceCheckItem,
+    AbsencePeriod,
     FaceCheckReportResponse,
     FaceCheckRequest,
     FaceCheckResponse,
@@ -33,9 +38,22 @@ _STATUS_MESSAGE = {
     "different_person": "Yuz profil surati bilan mos kelmadi",
     "no_reference": "Profil surati topilmadi — o'qituvchiga murojaat qiling",
     "no_camera": "Kamera ochilmadi",
+    "page_hidden": "Sahifa fonda edi — tekshiruv o'tkazilmadi",
 }
 
-_FAILED_STATUSES = {"no_face", "multiple_faces", "different_person"}
+# Davr hisoblash mantiqi `core/utils/face_absence.py` da: u sof funksiya va
+# hisobotda ham, kelajakdagi qayta hisoblashda ham bir xil ishlashi kerak.
+_FAILED_STATUSES = set(FAILED_STATUSES)
+
+# Bitta davrdan nechta surat saqlanadi. Tekshiruv endi daqiqada bir marta
+# ketadi: 90 daqiqalik darsda 30 talabadan minglab kadr yig'ilardi, holbuki
+# o'qituvchiga dalil sifatida boshidagi bir-ikkitasi yetarli.
+_MAX_IMAGES_PER_SPAN = 2
+
+# Talabaning oxirgi tekshiruvi guruhnikidan shuncha orqada qolsa, u darsni
+# erta tark etgan deb hisoblanadi. Tekshiruv oralig'i ~1 daqiqa, shuning
+# uchun bir nechta o'tkazib yuborilgan kadr hali «chiqib ketdi» degani emas.
+_LEFT_EARLY_GAP_SECONDS = 5 * 60
 
 
 class FaceCheckRepository:
@@ -74,6 +92,38 @@ class FaceCheckRepository:
             response.raise_for_status()
             return response.json()
 
+    async def _should_save_image(self, session: AsyncSession, lesson_id: int, user_id: int) -> bool:
+        """Joriy «yo'q» davridan yetarlicha surat olinganmi.
+
+        Oxirgi yozuvlarga qaraymiz: yuz topilgan kadrga yetguncha (ya'ni davr
+        boshiga) nechta surat saqlanganini sanaymiz. `ok` ko'rinishi bilan
+        hisob nolga qaytadi — keyingi yo'qolish yangi davr va u o'z dalilini
+        oladi.
+        """
+        recent = (
+            (
+                await session.execute(
+                    select(LessonFaceCheck.status, LessonFaceCheck.image_name)
+                    .where(
+                        LessonFaceCheck.lesson_id == lesson_id,
+                        LessonFaceCheck.user_id == user_id,
+                    )
+                    .order_by(desc(LessonFaceCheck.created_at))
+                    .limit(20)
+                )
+            )
+            .all()
+        )
+
+        saved = 0
+        for row_status, image_name in recent:
+            if row_status not in _FAILED_STATUSES:
+                # Davr shu yerda tugagan (yoki hali boshlanmagan).
+                break
+            if image_name:
+                saved += 1
+        return saved < _MAX_IMAGES_PER_SPAN
+
     def _save_image(self, image_base64: str) -> str | None:
         """Muammoli kadrni diskka yozadi va fayl nomini qaytaradi."""
         payload = image_base64.split(",", 1)[-1]
@@ -109,7 +159,11 @@ class FaceCheckRepository:
         check_status: str = "no_camera"
         image_name: str | None = None
 
-        if not data.camera_unavailable and data.image_base64:
+        if data.page_hidden:
+            # Sahifa fonda: brauzer taymerlarni sekinlashtiradi va kamera qora
+            # kadr berishi mumkin. Bunday kadrga qarab qaror qilish halol emas.
+            check_status = "page_hidden"
+        elif not data.camera_unavailable and data.image_base64:
             # Etalon: avval foydalanuvchi o'zi yuklagan profil surati, so'ng
             # HEMIS'dagi surat — u eskirgan bo'lishi mumkin.
             reference_url = (current_user.avatar_path or student.image_path or "").strip()
@@ -137,7 +191,9 @@ class FaceCheckRepository:
                 else:
                     check_status = "different_person"
 
-            if check_status in _FAILED_STATUSES:
+            if check_status in _FAILED_STATUSES and await self._should_save_image(
+                session, lesson_id, current_user.id
+            ):
                 image_name = self._save_image(data.image_base64)
 
         record = LessonFaceCheck(
@@ -196,30 +252,66 @@ class FaceCheckRepository:
         for row in rows:
             grouped.setdefault(row.user_id, []).append(row)
 
+        # Dars qachon tugaganini hech kim yozib qo'ymaydi, shuning uchun
+        # «erta chiqib ketdi» ni guruhdagi eng kech tekshiruvga qarab
+        # aniqlaymiz: kimdir hali darsda bo'lsa, tekshiruvi davom etgan.
+        lesson_last_check = max((row.created_at for row in rows), default=None)
+
         students = [
-            FaceCheckStudentSummary(
-                user_id=user_id,
-                user_name=names.get(user_id),
-                total=len(items),
-                passed=sum(1 for item in items if item.status == "ok"),
-                failed=sum(1 for item in items if item.status in _FAILED_STATUSES),
-                checks=[
-                    FaceCheckItem(
-                        id=item.id,
-                        user_id=item.user_id,
-                        user_name=names.get(item.user_id),
-                        stage=item.stage,  # type: ignore[arg-type]
-                        status=item.status,  # type: ignore[arg-type]
-                        has_image=bool(item.image_name),
-                        created_at=item.created_at,
-                    )
-                    for item in items
-                ],
-            )
+            self._student_summary(user_id, names.get(user_id), items, lesson_last_check)
             for user_id, items in grouped.items()
         ]
-        students.sort(key=lambda item: (-item.failed, item.user_name or ""))
+        # Eng ko'p yo'q bo'lganlar yuqorida — o'qituvchi aynan shularni ko'radi.
+        students.sort(key=lambda item: (-item.absent_seconds, -item.failed, item.user_name or ""))
         return FaceCheckReportResponse(lesson_id=lesson_id, students=students)
+
+    def _student_summary(
+        self,
+        user_id: int,
+        user_name: str | None,
+        items: list[LessonFaceCheck],
+        lesson_last_check,
+    ) -> FaceCheckStudentSummary:
+        """Bitta talabaning yozuvlaridan xulosa: kuzatuv oynasi va davrlar."""
+        ordered = sorted(items, key=lambda item: item.created_at)
+        first_check = ordered[0].created_at
+        last_check = ordered[-1].created_at
+
+        spans = build_absence_spans(ordered)
+        absent_seconds = spans_total_seconds(spans, last_check)
+
+        # Boshqalar hali tekshirilayotganda bu talabanikilar to'xtagan bo'lsa,
+        # u brauzerni yopgan yoki Zoom ilovasiga o'tgan bo'lishi mumkin. Buni
+        # «yuz yo'q» bilan aralashtirmaymiz: kamera umuman so'ralmagan.
+        left_early = bool(
+            lesson_last_check is not None
+            and (lesson_last_check - last_check).total_seconds() > _LEFT_EARLY_GAP_SECONDS
+        )
+
+        return FaceCheckStudentSummary(
+            user_id=user_id,
+            user_name=user_name,
+            total=len(ordered),
+            passed=sum(1 for item in ordered if item.status == "ok"),
+            failed=sum(1 for item in ordered if item.status in _FAILED_STATUSES),
+            first_check=first_check,
+            last_check=last_check,
+            tracked_seconds=int((last_check - first_check).total_seconds()),
+            absent_seconds=absent_seconds,
+            periods=[
+                AbsencePeriod(
+                    start=span.start,
+                    end=span.end,
+                    duration_seconds=spans_total_seconds([span], last_check),
+                    checks=span.checks,
+                    statuses=span.statuses,
+                    image_check_ids=span.image_check_ids,
+                )
+                for span in spans
+            ],
+            ended_absent=bool(spans and spans[-1].end is None),
+            left_early=left_early,
+        )
 
     async def image_path(self, session: AsyncSession, check_id: int, current_user: User):
         """Suratni faqat dars o'qituvchisi va admin ko'radi.

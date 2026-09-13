@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "sync-zoom-lib": "node scripts/sync-zoom-lib.mjs",
+    "dev": "npm run sync-zoom-lib && vite",
+    "build": "npm run sync-zoom-lib && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

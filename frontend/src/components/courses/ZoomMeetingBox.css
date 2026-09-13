@@ -1,26 +1,47 @@
+/* Quti kartochkaning ichki padding'idan chiqariladi.
+   `CardContent` (p-4 / sm:p-6) Zoom'ni ikki yonidan qisib qo'yardi: ekran
+   kengligining bir qismi behuda ketardi, video esa kichrayardi. Manfiy
+   margin uni aynan o'sha padding'ga teng kengaytiradi. */
 .zoom-meeting-shell {
-    width: 100%;
     isolation: isolate;
+    width: auto;
+    margin-inline: -1rem;
+}
+
+@media (min-width: 640px) {
+    .zoom-meeting-shell {
+        margin-inline: -1.5rem;
+    }
 }
 
 .zoom-meeting-viewport {
     position: relative;
-    height: clamp(360px, 68dvh, 840px);
     min-width: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: #475569 #0f172a;
     background: radial-gradient(ellipse at top, #1e293b, #020617);
 }
 
+/* Jitsi bilan bir xil tuzilma: nisbatni CSS ushlab turadi, JS esa faqat
+   kenglikni beradi.
+
+   Nega shunday. Zoom hujjatida aniq yozilgan: «the width you set will always
+   be respected», balandlikni esa SDK 16:9 ga qarab o'zi hisoblaydi. Ilgari
+   biz balandlikni ham majburlamoqchi bo'lgandik — SDK uni qabul qilmasdi
+   (901px berilganda 359px chizgan edi), natijada quti va video o'lchamlari
+   bir-biriga mos kelmay, panel pastda qolib ketardi. */
 .zoom-meeting-root {
     position: relative;
-    width: calc(100% - 24px);
-    max-width: 1440px;
-    min-width: 240px;
-    min-height: calc(100% - 24px);
-    margin: 12px auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    /* Past oynada quti ekrandan oshib ketmasin. */
+    max-height: 78dvh;
+}
+
+/* SDK o'z konteynerini ichkarida yaratadi — u ham qutini to'ldirsin.
+   Aks holda Zoom uni o'z hisobiga qarab kichik qilib qo'yadi va atrofida
+   qora maydon qoladi. */
+.zoom-meeting-root > div {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .zoom-meeting-shell:fullscreen {
@@ -28,19 +49,28 @@
     flex-direction: column;
     width: 100%;
     height: 100dvh;
+    /* To'liq ekranda kartochka yo'q — manfiy margin ham kerak emas, aks
+       holda kontent yon tomonga surilib ketardi. */
+    margin-inline: 0;
     border: 0;
     border-radius: 0;
-    overflow: auto;
 }
 
 .zoom-meeting-shell:fullscreen .zoom-meeting-viewport {
     flex: 1;
     min-height: 200px;
-    height: auto;
+}
+
+.zoom-meeting-shell:fullscreen .zoom-meeting-root {
+    /* To'liq ekranda nisbat emas, butun balandlik kerak. */
+    height: 100%;
+    aspect-ratio: auto;
+    max-height: none;
 }
 
 @media (max-width: 640px) {
-    .zoom-meeting-viewport {
-        height: clamp(360px, 65dvh, 640px);
+    .zoom-meeting-root {
+        /* Telefonda pastroq chegara: brauzer paneli ham joy oladi. */
+        max-height: 72dvh;
     }
 }

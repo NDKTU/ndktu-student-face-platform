@@ -7,7 +7,9 @@ export type FaceCheckStatus =
     | 'multiple_faces'
     | 'different_person'
     | 'no_reference'
-    | 'no_camera';
+    | 'no_camera'
+    /** Sahifa fonda edi — kadr ishonchsiz, talabani ayblamaydi. */
+    | 'page_hidden';
 
 export interface FaceCheckResult {
     id: number;
@@ -25,13 +27,33 @@ export interface FaceCheckItem {
     created_at: string;
 }
 
+/** Yuz ko'rinmagan bir davr. `end === null` — talaba oxirigacha qaytmagan. */
+export interface AbsencePeriod {
+    start: string;
+    end?: string | null;
+    duration_seconds: number;
+    checks: number;
+    statuses: FaceCheckStatus[];
+    /** Shu davrda saqlangan suratlar — dalil sifatida davr boshidan 1-2 tasi. */
+    image_check_ids: number[];
+}
+
 export interface FaceCheckStudentSummary {
     user_id: number;
     user_name?: string | null;
     total: number;
     passed: number;
     failed: number;
-    checks: FaceCheckItem[];
+    /** Kuzatuv oynasi — talabaning birinchi va oxirgi tekshiruvi. */
+    first_check?: string | null;
+    last_check?: string | null;
+    tracked_seconds: number;
+    absent_seconds: number;
+    periods: AbsencePeriod[];
+    /** Oxirgi davr yopilmagan: yuz qaytmadi. */
+    ended_absent: boolean;
+    /** Tekshiruvlar erta to'xtagan — brauzer yopilgan bo'lishi mumkin. */
+    left_early: boolean;
 }
 
 export interface FaceCheckReport {
@@ -43,7 +65,13 @@ export const faceCheckService = {
     /** Kadrni serverga yuboradi; qaror serverda qabul qilinadi. */
     run: async (
         lessonId: number,
-        payload: { image_base64?: string; stage: FaceCheckStage; camera_unavailable?: boolean },
+        payload: {
+            image_base64?: string;
+            stage: FaceCheckStage;
+            camera_unavailable?: boolean;
+            /** Sahifa fonda edi — server kadrga qarab qaror qilmaydi. */
+            page_hidden?: boolean;
+        },
     ) => {
         const response = await api.post<FaceCheckResult>(`/lesson/${lessonId}/face-check`, payload);
         return response.data;

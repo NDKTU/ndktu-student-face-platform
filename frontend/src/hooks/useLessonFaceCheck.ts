@@ -11,9 +11,14 @@ import { logger } from '@/utils/logger';
  *
  * Tekshiruv vaqtlari tasodifiy: qat'iy jadval bo'lsa, uni oldindan bilib
  * olish mumkin edi.
+ *
+ * Oraliq ~1 daqiqa. Hisobotda «necha daqiqa yo'q edi» degan savolga javob
+ * berish kerak, 5-12 daqiqalik oraliqda esa aniqlik o'sha oraliqdan yaxshi
+ * bo'la olmasdi. Qaror bitta kadrga qarab qabul qilinmaydi: ketma-ket
+ * ikkitasi buzilgandagina «yo'q» davri ochiladi (backend'da).
  */
-const MIN_INTERVAL_MS = 5 * 60 * 1000;
-const MAX_INTERVAL_MS = 12 * 60 * 1000;
+const MIN_INTERVAL_MS = 45 * 1000;
+const MAX_INTERVAL_MS = 75 * 1000;
 
 const randomDelay = () => MIN_INTERVAL_MS + Math.random() * (MAX_INTERVAL_MS - MIN_INTERVAL_MS);
 
@@ -77,6 +82,19 @@ export function useLessonFaceCheck(lessonId: number) {
      * bu guruhning talabasi emas). Bunday holatda dars to'xtatilmaydi.
      */
     const runCheck = useCallback(async (stage: FaceCheckStage): Promise<FaceCheckResult | null> => {
+        // Sahifa fonda bo'lsa kadr olinmaydi: brauzer fon tabidagi taymerlarni
+        // sekinlashtiradi va kamera qora kadr berishi mumkin. Bunday kadrga
+        // qarab «talaba yo'q» deyish halol emas — serverga holatni aytamiz.
+        if (document.visibilityState === 'hidden') {
+            try {
+                const result = await faceCheckService.run(lessonId, { stage, page_hidden: true });
+                setLastResult(result);
+                return result;
+            } catch (cause) {
+                logger.warn('Face check skipped (page hidden)', cause);
+                return null;
+            }
+        }
         const cameraReady = await openCamera();
         if (!cameraReady) {
             try {
@@ -105,6 +123,12 @@ export function useLessonFaceCheck(lessonId: number) {
             // talaba ko'rinishida): tekshiruv qo'llanmaydi, xato ham emas.
             if (status === 403) {
                 setNotApplicable(true);
+                return null;
+            }
+            // 429 — cheklovga urildik. Bu talabaning aybi emas va uni xato deb
+            // jurnalga yozish mumkin emas: keyingi tekshiruvda qayta uriniladi.
+            if (status === 429) {
+                logger.warn('Face check rate limited — keyingi tekshiruvda qayta urinamiz');
                 return null;
             }
             logger.error('Face check failed', cause);

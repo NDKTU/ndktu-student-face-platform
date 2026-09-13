@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
@@ -21,12 +21,11 @@ const ZOOM_CDN = `https://source.zoom.us/${ZOOM_SDK_VERSION}`;
 // yurmaydi — shuning uchun avval Zoom'ning vendor fayllari yuklanadi.
 // Ular `window.React` (18) ni yozadi; loyihaning React 19 esa modul ichida
 // qoladi, ular to'qnashmaydi.
+// Zoom'ning rasmiy namunasi aynan shu uchtasini yuklaydi. Ilgari bu yerda
+// redux, redux-thunk va lodash ham bor edi — SDK ularsiz ham ishlaydi.
 const ZOOM_SCRIPTS = [
     `${ZOOM_CDN}/lib/vendor/react.min.js`,
     `${ZOOM_CDN}/lib/vendor/react-dom.min.js`,
-    `${ZOOM_CDN}/lib/vendor/redux.min.js`,
-    `${ZOOM_CDN}/lib/vendor/redux-thunk.min.js`,
-    `${ZOOM_CDN}/lib/vendor/lodash.min.js`,
     `${ZOOM_CDN}/zoom-meeting-embedded-${ZOOM_SDK_VERSION}.min.js`,
 ];
 
@@ -35,8 +34,6 @@ type ZoomClient = {
     join: (options: Record<string, unknown>) => Promise<void>;
     leaveMeeting: () => Promise<void>;
     on?: (event: string, callback: (payload: unknown) => void) => void;
-    /** SDK 6.x: uchrashuv davomida video o'lchamini qayta belgilash. */
-    updateVideoOptions?: (options: Record<string, unknown>) => void;
 };
 
 declare global {
@@ -104,42 +101,11 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
     const [isFullscreen, setIsFullscreen] = useState(false);
     const faceCheck = useLessonFaceCheck(lessonId);
 
-    // Zoom's video dimensions exclude its header and toolbar. Measure the
-    // available stage, and keep ribbon sizing separate from speaker/gallery.
-    const viewSizes = useCallback(() => {
-        const viewport = viewportRef.current;
-        const width = Math.max(240, Math.min(1440, (viewport?.clientWidth || 960) - 24));
-        const availableHeight = Math.max(135, (viewport?.clientHeight || 600) - 120);
-        return {
-            default: { width, height: Math.min(720, availableHeight, Math.round(width * 9 / 16)) },
-            ribbon: { width: Math.min(316, width), height: Math.min(720, availableHeight) },
-        };
-    }, []);
-
     useEffect(() => {
         const onChange = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
-
-    useEffect(() => {
-        const viewport = viewportRef.current;
-        if (!viewport || state !== 'joined') return;
-        let frame = 0;
-        const resize = () => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                clientRef.current?.updateVideoOptions?.({ viewSizes: viewSizes() });
-            });
-        };
-        const observer = new ResizeObserver(resize);
-        observer.observe(viewport);
-        resize();
-        return () => {
-            observer.disconnect();
-            cancelAnimationFrame(frame);
-        };
-    }, [state, viewSizes]);
 
     const toggleFullscreen = async () => {
         const element = shellRef.current;
@@ -199,17 +165,24 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
 
             const client = window.ZoomMtgEmbedded.createClient();
             clientRef.current = client;
+            // O'lcham berilmaydi — SDK o'zini o'zi o'lchaydi. Zoom'ning rasmiy
+            // namunasida (`meetingsdk-web-sample`) ham `viewSizes`, `customize.video`
+            // va `updateVideoOptions` umuman ishlatilmaydi: `zoomAppRoot` va
+            // `language` dan boshqasi yo'q. Bizda esa o'sha sonlar bilan kurash
+            // videoni kichraytirib, panelni qutidan tashqarida qoldirardi —
+            // SDK berilgan balandlikni baribir o'ziga moslab qayta hisoblardi.
+            // Shakl endi CSS zimmasida: `.zoom-meeting-root` (aspect-ratio 16/9).
             await client.init({
                 zoomAppRoot: containerRef.current,
                 language: 'en-US',
                 patchJsMedia: true,
-                customize: {
-                    video: {
-                        isResizable: false,
-                        popper: { disableDraggable: true },
-                        viewSizes: viewSizes(),
-                    },
-                },
+                // Audio/video dekodlash kutubxonalari (WASM va worklet'lar)
+                // o'z domenimizdan beriladi. Ular berilmasa SDK ularni Zoom
+                // CDN'idan qidiradi: interfeys va tugmalar chiziladi, lekin
+                // video oqimi dekodlanmay, maydon qora qolardi — bizdagi
+                // «qora ekran» aynan shu edi. Zoom namunasi ham shu yo'lni
+                // tanlaydi (`assetPath` + o'z `/lib` papkasi).
+                assetPath: `${window.location.origin}/lib`,
             });
             // Uchrashuv tugaganda yoki uzilib qolganda tugma qaytib kelsin.
             client.on?.('connection-change', (payload) => {
@@ -298,15 +271,21 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                                 ? 'Tekshirilmoqda...'
                                 : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
                         </Button>
-                        {/* SDK ishlamaydigan brauzerlar uchun (ayniqsa mobil) zaxira yo'l. */}
-                        <a
-                            href={joinUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                        >
-                            Zoom ilovasida ochish
-                        </a>
+                        {/* Zaxira yo'l faqat SDK ishlamaganda ochiladi. Doim
+                            ko'rinib tursa, u nazoratdan chiqishning eng oson
+                            yo'li bo'lib qolardi: Zoom ilovasida o'tirgan
+                            talabani kuzatib bo'lmaydi va jurnalda u umuman
+                            kirmagandek ko'rinardi. */}
+                        {error && (
+                            <a
+                                href={joinUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                            >
+                                Zoom ilovasida ochish
+                            </a>
+                        )}
                     </div>
                 </div>
             ) : (
@@ -354,11 +333,11 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 <div ref={containerRef} className="zoom-meeting-root" />
             </div>
             {(state === 'joined' || state === 'joining') && (
+                /* Bu yerda «Zoom ilovasida ochish» ataylab yo'q: SDK allaqachon
+                   ishlayapti va kuzatuv boshlangan. Havola faqat nazoratdan
+                   chiqish yo'li bo'lib qolardi. */
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
                     <span>Ovoz va kamerani Zoom panelidan boshqaring</span>
-                    <a href={joinUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">
-                        Zoom ilovasida ochish ↗
-                    </a>
                 </div>
             )}
         </div>
