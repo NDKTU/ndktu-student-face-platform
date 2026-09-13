@@ -12,6 +12,7 @@ import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
 import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
+import { JitsiMeetingBox } from '@/components/courses/JitsiMeetingBox';
 import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
 import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePanel';
 import { Switch } from '@/components/ui/Switch';
@@ -64,6 +65,11 @@ export default function LessonDetailPage() {
     // ko'rishi kerak, jurnal esa alohida qadam.
     const [tab, setTab] = useState<'info' | 'attendance' | 'grading'>('info');
     const [contentKinds, setContentKinds] = useState<ResourceType[] | null>(null);
+    // Jonli dars qaysi xizmatda ochilsin. `null` — hali tanlanmagan, ya'ni
+    // biriktirilgan havolaga qarab o'zi aniqlanadi (pastda `liveProvider`).
+    // Tanlov faqat ko'rinishga ta'sir qiladi: ikkala havola ham o'z joyida
+    // qoladi, shuning uchun sinovdan keyin qaytish uchun hech narsa kerak emas.
+    const [providerChoice, setProviderChoice] = useState<'zoom' | 'jitsi' | null>(null);
     const [homeworkOpen, setHomeworkOpen] = useState(false);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
     const [quizOpen, setQuizOpen] = useState(false);
@@ -88,6 +94,15 @@ export default function LessonDetailPage() {
     // Jonli dars — Zoom havolasi. Oxirgisi olinadi: o'qituvchi havolani
     // yangilaganda eskisi qolib ketmasin.
     const zoom = [...resources].reverse().find((item) => item.resource_type === 'zoom');
+    // Jitsi — Zoom yonidagi muqobil (sinov uchun). Ikkalasi bir vaqtda
+    // biriktirilgan bo'lsa, ikkala blok ham ko'rinadi.
+    const jitsi = [...resources].reverse().find((item) => item.resource_type === 'jitsi');
+    // Qaysi xizmat ko'rsatiladi: tanlangani, bo'lmasa biriktirilgan havolaga
+    // qarab. Ikkalasi ham bo'lsa Zoom birinchi — u asosiy yo'l bo'lib qoladi,
+    // Jitsi esa sinovda.
+    const liveProvider: 'zoom' | 'jitsi' =
+        providerChoice ?? (zoom?.link_url ? 'zoom' : jitsi?.link_url ? 'jitsi' : 'zoom');
+    const live = liveProvider === 'jitsi' ? jitsi : zoom;
     const scripts = resources.filter((item) => item.resource_type === 'text');
     const extras = resources.filter((item) => item.resource_type === 'file' || item.resource_type === 'link');
     // Bir darsga — bitta uy vazifasi (bazada `uq_homework_per_lesson` bilan
@@ -147,20 +162,41 @@ export default function LessonDetailPage() {
             {/* ── Dars ma'lumoti ──────────────────────────────────────── */}
             {activeTab === 'info' && (
             <div className="space-y-6">
-            {(zoom?.link_url || canManageContent) && (
+            {(live?.link_url || canManageContent) && (
                 <SectionCard
                     icon={<Radio className="h-[18px] w-[18px]" />}
-                    tone="teal"
-                    title="Jonli dars (Zoom)"
-                    description={zoom?.link_url ? 'Uchrashuv biriktirilgan' : undefined}
+                    tone={liveProvider === 'jitsi' ? 'purple' : 'teal'}
+                    title={`Jonli dars (${liveProvider === 'jitsi' ? 'Jitsi' : 'Zoom'})`}
+                    description={live?.link_url ? 'Uchrashuv biriktirilgan' : undefined}
                     action={canManageContent && (
-                        zoom
-                            ? <CardAction variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(zoom.id)} icon={<Trash2 className="h-4 w-4" />} label="Havolani olib tashlash" />
-                            : <CardAction onClick={() => setContentKinds(['zoom'])} icon={<Plus className="h-4 w-4" />} label="Zoom havolasi" />
+                        live
+                            ? <CardAction variant="ghost" className="text-destructive" onClick={() => deleteResource.mutate(live.id)} icon={<Trash2 className="h-4 w-4" />} label="Havolani olib tashlash" />
+                            : <CardAction onClick={() => setContentKinds([liveProvider])} icon={<Plus className="h-4 w-4" />} label={liveProvider === 'jitsi' ? 'Jitsi havolasi' : 'Zoom havolasi'} />
                     )}
                 >
+                    {/* Xizmatni almashtirish. Ikkala havola biriktirilgan bo'lsa
+                        talaba ham tanlay oladi (qaysi biri ochilsa o'shanisi);
+                        faqat bittasi bo'lsa tanlov o'qituvchiga ko'rinadi —
+                        ikkinchisini qo'shish uchun. */}
+                    {(canManageContent || (zoom?.link_url && jitsi?.link_url)) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {(['zoom', 'jitsi'] as const).map((option) => (
+                                <Button
+                                    key={option}
+                                    size="sm"
+                                    variant={liveProvider === option ? 'primary' : 'outline'}
+                                    onClick={() => setProviderChoice(option)}
+                                >
+                                    {option === 'zoom' ? 'Zoom' : 'Jitsi'}
+                                    {!(option === 'zoom' ? zoom?.link_url : jitsi?.link_url) && (
+                                        <span className="ml-1.5 text-xs font-normal opacity-70">(havolasiz)</span>
+                                    )}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
                     {/* Nazorat har bir darsga kerak emas — o'qituvchi o'zi hal qiladi. */}
-                    {canManageContent && zoom?.link_url && (
+                    {canManageContent && live?.link_url && (
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
                             <div>
                                 <p className="flex items-center gap-2 text-sm font-medium"><ScanFace className="h-4 w-4" /> Yuz nazorati</p>
@@ -180,9 +216,15 @@ export default function LessonDetailPage() {
                             />
                         </div>
                     )}
-                    {zoom?.link_url
-                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />
-                        : <EmptyState icon={<Radio className="h-6 w-6" />} title="Jonli uchrashuv yo'q" description="Bu darsga Zoom havolasi biriktirilmagan." className="py-8" />}
+                    {/* Kalit (`key`) xizmat nomidan olinadi: almashtirilganda eski
+                        quti butunlay yo'q qilinsin va kamerani yopib ketsin —
+                        aks holda React ikkisini bitta komponent deb hisoblab,
+                        ichidagi ulanishni saqlab qolardi. */}
+                    {live?.link_url
+                        ? (liveProvider === 'jitsi'
+                            ? <JitsiMeetingBox key="jitsi" lessonId={lesson.id} joinUrl={live.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />
+                            : <ZoomMeetingBox key="zoom" lessonId={lesson.id} joinUrl={live.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />)
+                        : <EmptyState icon={<Radio className="h-6 w-6" />} title="Jonli uchrashuv yo'q" description={`Bu darsga ${liveProvider === 'jitsi' ? 'Jitsi' : 'Zoom'} havolasi biriktirilmagan.`} className="py-8" />}
                 </SectionCard>
             )}
 
@@ -241,7 +283,7 @@ export default function LessonDetailPage() {
 
                     {/* Yuz nazorati jurnali — davomat bilan bir kesimda: ikkovi
                         ham «kim darsda bo'ldi» degan savolga javob beradi. */}
-                    {zoom?.link_url && lesson.face_check_enabled && (
+                    {(zoom?.link_url || jitsi?.link_url) && lesson.face_check_enabled && (
                         <SectionCard icon={<ScanFace className="h-[18px] w-[18px]" />} tone="purple" title="Yuz nazorati">
                             <LessonFaceCheckReport lessonId={lesson.id} />
                         </SectionCard>
@@ -433,6 +475,7 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         { value: 'text', label: 'Skript / konspekt' },
         { value: 'video', label: 'YouTube video' },
         { value: 'zoom', label: 'Zoom (jonli dars)' },
+        { value: 'jitsi', label: 'Jitsi (jonli dars)' },
     ];
     const options = ALL_OPTIONS.filter((option) => (kinds ?? []).includes(option.value));
 
@@ -447,7 +490,7 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
             let fileUrl: string | undefined;
             if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
             else if (kind === 'file' && libraryFile) fileUrl = libraryFile.url;
-            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || libraryFile?.title || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || libraryFile?.title || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'jitsi' ? 'Jonli dars (Jitsi)' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: url.trim() || undefined, text_content: text.trim() || undefined });
             setTitle(''); setUrl(''); setText(''); setFile(null); setLibraryFile(null); onClose();
         } catch (cause) { setError((cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Saqlashda xatolik'); }
         finally { setSaving(false); }
@@ -459,11 +502,12 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         {/* Tanlov faqat bir nechta tur bo'lganda ko'rsatiladi. */}
         {options.length > 1 && <div className="flex flex-wrap gap-2">{options.map((option) => <Button key={option.value} size="sm" variant={kind === option.value ? 'primary' : 'outline'} onClick={() => { setKind(option.value); setError(''); }}>{option.label}</Button>)}</div>}
         {/* Zoom va video nomi avtomatik qo'yiladi — ortiqcha maydon so'ralmaydi. */}
-        {kind !== 'zoom' && kind !== 'video' && <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>}
+        {kind !== 'zoom' && kind !== 'jitsi' && kind !== 'video' && <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>}
         {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
         {kind === 'link' && <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />}
         {kind === 'video' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat havola.</p></div>}
         {kind === 'zoom' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://us05web.zoom.us/j/89012345678?pwd=..." /><p className="mt-1.5 text-xs text-muted-foreground">Zoom'da «Copy Invite Link» orqali olingan havolani qo'ying. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi, talabalar shu sahifada qo'shiladi.</p></div>}
+        {kind === 'jitsi' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://meet.jit.si/NdktuDars12" /><p className="mt-1.5 text-xs text-muted-foreground">Jitsi xonasi havolasi yoki shunchaki xona nomi. Ro'yxatdan o'tish shart emas — uchrashuv shu sahifada ochiladi.</p></div>}
         {kind === 'file' && <FileSourceField
             label="Fayl"
             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"

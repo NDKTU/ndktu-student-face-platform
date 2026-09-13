@@ -20,3 +20,9 @@ export const API_BASE_URL =
 // Enable Face Detection during Quiz (set to false to disable proctoring)
 export const ENABLE_QUIZ_PROCTORING =
     import.meta.env.VITE_ENABLE_QUIZ_PROCTORING !== 'false';
+
+// Jitsi Meet serveri (Zoom yonidagi muqobil, sinov uchun). Standart — ochiq
+// jamoat serveri. Muassasa o'z serverini ko'tarsa shu yerda almashtiriladi;
+// darsga qo'yilgan havolada domen bo'lsa, u shu qiymatdan ustun turadi.
+export const JITSI_DOMAIN =
+    import.meta.env.VITE_JITSI_DOMAIN || 'meet.jit.si';
