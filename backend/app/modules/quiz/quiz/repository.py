@@ -656,7 +656,7 @@ class QuizRepository:
 
     async def upload_image(self, session: AsyncSession, file, current_user) -> str:
         """Test rasmini yuklaydi — savol rasmlari bilan bir papkada."""
-        stored = await store_upload(
+        stored, _ = await store_upload(
             session,
             file,
             owner_user_id=current_user.id if current_user else None,

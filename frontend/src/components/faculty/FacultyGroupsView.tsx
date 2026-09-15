@@ -9,6 +9,7 @@ import type { Faculty } from '@/services/facultyService';
 import type { Group } from '@/services/groupService';
 import { Crumbs } from './Crumbs';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { formatDate } from '@/utils/date';
 
 interface FacultyGroupsViewProps {
     faculty: Faculty;
@@ -42,7 +43,7 @@ export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup, hideHeader }: 
             key: 'created_at',
             header: 'Yaratilgan sana',
             hideBelow: 'lg',
-            cell: (group) => new Date(group.created_at).toLocaleDateString(),
+            cell: (group) => formatDate(group.created_at),
         },
         {
             key: 'chevron',
@@ -101,7 +102,7 @@ export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup, hideHeader }: 
                                     <div className="min-w-0">
                                         <p className="font-medium text-foreground">{group.name}</p>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            ID: {group.id} · {new Date(group.created_at).toLocaleDateString()}
+                                            ID: {group.id} · {formatDate(group.created_at)}
                                         </p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

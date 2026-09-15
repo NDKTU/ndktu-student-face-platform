@@ -1,10 +1,12 @@
 import { CalendarCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useMyAttendance } from '@/hooks/useAttendance';
 import { ATTENDANCE_LABELS, type AttendanceStatus } from '@/services/attendanceService';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/date';
 
 const MISS_STYLES: Record<AttendanceStatus, string> = {
     present: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
@@ -25,16 +27,43 @@ const percentColor = (percent: number | null) => {
  * «qayerda yo'qotdim», shuning uchun ro'yxatda faqat qoldirilganlari.
  */
 export const MyAttendanceCard = () => {
-    const { data, isLoading, isError } = useMyAttendance();
+    const { data, isLoading, isError, error, refetch } = useMyAttendance();
     const [showMisses, setShowMisses] = useState(false);
 
     if (isLoading) {
         return <Skeleton className="h-40 w-full rounded-2xl" />;
     }
 
-    // Xato yoki hali biror dars belgilanmagan bo'lsa — blok umuman
-    // ko'rsatilmaydi: bo'sh «0%» talabani bekorga qo'rqitardi.
-    if (isError || !data || (data.present + data.late + data.absent + data.excused) === 0) {
+    // 404 — «bu hisob talabaga bog'lanmagan». Bu xato emas, holat: masalan,
+    // admin hisobida `student` roli ham bor. Bunday hisobga davomat tushunchasi
+    // yo'q, shuning uchun blok jim yashiriladi.
+    const notAStudent = isError && isAxiosError(error) && error.response?.status === 404;
+
+    // Qolgan xatolar (500, tarmoq) — jim yutilmaydi: talaba foizini
+    // ko'rmaganda buni nosozlik deb bilishi kerak, aks holda «davomatim yo'q»
+    // deb o'ylardi.
+    if (isError && !notAStudent) {
+        return (
+            <Card>
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+                    <p className="text-sm text-muted-foreground">
+                        Davomat ma'lumotini yuklab bo'lmadi.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => void refetch()}
+                        className="text-sm font-medium text-primary hover:underline"
+                    >
+                        Qayta urinish
+                    </button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Hali biror dars belgilanmagan bo'lsa ham blok ko'rsatilmaydi: bo'sh
+    // «0%» talabani bekorga qo'rqitardi.
+    if (!data || (data.present + data.late + data.absent + data.excused) === 0) {
         return null;
     }
 
@@ -112,7 +141,7 @@ export const MyAttendanceCard = () => {
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">{miss.lesson_topic}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {miss.lesson_date} · {miss.course_name}
+                                                {formatDate(miss.lesson_date)} · {miss.course_name}
                                                 {miss.comment ? ` · ${miss.comment}` : ''}
                                             </p>
                                         </div>

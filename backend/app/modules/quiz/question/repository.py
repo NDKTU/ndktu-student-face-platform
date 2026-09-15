@@ -363,7 +363,7 @@ class QuestionRepository:
 
         Papka avvalgidek `question/` — bazadagi mavjud havolalar shu yerga
         ishora qiladi va ularni buzib boʻlmaydi."""
-        stored = await store_upload(
+        stored, _ = await store_upload(
             session,
             file,
             owner_user_id=current_user.id if current_user else None,

@@ -16,6 +16,7 @@ import { useGroups } from '@/hooks/useGroups';
 import { HemisDataToken } from '@/components/hemis/HemisDataToken';
 import { GroupDuplicates } from '@/components/hemis/GroupDuplicates';
 import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
+import { formatDate } from '@/utils/date';
 
 /* Шаги мастера: проверка данных → синхронизация → готово. */
 const STEPS = ['Tekshirish', 'Sinxronlash', 'Yakun'];
@@ -404,7 +405,7 @@ const HemisSyncPage = () => {
                                                                             {Number(r?.grade).toFixed(1)}
                                                                         </div>
                                                                         <div className="text-[9px] font-medium text-muted-foreground mt-0.5">
-                                                                            {new Date(r?.created_at).toLocaleDateString()}
+                                                                            {formatDate(r?.created_at)}
                                                                         </div>
                                                                     </div>
                                                                 </div>

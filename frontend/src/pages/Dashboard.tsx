@@ -26,21 +26,26 @@ import { questionService } from '@/services/questionService';
 import { resultService } from '@/services/resultService';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
-/** Быстрые ссылки на основные разделы админки. */
-const QUICK_LINKS: { to: string; label: string; description: string; icon: React.ElementType }[] = [
-    { to: '/users',              label: 'Foydalanuvchilar',        description: "Akkauntlar va rollarni boshqarish",     icon: Users },
-    { to: '/students',           label: 'Talabalar',               description: "Talabalar ro'yxati va guruhlari",       icon: UserCheck },
-    { to: '/teachers',           label: "O'qituvchilar",           description: "O'qituvchilar va biriktirishlar",       icon: GraduationCap },
-    { to: '/faculties',          label: 'Fakultetlar',             description: "Tashkiliy tuzilma bo'limlari",          icon: Building2 },
-    { to: '/subjects',           label: 'Fanlar',                  description: "Fanlar va kurslar katalogi",            icon: Book },
-    { to: '/questions',          label: 'Savollar banki',          description: "Test savollarini boshqarish",           icon: FileQuestion },
-    { to: '/quizzes',            label: 'Testlar',                 description: "Testlarni yaratish va nazorat qilish",  icon: BookOpen },
-    { to: '/results',            label: 'Natijalar',               description: "Topshirilgan testlar tahlili",          icon: CheckCircle },
-    { to: '/admin/eduplan-sync', label: 'EPMOS sinxronizatsiya', description: "Tashkiliy tuzilmani import qilish",     icon: RefreshCw },
+/** Быстрые ссылки на основные разделы админки.
+ *  Фабрика, а не константа: `t` на уровне модуля недоступен, и при смене
+ *  языка список должен пересобираться. */
+const quickLinks = (t: TFunction): { to: string; label: string; description: string; icon: React.ElementType }[] => [
+    { to: '/users',              label: t('Foydalanuvchilar'),     description: t('Akkauntlar va rollarni boshqarish'),    icon: Users },
+    { to: '/students',           label: t('Talabalar'),            description: t("Talabalar ro'yxati va guruhlari"),      icon: UserCheck },
+    { to: '/teachers',           label: t("O'qituvchilar"),        description: t("O'qituvchilar va biriktirishlar"),      icon: GraduationCap },
+    { to: '/faculties',          label: t('Fakultetlar'),          description: t("Tashkiliy tuzilma bo'limlari"),         icon: Building2 },
+    { to: '/subjects',           label: t('Fanlar'),               description: t('Fanlar va kurslar katalogi'),           icon: Book },
+    { to: '/questions',          label: t('Savollar banki'),       description: t('Test savollarini boshqarish'),          icon: FileQuestion },
+    { to: '/quizzes',            label: t('Testlar'),              description: t('Testlarni yaratish va nazorat qilish'), icon: BookOpen },
+    { to: '/results',            label: t('Natijalar'),            description: t('Topshirilgan testlar tahlili'),         icon: CheckCircle },
+    { to: '/admin/eduplan-sync', label: t('EPMOS sinxronizatsiya'), description: t('Tashkiliy tuzilmani import qilish'),   icon: RefreshCw },
 ];
 
 const Dashboard: React.FC = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     // Diagramma o'qining kengligi class bilan boshqarilmaydi — son sifatida uzatiladi.
     const isNarrow = useIsMobile();
@@ -65,27 +70,27 @@ const Dashboard: React.FC = () => {
             {/* Welcome header */}
             <PageHeader
                 title={`${getGreeting()}, ${displayNameOf(user)}`}
-                description="Universitet tizimidagi asosiy ko'rsatkichlar va bo'limlar."
+                description={t("Universitet tizimidagi asosiy ko'rsatkichlar va bo'limlar.")}
             />
 
             <div className="grid items-stretch gap-6 xl:grid-cols-[2fr_1fr]">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-6">
                     <StatCard label="Talabalar" value={students?.total ?? 0} icon={UserCheck} isLoading={isStudentsLoading} color="orange" description="Universitet talabalari" />
-                    <StatCard label="O'qituvchilar" value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="blue" description="Barcha kafedralar" />
-                    <StatCard label="Foydalanuvchilar" value={users?.total ?? 0} icon={Users} isLoading={isUsersLoading} color="purple" description="Jami akkauntlar" />
-                    <StatCard label="Testlar" value={quizzes?.total ?? 0} icon={BookOpen} isLoading={isQuizzesLoading} color="teal" description="Jami yaratilgan testlar" />
+                    <StatCard label="O'qituvchilar" value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="blue" description={t("Barcha kafedralar")} />
+                    <StatCard label="Foydalanuvchilar" value={users?.total ?? 0} icon={Users} isLoading={isUsersLoading} color="purple" description={t("Jami akkauntlar")} />
+                    <StatCard label="Testlar" value={quizzes?.total ?? 0} icon={BookOpen} isLoading={isQuizzesLoading} color="teal" description={t("Jami yaratilgan testlar")} />
                     <StatCard label="Fanlar" value={subjects?.total ?? 0} icon={Book} isLoading={isSubjectsLoading} color="green" description="Fanlar katalogi" />
-                    <StatCard label="Savollar banki" value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="cyan" description="Jami savollar" />
+                    <StatCard label="Savollar banki" value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="cyan" description={t("Jami savollar")} />
                 </div>
                 <section className="rounded-lg bg-card shadow-[var(--surface-shadow)]">
-                    <h2 className="border-b border-border px-5 py-4 text-lg font-semibold">Test natijalari</h2>
+                    <h2 className="border-b border-border px-5 py-4 text-lg font-semibold">{t('Test natijalari')}</h2>
                     <div className="flex h-[calc(100%-61px)] flex-col items-center justify-center px-5 py-6 text-center">
                         <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent text-accent-foreground">
                             <CheckCircle className="h-8 w-8" />
                         </span>
                         {isResultsLoading ? <div className="h-10 w-24 animate-pulse rounded bg-muted" /> :
                             <p className="text-4xl font-semibold tabular-nums">{(results?.total ?? 0).toLocaleString('uz-UZ')}</p>}
-                        <p className="mt-2 text-sm text-muted-foreground">Jami topshirilgan testlar</p>
+                        <p className="mt-2 text-sm text-muted-foreground">{t('Jami topshirilgan testlar')}</p>
                         <Link to="/results" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-primary/20">
                             Natijalarni ko'rish <ArrowUpRight className="h-4 w-4" />
                         </Link>
@@ -152,7 +157,7 @@ const Dashboard: React.FC = () => {
             <div>
                 <h2 className="mb-4 text-lg font-semibold text-foreground">Tezkor o'tish</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => (
+                    {quickLinks(t).map(({ to, label, description, icon: Icon }) => (
                         <Link
                             key={to}
                             to={to}

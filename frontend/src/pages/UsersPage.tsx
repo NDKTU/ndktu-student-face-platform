@@ -33,36 +33,47 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 
-const userSchema = z.object({
-    username: z.string().min(3, "Foydalanuvchi nomi kamida 3 ta belgidan iborat bo'lishi kerak"),
-    password: z.string().optional(),
-    role_ids: z.array(z.coerce.number()).min(1, 'Kamida bitta rol tanlanishi shart'),
-});
+// Sxema fabrika: zod xabarlari yaratilish paytida hisoblanadi, shuning uchun
+// til almashtirilganda yangilanishi uchun ular `t` bilan birga qayta
+// quriladi (`useMemo` da).
+const buildUserSchema = (t: TFunction) =>
+    z.object({
+        username: z.string().min(3, t("Foydalanuvchi nomi kamida 3 ta belgidan iborat bo'lishi kerak")),
+        password: z.string().optional(),
+        role_ids: z.array(z.coerce.number()).min(1, t('Kamida bitta rol tanlanishi shart')),
+    });
 
-type UserFormValues = z.infer<typeof userSchema>;
+type UserFormValues = z.infer<ReturnType<typeof buildUserSchema>>;
 
 type SortField = 'id' | 'username' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const UsersPage = () => {
+    const { t } = useTranslation();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
+    // Filtrlar va sahifa URL'da: yangilashda ham, «Orqaga» bosganda ham
+    // saqlanadi va havola qilib yuborsa bo'ladi.
+    const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
+    const [selectedRoleFilter, setSelectedRoleFilter] = useUrlState<string>('role', 'all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
     // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
     // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
     const viewMode = useCatalogView();
 
-    const [sortField, setSortField] = useState<SortField>('id');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+    const [sortField, setSortField] = useUrlState<SortField>('sort', 'id');
+    const [sortOrder, setSortOrder] = useUrlState<SortOrder>('order', 'desc');
 
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 15;
 
@@ -103,8 +114,10 @@ export const UsersPage = () => {
 
     const roleChipOptions = useMemo(() => {
         const list = roles.map((r) => ({ value: String(r.id), label: r.name }));
-        return [{ value: 'all', label: 'Barchasi' }, ...list];
-    }, [roles]);
+        return [{ value: 'all', label: t('Barchasi') }, ...list];
+        // `t` ham bog'liqlik: usiz til almashtirilganda memo eski qiymatni
+        // ushlab qolardi va chip o'zbekcha bo'lib qolardi.
+    }, [roles, t]);
 
     const handleSort = (field: SortField) => {
         // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda admin yangi
@@ -130,7 +143,7 @@ export const UsersPage = () => {
             { id: userToDelete.id, force: cascadeWarnings.length > 0 },
             {
                 onSuccess: () => {
-                    toast.success("Foydalanuvchi o'chirildi");
+                    toast.success(t("Foydalanuvchi o'chirildi"));
                     setIsDeleteModalOpen(false);
                     setUserToDelete(null);
                     setCascadeWarnings([]);
@@ -140,7 +153,7 @@ export const UsersPage = () => {
                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                         setCascadeWarnings(error.response.data.detail.warnings || []);
                     } else {
-                        toast.error("O'chirishda xatolik yuz berdi");
+                        toast.error(t("O'chirishda xatolik yuz berdi"));
                         setIsDeleteModalOpen(false);
                         setUserToDelete(null);
                         setCascadeWarnings([]);
@@ -173,7 +186,7 @@ export const UsersPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    title="Tahrirlash"
+                    title={t('Tahrirlash')}
                     onClick={(e) => {
                         e.stopPropagation();
                         setSelectedUser(user);
@@ -188,7 +201,7 @@ export const UsersPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                    title="O'chirish"
+                    title={t("O'chirish")}
                     onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteClick(user);
@@ -206,18 +219,18 @@ export const UsersPage = () => {
 
             {/* Breadcrumb Header */}
             <OrganizationBreadcrumbs
-                items={[{ label: 'Foydalanuvchilar', onClick: () => {} }, { label: 'Tizim foydalanuvchilari' }]}
-                title="Tizim Foydalanuvchilari"
-                description="Tizim hisoblari, administratorlar, xodimlar va biriktirilgan rollar"
+                items={[{ label: t('Foydalanuvchilar'), onClick: () => {} }, { label: t('Tizim foydalanuvchilari') }]}
+                title={t('Tizim Foydalanuvchilari')}
+                description={t('Tizim hisoblari, administratorlar, xodimlar va biriktirilgan rollar')}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Foydalanuvchi nomi bo'yicha qidirish..."
+                searchPlaceholder={t("Foydalanuvchi nomi bo'yicha qidirish...")}
                 totalCount={totalCount}
-                totalLabel="Foydalanuvchilar"
+                totalLabel={t('Foydalanuvchilar')}
                 activeFilterCount={(selectedRoleFilter !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0)}
                 onClearFilters={() => {
                     setSelectedRoleFilter('all');
@@ -227,7 +240,7 @@ export const UsersPage = () => {
                 chips={
                     roleChipOptions.length > 1 ? (
                         <FilterChipGroup
-                            label="Rol bo'yicha"
+                            label={t("Rol bo'yicha")}
                             value={selectedRoleFilter}
                             onChange={(val) => {
                                 setSelectedRoleFilter(val);
@@ -248,7 +261,7 @@ export const UsersPage = () => {
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>Qo'shish</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
@@ -275,11 +288,11 @@ export const UsersPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
-                        title="Foydalanuvchilar topilmadi"
+                        title={t('Foydalanuvchilar topilmadi')}
                         description={
                             searchTerm || selectedRoleFilter !== 'all'
-                                ? "Tanlangan filtrlarga mos foydalanuvchi topilmadi."
-                                : "Hozircha tizimda foydalanuvchi qo'shilmagan."
+                                ? t('Tanlangan filtrlarga mos foydalanuvchi topilmadi.')
+                                : t("Hozircha tizimda foydalanuvchi qo'shilmagan.")
                         }
                     />
                 </div>
@@ -302,22 +315,22 @@ export const UsersPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Foydalanuvchi</span>
+                                    <span>{t('Foydalanuvchi')}</span>
                                     {renderSortIcon('username')}
                                 </div>
                             </TableHead>
-                            <TableHead className="font-bold text-xs">Biriktirilgan Rollar</TableHead>
+                            <TableHead className="font-bold text-xs">{t('Biriktirilgan Rollar')}</TableHead>
                             <TableHead
                                 onClick={() => handleSort('created_at')}
                                 className="group cursor-pointer select-none font-bold text-xs hidden md:table-cell hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Yaratilgan sana</span>
+                                    <span>{t('Yaratilgan sana')}</span>
                                     {renderSortIcon('created_at')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-center font-bold text-xs">Holati</TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-center font-bold text-xs">{t('Holati')}</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -377,7 +390,7 @@ export const UsersPage = () => {
                                     {/* Yaratilgan sana */}
                                     <TableCell className="hidden md:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+                                            {formatDate(user.created_at)}
                                         </span>
                                     </TableCell>
 
@@ -386,7 +399,7 @@ export const UsersPage = () => {
                                         {isActive ? (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                                 <CheckCircle2 className="h-3 w-3" />
-                                                <span>Faol</span>
+                                                <span>{t('Faol')}</span>
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-semibold text-gray-500">
@@ -423,7 +436,7 @@ export const UsersPage = () => {
                             }
                             metrics={[
                                 { label: 'User ID', value: `#${user.id}` },
-                                { label: 'Sana', value: user.created_at ? new Date(user.created_at).toLocaleDateString() : '—' },
+                                { label: t('Sana'), value: formatDate(user.created_at) },
                             ]}
                             actions={renderRowActions(user)}
                         />
@@ -459,12 +472,12 @@ export const UsersPage = () => {
                     setUserToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Foydalanuvchini o'chirish"
+                title={t("Foydalanuvchini o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
                             <p className="text-destructive font-medium">
-                                Diqqat! Ushbu foydalanuvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:
+                                {t("Diqqat! Ushbu foydalanuvchini o'chirish quyidagi ma'lumotlarni ham o'chiradi:")}
                             </p>
                             <ul className="list-disc pl-5 text-sm text-destructive/80">
                                 {cascadeWarnings.map((w, i) => (
@@ -472,15 +485,15 @@ export const UsersPage = () => {
                                 ))}
                             </ul>
                             <p className="font-semibold text-destructive mt-2">
-                                Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!
+                                {t("Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!")}
                             </p>
                         </div>
                     ) : (
-                        `Siz haqiqatan ham '${userToDelete?.username}' foydalanuvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
+                        t("Siz haqiqatan ham '{{username}}' foydalanuvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.", { username: userToDelete?.username })
                     )
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t('Bekor qilish')}
             />
         </div>
     );
@@ -499,10 +512,16 @@ const UserModal = ({
     roles: Role[];
     onSuccess: (user?: User) => void;
 }) => {
+    const { t } = useTranslation();
+    // Sxema `t` ga bog'liq: til almashtirilganda validatsiya xabarlari ham
+    // yangi tilda chiqishi kerak.
+    const userSchema = useMemo(() => buildUserSchema(t), [t]);
     const {
         register,
         handleSubmit,
         reset,
+        watch,
+        setValue,
         formState: { errors },
     } = useForm<UserFormValues>({
         resolver: zodResolver(userSchema) as any,
@@ -535,6 +554,24 @@ const UserModal = ({
         }
     }, [user, reset]);
 
+    // Rollar `register('role_ids')` bilan emas, aniq `checked`/`onChange` bilan
+    // boshqariladi — kodbazadagi qolgan checkbox-guruhlar ham shunday
+    // (`RolePermissionsPage`, `TeacherGroupModal`).
+    //
+    // `register` bu yerda ishlamasdi: DOM'da `value` doim SATR (`"3"`), forma
+    // holatida esa rol id'lari SON (`user.roles.map(r => r.id)`). RHF checkbox
+    // guruhini belgilashda massivni input'ning satr qiymati bilan solishtiradi,
+    // `[3].includes("3")` esa `false` — shuning uchun tahrirlashda hamma
+    // katakcha bo'sh chiqardi. Endi ikkala tomonda ham son.
+    const selectedRoleIds = watch('role_ids') ?? [];
+
+    const toggleRole = (roleId: number, checked: boolean) => {
+        const next = checked
+            ? [...selectedRoleIds, roleId]
+            : selectedRoleIds.filter((id) => id !== roleId);
+        setValue('role_ids', next, { shouldValidate: true, shouldDirty: true });
+    };
+
     const onSubmit = (data: UserFormValues) => {
         if (user) {
             const payload: any = {
@@ -555,7 +592,7 @@ const UserModal = ({
                 {
                     onSuccess: (updatedUser: any) => {
                         if (!rolesChanged) {
-                            toast.success('Foydalanuvchi yangilandi');
+                            toast.success(t('Foydalanuvchi yangilandi'));
                             onSuccess(updatedUser);
                             return;
                         }
@@ -563,25 +600,25 @@ const UserModal = ({
                             { user_id: user.id, role_ids: data.role_ids },
                             {
                                 onSuccess: () => {
-                                    toast.success('Foydalanuvchi va rollari yangilandi');
+                                    toast.success(t('Foydalanuvchi va rollari yangilandi'));
                                     onSuccess(updatedUser);
                                 },
                                 onError: (error) => {
                                     logger.error('Failed to assign roles', error);
-                                    toast.error("Rollarni o'zgartirishda xatolik yuz berdi");
+                                    toast.error(t("Rollarni o'zgartirishda xatolik yuz berdi"));
                                 },
                             }
                         );
                     },
                     onError: (error) => {
                         logger.error('Failed to update user', error);
-                        toast.error('Foydalanuvchini yangilashda xatolik yuz berdi');
+                        toast.error(t('Foydalanuvchini yangilashda xatolik yuz berdi'));
                     },
                 }
             );
         } else {
             if (!data.password) {
-                toast.error('Yangi foydalanuvchilar uchun parol talab qilinadi');
+                toast.error(t('Yangi foydalanuvchilar uchun parol talab qilinadi'));
                 return;
             }
 
@@ -595,12 +632,12 @@ const UserModal = ({
 
             createMutation.mutate(payload, {
                 onSuccess: (newUser: any) => {
-                    toast.success('Foydalanuvchi yaratildi');
+                    toast.success(t('Foydalanuvchi yaratildi'));
                     onSuccess(newUser);
                 },
                 onError: (error: any) => {
                     logger.error('Failed to create user', error);
-                    toast.error('Foydalanuvchi yaratishda xatolik yuz berdi');
+                    toast.error(t('Foydalanuvchi yaratishda xatolik yuz berdi'));
                 },
             });
         }
@@ -610,35 +647,35 @@ const UserModal = ({
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={user ? 'Foydalanuvchini tahrirlash' : 'Foydalanuvchi yaratish'}
+            title={user ? t('Foydalanuvchini tahrirlash') : t('Foydalanuvchi yaratish')}
         >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <Input
-                    label="Foydalanuvchi nomi"
+                    label={t('Foydalanuvchi nomi')}
                     {...register('username')}
                     error={errors.username?.message}
-                    placeholder="masalan: admin_dekanat"
+                    placeholder={t('masalan: admin_dekanat')}
                 />
 
                 <Input
-                    label={user ? "Yangi parol (o'zgartirish shart bo'lmasa bo'sh qoldiring)" : 'Parol'}
+                    label={user ? t("Yangi parol (o'zgartirish shart bo'lmasa bo'sh qoldiring)") : t('Parol')}
                     type="password"
                     autoComplete="new-password"
                     {...register('password')}
                     error={errors.password?.message}
-                    placeholder={user ? '••••••••' : 'Kamida 6 ta belgi'}
+                    placeholder={user ? '••••••••' : t('Kamida 6 ta belgi')}
                 />
 
                 <div className="space-y-2 relative z-0">
-                    <label className="text-sm font-medium">Tizim Rollari</label>
+                    <label className="text-sm font-medium">{t('Tizim Rollari')}</label>
                     <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto p-2.5 border border-border rounded-xl bg-card">
                         {roles.map((role) => (
                             <div key={role.id} className="flex items-center space-x-2">
                                 <input
                                     type="checkbox"
                                     id={`role-${role.id}`}
-                                    value={role.id}
-                                    {...register('role_ids')}
+                                    checked={selectedRoleIds.includes(role.id)}
+                                    onChange={(event) => toggleRole(role.id, event.target.checked)}
                                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                 />
                                 <label
@@ -657,10 +694,10 @@ const UserModal = ({
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-border">
                     <Button type="button" variant="outline" onClick={onClose}>
-                        Bekor qilish
+                        {t('Bekor qilish')}
                     </Button>
                     <Button type="submit" isLoading={isSubmitting}>
-                        {user ? 'Yangilash' : 'Yaratish'}
+                        {user ? t('Yangilash') : t('Yaratish')}
                     </Button>
                 </div>
             </form>

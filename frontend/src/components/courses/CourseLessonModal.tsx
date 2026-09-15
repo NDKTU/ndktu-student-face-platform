@@ -53,9 +53,6 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
     // Jonli dars havolasi. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi,
     // talabalar esa dars sahifasida qo'shiladi.
     const [zoomUrl, setZoomUrl] = useState('');
-    // Jitsi — Zoom yonidagi muqobil (sinov uchun). Ikkalasi bir vaqtda
-    // biriktirilishi mumkin: o'qituvchi qaysi biri ishlashini sinab ko'radi.
-    const [jitsiUrl, setJitsiUrl] = useState('');
     const [showResources, setShowResources] = useState(false);
     const [extraFiles, setExtraFiles] = useState<File[]>([]);
     // Kutubxonadan tanlanganlar allaqachon serverda — ularni yuklash shart emas.
@@ -98,7 +95,6 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
         setDescription(lesson?.description ?? '');
         setYoutubeUrl(lesson?.resources?.find((r) => r.resource_type === 'video')?.link_url ?? '');
         setZoomUrl(lesson?.resources?.find((r) => r.resource_type === 'zoom')?.link_url ?? '');
-        setJitsiUrl(lesson?.resources?.find((r) => r.resource_type === 'jitsi')?.link_url ?? '');
         setShowResources(false);
         setExtraFiles([]);
         setLinks([]);
@@ -270,20 +266,6 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                         link_url: zoomUrl.trim(),
                     });
                 }
-
-                // Jitsi havolasi — Zoom bilan bir xil yo'l bilan.
-                const jitsi = lesson.resources?.find((r) => r.resource_type === 'jitsi');
-                if (jitsi && jitsi.link_url !== jitsiUrl.trim()) {
-                    await resourceService.delete(jitsi.id);
-                }
-                if (jitsiUrl.trim() && (!jitsi || jitsi.link_url !== jitsiUrl.trim())) {
-                    await resourceService.create({
-                        lesson_id: lesson.id,
-                        resource_type: 'jitsi',
-                        title: 'Jonli dars (Jitsi)',
-                        link_url: jitsiUrl.trim(),
-                    });
-                }
             } else {
                 const created = await createLesson.mutateAsync({
                     course_id: course.id,
@@ -308,15 +290,6 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                         resource_type: 'zoom',
                         title: 'Jonli dars',
                         link_url: zoomUrl.trim(),
-                    });
-                }
-
-                if (jitsiUrl.trim()) {
-                    await resourceService.create({
-                        lesson_id: lessonId,
-                        resource_type: 'jitsi',
-                        title: 'Jonli dars (Jitsi)',
-                        link_url: jitsiUrl.trim(),
                     });
                 }
             }
@@ -439,25 +412,6 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                         <p className="mt-1.5 text-xs text-muted-foreground">
                             Zoom'da «Copy Invite Link» orqali olingan havola. Uchrashuvni siz Zoom ilovasida
                             boshlaysiz, talabalar esa dars sahifasidan qo'shiladi.
-                        </p>
-                    </div>
-
-                    {/* Jitsi — Zoom o'rniga emas, yonida: qaysi biri qulayroq
-                        ekanini sinash uchun. Bo'sh qoldirilsa hech narsa
-                        o'zgarmaydi va dars avvalgidek Zoom bilan o'tadi. */}
-                    <div>
-                        <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                            <Video className="h-4 w-4 text-violet-500" /> Jonli dars (Jitsi havolasi)
-                            <span className="font-normal text-muted-foreground">(ixtiyoriy, sinov uchun)</span>
-                        </label>
-                        <Input
-                            value={jitsiUrl}
-                            onChange={(event) => setJitsiUrl(event.target.value)}
-                            placeholder="https://meet.jit.si/NdktuDars12"
-                        />
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                            Jitsi xonasi havolasi yoki shunchaki xona nomi. Ro'yxatdan o'tish shart emas —
-                            uchrashuv dars sahifasida ochiladi.
                         </p>
                     </div>
                     </>

@@ -73,7 +73,7 @@ class ZoomService:
 
     async def build_join_payload(self, session: AsyncSession, lesson_id: int, user: User) -> ZoomJoinResponse:
         if not settings.zoom.enabled:
-            raise HTTPException(
+               raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Zoom integratsiyasi sozlanmagan",
             )

@@ -17,6 +17,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useLesson } from '@/hooks/useLessons';
+import { Combobox } from '@/components/ui/Combobox';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 
 // Variantlar faqat klassik savolda majburiy: boshqa turlarda ular umuman
 // boshqa shaklda (`payload`) saqlanadi.
@@ -63,7 +66,15 @@ const QuestionFormPage = () => {
     const isEditMode = !!id;
     const questionId = id ? parseInt(id, 10) : 0;
 
-    const { data: subjectsData } = useSubjects(1, 100);
+    // Fanlar 2978 ta — hammasini yuklab brauzerda qidirib bo'lmaydi. Qidiruv
+    // serverda (`useSubjects` uni `name=` ga o'giradi), sahifa hajmi kichik.
+    const [subjectQuery, setSubjectQuery] = useState('');
+    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
+    const { data: subjectsData } = useSubjects(1, FILTER_PAGE_SIZE, debouncedSubjectQuery);
+    // Tanlangan fan qidiruv natijasida bo'lmasligi mumkin — u holda Combobox
+    // nom o'rniga placeholder ko'rsatardi va saqlashda maydon bo'sh deb
+    // hisoblanardi. Shuning uchun tanlov alohida eslab qolinadi.
+    const [selectedSubjectOption, setSelectedSubjectOption] = useState<FilterOption | null>(null);
     // Dars sahifasidan kelinganda fan darsdan olinadi va tanlash so'ralmaydi:
     // dars allaqachon o'qituvchi-fan juftligiga bog'langan.
     const { data: lessonData } = useLesson(lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined);
@@ -74,6 +85,14 @@ const QuestionFormPage = () => {
     const updateMutation = useUpdateQuestion();
 
     const subjects = subjectsData?.subjects || [];
+    const subjectOptions = useMemo(
+        () =>
+            withSelected(
+                subjects.map((s) => ({ value: String(s.id), label: s.name })),
+                selectedSubjectOption,
+            ),
+        [subjects, selectedSubjectOption],
+    );
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
     const isLoading = isEditMode && isQuestionLoading;
 
@@ -115,8 +134,27 @@ const QuestionFormPage = () => {
 
     useEffect(() => {
         if (question) {
+            // Fan savolning o'zidan olinadi (`subject_name` javobda bor), fanlar
+            // ro'yxatidan emas. Ilgari forma ro'yxatga bog'liq edi va ro'yxatdan
+            // kirilganda (client-side navigatsiya) ro'yxat kelguncha
+            // initsializatsiya bo'lib ulgurardi — fan bo'sh qolardi. Endi
+            // poyga yo'q: savol keldi — fan ham bor.
+            setSelectedSubjectOption({
+                value: question.subject_id.toString(),
+                label: question.subject_name || `#${question.subject_id}`,
+            });
+            // `question_type` SHART: `reset(values)` formani berilgan obyektga
+            // tenglashtiradi, `defaultValues` bilan birlashtirmaydi. Tushib
+            // qolsa maydon `undefined` bo'lardi va ikki oqibat chiqardi:
+            //   1) `watch('question_type')` bo'sh — tur bo'yicha chiqadigan
+            //      beshta blokning hammasi (A/B/C/D ham) yashirinardi;
+            //   2) `<select>` brauzerda birinchi variantni ko'rsatgani uchun
+            //      saqlashda doim `QUIZ` ketardi — `TRUE_FALSE` savolni ochib
+            //      shunchaki saqlash uni `QUIZ` ga aylantirib, `payload` ni
+            //      (to'g'ri javobni) o'chirib yuborardi.
             reset({
                 subject_id: question.subject_id.toString(),
+                question_type: question.question_type,
                 text: question.text,
                 option_a: question.option_a,
                 option_b: question.option_b,
@@ -124,6 +162,37 @@ const QuestionFormPage = () => {
                 option_d: question.option_d,
                 correct_option: (question.correct_option as 'a' | 'b' | 'c' | 'd') || 'a',
             });
+
+            // Tur-maxsus javoblar formada emas, mahalliy holatda saqlanadi va
+            // ular ham urug'lantirilishi kerak: aks holda bloklar bo'sh
+            // ko'rinar, saqlashda esa asl javoblar o'rniga standart qiymatlar
+            // yozilardi.
+            // `payload` serverda `Record<string, unknown>` — bu yerda turini
+            // tekshirib olamiz, bir xil yozilgan eski yozuvlar ham bo'lishi
+            // mumkin.
+            const payload = question.payload ?? {};
+            const strings = (value: unknown): string[] =>
+                Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+            const numbers = (value: unknown): number[] =>
+                Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number') : [];
+
+            if (question.question_type === 'TRUE_FALSE') {
+                setTrueFalseAnswer(typeof payload.correct === 'boolean' ? payload.correct : true);
+            } else if (question.question_type === 'MULTI_SELECT') {
+                const options = strings(payload.options);
+                const correct = numbers(payload.correct);
+                setMultiOptions(
+                    options.length
+                        ? options.map((text, index) => ({ text, correct: correct.includes(index) }))
+                        : [{ text: '', correct: true }, { text: '', correct: false }],
+                );
+            } else if (question.question_type === 'TYPE_ANSWER') {
+                const answers = strings(payload.answers);
+                setTextAnswers(answers.length ? answers : ['']);
+            } else if (question.question_type === 'PUZZLE') {
+                const items = strings(payload.items);
+                setPuzzleItems(items.length ? items : ['', '']);
+            }
         }
     }, [question, reset]);
 
@@ -271,11 +340,19 @@ const QuestionFormPage = () => {
             return;
         }
 
+        // Tahrirlashda tur savolning o'zidan olinadi, formadan emas: u
+        // `disabled={isEditMode}` bilan baribir o'zgartirilmaydi, lekin forma
+        // holati biror sababga ko'ra bo'shab qolsa `<select>` birinchi
+        // variantni (`QUIZ`) qaytarib, savol turini jimgina almashtirib
+        // yuborardi. Manba bitta bo'lgani ma'qul.
+        const questionKind = (isEditMode && question ? question.question_type : data.question_type) as
+            QuestionFormValues['question_type'];
+
         const payload: QuestionCreateRequest = {
             subject_id: parseInt(data.subject_id, 10),
             user_id: user.id,
             text: data.text,
-            question_type: data.question_type,
+            question_type: questionKind,
             option_a: data.option_a,
             option_b: data.option_b,
             option_c: data.option_c,
@@ -283,11 +360,11 @@ const QuestionFormPage = () => {
             correct_option: data.correct_option,
         };
 
-        if (data.question_type === 'TRUE_FALSE') {
+        if (questionKind === 'TRUE_FALSE') {
             payload.payload = { correct: trueFalseAnswer };
         }
 
-        if (data.question_type === 'TYPE_ANSWER') {
+        if (questionKind === 'TYPE_ANSWER') {
             const filled = textAnswers.map((item) => item.trim()).filter(Boolean);
             if (filled.length === 0) {
                 toast.error("Kamida bitta to'g'ri javob yozing");
@@ -296,7 +373,7 @@ const QuestionFormPage = () => {
             payload.payload = { answers: filled };
         }
 
-        if (data.question_type === 'PUZZLE') {
+        if (questionKind === 'PUZZLE') {
             const filled = puzzleItems.map((item) => item.trim()).filter(Boolean);
             if (filled.length < 2) {
                 toast.error("Kamida ikkita bo'lak kerak");
@@ -309,7 +386,7 @@ const QuestionFormPage = () => {
             payload.payload = { items: filled };
         }
 
-        if (data.question_type === 'MULTI_SELECT') {
+        if (questionKind === 'MULTI_SELECT') {
             const filled = multiOptions.filter((option) => option.text.trim());
             const correct = filled.map((option, index) => (option.correct ? index : -1)).filter((index) => index >= 0);
             // Serverda ham tekshiriladi, lekin xatoni shu yerda aytish tezroq.
@@ -503,15 +580,19 @@ const QuestionFormPage = () => {
                                         </p>
                                     </>
                                 ) : (
-                                    <select
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        {...register('subject_id')}
-                                    >
-                                        <option value="">Fanni tanlang</option>
-                                        {subjects.map((s) => (
-                                            <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))}
-                                    </select>
+                                    <Combobox
+                                        options={subjectOptions}
+                                        value={watch('subject_id')}
+                                        onSearchChange={setSubjectQuery}
+                                        onChange={(value) => {
+                                            setValue('subject_id', value, { shouldValidate: true });
+                                            setSelectedSubjectOption(
+                                                subjectOptions.find((o) => o.value === value) ?? null,
+                                            );
+                                        }}
+                                        placeholder="Fanni tanlang"
+                                        searchPlaceholder="Fan nomi bo'yicha qidirish..."
+                                    />
                                 )}
                                 {errors.subject_id && <p className="text-xs text-destructive font-medium">{errors.subject_id.message}</p>}
                             </div>

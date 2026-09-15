@@ -26,6 +26,8 @@ import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
 import { useQuizzes } from '@/hooks/useQuizzes';
 import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
+import { formatDate, formatDateTime } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
 // --grade-* хранят полные значения цвета — используем напрямую, без hsl().
@@ -103,7 +105,7 @@ const ResultCard = ({ result, onClick }: ResultCardProps) => {
                 <div className="flex items-center gap-1.5">
                     <Calendar className="h-3 w-3 text-muted-foreground" />
                     <span className="text-[11px] text-muted-foreground">
-                        {new Date(result.created_at).toLocaleDateString('uz-UZ')}
+                        {formatDate(result.created_at)}
                     </span>
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-primary font-medium opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
@@ -122,6 +124,7 @@ interface HeroStatsProps {
 }
 
 const HeroStats = ({ results, total }: HeroStatsProps) => {
+    const { t } = useTranslation();
     const grades = results.map(r => r.grade);
     const avg = grades.length > 0 ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) : '—';
     const best = grades.length > 0 ? Math.max(...grades) : null;
@@ -129,9 +132,9 @@ const HeroStats = ({ results, total }: HeroStatsProps) => {
     return (
         <div className="grid grid-cols-3 gap-3">
             {[
-                { label: "Jami natijalar", value: total, mono: true },
-                { label: "O'rtacha ball", value: avg, mono: true },
-                { label: "Eng yuqori ball", value: best ?? '—', mono: true },
+                { label: t("Jami natijalar"), value: total, mono: true },
+                { label: t("O'rtacha ball"), value: avg, mono: true },
+                { label: t("Eng yuqori ball"), value: best ?? '—', mono: true },
             ].map(({ label, value }) => (
                 <div key={label} className="rounded-2xl border border-border bg-card px-4 py-4 text-center">
                     <p className="font-display text-3xl font-semibold text-foreground leading-none">{value}</p>
@@ -145,6 +148,7 @@ const HeroStats = ({ results, total }: HeroStatsProps) => {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const ResultsPage = () => {
+    const { t } = useTranslation();
     const { user, activeRole, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
 
@@ -167,7 +171,7 @@ const ResultsPage = () => {
         if (resultToDelete) {
             deleteResult(resultToDelete, {
                 onSuccess: () => {
-                    toast.success("Natija o'chirildi");
+                    toast.success(t("Natija o'chirildi"));
                     setResultToDelete(null);
                 }
             });
@@ -258,21 +262,21 @@ const ResultsPage = () => {
             setIsExporting(true);
             const response = await resultService.getResults({ ...resultFilters, page: 1, limit: 10000 });
             const items = response.results || [];
-            if (items.length === 0) { toast.info('Eksport qilish uchun natijalar topilmadi.'); return; }
+            if (items.length === 0) { toast.info(t('Eksport qilish uchun natijalar topilmadi.')); return; }
 
             const { utils, writeFile } = await import('xlsx');
-            const date = new Date().toLocaleDateString('uz-UZ').replace(/\//g, '.');
+            const date = formatDate(new Date());
             const wsData: unknown[][] = [
                 ['NDKTU — Talabalar Natijalari', '', '', '', '', '', ''],
                 [`Sana: ${date}`, '', '', `Guruh: ${selectedGroup ? groups.find(g => g.id === parsedGroup)?.name || '-' : 'Barchasi'}`, '', '', ''],
                 [],
                 isAdminOrTeacher
-                    ? ['ID', 'Talaba', 'Guruh', 'Fan', 'Test', 'Ball', "To'g'ri / Jami", 'Sana']
-                    : ['ID', 'Fan', 'Test', 'Ball', "To'g'ri / Jami", 'Sana'],
+                    ? ['ID', t('Talaba'), t('Guruh'), t('Fan'), t('Test'), 'Ball', t("To'g'ri / Jami"), t('Sana')]
+                    : ['ID', t('Fan'), t('Test'), 'Ball', t("To'g'ri / Jami"), t('Sana')],
             ];
 
             items.forEach(r => {
-                const dateStr = new Date(r.created_at).toLocaleString('uz-UZ', { hour12: false });
+                const dateStr = formatDateTime(r.created_at);
                 const name = r.student_name || r.user?.username || `Foydalanuvchi ${r.user_id}`;
                 const ratio = `${r.correct_answers} / ${r.correct_answers + r.wrong_answers}`;
                 if (isAdminOrTeacher) {
@@ -290,7 +294,7 @@ const ResultsPage = () => {
             utils.book_append_sheet(wb, ws, 'Natijalar');
             writeFile(wb, `Natijalar_${date.replace(/\./g, '-')}.xlsx`);
         } catch {
-            toast.error('Eksport qilishda xatolik yuz berdi.');
+            toast.error(t('Eksport qilishda xatolik yuz berdi.'));
         } finally {
             setIsExporting(false);
         }
@@ -308,7 +312,7 @@ const ResultsPage = () => {
         },
         {
             key: 'student',
-            header: 'Talaba',
+            header: t('Talaba'),
             cell: (result) => (
                 <div>
                     <div className="font-medium text-sm">{result.student_name || result.user?.username || '—'}</div>
@@ -318,11 +322,11 @@ const ResultsPage = () => {
                 </div>
             ),
         },
-        { key: 'group', header: 'Guruh', hideBelow: 'md', className: 'text-sm', cell: (result) => result.group?.name || '—' },
-        { key: 'subject', header: 'Fan', hideBelow: 'lg', className: 'text-sm', cell: (result) => result.subject?.name || '—' },
+        { key: 'group', header: t('Guruh'), hideBelow: 'md', className: 'text-sm', cell: (result) => result.group?.name || '—' },
+        { key: 'subject', header: t('Fan'), hideBelow: 'lg', className: 'text-sm', cell: (result) => result.subject?.name || '—' },
         {
             key: 'quiz',
-            header: 'Test',
+            header: t('Test'),
             hideBelow: 'lg',
             className: 'text-sm max-w-[180px] truncate',
             cell: (result) => result.quiz?.title || `Test ${result.quiz_id}`,
@@ -342,7 +346,7 @@ const ResultsPage = () => {
         },
         {
             key: 'score',
-            header: 'Natija',
+            header: t('Natija'),
             cell: (result) => (
                 <div className="flex items-center gap-2">
                     {result.cheating_detected && (
@@ -356,17 +360,17 @@ const ResultsPage = () => {
         },
         {
             key: 'date',
-            header: 'Sana',
+            header: t('Sana'),
             hideBelow: 'md',
             className: 'text-xs text-muted-foreground whitespace-nowrap',
-            cell: (result) => new Date(result.created_at).toLocaleString('uz-UZ', { hour12: false }),
+            cell: (result) => formatDateTime(result.created_at),
         },
     ];
 
     if (isAdmin) {
         columns.push({
             key: 'actions',
-            header: 'Amallar',
+            header: t('Amallar'),
             headClassName: 'w-[100px]',
             cell: (result) => (
                 <div className="flex items-center gap-1">
@@ -401,9 +405,9 @@ const ResultsPage = () => {
         <div className="flex flex-wrap gap-3 items-end">
             {isAdminOrTeacher && (
                 <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Talaba</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Talaba')}</label>
                     <Input
-                        placeholder="Ism yoki login..."
+                        placeholder={t("Ism yoki login...")}
                         value={usernameSearch}
                         onChange={e => setUsernameSearch(e.target.value)}
                     />
@@ -417,8 +421,8 @@ const ResultsPage = () => {
                         options={facultyOptions}
                         value={selectedFaculty}
                         onChange={val => setSelectedFaculty(val || '')}
-                        placeholder="Barcha fakultetlar"
-                        searchPlaceholder="Qidirish..."
+                        placeholder={t("Barcha fakultetlar")}
+                        searchPlaceholder={t("Qidirish...")}
                     />
                 </div>
             )}
@@ -430,44 +434,44 @@ const ResultsPage = () => {
                         options={kafedraOptions}
                         value={selectedKafedra}
                         onChange={val => setSelectedKafedra(val || '')}
-                        placeholder="Barcha kafedralar"
-                        searchPlaceholder="Qidirish..."
+                        placeholder={t("Barcha kafedralar")}
+                        searchPlaceholder={t("Qidirish...")}
                     />
                 </div>
             )}
 
             {isAdminOrTeacher && (
                 <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guruh</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Guruh')}</label>
                     <Combobox
                         options={groups.map(g => ({ value: String(g.id), label: g.name }))}
                         value={selectedGroup}
                         onChange={val => setSelectedGroup(val || '')}
-                        placeholder="Barcha guruhlar"
-                        searchPlaceholder="Qidirish..."
+                        placeholder={t("Barcha guruhlar")}
+                        searchPlaceholder={t("Qidirish...")}
                     />
                 </div>
             )}
 
             <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fan</label>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Fan')}</label>
                 <Combobox
                     options={subjectOptions}
                     value={selectedSubject}
                     onChange={setSelectedSubject}
-                    placeholder="Barcha fanlar"
-                    searchPlaceholder="Qidirish..."
+                    placeholder={t("Barcha fanlar")}
+                    searchPlaceholder={t("Qidirish...")}
                 />
             </div>
 
             <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Test</label>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Test')}</label>
                 <Combobox
                     options={quizOptions}
                     value={selectedQuiz}
                     onChange={setSelectedQuiz}
-                    placeholder="Barcha testlar"
-                    searchPlaceholder="Qidirish..."
+                    placeholder={t("Barcha testlar")}
+                    searchPlaceholder={t("Qidirish...")}
                 />
             </div>
 
@@ -482,8 +486,8 @@ const ResultsPage = () => {
                     ]}
                     value={selectedGrade}
                     onChange={setSelectedGrade}
-                    placeholder="Barcha"
-                    searchPlaceholder="Qidirish..."
+                    placeholder={t("Barcha")}
+                    searchPlaceholder={t("Qidirish...")}
                 />
             </div>
 
@@ -514,7 +518,7 @@ const ResultsPage = () => {
             {/* Page header */}
             <PageHeader
                 title="Natijalar"
-                description={isStudent ? 'Sizning test natijalaringiz' : 'Talabalar test natijalari va baholari'}
+                description={isStudent ? t('Sizning test natijalaringiz') : t('Talabalar test natijalari va baholari')}
                 actions={
                     <Button
                         variant="outline"
@@ -570,8 +574,8 @@ const ResultsPage = () => {
                 ) : results.length === 0 ? (
                     <EmptyState
                         icon={<FileText className="h-6 w-6" />}
-                        title="Natijalar topilmadi"
-                        description="Siz hali birorta ham test topshirmagansiz yoki filtrga mos natija yo'q."
+                        title={t("Natijalar topilmadi")}
+                        description={t("Siz hali birorta ham test topshirmagansiz yoki filtrga mos natija yo'q.")}
                     />
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -600,8 +604,8 @@ const ResultsPage = () => {
                             onRetry={() => refetchResults()}
                             onRowClick={(result) => handleViewAnswers(result)}
                             emptyIcon={<FileText className="h-6 w-6" />}
-                            emptyTitle="Natijalar topilmadi"
-                            emptyDescription={hasActiveFilters ? "Filtrlarni o'zgartirib ko'ring." : "Hozircha test natijalari yo'q."}
+                            emptyTitle={t("Natijalar topilmadi")}
+                            emptyDescription={hasActiveFilters ? "Filtrlarni o'zgartirib ko'ring." : t("Hozircha test natijalari yo'q.")}
                             renderCard={(result) => {
                                 const conf = getGradeConf(result.grade);
                                 const total = result.correct_answers + result.wrong_answers;
@@ -633,7 +637,7 @@ const ResultsPage = () => {
                                                 </span>
                                             </div>
                                             <span className="text-[11px] text-muted-foreground">
-                                                {new Date(result.created_at).toLocaleDateString('uz-UZ')}
+                                                {formatDate(result.created_at)}
                                             </span>
                                         </div>
                                     </div>
@@ -655,10 +659,10 @@ const ResultsPage = () => {
                 isOpen={resultToDelete !== null}
                 onClose={() => setResultToDelete(null)}
                 onConfirm={handleConfirmDelete}
-                title="Natijani o'chirish"
-                description="Haqiqatan ham ushbu natijani o'chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi."
-                confirmText="O'chirish"
-                cancelText="Bekor qilish"
+                title={t("Natijani o'chirish")}
+                description={t("Haqiqatan ham ushbu natijani o'chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.")}
+                confirmText={t("O'chirish")}
+                cancelText={t("Bekor qilish")}
                 isLoading={isDeleting}
                 variant="danger"
             />

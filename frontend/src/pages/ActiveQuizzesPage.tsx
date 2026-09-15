@@ -13,6 +13,8 @@ import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
 
 const ActiveQuizzesPage = () => {
     const { hasPermission } = useAuth();
@@ -46,13 +48,41 @@ const ActiveQuizzesPage = () => {
         sortDir,
     );
 
+    // Ikkita alohida so'rov, ataylab:
+    //  * `allSubjectsData` — jadvalda fan NOMINI ko'rsatish uchun
+    //    (`getSubjectName`). Quiz javobida faqat `subject_id` bor,
+    //    shuning uchun nomlar ro'yxatdan qidiriladi va uni qisqartirib
+    //    bo'lmaydi: qatorlarda «-» chiqib qolardi.
+    //  * `subjectOptionsData` — filtr ro'yxati uchun. Fanlar 2978 ta,
+    //    hammasi yuklanmaydi; qidiruv serverga uzatiladi.
     const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
+    const [subjectQuery, setSubjectQuery] = useState('');
+    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
+    const { data: subjectOptionsData } = useSubjects(
+        1,
+        FILTER_PAGE_SIZE,
+        debouncedSubjectQuery,
+        undefined,
+        hasPermission('read:subject'),
+    );
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
 
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
     const allSubjects = allSubjectsData?.subjects || [];
+    // Tanlangan fan qidiruv natijasidan tushib qolsa, Combobox nom
+    // o'rniga placeholder ko'rsatardi — go'yo filtr olib tashlangandek.
+    const selectedSubjectOption = filterSubjectId
+        ? {
+              value: String(filterSubjectId),
+              label: allSubjects.find((s) => s.id === filterSubjectId)?.name ?? `#${filterSubjectId}`,
+          }
+        : null;
+    const subjectOptions = withSelected(
+        (subjectOptionsData?.subjects || []).map((s) => ({ value: String(s.id), label: s.name })),
+        selectedSubjectOption,
+    );
     const allGroups = allGroupsData?.groups || [];
     const allTeachers = allTeachersData?.teachers || [];
 
@@ -94,6 +124,8 @@ const ActiveQuizzesPage = () => {
 
             <QuizFilters
                 subjects={allSubjects}
+                subjectOptions={subjectOptions}
+                onSubjectSearchChange={setSubjectQuery}
                 groups={allGroups}
                 teachers={allTeachers}
                 filterSubjectId={filterSubjectId}

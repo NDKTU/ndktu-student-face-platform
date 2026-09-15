@@ -1,10 +1,7 @@
 import api from './api';
 
-/**
- * `zoom` — jonli dars havolasi (Meeting SDK orqali saytda ochiladi).
- * `jitsi` — o'sha ish uchun muqobil (sinov uchun qo'shildi, Zoom o'z joyida).
- */
-export type ResourceType = 'file' | 'link' | 'text' | 'video' | 'zoom' | 'jitsi';
+/** `zoom` — jonli dars havolasi (Meeting SDK orqali saytda ochiladi). */
+export type ResourceType = 'file' | 'link' | 'text' | 'video' | 'zoom';
 
 export interface Resource {
     id: number;

@@ -20,7 +20,7 @@ import {
     Award,
 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
-import { useStudents, /* useDeleteStudent */ } from '@/hooks/useStudents';
+import { useStudents, useStudent, /* useDeleteStudent */ } from '@/hooks/useStudents';
 import { useUserResults } from '@/hooks/useResults';
 import { useGroups } from '@/hooks/useGroups';
 import { useCatalogView } from '@/hooks/useCatalogView';
@@ -34,18 +34,19 @@ import { CatalogCard, CatalogGrid } from '@/components/catalog/CatalogCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { initialsOf, tileFor } from '@/lib/avatarTiles';
-import { cn } from '@/lib/utils';
 import type { Result } from '@/services/resultService';
+import { formatDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
+import { PersonAvatar } from '@/components/ui/PersonAvatar';
 
 type SortField = 'name' | 'user_id' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const StudentsPage = () => {
+    const { t } = useTranslation();
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [studentToChangeGroup, setStudentToChangeGroup] = useState<Student | null>(null);
-    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
     // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
@@ -133,10 +134,21 @@ export const StudentsPage = () => {
     const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
     const totalCount = studentsData?.total ?? students.length;
 
+    // URL'dagi `?student=<id>` — batafsil ko'rinish manbai.
+    const detailId = Number(searchParams.get('student')) || 0;
+    const { data: detailStudent } = useStudent(detailId);
+
+    // Guruh nomi API javobida yo'q (faqat `group_id`), shuning uchun u
+    // allaqachon yuklangan guruhlar ro'yxatidan olinadi.
+    const groupNameById = useMemo(
+        () => new Map((groupsData?.groups || []).map((g) => [g.id, g.name])),
+        [groupsData],
+    );
+
     const groupOptions = useMemo(() => {
         const list = (groupsData?.groups || []).map((g) => ({ value: String(g.id), label: g.name }));
-        return [{ value: 'all', label: 'Barcha guruhlar' }, ...list];
-    }, [groupsData]);
+        return [{ value: 'all', label: t('Barcha guruhlar') }, ...list];
+    }, [groupsData, t]);
 
     const handleSort = (field: SortField) => {
         // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda
@@ -150,14 +162,26 @@ export const StudentsPage = () => {
         }
     };
 
+    // Batafsil ko'rinish URL'da: ilgari u faqat mahalliy holatda edi, shuning
+    // uchun brauzerning «Orqaga» tugmasi kartochkani umuman ko'rmay, undan
+    // oldingi manzilga sakrardi. Endi ochilish `?student=<id>` ni qo'shadi —
+    // «Orqaga» ro'yxatga qaytaradi, havolani ulashsa ham o'sha talaba ochiladi.
     const handleViewStudent = (student: Student) => {
         setSelectedStudent(student);
-        setViewMode('detail');
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('student', String(student.id));
+            return next;
+        });
     };
 
     const handleBackToList = () => {
         setSelectedStudent(null);
-        setViewMode('list');
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('student');
+            return next;
+        });
     };
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
@@ -167,7 +191,7 @@ export const StudentsPage = () => {
 //             { id: studentToDelete.id, force: cascadeWarnings.length > 0 },
 //             {
 //                 onSuccess: () => {
-//                     toast.success("Talaba o'chirildi");
+//                     toast.success(t("Talaba o'chirildi"));
 //                     setStudentToDelete(null);
 //                     setCascadeWarnings([]);
 //                     refetch();
@@ -176,7 +200,7 @@ export const StudentsPage = () => {
 //                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
 //                         setCascadeWarnings(error.response.data.detail.warnings || []);
 //                     } else {
-//                         toast.error("Talabani o'chirishda xatolik yuz berdi");
+//                         toast.error(t("Talabani o'chirishda xatolik yuz berdi"));
 //                         setStudentToDelete(null);
 //                         setCascadeWarnings([]);
 //                     }
@@ -216,10 +240,10 @@ export const StudentsPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    title="Tahrirlash"
+                    title={t("Tahrirlash")}
                     onClick={(e) => {
                         e.stopPropagation();
-                        toast.info("Tahrirlash funksiyasi tez orada qo'shiladi");
+                        toast.info(t("Tahrirlash funksiyasi tez orada qo'shiladi"));
                     }}
                 >
                     <Pencil className="h-4 w-4" />
@@ -230,7 +254,7 @@ export const StudentsPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                    title="O'chirish"
+                    title={t("O'chirish")}
                     onClick={(e) => {
                         e.stopPropagation();
                         setStudentToDelete(student);
@@ -253,8 +277,20 @@ export const StudentsPage = () => {
         </div>
     );
 
-    if (viewMode === 'detail' && selectedStudent) {
-        return <StudentDetail student={selectedStudent} onBack={handleBackToList} />;
+    if (detailId) {
+        // To'g'ridan-to'g'ri havola bilan kelinganda ro'yxatda bunday talaba
+        // bo'lmasligi mumkin, shuning uchun id bo'yicha alohida so'rov bor.
+        const student = selectedStudent?.id === detailId ? selectedStudent : detailStudent;
+        if (student) {
+            return (
+                <StudentDetail
+                    student={student}
+                    groupName={groupNameById.get(student.group_id)}
+                    onBack={handleBackToList}
+                />
+            );
+        }
+        return <div className="space-y-4"><Skeleton className="h-10 w-1/2" /><Skeleton className="h-64 w-full rounded-2xl" /></div>;
     }
 
     return (
@@ -263,18 +299,18 @@ export const StudentsPage = () => {
 
             {/* Breadcrumb Header */}
             <OrganizationBreadcrumbs
-                items={[{ label: 'Foydalanuvchilar', onClick: () => {} }, { label: 'Talabalar' }]}
-                title="Talabalar"
-                description="Barcha fakultet va guruh talabalari, HEMIS integratsiyasi va test natijalari"
+                items={[{ label: 'Foydalanuvchilar', onClick: () => {} }, { label: t('Talabalar') }]}
+                title={t("Talabalar")}
+                description={t("Barcha fakultet va guruh talabalari, HEMIS integratsiyasi va test natijalari")}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Talaba F.I.SH yoki ID bo'yicha qidirish..."
+                searchPlaceholder={t("Talaba F.I.SH yoki ID bo'yicha qidirish...")}
                 totalCount={totalCount}
-                totalLabel="Talabalar"
+                totalLabel={t("Talabalar")}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={handleClearFilters}
                 extraFilters={
@@ -299,7 +335,7 @@ export const StudentsPage = () => {
                                         { replace: true },
                                     );
                                 }}
-                                placeholder="Guruh bo'yicha saralash"
+                                placeholder={t("Guruh bo'yicha saralash")}
                             />
                         </div>
                     </PermissionGate>
@@ -327,11 +363,11 @@ export const StudentsPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
-                        title="Talabalar topilmadi"
+                        title={t("Talabalar topilmadi")}
                         description={
                             searchTerm || selectedGroup !== 'all'
-                                ? "Tanlangan mezonlarga mos talaba topilmadi."
-                                : "Hozircha talaba qo'shilmagan."
+                                ? t("Tanlangan mezonlarga mos talaba topilmadi.")
+                                : t("Hozircha talaba qo'shilmagan.")
                         }
                     />
                 </div>
@@ -346,7 +382,7 @@ export const StudentsPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Talaba F.I.SH</span>
+                                    <span>{t('Talaba F.I.SH')}</span>
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
@@ -368,11 +404,11 @@ export const StudentsPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hidden xl:table-cell hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Qo'shilgan sana</span>
+                                    <span>{t("Qo'shilgan sana")}</span>
                                     {renderSortIcon('created_at')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -394,14 +430,12 @@ export const StudentsPage = () => {
                                     {/* Talaba F.I.SH */}
                                     <TableCell>
                                         <div className="flex items-center gap-3">
-                                            <div
-                                                className={cn(
-                                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold shadow-xs',
-                                                    tileFor(student.id)
-                                                )}
-                                            >
-                                                {initialsOf(displayName)}
-                                            </div>
+                                            <PersonAvatar
+                                                id={student.id}
+                                                name={displayName}
+                                                src={student.image_path}
+                                                className="h-9 w-9"
+                                            />
                                             <div className="min-w-0">
                                                 <p className="font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
                                                     {displayName}
@@ -448,7 +482,7 @@ export const StudentsPage = () => {
                                     {/* Qo'shilgan sana */}
                                     <TableCell className="hidden xl:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {student.created_at ? new Date(student.created_at).toLocaleDateString() : '—'}
+                                            {formatDate(student.created_at)}
                                         </span>
                                     </TableCell>
 
@@ -483,8 +517,8 @@ export const StudentsPage = () => {
                                     </span>
                                 }
                                 metrics={[
-                                    { label: 'Talaba ID', value: student.student_id_number || '—' },
-                                    { label: 'Sana', value: student.created_at ? new Date(student.created_at).toLocaleDateString() : '—' },
+                                    { label: t('Talaba ID'), value: student.student_id_number || '—' },
+                                    { label: t('Sana'), value: formatDate(student.created_at) },
                                 ]}
                                 actions={renderActions(student)}
                                 onClick={() => handleViewStudent(student)}
@@ -513,7 +547,7 @@ export const StudentsPage = () => {
                     setCascadeWarnings([]);
                 }}
                 onConfirm={handleDelete}
-                title="Talabani o'chirish"
+                title={t("Talabani o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
@@ -533,8 +567,8 @@ export const StudentsPage = () => {
                         `Siz haqiqatan ham "${studentToDelete?.full_name}" talabasini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                     )
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t("Bekor qilish")}
                 variant="danger"
             />
             */}
@@ -553,7 +587,12 @@ export const StudentsPage = () => {
     );
 };
 
-const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => void }) => {
+const StudentDetail = ({
+    student,
+    groupName,
+    onBack,
+}: { student: Student; groupName?: string; onBack: () => void }) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 5;
@@ -595,6 +634,15 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                     <ArrowLeft className="h-4 w-4" />
                     <span>Orqaga</span>
                 </Button>
+                {/* Surat HEMIS'dan keladi va yuz tekshiruvida etalon sifatida
+                    ishlatiladi — uni ko'rsatmaslik xodimga «bu kimning surati
+                    bilan solishtirilyapti?» degan savolga javob bermasdi. */}
+                <PersonAvatar
+                    id={student.id}
+                    name={student.full_name || `Talaba #${student.id}`}
+                    src={student.image_path}
+                    className="h-14 w-14 text-base"
+                />
                 <div>
                     <h1 className="page-title">{student.full_name || `Talaba #${student.id}`}</h1>
                     <p className="text-xs text-muted-foreground">User ID: #{student.user_id}</p>
@@ -651,8 +699,14 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                             <span className="text-foreground">{student.specialty || '—'}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
+                            <span className="font-medium text-muted-foreground">Guruh:</span>
+                            <span className="font-semibold text-foreground">{groupName || '—'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
                             <span className="font-medium text-muted-foreground">Bosqich:</span>
-                            <span className="badge badge-primary">{student.level ? `${student.level}-kurs` : '—'}</span>
+                            {/* `level` bekenddan allaqachon «3-kurs» ko'rinishida
+                                keladi — qo'shimcha `-kurs` «3-kurs-kurs» berardi. */}
+                            <span className="badge badge-primary">{student.level || '—'}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm py-1 border-b border-border/50">
                             <span className="font-medium text-muted-foreground">Semestr:</span>
@@ -693,7 +747,7 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                                     <TableRow className="border-b border-border/80">
                                         <TableHead className="font-bold text-xs">Test Nomi</TableHead>
                                         <TableHead className="font-bold text-xs">Fan</TableHead>
-                                        <TableHead className="font-bold text-xs hidden md:table-cell">Sana</TableHead>
+                                        <TableHead className="font-bold text-xs hidden md:table-cell">{t('Sana')}</TableHead>
                                         <TableHead className="font-bold text-xs">Natija</TableHead>
                                         <TableHead className="text-right font-bold text-xs pr-4">Batafsil</TableHead>
                                     </TableRow>
@@ -721,7 +775,7 @@ const StudentDetail = ({ student, onBack }: { student: Student; onBack: () => vo
                                                 {result.subject?.name || '-'}
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">
-                                                {new Date(result.created_at).toLocaleDateString()}
+                                                {formatDate(result.created_at)}
                                             </TableCell>
                                             <TableCell>{renderResultScore(result)}</TableCell>
                                             <TableCell className="text-right pr-4">

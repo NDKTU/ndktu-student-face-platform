@@ -34,6 +34,15 @@ export interface LibraryFileDetail extends LibraryFile {
     usages: FileUsage[];
 }
 
+/**
+ * Yuklash javobi. `deduplicated` — ayni baytlar kutubxonada allaqachon bor
+ * edi, server yangi yozuv yaratmasdan mavjudini qaytardi. Buni faqat server
+ * biladi: javobdagi qolgan maydonlar ikkala holatda bir xil.
+ */
+export interface UploadedLibraryFile extends LibraryFile {
+    deduplicated: boolean;
+}
+
 export interface LibraryFolder {
     id: number;
     name: string;
@@ -85,7 +94,7 @@ export const fileService = {
     upload: async (file: File, folderId?: number) => {
         const form = new FormData();
         form.append('file', file);
-        const response = await api.post<LibraryFile>('/file/upload', form, {
+        const response = await api.post<UploadedLibraryFile>('/file/upload', form, {
             params: folderId ? { folder_id: folderId } : undefined,
             headers: { 'Content-Type': 'multipart/form-data' },
         });

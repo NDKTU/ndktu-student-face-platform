@@ -35,11 +35,13 @@ import { useSubjects, /* useCreateSubject, */ /* useUpdateSubject, */ /* useDele
 import { useCatalogView } from '@/hooks/useCatalogView';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
 
 // EPOS maʼlumoti: fan yaratish/tahrirlash oynasi kommentga olindi (2026-09-11),
 // shu bilan uning formasi sxemasi ham kerak emas.
 // const subjectSchema = z.object({
-//     name: z.string().min(1, 'Fan nomi kiritilishi shart'),
+//     name: z.string().min(1, t('Fan nomi kiritilishi shart')),
 // });
 //
 // type SubjectFormValues = z.infer<typeof subjectSchema>;
@@ -47,6 +49,7 @@ type SortField = 'id' | 'name' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const SubjectsPage = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,7 +128,7 @@ export const SubjectsPage = () => {
 //             { id: subjectToDelete.id, force: cascadeWarnings.length > 0 },
 //             {
 //                 onSuccess: () => {
-//                     toast.success("Fan o'chirildi");
+//                     toast.success(t("Fan o'chirildi"));
 //                     setIsDeleteModalOpen(false);
 //                     setSubjectToDelete(null);
 //                     setCascadeWarnings([]);
@@ -135,7 +138,7 @@ export const SubjectsPage = () => {
 //                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
 //                         setCascadeWarnings(error.response.data.detail.warnings || []);
 //                     } else {
-//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         toast.error(t("O'chirishda xatolik yuz berdi"));
 //                         setIsDeleteModalOpen(false);
 //                         setSubjectToDelete(null);
 //                         setCascadeWarnings([]);
@@ -172,7 +175,7 @@ export const SubjectsPage = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title="Tahrirlash"
+                            title={t("Tahrirlash")}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedSubject(subject);
@@ -187,7 +190,7 @@ export const SubjectsPage = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                            title="O'chirish"
+                            title={t("O'chirish")}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteClick(subject);
@@ -225,15 +228,15 @@ export const SubjectsPage = () => {
             {/* Unified Breadcrumbs Header */}
             <OrganizationBreadcrumbs
                 items={[{ label: 'Fanlar', onClick: () => {} }]}
-                title="O'quv Fanlari"
-                description="Universitet o'quv fanlari katalogi, test savollari va darslar"
+                title={t("O'quv Fanlari")}
+                description={t("Universitet o'quv fanlari katalogi, test savollari va darslar")}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Fan nomi bo'yicha qidirish..."
+                searchPlaceholder={t("Fan nomi bo'yicha qidirish...")}
                 totalCount={totalCount}
                 totalLabel="Fanlar"
                 /* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
@@ -251,7 +254,7 @@ export const SubjectsPage = () => {
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>Qo'shish</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
@@ -279,11 +282,11 @@ export const SubjectsPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
-                        title="Fanlar topilmadi"
+                        title={t("Fanlar topilmadi")}
                         description={
                             searchTerm
-                                ? "Qidiruv mezonlariga mos fan topilmadi."
-                                : "Hozircha tizimda fan qo'shilmagan."
+                                ? t("Qidiruv mezonlariga mos fan topilmadi.")
+                                : t("Hozircha tizimda fan qo'shilmagan.")
                         }
                     />
                 </div>
@@ -298,7 +301,7 @@ export const SubjectsPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Fan Nomi</span>
+                                    <span>{t('Fan Nomi')}</span>
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
@@ -308,12 +311,12 @@ export const SubjectsPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hidden md:table-cell hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Yaratilgan sana</span>
+                                    <span>{t('Yaratilgan sana')}</span>
                                     {renderSortIcon('created_at')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-center font-bold text-xs">Holati</TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-center font-bold text-xs">{t('Holati')}</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -368,7 +371,7 @@ export const SubjectsPage = () => {
                                     {/* Yaratilgan sana */}
                                     <TableCell className="hidden md:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {subject.created_at ? new Date(subject.created_at).toLocaleDateString() : '—'}
+                                            {formatDate(subject.created_at)}
                                         </span>
                                     </TableCell>
 
@@ -377,12 +380,12 @@ export const SubjectsPage = () => {
                                         {isActive ? (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                                 <CheckCircle2 className="h-3 w-3" />
-                                                <span>Faol</span>
+                                                <span>{t('Faol')}</span>
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-semibold text-gray-500">
                                                 <XCircle className="h-3 w-3" />
-                                                <span>Nofaol</span>
+                                                <span>{t('Nofaol')}</span>
                                             </span>
                                         )}
                                     </TableCell>
@@ -414,8 +417,8 @@ export const SubjectsPage = () => {
                                 </span>
                             }
                             metrics={[
-                                { label: 'Fan ID', value: `#${subject.id}` },
-                                { label: 'Sana', value: subject.created_at ? new Date(subject.created_at).toLocaleDateString() : '—' },
+                                { label: t('Fan ID'), value: `#${subject.id}` },
+                                { label: t('Sana'), value: formatDate(subject.created_at) },
                             ]}
                             actions={renderActions(subject)}
                             onClick={() => navigate(`/questions?subject_id=${subject.id}`)}
@@ -454,7 +457,7 @@ export const SubjectsPage = () => {
                     setSubjectToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Fanni o'chirish"
+                title={t("Fanni o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
@@ -474,8 +477,8 @@ export const SubjectsPage = () => {
                         `Siz haqiqatan ham "${subjectToDelete?.name}" fanini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                     )
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
             */}
         </div>
@@ -524,22 +527,22 @@ export const SubjectsPage = () => {
 //                 { id: subject.id, data },
 //                 {
 //                     onSuccess: (updatedSubject) => {
-//                         toast.success('Fan yangilandi');
+//                         toast.success(t('Fan yangilandi'));
 //                         onSuccess(updatedSubject);
 //                     },
 //                     onError: () => {
-//                         toast.error('Fanni yangilashda xatolik yuz berdi');
+//                         toast.error(t('Fanni yangilashda xatolik yuz berdi'));
 //                     },
 //                 }
 //             );
 //         } else {
 //             createMutation.mutate(data, {
 //                 onSuccess: (newSubject) => {
-//                     toast.success('Fan yaratildi');
+//                     toast.success(t('Fan yaratildi'));
 //                     onSuccess(newSubject);
 //                 },
 //                 onError: () => {
-//                     toast.error('Fan yaratishda xatolik yuz berdi');
+//                     toast.error(t('Fan yaratishda xatolik yuz berdi'));
 //                 },
 //             });
 //         }
@@ -549,11 +552,11 @@ export const SubjectsPage = () => {
 //         <Modal
 //             isOpen={isOpen}
 //             onClose={onClose}
-//             title={subject ? 'Fanni tahrirlash' : 'Yangi fan yaratish'}
+//             title={subject ? t('Fanni tahrirlash') : t('Yangi fan yaratish')}
 //         >
 //             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 //                 <Input
-//                     label="Fan nomi"
+//                     label={t("Fan nomi")}
 //                     {...register('name')}
 //                     error={errors.name?.message}
 //                     placeholder="masalan: Oliy matematika"
@@ -564,7 +567,7 @@ export const SubjectsPage = () => {
 //                         Bekor qilish
 //                     </Button>
 //                     <Button type="submit" isLoading={isSubmitting}>
-//                         {subject ? 'Yangilash' : 'Yaratish'}
+//                         {subject ? t('Yangilash') : t('Yaratish')}
 //                     </Button>
 //                 </div>
 //             </form>

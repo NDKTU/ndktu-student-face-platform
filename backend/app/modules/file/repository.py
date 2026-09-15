@@ -27,6 +27,7 @@ from app.modules.file.schemas import (
     FileListResponse,
     FileResponse,
     FileUpdateRequest,
+    FileUploadResponse,
     FileUsageInfo,
     FolderCreateRequest,
     FolderResponse,
@@ -205,14 +206,14 @@ class FileRepository:
         file: UploadFile,
         user: User,
         folder_id: int | None = None,
-    ) -> FileResponse:
+    ) -> FileUploadResponse:
         if folder_id is not None:
             await self._get_owned_folder(session, folder_id, user)
         else:
             # Papka koʻrsatilmagan — shaxsiy papkaga tushadi, ildizga emas.
             folder_id = await self._personal_folder_id(session, user)
 
-        stored = await store_upload(
+        stored, created = await store_upload(
             session,
             file,
             owner_user_id=user.id,
@@ -221,7 +222,8 @@ class FileRepository:
         )
         await session.commit()
         await session.refresh(stored, ["blob"])
-        return self._to_response(stored, await self._usage_count(session, stored.id))
+        base = self._to_response(stored, await self._usage_count(session, stored.id))
+        return FileUploadResponse(**base.model_dump(), deduplicated=not created)
 
     # ─── Roʻyxat ──────────────────────────────────────────────────────
 

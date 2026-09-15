@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ClipboardList, Search } from 'lucide-react';
+import { courseTypeLabel } from '@/services/courseTypes';
 import { useTeacherAssignments } from '@/hooks/useTeacherAssignments';
 import { useKafedras } from '@/hooks/useReferenceData';
 import { useRoleView } from '@/hooks/useRoleView';
@@ -56,6 +57,11 @@ export const TeacherAssignmentsPage = () => {
 
     // Mashgʻulot turlari EPOS'dan keladi va oldindan maʼlum emas — roʻyxatni
     // koʻringan qatorlardan yigʻamiz. EPOS ularni bermasa, filtr ham chiqmaydi.
+    //
+    // Qiymatlar EPOS'dan inglizcha keladi (`lecture`, `practice`, `lab`,
+    // `seminar`) va kurs turlari bilan bir xil, shuning uchun bir xil lugʻat
+    // ishlatiladi. Notanish tur chiqsa — oʻz nomi bilan koʻrsatiladi, chunki
+    // yashirish filtrni yolgʻon toʻliq koʻrsatardi.
     const loadTypeOptions = useMemo(() => {
         const seen = new Set<string>();
         for (const row of data?.items ?? []) {
@@ -63,7 +69,9 @@ export const TeacherAssignmentsPage = () => {
         }
         return [
             { value: 'all', label: 'Barcha turlar' },
-            ...Array.from(seen).sort().map((t) => ({ value: t, label: t })),
+            ...Array.from(seen)
+                .map((t) => ({ value: t, label: courseTypeLabel(t) ?? t }))
+                .sort((a, b) => a.label.localeCompare(b.label)),
         ];
     }, [data]);
 
@@ -106,7 +114,7 @@ export const TeacherAssignmentsPage = () => {
                                 key={type}
                                 className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                             >
-                                {type}
+                                {courseTypeLabel(type) ?? type}
                             </span>
                         ))}
                     </div>
@@ -209,7 +217,8 @@ export const TeacherAssignmentsPage = () => {
                         <p className="mt-2 text-sm text-foreground">{row.subject_name}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {row.group_name}
-                            {row.load_types.length > 0 && ` · ${row.load_types.join(', ')}`}
+                            {row.load_types.length > 0 &&
+                                ` · ${row.load_types.map((t) => courseTypeLabel(t) ?? t).join(', ')}`}
                         </p>
                     </div>
                 )}

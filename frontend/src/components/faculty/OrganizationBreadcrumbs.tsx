@@ -96,7 +96,11 @@ export const OrganizationBreadcrumbs: React.FC<OrganizationBreadcrumbsProps> = (
                         </Button>
                     )}
                     <div>
-                        <h1 className="page-title text-xl sm:text-2xl font-bold tracking-tight capitalize text-foreground">
+                        {/* `capitalize` yo'q: sarlavhalar chaqiruv joyida allaqachon to'g'ri
+                        yozilgan, CSS esa har bir so'zni bosh harf qilib
+                        «Agromuhandislik Va Kommunikatsion...» yoki ruschada
+                        «Пользователи Системы» degan ko'rinish berardi. */}
+                    <h1 className="page-title text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                             {displayTitle}
                         </h1>
                         {description && (

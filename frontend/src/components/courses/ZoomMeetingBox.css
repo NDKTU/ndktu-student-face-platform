@@ -20,8 +20,7 @@
     background: radial-gradient(ellipse at top, #1e293b, #020617);
 }
 
-/* Jitsi bilan bir xil tuzilma: nisbatni CSS ushlab turadi, JS esa faqat
-   kenglikni beradi.
+/* Nisbatni CSS ushlab turadi, JS esa faqat kenglikni beradi.
 
    Nega shunday. Zoom hujjatida aniq yozilgan: «the width you set will always
    be respected», balandlikni esa SDK 16:9 ga qarab o'zi hisoblaydi. Ilgari

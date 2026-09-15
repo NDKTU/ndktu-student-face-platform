@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 // import { /* TeacherGroupModal */ } from '@/components/teachers/TeacherGroupModal';
 // import { /* TeacherSubjectModal */ } from '@/components/teachers/TeacherSubjectModal';
 import { TeacherDetail } from '@/components/teachers/TeacherDetail';
+import { formatDate } from '@/utils/date';
 
 interface KafedraTeachersViewProps {
     faculty: Faculty;
@@ -179,7 +180,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
             key: 'created_at',
             header: 'Yaratilgan sana',
             hideBelow: 'lg',
-            cell: (teacher) => new Date(teacher.created_at).toLocaleDateString(),
+            cell: (teacher) => formatDate(teacher.created_at),
         },
         // Amallar ustuni bo'shab qoldi: guruh/fan biriktirish frontenddan olindi, tahrirlash/o'chirish esa oldinroq kommentga olingan (2026-09-11). Satr bosilsa o'qituvchi kartochkasi ochiladi.
 //         {
@@ -251,7 +252,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                                         {teacher?.full_name || teacher.user?.username || 'Noma\'lum'}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {teacher.user?.username || '-'} · {new Date(teacher.created_at).toLocaleDateString()}
+                                        {teacher.user?.username || '-'} · {formatDate(teacher.created_at)}
                                     </p>
                                 </div>
                                 {/* Amallar ustuni bo'shab qoldi: guruh/fan biriktirish frontenddan olindi, tahrirlash/o'chirish esa oldinroq kommentga olingan (2026-09-11). Satr bosilsa o'qituvchi kartochkasi ochiladi.

@@ -19,14 +19,7 @@ import { Brain, Eye, Calendar, User as UserIcon, Trash2 } from 'lucide-react';
 import type { TestResultResponse } from '@/services/psychologyService';
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
-
-function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleString('uz-UZ', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit',
-    });
-}
+import { formatDateTime } from '@/utils/date';
 
 function ResultDetailModal({ result, onClose }: { result: TestResultResponse | null; onClose: () => void }) {
     if (!result) return null;
@@ -49,7 +42,7 @@ function ResultDetailModal({ result, onClose }: { result: TestResultResponse | n
                         </div>
                         <div className="col-span-2">
                             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Vaqt</p>
-                            <p className="font-medium text-foreground">{formatDate(result.created_at)}</p>
+                            <p className="font-medium text-foreground">{formatDateTime(result.created_at)}</p>
                         </div>
                     </div>
                 </div>
@@ -220,7 +213,7 @@ export default function PsychologyResultsPage() {
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    {formatDate(r.created_at)}
+                                                    {formatDateTime(r.created_at)}
                                                 </span>
                                                 <span>{r.answers.length} javob</span>
                                             </div>

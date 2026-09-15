@@ -458,3 +458,43 @@ input[type='number'] {
 .stat-card:hover {
   box-shadow: 0 6px 24px color-mix(in srgb, var(--stat-color) 12%, transparent);
 }
+
+/* ── Jodit: qorong'i rejim ────────────────────────────────────────────────
+   Jodit o'z CSS'ini olib keladi va tahrirlash maydoniga oq fon qo'yadi.
+   Ilova qorong'i rejimda matn rangi `--foreground` dan (deyarli oq) meros
+   qolardi — natijada savol matni va A/B/C/D variantlari OQ USTIGA OQ bo'lib
+   umuman ko'rinmasdi.
+
+   Alohida qoidalar bilan tuzatib bo'lmaydi: Jodit selektorlari `:not()` bilan
+   yozilgani uchun spetsifiklik bo'yicha ustun turadi. Lekin Jodit butunlay
+   o'z `--jd-*` o'zgaruvchilarida qurilgan (135 ta) — shuning uchun faqat
+   o'zgaruvchilar qayta aniqlanadi, qolgani o'z-o'zidan to'g'ri chiqadi.
+
+   Yorug' rejimga tegilmaydi. */
+.dark .jodit-container,
+[data-theme="dark"] .jodit-container {
+  --jd-color-background-default: var(--card);
+  --jd-color-background-light-gray: var(--background);
+  --jd-color-background-gray: var(--background);
+  --jd-color-background-gray-hover: var(--border);
+  --jd-color-background-button-hover: var(--border);
+  --jd-color-panel: var(--background);
+  --jd-color-text: var(--foreground);
+  --jd-color-text-icons: var(--foreground);
+  --jd-color-border: var(--border);
+  --jd-color-border-active: var(--border);
+  --jd-color-button-background-hover: var(--border);
+}
+
+/* Ochiluvchi panellar `.jodit-container` ichida emas, `<body>` ga chiqariladi. */
+.dark .jodit-popup,
+.dark .jodit-dialog,
+[data-theme="dark"] .jodit-popup,
+[data-theme="dark"] .jodit-dialog {
+  --jd-color-background-default: var(--card);
+  --jd-color-background-light-gray: var(--background);
+  --jd-color-panel: var(--background);
+  --jd-color-text: var(--foreground);
+  --jd-color-text-icons: var(--foreground);
+  --jd-color-border: var(--border);
+}

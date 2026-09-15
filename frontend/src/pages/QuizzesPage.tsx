@@ -21,8 +21,13 @@ import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
+import { useTranslation } from 'react-i18next';
+import { useUrlState, useUrlNumberState, useUrlOptionalNumberState, useUrlOptionalBoolState } from '@/hooks/useUrlState';
 
 const QuizzesPage = () => {
+    const { t } = useTranslation();
     const { hasPermission } = useAuth();
     const { isTeacher } = useRoleView();
 
@@ -31,22 +36,23 @@ const QuizzesPage = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
+    // Filtrlar, saralash va sahifa URL'da.
+    const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
     const pageSize = 10;
     const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
     const [isRepeatConfirmOpen, setIsRepeatConfirmOpen] = useState(false);
     const [quizToRepeat, setQuizToRepeat] = useState<Quiz | null>(null);
     const [repeatedQuiz, setRepeatedQuiz] = useState<Quiz | null>(null);
 
-    const [filterFacultyId, setFilterFacultyId] = useState<number | undefined>(undefined);
-    const [filterSubjectId, setFilterSubjectId] = useState<number | undefined>(undefined);
-    const [filterGroupId, setFilterGroupId] = useState<number | undefined>(undefined);
-    const [filterUserId, setFilterUserId] = useState<number | undefined>(undefined);
-    const [filterIsActive, setFilterIsActive] = useState<boolean | undefined>(undefined);
-    const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+    const [filterFacultyId, setFilterFacultyId] = useUrlOptionalNumberState('faculty');
+    const [filterSubjectId, setFilterSubjectId] = useUrlOptionalNumberState('subject');
+    const [filterGroupId, setFilterGroupId] = useUrlOptionalNumberState('group');
+    const [filterUserId, setFilterUserId] = useUrlOptionalNumberState('teacher');
+    const [filterIsActive, setFilterIsActive] = useUrlOptionalBoolState('active');
+    const [sortDir, setSortDir] = useUrlState<'desc' | 'asc'>('order', 'desc');
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -69,7 +75,23 @@ const QuizzesPage = () => {
     });
 
     const { data: allFacultiesData } = useFaculties(1, 200, undefined, hasPermission('read:faculty'));
+    // Ikkita alohida so'rov, ataylab:
+    //  * `allSubjectsData` — jadvalda fan NOMINI ko'rsatish uchun
+    //    (`getSubjectName`). Quiz javobida faqat `subject_id` bor,
+    //    shuning uchun nomlar ro'yxatdan qidiriladi va uni qisqartirib
+    //    bo'lmaydi: qatorlarda «-» chiqib qolardi.
+    //  * `subjectOptionsData` — filtr ro'yxati uchun. Fanlar 2978 ta,
+    //    hammasi yuklanmaydi; qidiruv serverga uzatiladi.
     const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
+    const [subjectQuery, setSubjectQuery] = useState('');
+    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
+    const { data: subjectOptionsData } = useSubjects(
+        1,
+        FILTER_PAGE_SIZE,
+        debouncedSubjectQuery,
+        undefined,
+        hasPermission('read:subject'),
+    );
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
 
@@ -81,6 +103,18 @@ const QuizzesPage = () => {
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
     const allFaculties = allFacultiesData?.faculties || [];
     const allSubjects = allSubjectsData?.subjects || [];
+    // Tanlangan fan qidiruv natijasidan tushib qolsa, Combobox nom
+    // o'rniga placeholder ko'rsatardi — go'yo filtr olib tashlangandek.
+    const selectedSubjectOption = filterSubjectId
+        ? {
+              value: String(filterSubjectId),
+              label: allSubjects.find((s) => s.id === filterSubjectId)?.name ?? `#${filterSubjectId}`,
+          }
+        : null;
+    const subjectOptions = withSelected(
+        (subjectOptionsData?.subjects || []).map((s) => ({ value: String(s.id), label: s.name })),
+        selectedSubjectOption,
+    );
     const allGroups = allGroupsData?.groups || [];
     const allTeachers = allTeachersData?.teachers || [];
 
@@ -104,7 +138,7 @@ const QuizzesPage = () => {
         if (!quizToDelete) return;
         deleteQuizMutation.mutate({ id: quizToDelete.id, force: cascadeWarnings.length > 0 }, {
             onSuccess: () => {
-                toast.success("Test o'chirildi");
+                toast.success(t("Test o'chirildi"));
                 setIsDeleteModalOpen(false);
                 setQuizToDelete(null);
                 setCascadeWarnings([]);
@@ -113,7 +147,7 @@ const QuizzesPage = () => {
                 if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
                     setCascadeWarnings(error.response.data.detail.warnings || []);
                 } else {
-                    toast.error("O'chirishda xatolik yuz berdi");
+                    toast.error(t("O'chirishda xatolik yuz berdi"));
                     setIsDeleteModalOpen(false);
                     setQuizToDelete(null);
                     setCascadeWarnings([]);
@@ -139,7 +173,7 @@ const QuizzesPage = () => {
                 setRepeatedQuiz(newQuiz);
             },
             onError: () => {
-                toast.error('Testni qayta yaratishda xatolik yuz berdi');
+                toast.error(t('Testni qayta yaratishda xatolik yuz berdi'));
             },
         });
     };
@@ -163,7 +197,7 @@ const QuizzesPage = () => {
                 setIsUpdatingStatus(null);
             },
             onSuccess: () => {
-                toast.success(payload.is_active ? 'Test faollashtirildi' : "Test faol emas holatga o'tkazildi");
+                toast.success(payload.is_active ? t('Test faollashtirildi') : t("Test faol emas holatga o'tkazildi"));
             },
             onError: (error: unknown) => {
                 logger.error('Failed to update quiz status', error);
@@ -176,7 +210,7 @@ const QuizzesPage = () => {
                     toast.error(response.data.detail.message);
                     return;
                 }
-                toast.error('Test holatini yangilashda xatolik yuz berdi');
+                toast.error(t('Test holatini yangilashda xatolik yuz berdi'));
             },
         });
     };
@@ -207,14 +241,14 @@ const QuizzesPage = () => {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Testlar"
-                description="Barcha testlar ro'yxati — filtrlar bilan"
+                title={t('Testlar')}
+                description={t("Barcha testlar ro'yxati — filtrlar bilan")}
                 actions={
                     <>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Qidirish..."
+                                placeholder={t("Qidirish...")}
                                 className="pl-8 w-full sm:w-[220px]"
                                 value={searchTerm}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
@@ -223,7 +257,7 @@ const QuizzesPage = () => {
                         {!isTeacher && (
                             <Button onClick={handleCreateQuiz}>
                                 <Plus className="mr-2 h-4 w-4" />
-                                Test yaratish
+                                {t('Test yaratish')}
                             </Button>
                         )}
                     </>
@@ -232,6 +266,8 @@ const QuizzesPage = () => {
 
             <QuizFilters
                 subjects={allSubjects}
+                subjectOptions={subjectOptions}
+                onSubjectSearchChange={setSubjectQuery}
                 groups={allGroups}
                 teachers={allTeachers}
                 faculties={allFaculties}
@@ -289,30 +325,30 @@ const QuizzesPage = () => {
                 isOpen={isDeleteModalOpen}
                 onClose={() => { setIsDeleteModalOpen(false); setCascadeWarnings([]); setQuizToDelete(null); }}
                 onConfirm={handleConfirmDelete}
-                title="Testni o'chirish"
+                title={t("Testni o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
-                            <p className="text-destructive font-medium">Diqqat! Ushbu testni o'chirish quyidagi ma'lumotlarni ham o'chiradi:</p>
+                            <p className="text-destructive font-medium">{t("Diqqat! Ushbu testni o'chirish quyidagi ma'lumotlarni ham o'chiradi:")}</p>
                             <ul className="list-disc pl-5 text-sm text-destructive/90">
                                 {cascadeWarnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
-                            <p className="font-semibold text-destructive mt-2">Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!</p>
+                            <p className="font-semibold text-destructive mt-2">{t("Tasdiqlaysizmi? Bu amalni bekor qilib bo'lmaydi!")}</p>
                         </div>
                     ) : `Siz haqiqatan ham "${quizToDelete?.title}" testini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
 
             <ConfirmDialog
                 isOpen={isRepeatConfirmOpen}
                 onClose={() => setIsRepeatConfirmOpen(false)}
                 onConfirm={handleConfirmRepeat}
-                title="Testni qayta yaratish"
+                title={t("Testni qayta yaratish")}
                 description={`"${quizToRepeat?.title}" testi uchun 2-urinish yaratilsinmi? Yangi PIN generatsiya qilinadi va talabalar shu PIN orqali qayta topshira oladi.`}
-                confirmText={repeatQuizMutation.isPending ? 'Yaratilmoqda...' : 'Yaratish'}
-                cancelText="Bekor qilish"
+                confirmText={repeatQuizMutation.isPending ? 'Yaratilmoqda...' : t('Yaratish')}
+                cancelText={t("Bekor qilish")}
             />
 
             <RepeatedQuizSuccessModal quiz={repeatedQuiz} onClose={() => setRepeatedQuiz(null)} />

@@ -224,8 +224,57 @@ class EduPlanSyncService:
         target = normalize_name(name)
         return [row for row in unclaimed if normalize_name(name_of(row)) == target]
 
-    @staticmethod
+    #: Поля, которые нельзя сравнить по имени колонки, поэтому в решении
+    #: «что-то изменилось?» они не участвуют.
+    #:
+    #: * ``hemis_group_id`` — ``upsert_group`` пишет его условно: пустое
+    #:   значение из EduPlan не затирает известную связку, а разобранную
+    #:   вручную не трогает вовсе. Сравнение «в лоб» держало бы такие группы
+    #:   в вечном ``update``.
+    #: * ``username`` — лежит не в строке сущности, а в связанном ``users``,
+    #:   и при создании проходит через ``_unique_username``.
+    _INCOMPARABLE_FIELDS = frozenset({"hemis_group_id", "username"})
+
+    @classmethod
+    def _is_up_to_date(
+        cls,
+        row: Any,
+        changes: dict[str, Any],
+        parent_external: dict[str, dict[int, str]],
+    ) -> bool:
+        """Строка зеркала уже совпадает с тем, что приехало из EduPlan?
+
+        Консервативно: любое поле, которое не удаётся сравнить уверенно,
+        считается изменившимся. Лишний ``update`` — это шум, пропущенный
+        ``update`` — это расхождение зеркала с EduPlan, что гораздо хуже.
+        """
+        # Строка могла быть помечена неактивной прошлым прогоном, а теперь
+        # снова приехала: `_stamp` вернёт `is_active = True`, значит это
+        # изменение, даже если все поля совпадают.
+        if not getattr(row, "is_active", True):
+            return False
+
+        for field, value in changes.items():
+            if field in cls._INCOMPARABLE_FIELDS:
+                continue
+
+            if field.endswith("_external_id"):
+                # Ссылка на родителя: в снимке — внешний id, в строке —
+                # локальный FK. Сверяем через карту «локальный id → внешний».
+                local_fk = getattr(row, field.replace("_external_id", "_id"), None)
+                current = parent_external.get(field, {}).get(local_fk) if local_fk else None
+                if (current or None) != (value or None):
+                    return False
+                continue
+
+            if getattr(row, field, None) != value:
+                return False
+
+        return True
+
+    @classmethod
     def _decide(
+        cls,
         entity: EduPlanEntity,
         external_id: str,
         external_name: str,
@@ -233,10 +282,21 @@ class EduPlanSyncService:
         candidates: list[Any],
         changes: dict[str, Any],
         name_of=lambda row: row.name,
+        parent_external: dict[str, dict[int, str]] | None = None,
     ) -> Proposal:
         if external_id in linked:
             row = linked[external_id]
-            action = ProposalAction.update if changes else ProposalAction.unchanged
+            # `changes` — это не diff, а полный набор полей для записи
+            # (`_apply_one` читает из него `name`, `*_external_id` и прочее),
+            # поэтому он никогда не пуст. Раньше действие выбиралось по нему
+            # самому — и `unchanged` не наступал никогда: каждый прогон
+            # переписывал весь каталог, а админ не видел, что менялось на
+            # самом деле. Теперь сравниваем со строкой зеркала.
+            action = (
+                ProposalAction.unchanged
+                if cls._is_up_to_date(row, changes, parent_external or {})
+                else ProposalAction.update
+            )
             return Proposal(
                 entity=entity,
                 action=action,
@@ -283,6 +343,18 @@ class EduPlanSyncService:
     ) -> list[Proposal]:
         proposals: list[Proposal] = []
 
+        # Карта «локальный id родителя → его внешний id»: без неё нельзя
+        # понять, изменилась ли привязка (в снимке — внешний id, в строке —
+        # локальный FK). Три дешёвых индекса, строятся один раз на прогон.
+        parent_external: dict[str, dict[int, str]] = {}
+        for field, parent_entity in (
+            ("faculty_external_id", EduPlanEntity.faculty),
+            ("kafedra_external_id", EduPlanEntity.kafedra),
+            ("speciality_external_id", EduPlanEntity.speciality),
+        ):
+            index = await eduplan_repository.index_by_external(session, ENTITY_MODEL[parent_entity])
+            parent_external[field] = {row.id: ext_id for ext_id, row in index.items()}
+
         for entity in entities:
             model = ENTITY_MODEL[entity]
             linked = await eduplan_repository.index_by_external(session, model)
@@ -302,7 +374,11 @@ class EduPlanSyncService:
             for external_id, name, changes, name_of in external:
                 seen.add(external_id)
                 candidates = self._match(name, unclaimed, name_of)
-                proposals.append(self._decide(entity, external_id, name, linked, candidates, changes, name_of))
+                proposals.append(
+                    self._decide(
+                        entity, external_id, name, linked, candidates, changes, name_of, parent_external
+                    )
+                )
 
             # Было в зеркале, пропало на той стороне.
             for external_id, row in linked.items():

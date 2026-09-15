@@ -45,7 +45,7 @@ class ResourceRepository:
         qayta yuklamasdan boshqa kursga qoʻsha oladi. Papka ham oʻsha
         (``course_resources/``), aks holda bazadagi eski havolalar buzilardi.
         """
-        stored = await store_upload(
+        stored, _ = await store_upload(
             session,
             file,
             owner_user_id=current_user.id,

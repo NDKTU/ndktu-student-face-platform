@@ -12,6 +12,7 @@ import type { Student } from '@/services/studentService';
 import type { Result } from '@/services/resultService';
 import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { formatDate } from '@/utils/date';
 
 interface StudentDetailViewProps {
     faculty: Faculty;
@@ -89,7 +90,7 @@ export const StudentDetailView = ({
             header: 'Sana',
             hideBelow: 'lg',
             className: 'align-middle text-xs font-mono text-muted-foreground',
-            cell: (r) => new Date(r.created_at).toLocaleDateString(),
+            cell: (r) => formatDate(r.created_at),
         },
         { key: 'grade', header: 'Natija', className: 'align-middle', cell: renderResultScore },
         {

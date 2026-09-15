@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { AUDIENCE_LABELS, STATUS_LABELS, toIsoOrNull, toLocalInput } from './labels';
 import { useAudienceOptions, useCreateAnnouncement, useUpdateAnnouncement } from '@/hooks/useAnnouncements';
+import { normalizeExternalUrl } from '@/utils/url';
 import type {
     Announcement,
     AnnouncementPayload,
@@ -66,6 +67,7 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
     // shart emas.
     const [form, setForm] = useState(() => (editing ? formOf(editing) : emptyState));
     const [error, setError] = useState('');
+    const [linkError, setLinkError] = useState('');
 
     const createAnnouncement = useCreateAnnouncement();
     const updateAnnouncement = useUpdateAnnouncement();
@@ -123,6 +125,16 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
             setError(`${AUDIENCE_LABELS[form.audienceKind]} tanlanmagan`);
             return;
         }
+        // Havola bekendda ham tekshiriladi; bu yerda — maydon yonida, so'rov
+        // ketmasidan oldin aytish uchun. Sxemasiz kiritilgani `https://` bilan
+        // to'ldirib saqlanadi.
+        const linkUrl = normalizeExternalUrl(form.linkUrl);
+        if (linkUrl === null) {
+            setLinkError("Havola to'liq emas. Masalan: https://nsumt.uz/xabar");
+            setError('');
+            return;
+        }
+        setLinkError('');
         setError('');
 
         const payload: AnnouncementPayload = {
@@ -136,7 +148,7 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
             registration_enabled: form.registrationEnabled,
             event_at: toIsoOrNull(form.eventAt),
             location: form.location.trim() || null,
-            link_url: form.linkUrl.trim() || null,
+            link_url: linkUrl ?? null,
             capacity: form.capacity ? Number(form.capacity) : null,
             registration_deadline: toIsoOrNull(form.registrationDeadline),
             audience_kind: form.audienceKind,
@@ -331,9 +343,14 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
                 <label className="mb-1 block text-sm font-medium">Havola (ixtiyoriy)</label>
                 <Input
                     value={form.linkUrl}
-                    onChange={(event) => patch('linkUrl', event.target.value)}
+                    onChange={(event) => {
+                        patch('linkUrl', event.target.value);
+                        if (linkError) setLinkError('');
+                    }}
                     placeholder="https://..."
+                    aria-invalid={linkError ? true : undefined}
                 />
+                {linkError && <p className="mt-1 text-sm text-destructive">{linkError}</p>}
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}

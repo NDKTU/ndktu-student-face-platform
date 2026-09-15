@@ -148,7 +148,17 @@ class UserRepository:
         )
 
     async def update_user(self, session: AsyncSession, user_id: int, data: UserUpdateRequest) -> User:
-        stmt = select(User).where(User.id == user_id)
+        # `roles` shu yerda yuklanishi shart: javob sxemasi (`UserCreateResponse`)
+        # uni talab qiladi, `User.roles` esa dangasa (`lazy="select"`), va
+        # serializatsiya endpointdan tashqarida — async kontekst tugagach —
+        # bo'ladi. Yuklanmagan holda o'sha yerda `MissingGreenlet` bilan 500
+        # chiqardi, ustiga o'zgarish allaqachon commit qilingan bo'lardi.
+        #
+        # Xato faqat BEGONA hisobni tahrirlaganda ko'rinardi: o'zini
+        # tahrirlaganda `PermissionRequired` aynan shu sessiyada foydalanuvchini
+        # `selectinload(User.roles)` bilan allaqachon yuklab qo'ygan bo'ladi
+        # (`expire_on_commit=False` uni commit'dan keyin ham saqlaydi).
+        stmt = select(User).where(User.id == user_id).options(selectinload(User.roles))
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 

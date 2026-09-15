@@ -34,6 +34,18 @@ class FileDetailResponse(FileResponse):
     usages: List[FileUsageInfo] = Field(default_factory=list)
 
 
+class FileUploadResponse(FileResponse):
+    """Yuklash javobi: qolgan maydonlar odatdagidek, ustiga bitta bayroq.
+
+    ``deduplicated`` — ayni baytlar shu foydalanuvchida allaqachon boʻlgani
+    uchun yangi yozuv yaratilmadi, mavjudi qaytarildi. Faqat yuklashda
+    maʼnoga ega, shuning uchun umumiy ``FileResponse`` ga qoʻshilmadi:
+    roʻyxat va biriktirish javoblarida bu savol umuman turmaydi.
+    """
+
+    deduplicated: bool = False
+
+
 class FileListRequest(BaseModel):
     folder_id: Optional[int] = None
     # Papkasi yoʻq fayllarni koʻrsatish uchun: folder_id=None "hammasi" degani.

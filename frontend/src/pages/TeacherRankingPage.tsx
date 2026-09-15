@@ -20,6 +20,7 @@ import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
 import { useAuth } from '@/context/AuthContext';
 import PermissionGate from '@/components/auth/PermissionGate';
 import { Combobox } from '@/components/ui/Combobox';
+import { formatDate } from '@/utils/date';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'teachers' | 'faculty' | 'kafedra';
@@ -202,7 +203,7 @@ const TeachersPanel = () => {
 
             const { utils, writeFile } = await import('xlsx');
             
-            const date = new Date().toLocaleDateString('uz-UZ').replace(/\//g, '.');
+            const date = formatDate(new Date());
             const facName = facultiesData?.faculties.find(f => f.id.toString() === facultyId)?.name || 'Barcha fakultetlar';
             const kafName = kafedrasData?.kafedras.find(k => k.id.toString() === kafedraId)?.name || 'Barcha kafedralar';
 

@@ -2,6 +2,20 @@ import * as React from "react";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Ayni damda ochiq bo'lgan ro'yxatlar soni.
+ *
+ * Modal buni Escape bosilganda o'qiydi: ro'yxat ochiq bo'lsa, Escape avval
+ * ro'yxatni yopadi, modalni emas. Boshqa yo'l yo'q — Radix `keydown` ni
+ * hujjatda ushlash bosqichida tinglaydi va modal ochilganda ro'yxatdan oldin
+ * ro'yxatdan o'tadi, ya'ni hodisani undan oldin to'xtatib bo'lmaydi. Radix esa
+ * o'z `onEscapeKeyDown` ida `defaultPrevented` ni tekshiradi — modal aynan
+ * shu yerda to'xtatiladi.
+ */
+let openCount = 0;
+
+export const isComboboxOpen = () => openCount > 0;
+
 interface ComboboxProps {
     options: { value: string; label: string }[];
     value?: string;
@@ -45,16 +59,42 @@ export function Combobox({
             }
         };
 
+        // Ochiq ro'yxat ostidagi tugmalarni to'sib qo'yadi, shuning uchun uni
+        // yopishning klaviatura yo'li ham kerak: sichqonchasiz ishlaydiganlar
+        // uchun tashqariga bosishdan boshqa chora qolmasdi.
+        //
+        // `keydown` hujjat darajasida ushlanadi, chunki fokus qidiruv
+        // maydonida ham, ro'yxat ichida ham, umuman boshqa joyda ham
+        // bo'lishi mumkin.
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return;
+            setOpen(false);
+            setSearchQuery("");
+        };
+
         // `touchstart` ham kerak: sensorli ekranda `mousedown` kechikib keladi,
         // shuning uchun ro'yxat barmoq bilan tashqariga bosilganda yopilmay turardi.
         if (open) {
             document.addEventListener("mousedown", handleClickOutside);
             document.addEventListener("touchstart", handleClickOutside);
+            document.addEventListener("keydown", handleEscape, true);
         }
 
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
             document.removeEventListener("touchstart", handleClickOutside);
+            document.removeEventListener("keydown", handleEscape, true);
+        };
+    }, [open]);
+
+    // Ochiq ro'yxatlar hisobi. `open` o'zgarganda emas, komponent yo'q
+    // bo'lganda ham kamayishi kerak: ro'yxat ochiq turganda sahifa
+    // almashinsa, hisob abadiy o'sib qolardi.
+    React.useEffect(() => {
+        if (!open) return;
+        openCount += 1;
+        return () => {
+            openCount -= 1;
         };
     }, [open]);
 

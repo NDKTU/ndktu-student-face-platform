@@ -16,7 +16,7 @@ import {
     // GraduationCap, — «Kurslar» ustuni bilan birga yashirildi (2026-09-11)
 } from 'lucide-react';
 // import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
-import { useTeachers, /* useDeleteTeacher */ } from '@/hooks/useTeachers';
+import { useTeachers, useTeacher, /* useDeleteTeacher */ } from '@/hooks/useTeachers';
 import { useKafedras } from '@/hooks/useReferenceData';
 import { useCatalogView } from '@/hooks/useCatalogView';
 import type { Teacher } from '@/services/teacherService';
@@ -35,32 +35,44 @@ import { Combobox } from '@/components/ui/Combobox';
 import { ExternalSourceBadge, InactiveBadge } from '@/components/common/ExternalSourceBadge';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { useSearchParams } from 'react-router-dom';
+import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 
-const COURSE_FILTER_OPTIONS = [
-    { value: 'all', label: 'Barchasi' },
-    { value: 'with', label: 'Kursi borlar' },
-    { value: 'without', label: 'Kursi yo\'qlar' },
+// Fabrika, konstanta emas: `t` modul darajasida mavjud emas, va til
+// almashtirilganda ro'yxat qayta qurilishi kerak.
+const courseFilterOptions = (t: TFunction) => [
+    { value: 'all', label: t('Barchasi') },
+    { value: 'with', label: t('Kursi borlar') },
+    { value: 'without', label: t("Kursi yo'qlar") },
 ];
 
 type SortField = 'name' | 'kafedra' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const TeachersPage = () => {
+    const { t } = useTranslation();
     const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const detailId = Number(searchParams.get('teacher')) || 0;
+    const { data: detailTeacher } = useTeacher(detailId);
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
     // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
     // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
     const displayMode = useCatalogView();
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const [selectedKafedraFilter, setSelectedKafedraFilter] = useState<string>('all');
-    const [coursesFilter, setCoursesFilter] = useState<'all' | 'with' | 'without'>('all');
-    const [searchTerm, setSearchTerm] = useState('');
+    // Filtrlar, saralash va sahifa URL'da — yangilash va «Orqaga» ularni
+    // saqlaydi, kesimni havola qilib yuborsa bo'ladi.
+    const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
+    const [selectedKafedraFilter, setSelectedKafedraFilter] = useUrlState<string>('kafedra', 'all');
+    const [coursesFilter, setCoursesFilter] = useUrlState<'all' | 'with' | 'without'>('courses', 'all');
+    const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [sortField, setSortField] = useState<SortField>('name');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+    const [sortField, setSortField] = useUrlState<SortField>('sort', 'name');
+    const [sortOrder, setSortOrder] = useUrlState<SortOrder>('order', 'asc');
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -114,8 +126,8 @@ export const TeachersPage = () => {
 
     const kafedraOptions = useMemo(() => {
         const list = kafedras.map((k) => ({ value: String(k.id), label: k.name }));
-        return [{ value: 'all', label: 'Barcha kafedralar' }, ...list];
-    }, [kafedras]);
+        return [{ value: 'all', label: t('Barcha kafedralar') }, ...list];
+    }, [kafedras, t]);
 
     const handleSort = (field: SortField) => {
         // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda
@@ -129,14 +141,25 @@ export const TeachersPage = () => {
         }
     };
 
+    // Batafsil ko'rinish URL'da (`?teacher=<id>`), mahalliy holatda emas:
+    // aks holda brauzerning «Orqaga» tugmasi kartochkani o'tkazib yuborardi
+    // va havolani ulashib bo'lmasdi.
     const handleViewTeacher = (teacher: Teacher) => {
         setSelectedTeacher(teacher);
-        setViewMode('detail');
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('teacher', String(teacher.id));
+            return next;
+        });
     };
 
     const handleBackToList = () => {
         setSelectedTeacher(null);
-        setViewMode('list');
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('teacher');
+            return next;
+        });
     };
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
@@ -175,7 +198,7 @@ export const TeachersPage = () => {
 //             { id: teacherToDelete.id, force: cascadeWarnings.length > 0 },
 //             {
 //                 onSuccess: () => {
-//                     toast.success("O'qituvchi o'chirildi");
+//                     toast.success(t("O'qituvchi o'chirildi"));
 //                     setIsDeleteModalOpen(false);
 //                     setTeacherToDelete(null);
 //                     setCascadeWarnings([]);
@@ -185,7 +208,7 @@ export const TeachersPage = () => {
 //                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
 //                         setCascadeWarnings(error.response.data.detail.warnings || []);
 //                     } else {
-//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         toast.error(t("O'chirishda xatolik yuz berdi"));
 //                         setIsDeleteModalOpen(false);
 //                         setTeacherToDelete(null);
 //                         setCascadeWarnings([]);
@@ -197,7 +220,7 @@ export const TeachersPage = () => {
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const handleSuccess = () => {
-//         toast.success("O'qituvchi saqlandi");
+//         toast.success(t("O'qituvchi saqlandi"));
 //         setIsModalOpen(false);
 //         setSelectedTeacher(null);
 //         refetch();
@@ -244,7 +267,7 @@ export const TeachersPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    title="Tahrirlash"
+                    title={t("Tahrirlash")}
                     onClick={(e) => handleEditClick(teacher, e)}
                 >
                     <Pencil className="h-4 w-4" />
@@ -255,7 +278,7 @@ export const TeachersPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                    title="O'chirish"
+                    title={t("O'chirish")}
                     onClick={(e) => handleDeleteClick(teacher, e)}
                 >
                     <Trash2 className="h-4 w-4" />
@@ -274,8 +297,14 @@ export const TeachersPage = () => {
         </div>
     );
 
-    if (viewMode === 'detail' && selectedTeacher) {
-        return <TeacherDetail teacher={selectedTeacher} onBack={handleBackToList} />;
+    if (detailId) {
+        // Havola bilan to'g'ridan-to'g'ri kelinganda ro'yxatda bunday
+        // o'qituvchi bo'lmasligi mumkin — id bo'yicha alohida so'rov.
+        const teacher = selectedTeacher?.id === detailId ? selectedTeacher : detailTeacher;
+        if (teacher) {
+            return <TeacherDetail teacher={teacher} onBack={handleBackToList} />;
+        }
+        return <div className="space-y-4"><Skeleton className="h-10 w-1/2" /><Skeleton className="h-64 w-full rounded-2xl" /></div>;
     }
 
     return (
@@ -285,15 +314,15 @@ export const TeachersPage = () => {
             {/* Breadcrumbs Header */}
             <OrganizationBreadcrumbs
                 items={[{ label: 'Foydalanuvchilar', onClick: () => {} }, { label: "O'qituvchilar" }]}
-                title="Professor-O'qituvchilar"
-                description="Universitet o'qituvchilar tarkibi, kafedralar, biriktirilgan fan va guruhlar"
+                title={t("Professor-O'qituvchilar")}
+                description={t("Universitet o'qituvchilar tarkibi, kafedralar, biriktirilgan fan va guruhlar")}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="O'qituvchi F.I.SH bo'yicha qidirish..."
+                searchPlaceholder={t("O'qituvchi F.I.SH bo'yicha qidirish...")}
                 totalCount={totalCount}
                 totalLabel="O'qituvchilar"
                 activeFilterCount={
@@ -317,18 +346,18 @@ export const TeachersPage = () => {
                                     setSelectedKafedraFilter(val);
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Kafedra bo'yicha saralash"
+                                placeholder={t("Kafedra bo'yicha saralash")}
                             />
                         </div>
                         <div className="w-full sm:w-[210px]">
                             <Combobox
-                                options={COURSE_FILTER_OPTIONS}
+                                options={courseFilterOptions(t)}
                                 value={coursesFilter}
                                 onChange={(val) => {
                                     setCoursesFilter(val as 'all' | 'with' | 'without');
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Kurslar bo'yicha"
+                                placeholder={t("Kurslar bo'yicha")}
                             />
                         </div>
                     </div>
@@ -345,7 +374,7 @@ export const TeachersPage = () => {
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>Qo'shish</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
@@ -373,11 +402,11 @@ export const TeachersPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
-                        title="O'qituvchilar topilmadi"
+                        title={t("O'qituvchilar topilmadi")}
                         description={
                             searchTerm || selectedKafedraFilter !== 'all' || coursesFilter !== 'all'
-                                ? "Tanlangan filtrlarga mos o'qituvchi topilmadi."
-                                : "Hozircha o'qituvchi qo'shilmagan."
+                                ? t("Tanlangan filtrlarga mos o'qituvchi topilmadi.")
+                                : t("Hozircha o'qituvchi qo'shilmagan.")
                         }
                     />
                 </div>
@@ -392,7 +421,7 @@ export const TeachersPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>O'qituvchi F.I.SH</span>
+                                    <span>{t("O'qituvchi F.I.SH")}</span>
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
@@ -401,7 +430,7 @@ export const TeachersPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Kafedra</span>
+                                    <span>{t('Kafedra')}</span>
                                     {renderSortIcon('kafedra')}
                                 </div>
                             </TableHead>
@@ -414,12 +443,12 @@ export const TeachersPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hidden lg:table-cell hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Yaratilgan sana</span>
+                                    <span>{t('Yaratilgan sana')}</span>
                                     {renderSortIcon('created_at')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-center font-bold text-xs">Holati</TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-center font-bold text-xs">{t('Holati')}</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -489,7 +518,7 @@ export const TeachersPage = () => {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground italic">Kurs yo'q</span>
+                                            <span className="text-xs text-muted-foreground italic">{t("Kurs yo'q")}</span>
                                         )}
                                     </TableCell>
                                     */}
@@ -504,7 +533,7 @@ export const TeachersPage = () => {
                                     {/* Yaratilgan sana */}
                                     <TableCell className="hidden lg:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {teacher.created_at ? new Date(teacher.created_at).toLocaleDateString() : '—'}
+                                            {formatDate(teacher.created_at)}
                                         </span>
                                     </TableCell>
 
@@ -512,7 +541,7 @@ export const TeachersPage = () => {
                                     <TableCell className="text-center">
                                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                             <CheckCircle2 className="h-3 w-3" />
-                                            <span>Faol</span>
+                                            <span>{t('Faol')}</span>
                                         </span>
                                     </TableCell>
 
@@ -540,7 +569,7 @@ export const TeachersPage = () => {
                                         {teacher.kafedra ? (
                                             <span className="badge badge-primary text-xs">{teacher.kafedra.name}</span>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground">Kafedra yo'q</span>
+                                            <span className="text-xs text-muted-foreground">{t("Kafedra yo'q")}</span>
                                         )}
                                         <ExternalSourceBadge row={teacher} />
                                         <InactiveBadge row={teacher} />
@@ -548,7 +577,7 @@ export const TeachersPage = () => {
                                 }
                                 metrics={[
                                     { label: 'Login', value: teacher.user?.username || '—' },
-                                    { label: 'Sana', value: teacher.created_at ? new Date(teacher.created_at).toLocaleDateString() : '—' },
+                                    { label: t('Sana'), value: formatDate(teacher.created_at) },
                                 ]}
                                 actions={renderActions(teacher)}
                                 onClick={() => handleViewTeacher(teacher)}
@@ -587,7 +616,7 @@ export const TeachersPage = () => {
                     setTeacherToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="O'qituvchini o'chirish"
+                title={t("O'qituvchini o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
@@ -607,8 +636,8 @@ export const TeachersPage = () => {
                         `Siz haqiqatan ham "${teacherToDelete?.full_name}" o'qituvchisini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                     )
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
             */}
 

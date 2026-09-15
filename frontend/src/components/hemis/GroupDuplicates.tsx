@@ -5,8 +5,7 @@ import { AlertTriangle, CheckCircle2, Copy, Loader2, RefreshCw } from 'lucide-re
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { groupService } from '@/services/groupService';
-
-const dateLabel = (value?: string | null) => (value ? value.slice(0, 10) : '—');
+import { formatDate } from '@/utils/date';
 
 /**
  * Takrorlangan guruhlarni birlashtirish — talabalarni import qilishdan
@@ -111,7 +110,7 @@ export const GroupDuplicates = () => {
                                                     {row.external_id ?? '—'}
                                                 </td>
                                                 <td className="p-2 text-xs text-muted-foreground">
-                                                    {dateLabel(row.synced_at)}
+                                                    {formatDate(row.synced_at)}
                                                 </td>
                                                 <td className="p-2 text-xs text-muted-foreground">
                                                     {`talaba ${row.students}, test ${row.quizzes}, natija ${row.results}, kurs ${row.courses}, yuklama ${row.workloads}`}

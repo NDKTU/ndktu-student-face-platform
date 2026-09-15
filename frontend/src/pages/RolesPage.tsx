@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { formatDate } from '@/utils/date';
 
 const roleSchema = z.object({
     name: z.string().min(1, 'Rol nomi kiritilishi shart'),
@@ -142,7 +143,7 @@ const RolesPage = () => {
         {
             key: 'created_at',
             header: 'Yaratilgan sana',
-            cell: (role) => (role.created_at ? new Date(role.created_at).toLocaleDateString() : '-'),
+            cell: (role) => formatDate(role.created_at),
             hideBelow: 'lg',
         },
         {
@@ -198,7 +199,7 @@ const RolesPage = () => {
                                     <div>
                                         <p className="font-medium text-foreground">{role.name}</p>
                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                            ID: {role.id}{role.created_at ? ` · ${new Date(role.created_at).toLocaleDateString()}` : ''}
+                                            ID: {role.id}{role.created_at ? ` · ${formatDate(role.created_at)}` : ''}
                                         </p>
                                     </div>
                                     {renderRowActions(role)}

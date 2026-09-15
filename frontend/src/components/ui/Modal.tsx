@@ -2,6 +2,7 @@ import React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isComboboxOpen } from './Combobox';
 
 interface ModalProps {
     isOpen: boolean;
@@ -20,6 +21,14 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-md transition-opacity duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
             <DialogPrimitive.Content
                 aria-describedby={undefined}
+                // Ochiq ro'yxat ustidan Escape bosilganda modal yopilmaydi:
+                // ro'yxatning o'zi yopiladi (buni Combobox alohida qiladi).
+                // Aks holda bitta bosishda butun forma yopilib, kiritilgan
+                // ma'lumot yo'qolardi. Radix bu chaqiruvdan keyin
+                // `defaultPrevented` ni tekshiradi, shuning uchun bu ishlaydi.
+                onEscapeKeyDown={(event) => {
+                    if (isComboboxOpen()) event.preventDefault();
+                }}
                 className={cn(
                     // Telefon: pastdan chiqadigan varaq (bottom sheet) — barmoq yetadigan
                     // joyda ochiladi va ekranning 90% igacha cho'ziladi.

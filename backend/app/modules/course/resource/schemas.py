@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.schemas import TashkentDatetime
 
-RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom", "jitsi"]
+RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom"]
 
 
 class ResourceCreateRequest(BaseModel):
@@ -32,8 +32,6 @@ class ResourceCreateRequest(BaseModel):
             "text": self.text_content,
             "video": self.link_url,
             "zoom": self.link_url,
-            # Jitsi — Zoom yonidagi muqobil (sinov uchun). Zoom o'z joyida qoladi.
-            "jitsi": self.link_url,
         }
         if not field_by_type[self.resource_type]:
             raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
@@ -41,10 +39,6 @@ class ResourceCreateRequest(BaseModel):
             from app.core.utils.zoom_link import parse_zoom_link
 
             parse_zoom_link(self.link_url or "")
-        if self.resource_type == "jitsi":
-            from app.core.utils.jitsi_link import parse_jitsi_link
-
-            parse_jitsi_link(self.link_url or "")
         return self
 
 

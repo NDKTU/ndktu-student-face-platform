@@ -182,9 +182,12 @@ export const FilesPage = () => {
         let reused = 0;
         for (const file of Array.from(files)) {
             try {
-                const before = data?.total ?? 0;
+                // Dublikatni server aytadi: roʻyxat uzunligiga qarab taxmin
+                // qilib boʻlmaydi — u filtrlangan, sahifalangan va bu sikl
+                // ichida yangilanmaydi (React Query keshi keyingi render'da
+                // almashadi, ishlab turgan closure esa eski qiymatni koʻradi).
                 const result = await upload.mutateAsync({ file, folderId });
-                if (result.usage_count > 0 || before === data?.total) reused += 1;
+                if (result.deduplicated) reused += 1;
                 uploaded += 1;
             } catch (error) {
                 const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -193,10 +196,14 @@ export const FilesPage = () => {
         }
 
         if (uploaded) {
+            // Endi aniq son maʼlum, shuning uchun "baʼzilari" degan mavhum
+            // ibora oʻrniga nechtasi ekani aytiladi.
             toast.success(
-                reused
-                    ? `${uploaded} ta fayl qabul qilindi (ulardan baʼzilari kutubxonada bor edi)`
-                    : `${uploaded} ta fayl muvaffaqiyatli yuklandi`,
+                reused === 0
+                    ? `${uploaded} ta fayl muvaffaqiyatli yuklandi`
+                    : reused === uploaded
+                        ? `${uploaded} ta fayl kutubxonada allaqachon bor edi`
+                        : `${uploaded} ta fayl qabul qilindi (${reused} tasi kutubxonada bor edi)`,
             );
         }
         if (fileInputRef.current) fileInputRef.current.value = '';

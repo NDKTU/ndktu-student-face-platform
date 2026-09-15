@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { hemisService } from '@/services/hemisService';
+import { formatDateTime } from '@/utils/date';
 
 /**
  * HEMIS ma'lumot API tokeni: saqlash va tekshirish.
@@ -68,7 +69,7 @@ export const HemisDataToken = () => {
                     )}
                     {settings?.last_ok_at && (
                         <span className="text-xs text-muted-foreground">
-                            oxirgi muvaffaqiyatli so'rov: {new Date(settings.last_ok_at).toLocaleString()}
+                            oxirgi muvaffaqiyatli so'rov: {formatDateTime(settings.last_ok_at)}
                         </span>
                     )}
                 </div>

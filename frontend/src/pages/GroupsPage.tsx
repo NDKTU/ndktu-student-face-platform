@@ -32,13 +32,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { IdChip } from '@/components/common/IdChip';
+import { useTranslation } from 'react-i18next';
 
-type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki';
-type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4';
+type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
+type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4' | '5';
 type SortField = 'name' | 'course' | 'student_count';
 type SortOrder = 'asc' | 'desc';
 
 export const GroupsPage = () => {
+    const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
     // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
@@ -158,16 +160,16 @@ export const GroupsPage = () => {
             value: f.id.toString(),
             label: f.name,
         }));
-        return [{ value: 'all', label: 'Barcha fakultetlar' }, ...options];
-    }, [faculties]);
+        return [{ value: 'all', label: t('Barcha fakultetlar') }, ...options];
+    }, [faculties, t]);
 
     const specialityOptions = useMemo(() => {
         const options = specialities.map((s) => ({
             value: s.id.toString(),
             label: s.name,
         }));
-        return [{ value: 'all', label: 'Barcha mutaxassisliklar' }, ...options];
-    }, [specialities]);
+        return [{ value: 'all', label: t('Barcha mutaxassisliklar') }, ...options];
+    }, [specialities, t]);
 
     const getFacultyName = (facultyId: number) => {
         const faculty = faculties.find((f) => f.id === facultyId);
@@ -238,7 +240,7 @@ export const GroupsPage = () => {
 //             { id: groupToDelete.id, force: cascadeWarnings.length > 0 },
 //             {
 //                 onSuccess: () => {
-//                     toast.success("Guruh o'chirildi");
+//                     toast.success(t("Guruh o'chirildi"));
 //                     setIsDeleteModalOpen(false);
 //                     setGroupToDelete(null);
 //                     setCascadeWarnings([]);
@@ -248,7 +250,7 @@ export const GroupsPage = () => {
 //                     if (error.response?.status === 409 && error.response?.data?.detail?.requires_confirmation) {
 //                         setCascadeWarnings(error.response.data.detail.warnings || []);
 //                     } else {
-//                         toast.error("O'chirishda xatolik yuz berdi");
+//                         toast.error(t("O'chirishda xatolik yuz berdi"));
 //                         setIsDeleteModalOpen(false);
 //                         setGroupToDelete(null);
 //                         setCascadeWarnings([]);
@@ -305,7 +307,7 @@ export const GroupsPage = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title="Tahrirlash"
+                            title={t("Tahrirlash")}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedGroup(group);
@@ -320,7 +322,7 @@ export const GroupsPage = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                            title="O'chirish"
+                            title={t("O'chirish")}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteClick(group);
@@ -382,14 +384,14 @@ export const GroupsPage = () => {
                         ? `${currentFacultyObj.name} — guruhlar`
                         : "O'quv Guruhlari"
                 }
-                description="Universitet o'quv guruhlari, ta'lim shakllari va talabalar taqsimoti"
+                description={t("Universitet o'quv guruhlari, ta'lim shakllari va talabalar taqsimoti")}
             />
 
             {/* Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Guruh nomi bo'yicha qidirish..."
+                searchPlaceholder={t("Guruh nomi bo'yicha qidirish...")}
                 totalCount={totalCount}
                 totalLabel="Guruhlar"
                 activeFilterCount={activeFilterCount}
@@ -402,7 +404,7 @@ export const GroupsPage = () => {
                                 options={facultyOptions}
                                 value={selectedFacultyFilter}
                                 onChange={handleFacultyFilterChange}
-                                placeholder="Fakultet bo'yicha"
+                                placeholder={t("Fakultet bo'yicha")}
                             />
                         </div>
                         <div className="w-full sm:w-[220px]">
@@ -410,7 +412,7 @@ export const GroupsPage = () => {
                                 options={specialityOptions}
                                 value={selectedSpecialityFilter}
                                 onChange={handleSpecialityFilterChange}
-                                placeholder="Mutaxassislik bo'yicha"
+                                placeholder={t("Mutaxassislik bo'yicha")}
                             />
                         </div>
                     </div>
@@ -423,34 +425,36 @@ export const GroupsPage = () => {
                     <div className="flex flex-wrap items-center gap-4 w-full">
                         {/* Education Form Chips */}
                         <FilterChipGroup<EducationFormFilter>
-                            label="Ta'lim shakli"
+                            label={t("Ta'lim shakli")}
                             value={educationFormFilter}
                             onChange={(val) => {
                                 setEducationFormFilter(val);
                                 setCurrentPage(1);
                             }}
                             options={[
-                                { value: 'all', label: 'Barchasi' },
+                                { value: 'all', label: t('Barchasi') },
                                 { value: 'Kunduzgi', label: 'Kunduzgi' },
                                 { value: 'Sirtqi', label: 'Sirtqi' },
                                 { value: 'Kechki', label: 'Kechki' },
+                                { value: 'Masofaviy', label: 'Masofaviy' },
                             ]}
                         />
 
                         {/* Course Level Chips */}
                         <FilterChipGroup<CourseLevelFilter>
-                            label="Bosqich"
+                            label={t("Bosqich")}
                             value={courseLevelFilter}
                             onChange={(val) => {
                                 setCourseLevelFilter(val);
                                 setCurrentPage(1);
                             }}
                             options={[
-                                { value: 'all', label: 'Barchasi' },
+                                { value: 'all', label: t('Barchasi') },
                                 { value: '1', label: '1-kurs' },
                                 { value: '2', label: '2-kurs' },
                                 { value: '3', label: '3-kurs' },
                                 { value: '4', label: '4-kurs' },
+                                { value: '5', label: '5-kurs' },
                             ]}
                         />
                     </div>
@@ -467,7 +471,7 @@ export const GroupsPage = () => {
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>Qo'shish</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
@@ -495,11 +499,11 @@ export const GroupsPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={9}
-                        title="Guruhlar topilmadi"
+                        title={t("Guruhlar topilmadi")}
                         description={
                             searchTerm || selectedFacultyFilter !== 'all' || selectedSpecialityFilter !== 'all'
-                                ? "Tanlangan filtrlarga mos guruh topilmadi."
-                                : "Hozircha guruh qo'shilmagan."
+                                ? t("Tanlangan filtrlarga mos guruh topilmadi.")
+                                : t("Hozircha guruh qo'shilmagan.")
                         }
                     />
                 </div>
@@ -514,20 +518,20 @@ export const GroupsPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Guruh Nomi</span>
+                                    <span>{t('Guruh Nomi')}</span>
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
-                            <TableHead className="font-bold text-xs hidden lg:table-cell">Fakultet / Mutaxassislik</TableHead>
+                            <TableHead className="font-bold text-xs hidden lg:table-cell">{t('Fakultet / Mutaxassislik')}</TableHead>
                             <TableHead className="text-center font-bold text-xs">EPMOS ID</TableHead>
                             <TableHead className="text-center font-bold text-xs">HEMIS ID</TableHead>
-                            <TableHead className="text-center font-bold text-xs">Ta'lim Shakli</TableHead>
+                            <TableHead className="text-center font-bold text-xs">{t("Ta'lim Shakli")}</TableHead>
                             <TableHead
                                 onClick={() => handleSort('course')}
                                 className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center justify-center">
-                                    <span>Bosqich</span>
+                                    <span>{t('Bosqich')}</span>
                                     {renderSortIcon('course')}
                                 </div>
                             </TableHead>
@@ -540,8 +544,8 @@ export const GroupsPage = () => {
                                     {renderSortIcon('student_count')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-center font-bold text-xs">Holati</TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-center font-bold text-xs">{t('Holati')}</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -625,12 +629,12 @@ export const GroupsPage = () => {
                                         {isActive ? (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                                 <CheckCircle2 className="h-3 w-3" />
-                                                <span>Faol</span>
+                                                <span>{t('Faol')}</span>
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-semibold text-gray-500">
                                                 <XCircle className="h-3 w-3" />
-                                                <span>Nofaol</span>
+                                                <span>{t('Nofaol')}</span>
                                             </span>
                                         )}
                                     </TableCell>
@@ -658,7 +662,7 @@ export const GroupsPage = () => {
                                         {getFacultyName(group.faculty_id)}
                                     </span>
                                     <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                        <span>{group.education_shape || 'Guruh'}</span>
+                                        <span>{group.education_shape || t('Guruh')}</span>
                                         <ExternalSourceBadge row={group} />
                                         <InactiveBadge row={group} />
                                         {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
@@ -670,8 +674,8 @@ export const GroupsPage = () => {
                             onClick={() => openGroupStudents(group.id)}
                             actions={renderActions(group)}
                             metrics={[
-                                { label: 'Bosqich', value: group.course ? `${group.course}-kurs` : '—' },
-                                { label: 'Talaba', value: group.student_count ?? '—', accent: true },
+                                { label: t('Bosqich'), value: group.course ? `${group.course}-kurs` : '—' },
+                                { label: t('Talaba'), value: group.student_count ?? '—', accent: true },
                             ]}
                         />
                     ))}
@@ -716,7 +720,7 @@ export const GroupsPage = () => {
                     setGroupToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Guruhni o'chirish"
+                title={t("Guruhni o'chirish")}
                 description={
                     cascadeWarnings.length > 0 ? (
                         <div className="space-y-2 mt-2 text-left">
@@ -736,8 +740,8 @@ export const GroupsPage = () => {
                         `Siz haqiqatan ham "${groupToDelete?.name}" guruhini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.`
                     )
                 }
-                confirmText={cascadeWarnings.length > 0 ? "Ha, majburiy o'chirish" : "O'chirish"}
-                cancelText="Bekor qilish"
+                confirmText={cascadeWarnings.length > 0 ? t("Ha, majburiy o'chirish") : t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
             */}
         </div>

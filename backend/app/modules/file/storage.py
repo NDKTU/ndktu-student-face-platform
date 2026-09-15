@@ -157,12 +157,18 @@ async def store_upload(
     subdir: str = "files",
     folder_id: int | None = None,
     title: str | None = None,
-) -> StoredFile:
-    """Faylni saqlaydi va kutubxona yozuvini qaytaradi.
+) -> tuple[StoredFile, bool]:
+    """Faylni saqlaydi va ``(kutubxona_yozuvi, yangi_yaratildimi)`` qaytaradi.
 
     ``subdir`` — eski yuklash yoʻllari uchun: savol rasmlari ``question/`` da,
     kurs materiallari ``course_resources/`` da qolishi kerak, aks holda
     bazadagi mavjud havolalar buziladi.
+
+    Ikkinchi qiymat kerak, chunki dublikat qaytganda javob yangi yozuvnikidan
+    farq qilmaydi: ikkalasi ham bir xil ``StoredFile``. Buni faqat shu yer
+    biladi, shuning uchun chaqiruvchiga aynan shu yerdan aytiladi — mijoz uni
+    roʻyxat uzunligiga qarab taxmin qila olmaydi (roʻyxat filtrlangan va
+    sahifalangan).
     """
     ext = _extension(file.filename)
     tmp_path, sha256, size = await _stream_to_temp(file, ext)
@@ -188,7 +194,7 @@ async def store_upload(
             )
         )
         if duplicate:
-            return duplicate
+            return duplicate, False
 
     stored = StoredFile(
         blob_id=blob.id,
@@ -199,4 +205,4 @@ async def store_upload(
     )
     session.add(stored)
     await session.flush()
-    return stored
+    return stored, True

@@ -1,12 +1,53 @@
 from datetime import datetime
 from typing import Any, List, Literal, Optional
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import TashkentDatetime
 
 STATUS_VALUES = Literal["draft", "published", "archived"]
 AUDIENCE_VALUES = Literal["all", "faculty", "group", "level"]
+
+
+def _normalize_link(value: Optional[str]) -> Optional[str]:
+    """E'lon havolasini tekshiradi va sxemasini to'ldiradi.
+
+    Maydon oldin umuman tekshirilmasdi: `not-a-url` ham saqlanib ketardi va
+    kartochkada `<a href="not-a-url">` bo'lib chiqardi — brauzer uni nisbiy
+    yo'l deb bilib, talabani SPA ichidagi mavjud bo'lmagan sahifaga olib
+    ketardi.
+
+    Sxemasiz kiritilgan manzil (`epmos.nsumt.uz/...`) rad etilmaydi, balki
+    `https://` bilan to'ldiriladi: odamlar havolani shunday ko'chirib
+    qo'yishadi va buni xato deb qaytarish bekorga to'siq bo'lardi.
+
+    Faqat `http`/`https` qoladi. `javascript:` va `data:` ataylab rad etiladi —
+    e'lon matnini istalgan o'qituvchi yozadi, havola esa boshqa talabalarning
+    brauzerida ochiladi.
+    """
+    if value is None:
+        return None
+
+    raw = value.strip()
+    if not raw:
+        return None
+
+    parts = urlsplit(raw)
+    if not parts.scheme:
+        # `//nsumt.uz/x` — sxemasiz nusxa ko'chirishning odatiy shakli:
+        # ikkinchi marta qo'shsak, `https:////nsumt.uz` bo'lib ketardi.
+        raw = f"https:{raw}" if raw.startswith("//") else f"https://{raw}"
+        parts = urlsplit(raw)
+
+    if parts.scheme not in ("http", "https"):
+        raise ValueError("Havola http:// yoki https:// bilan boshlanishi kerak")
+    # `urlsplit` hostni tekshirmaydi: `https://` ham bo'sh host bilan o'tib
+    # ketardi. Nuqta talab qilinadi — domensiz manzil havola emas.
+    if not parts.hostname or "." not in parts.hostname:
+        raise ValueError("Havolada to'g'ri domen ko'rsatilmagan")
+
+    return raw
 
 
 class AnnouncementAuthorInfo(BaseModel):
@@ -33,6 +74,11 @@ class AnnouncementBase(BaseModel):
     #: `audience_kind` ga mos qiymatlar: guruhda id lar, fakultet va kursda satrlar.
     audience_values: List[Any] = []
 
+    @field_validator("link_url")
+    @classmethod
+    def _check_link(cls, value: Optional[str]) -> Optional[str]:
+        return _normalize_link(value)
+
 
 class AnnouncementCreateRequest(AnnouncementBase):
     pass
@@ -54,6 +100,11 @@ class AnnouncementUpdateRequest(BaseModel):
     registration_deadline: Optional[datetime] = None
     audience_kind: Optional[AUDIENCE_VALUES] = None
     audience_values: Optional[List[Any]] = None
+
+    @field_validator("link_url")
+    @classmethod
+    def _check_link(cls, value: Optional[str]) -> Optional[str]:
+        return _normalize_link(value)
 
 
 class AnnouncementResponse(BaseModel):

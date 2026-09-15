@@ -1,4 +1,5 @@
 import { Database, Lock } from 'lucide-react';
+import { formatDateTime } from '@/utils/date';
 
 /** Признаки строки-зеркала, приходящие в любом ответе справочника. */
 export interface ExternalRefFields {
@@ -28,7 +29,7 @@ export const ExternalSourceBadge = ({ row }: { row?: ExternalRefFields | null })
 
     const label = SOURCE_LABEL[row!.external_source!] ?? row!.external_source!;
     const synced = row?.synced_at
-        ? new Date(row.synced_at).toLocaleString('ru-RU')
+        ? formatDateTime(row.synced_at)
         : null;
 
     return (

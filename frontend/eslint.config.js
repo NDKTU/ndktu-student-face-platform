@@ -30,6 +30,36 @@ export default defineConfig([
       'react-hooks/incompatible-library': 'warn',
       'react-hooks/immutability': 'warn',
       'react-refresh/only-export-components': 'warn',
+      // Sana formati bitta joyda — `src/utils/date.ts`. Argumentsiz
+      // `toLocaleDateString()` natijasini brauzer tili belgilaydi, ya'ni
+      // bitta jadval ikki xodimda ikki xil ko'rinadi; qattiq yozilgan
+      // locale ('ru-RU') esa o'zbek interfeysiga tushib qolardi. Ilgari
+      // helper bor edi-yu, majburiy emasdi — shuning uchun ilovada 5 xil
+      // format to'planib qolgan edi.
+      'no-restricted-syntax': [
+        'error',
+        {
+          // Bu ikkalasi faqat `Date` da bor — qaysi holatda chaqirilishidan
+          // qat'i nazar taqiqlanadi.
+          selector:
+            "CallExpression > MemberExpression[property.name=/^toLocale(Date|Time)String$/]",
+          message:
+            "Sanani to'g'ridan-to'g'ri formatlamang: '@/utils/date' dan formatDate / formatDateTime / formatDayMonth / formatTime ni ishlating.",
+        },
+        {
+          // `toLocaleString` sonlarda ham ishlatiladi (StatCard, Dashboard),
+          // shuning uchun faqat `new Date(...)` ustidan chaqirilgani ushlanadi.
+          selector:
+            "CallExpression > MemberExpression[property.name='toLocaleString'][object.type='NewExpression'][object.callee.name='Date']",
+          message:
+            "Sanani to'g'ridan-to'g'ri formatlamang: '@/utils/date' dan formatDate / formatDateTime ni ishlating.",
+        },
+      ],
     },
+  },
+  {
+    // Kanonik formatlagichning o'zi — istisno.
+    files: ['src/utils/date.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
 ])

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { labelFor, parsePermission } from '@/constants/resources';
+import { permissionDisplay, permissionGroupLabel as labelFor } from '@/constants/permissionDisplay';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 // Ruxsatlar ro'yxati faqat ko'rish uchun: ular backend route'laridagi
@@ -45,8 +45,13 @@ const PermissionsPage = () => {
 
     useEffect(() => { fetchData(); }, [debouncedSearch]);
 
+    // Guruhlash `permissionDisplay` orqali: u `quiz_process:start_quiz` kabi
+    // teskari yozilgan nomlarni ham to'g'ri joyiga qo'yadi. Ilgari bu yerda
+    // `parsePermission` to'g'ridan-to'g'ri ishlatilardi va ikki nuqta bo'yicha
+    // bo'lingan ikkinchi bo'lak resurs deb olinardi — natijada 36 guruhning
+    // 11 tasi «Start_quiz», «Feed», «Submission» kabi inglizcha chiqardi.
     const grouped = permissions.reduce<Record<string, Permission[]>>((acc, perm) => {
-        const { resource } = parsePermission(perm.name);
+        const { resource } = permissionDisplay(perm.name);
         (acc[resource] ??= []).push(perm);
         return acc;
     }, {});
@@ -122,8 +127,10 @@ const PermissionsPage = () => {
                                         .slice()
                                         .sort((a, b) => a.name.localeCompare(b.name))
                                         .map((perm) => (
-                                            <div key={perm.id} className="py-2">
-                                                <span className="font-mono text-sm break-all">{perm.name}</span>
+                                            <div key={perm.id} className="py-2" title={perm.name}>
+                                                <span className="text-sm break-words">
+                                                    {permissionDisplay(perm.name).label}
+                                                </span>
                                             </div>
                                         ))}
                                 </div>

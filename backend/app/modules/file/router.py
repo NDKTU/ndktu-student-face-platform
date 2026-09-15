@@ -12,6 +12,7 @@ from app.modules.file.schemas import (
     FileListResponse,
     FileResponse,
     FileUpdateRequest,
+    FileUploadResponse,
     FolderCreateRequest,
     FolderListResponse,
     FolderResponse,
@@ -66,7 +67,7 @@ async def delete_folder(
 # ─── Fayllar ──────────────────────────────────────────────────────────
 
 
-@router.post("/upload", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
     folder_id: int | None = Query(default=None),

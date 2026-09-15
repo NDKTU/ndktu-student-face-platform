@@ -34,8 +34,11 @@ import { OrganizationToolbar } from '@/components/faculty/OrganizationToolbar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmpty } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { formatDate } from '@/utils/date';
+import { useTranslation } from 'react-i18next';
 
 export const QuestionsPage = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { user, hasPermission } = useAuth();
@@ -144,19 +147,19 @@ export const QuestionsPage = () => {
 
     const subjectOptions = useMemo(() => {
         const list = subjects.map((s) => ({ value: String(s.id), label: s.name }));
-        return [{ value: 'all', label: 'Barcha fanlar' }, ...list];
-    }, [subjects]);
+        return [{ value: 'all', label: t('Barcha fanlar') }, ...list];
+    }, [subjects, t]);
 
     const teacherOptions = useMemo(() => {
         const list = teachers.map((t) => ({
             value: String(t.user_id),
             label: t.full_name || t.user?.username || `ID: ${t.id}`,
         }));
-        return [{ value: 'all', label: "Barcha o'qituvchilar" }, ...list];
-    }, [teachers]);
+        return [{ value: 'all', label: t("Barcha o'qituvchilar") }, ...list];
+    }, [teachers, t]);
 
     const getSubjectName = (subId?: number | null) => {
-        if (!subId) return 'Fan biriktirilmagan';
+        if (!subId) return t('Fan biriktirilmagan');
         const s = subjects.find((item) => item.id === subId);
         return s ? s.name : `Fan #${subId}`;
     };
@@ -183,13 +186,13 @@ export const QuestionsPage = () => {
         if (!questionToDelete) return;
         deleteQuestionMutation.mutate(questionToDelete.id, {
             onSuccess: () => {
-                toast.success("Savol o'chirildi");
+                toast.success(t("Savol o'chirildi"));
                 setIsDeleteModalOpen(false);
                 setQuestionToDelete(null);
                 refetchQuestions();
             },
             onError: () => {
-                toast.error("Savolni o'chirishda xatolik yuz berdi");
+                toast.error(t("Savolni o'chirishda xatolik yuz berdi"));
                 setIsDeleteModalOpen(false);
                 setQuestionToDelete(null);
             },
@@ -198,7 +201,7 @@ export const QuestionsPage = () => {
 
     const handleDownloadExcel = () => {
         if (!parsedSubjectId) {
-            toast.error('Excel yuklab olish uchun fanni tanlang');
+            toast.error(t('Excel yuklab olish uchun fanni tanlang'));
             return;
         }
         downloadExcelMutation.mutate({
@@ -209,19 +212,19 @@ export const QuestionsPage = () => {
 
     const handleBulkDelete = () => {
         if (!parsedSubjectId) {
-            toast.error("O'chirish uchun fanni tanlang");
+            toast.error(t("O'chirish uchun fanni tanlang"));
             return;
         }
         bulkDeleteMutation.mutate(
             { subject_id: parsedSubjectId, user_id: effectiveOwnerUserId ?? (user?.id || 0) },
             {
                 onSuccess: (data: any) => {
-                    toast.success(data?.detail || "Barcha savollar o'chirildi");
+                    toast.success(data?.detail || t("Barcha savollar o'chirildi"));
                     setIsBulkDeleteModalOpen(false);
                     refetchQuestions();
                 },
                 onError: () => {
-                    toast.error("Savollarni o'chirishda xatolik yuz berdi");
+                    toast.error(t("Savollarni o'chirishda xatolik yuz berdi"));
                     setIsBulkDeleteModalOpen(false);
                 },
             }
@@ -244,7 +247,7 @@ export const QuestionsPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    title="Tahrirlash"
+                    title={t("Tahrirlash")}
                     onClick={(e) => handleEditQuestion(question, e)}
                 >
                     <Pencil className="h-4 w-4" />
@@ -255,7 +258,7 @@ export const QuestionsPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                    title="O'chirish"
+                    title={t("O'chirish")}
                     onClick={(e) => handleDeleteClick(question, e)}
                 >
                     <Trash2 className="h-4 w-4" />
@@ -269,15 +272,15 @@ export const QuestionsPage = () => {
             {/* Unified Breadcrumbs Header */}
             <OrganizationBreadcrumbs
                 items={[{ label: 'Savollar', onClick: () => {} }]}
-                title="Test Savollari Bazasi"
-                description="Fanlar bo'yicha test savollari, variantlar, Excel import va eksport"
+                title={t("Test Savollari Bazasi")}
+                description={t("Fanlar bo'yicha test savollari, variantlar, Excel import va eksport")}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Savol matni bo'yicha qidirish..."
+                searchPlaceholder={t("Savol matni bo'yicha qidirish...")}
                 totalCount={totalCount}
                 totalLabel="Savollar"
                 activeFilterCount={activeFilterCount}
@@ -289,7 +292,7 @@ export const QuestionsPage = () => {
                                 options={subjectOptions}
                                 value={selectedSubject}
                                 onChange={handleSubjectChange}
-                                placeholder="Fan bo'yicha saralash"
+                                placeholder={t("Fan bo'yicha saralash")}
                             />
                         </div>
                         {!isTeacher && teachers.length > 0 && (
@@ -298,7 +301,7 @@ export const QuestionsPage = () => {
                                     options={teacherOptions}
                                     value={selectedTeacher}
                                     onChange={handleTeacherChange}
-                                    placeholder="O'qituvchi bo'yicha"
+                                    placeholder={t("O'qituvchi bo'yicha")}
                                 />
                             </div>
                         )}
@@ -338,7 +341,7 @@ export const QuestionsPage = () => {
                                 className="h-9 gap-1.5 font-semibold shadow-sm"
                             >
                                 <Plus className="h-4 w-4" />
-                                <span>Qo'shish</span>
+                                <span>{t("Qo'shish")}</span>
                             </Button>
                         </PermissionGate>
                     </div>
@@ -358,15 +361,15 @@ export const QuestionsPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={6}
-                        title="Savollar topilmadi"
+                        title={t("Savollar topilmadi")}
                         description={
                             searchTerm || selectedSubject !== 'all'
-                                ? "Tanlangan filtrlarga mos savol topilmadi."
-                                // "Bazasi bo'sh" degan xabar noto'g'ri edi: bazada
+                                ? t("Tanlangan filtrlarga mos savol topilmadi.")
+                                // t("Bazasi bo'sh") degan xabar noto'g'ri edi: bazada
                                 // o'n minglab savol bor, shunchaki bu o'qituvchining
                                 // fanlarida yo'q. Foydalanuvchi buni tizim buzilgan
                                 // deb tushunardi.
-                                : "Fanlaringiz bo'yicha hali savol qo'shilmagan."
+                                : t("Fanlaringiz bo'yicha hali savol qo'shilmagan.")
                         }
                     />
                 </div>
@@ -376,11 +379,11 @@ export const QuestionsPage = () => {
                     <TableHeader className="bg-muted/40 sticky top-0 z-10 backdrop-blur-sm">
                         <TableRow className="border-b border-border/80">
                             <TableHead className="hidden w-[50px] text-center font-bold font-mono text-xs sm:table-cell">#</TableHead>
-                            <TableHead className="font-bold text-xs">Savol Matni</TableHead>
-                            <TableHead className="font-bold text-xs hidden md:table-cell">Fan</TableHead>
+                            <TableHead className="font-bold text-xs">{t('Savol Matni')}</TableHead>
+                            <TableHead className="font-bold text-xs hidden md:table-cell">{t('Fan')}</TableHead>
                             <TableHead className="hidden text-center font-bold text-xs sm:table-cell">To'g'ri javob</TableHead>
-                            <TableHead className="font-bold text-xs hidden lg:table-cell">Sana</TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="font-bold text-xs hidden lg:table-cell">{t('Sana')}</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -429,9 +432,7 @@ export const QuestionsPage = () => {
                                     {/* Sana */}
                                     <TableCell className="hidden lg:table-cell">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {question.created_at
-                                                ? new Date(question.created_at).toLocaleDateString()
-                                                : '—'}
+                                            {formatDate(question.created_at)}
                                         </span>
                                     </TableCell>
 
@@ -461,7 +462,7 @@ export const QuestionsPage = () => {
                 <Modal
                     isOpen={isDetailModalOpen}
                     onClose={() => setIsDetailModalOpen(false)}
-                    title="Savol Tafsilotlari"
+                    title={t("Savol Tafsilotlari")}
                 >
                     <div className="space-y-4">
                         <div>
@@ -547,10 +548,10 @@ export const QuestionsPage = () => {
                     setQuestionToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Savolni o'chirish"
-                description="Ushbu test savolini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi."
-                confirmText="O'chirish"
-                cancelText="Bekor qilish"
+                title={t("Savolni o'chirish")}
+                description={t("Ushbu test savolini o'chirmoqchimisiz? Bu amalni bekor qilib bo'lmaydi.")}
+                confirmText={t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
 
             {/* Bulk Delete Dialog */}
@@ -558,10 +559,10 @@ export const QuestionsPage = () => {
                 isOpen={isBulkDeleteModalOpen}
                 onClose={() => setIsBulkDeleteModalOpen(false)}
                 onConfirm={handleBulkDelete}
-                title="Barcha savollarni o'chirish"
+                title={t("Barcha savollarni o'chirish")}
                 description="Tanlangan fan bo'yicha BARCHA savollarni o'chirishni tasdiqlaysizmi? Bu amalni qaytarib bo'lmaydi!"
-                confirmText="Ha, barchasini o'chirish"
-                cancelText="Bekor qilish"
+                confirmText={t("Ha, barchasini o'chirish")}
+                cancelText={t("Bekor qilish")}
             />
         </div>
     );

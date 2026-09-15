@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useCourseAttendance } from '@/hooks/useAttendance';
 import { ATTENDANCE_LABELS, type AttendanceStatus } from '@/services/attendanceService';
 import { cn } from '@/lib/utils';
+import { formatDayMonth } from '@/utils/date';
 
 /** Katakdagi bitta harf: to'liq nom matritsani o'qib bo'lmas holga keltirardi. */
 const SHORT: Record<AttendanceStatus, string> = {
@@ -178,7 +179,7 @@ export const CourseAttendanceJournal = ({ courseId }: { courseId: number }) => {
                                         title={`${lesson.topic} — ${lesson.date}`}
                                         className="px-2 py-2 text-center text-[11px] font-semibold text-muted-foreground whitespace-nowrap"
                                     >
-                                        {lesson.date.slice(5)}
+                                        {formatDayMonth(lesson.date)}
                                     </th>
                                 ))}
                                 <th className="px-3 py-2 text-right text-xs font-bold whitespace-nowrap">Davomat</th>

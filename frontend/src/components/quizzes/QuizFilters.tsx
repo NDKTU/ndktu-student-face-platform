@@ -7,6 +7,7 @@ import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { Teacher } from '@/services/teacherService';
 import type { Faculty } from '@/services/facultyService';
+import { useTranslation } from 'react-i18next';
 
 interface QuizFiltersProps {
     subjects: Subject[];
@@ -18,6 +19,11 @@ interface QuizFiltersProps {
     onFacultyChange?: (id: number | undefined) => void;
     filterSubjectId: number | undefined;
     onSubjectChange: (id: number | undefined) => void;
+    /** Fanlar 2978 ta — bir sahifaga sig'maydi, shuning uchun qidiruv serverga
+     *  uzatiladi. `subjects` esa jadvalda nom ko'rsatish uchun qoladi.
+     *  Ikkalasi berilmasa Combobox yuklangan ro'yxat ichida filtrlaydi. */
+    subjectOptions?: { value: string; label: string }[];
+    onSubjectSearchChange?: (query: string) => void;
     filterGroupId: number | undefined;
     onGroupChange: (id: number | undefined) => void;
     filterUserId: number | undefined;
@@ -43,6 +49,8 @@ export const QuizFilters = ({
     onFacultyChange,
     filterSubjectId,
     onSubjectChange,
+    subjectOptions,
+    onSubjectSearchChange,
     filterGroupId,
     onGroupChange,
     filterUserId,
@@ -55,6 +63,7 @@ export const QuizFilters = ({
     onClearFilters,
     hideStatusFilter,
 }: QuizFiltersProps) => {
+    const { t } = useTranslation();
     return (
         <Card>
             <CardContent className="p-4">
@@ -62,12 +71,12 @@ export const QuizFilters = ({
                     {faculties && onFacultyChange && (
                         <PermissionGate permission="read:faculty">
                             <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
-                                <label className="text-sm font-medium">Fakultet bo'yicha filtri</label>
+                                <label className="text-sm font-medium">{t("Fakultet bo'yicha filtri")}</label>
                                 <Combobox
                                     options={faculties.map(f => ({ value: f.id.toString(), label: f.name }))}
                                     value={filterFacultyId?.toString()}
                                     onChange={(val) => onFacultyChange(val ? parseInt(val) : undefined)}
-                                    placeholder="Barcha fakultetlar"
+                                    placeholder={t("Barcha fakultetlar")}
                                     searchPlaceholder="Fakultetni qidirish..."
                                 />
                             </div>
@@ -75,43 +84,44 @@ export const QuizFilters = ({
                     )}
                     <PermissionGate permission="read:subject">
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
-                            <label className="text-sm font-medium">Fan bo'yicha filtri</label>
+                            <label className="text-sm font-medium">{t("Fan bo'yicha filtri")}</label>
                             <Combobox
-                                options={subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
+                                options={subjectOptions ?? subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
                                 value={filterSubjectId?.toString()}
+                                onSearchChange={onSubjectSearchChange}
                                 onChange={(val) => onSubjectChange(val ? parseInt(val) : undefined)}
-                                placeholder="Barcha fanlar"
+                                placeholder={t("Barcha fanlar")}
                                 searchPlaceholder="Fanni qidirish..."
                             />
                         </div>
                     </PermissionGate>
                     <PermissionGate permission="read:group">
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
-                            <label className="text-sm font-medium">Guruh bo'yicha filtri</label>
+                            <label className="text-sm font-medium">{t("Guruh bo'yicha filtri")}</label>
                             <Combobox
                                 options={groups.map(g => ({ value: g.id.toString(), label: g.name }))}
                                 value={filterGroupId?.toString()}
                                 onChange={(val) => onGroupChange(val ? parseInt(val) : undefined)}
-                                placeholder="Barcha guruhlar"
+                                placeholder={t("Barcha guruhlar")}
                                 searchPlaceholder="Guruhni qidirish..."
                             />
                         </div>
                     </PermissionGate>
                     <PermissionGate permission="read:teacher">
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
-                            <label className="text-sm font-medium">O'qituvchi bo'yicha filtri</label>
+                            <label className="text-sm font-medium">{t("O'qituvchi bo'yicha filtri")}</label>
                             <Combobox
                                 options={teachers.map(t => ({ value: (t?.user_id ?? '').toString(), label: t?.full_name ?? '' }))}
                                 value={filterUserId?.toString()}
                                 onChange={(val) => onUserChange(val ? parseInt(val) : undefined)}
-                                placeholder="Barcha o'qituvchilar"
+                                placeholder={t("Barcha o'qituvchilar")}
                                 searchPlaceholder="O'qituvchini qidirish..."
                             />
                         </div>
                     </PermissionGate>
                     {!hideStatusFilter && (
                         <div className="flex w-full flex-col gap-2 sm:w-[150px]">
-                            <label className="text-sm font-medium">Holat</label>
+                            <label className="text-sm font-medium">{t('Holat')}</label>
                             <select
                                 className={selectClassName}
                                 value={filterIsActive === undefined ? 'all' : filterIsActive.toString()}
@@ -120,21 +130,21 @@ export const QuizFilters = ({
                                     onIsActiveChange?.(val === 'all' ? undefined : val === 'true');
                                 }}
                             >
-                                <option value="all">Barchasi</option>
-                                <option value="true">Faol</option>
-                                <option value="false">Faol emas</option>
+                                <option value="all">{t('Barchasi')}</option>
+                                <option value="true">{t('Faol')}</option>
+                                <option value="false">{t('Faol emas')}</option>
                             </select>
                         </div>
                     )}
                     <div className="flex w-full flex-col gap-2 sm:w-[150px]">
-                        <label className="text-sm font-medium">Sana bo'yicha</label>
+                        <label className="text-sm font-medium">{t("Sana bo'yicha")}</label>
                         <select
                             className={selectClassName}
                             value={sortDir}
                             onChange={(e) => onSortDirChange(e.target.value as 'desc' | 'asc')}
                         >
-                            <option value="desc">Eng yangilari</option>
-                            <option value="asc">Eng eskilari</option>
+                            <option value="desc">{t('Eng yangilari')}</option>
+                            <option value="asc">{t('Eng eskilari')}</option>
                         </select>
                     </div>
                     {hasActiveFilters && (

@@ -9,6 +9,7 @@ import { BookOpen, Camera, Link as LinkIcon, Pencil, PlayCircle, RotateCcw, Tras
 import type { ProctoringMode, Quiz } from '@/services/quizService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 interface QuizTableProps {
     quizzes: Quiz[];
@@ -57,6 +58,7 @@ export const QuizTable = ({
     readOnly,
     variant = 'cards',
 }: QuizTableProps) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const hideActions = Boolean(isTeacher) || Boolean(readOnly);
     const showStart = Boolean(onStart);
@@ -177,7 +179,7 @@ export const QuizTable = ({
         const columns: DataTableColumn<Quiz>[] = [
             {
                 key: 'title',
-                header: 'Test',
+                header: t('Test'),
                 cell: (quiz) => (
                     <div className="min-w-0">
                         <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
@@ -198,14 +200,14 @@ export const QuizTable = ({
             },
             {
                 key: 'question_number',
-                header: 'Savol',
+                header: t('Savol'),
                 hideBelow: 'md',
                 className: 'font-mono text-sm',
                 cell: (quiz) => quiz.question_number,
             },
             {
                 key: 'duration',
-                header: 'Daqiqa',
+                header: t('Daqiqa'),
                 hideBelow: 'md',
                 className: 'font-mono text-sm',
                 cell: (quiz) => quiz.duration,
@@ -219,7 +221,7 @@ export const QuizTable = ({
             },
             {
                 key: 'is_active',
-                header: 'Holat',
+                header: t('Holat'),
                 cell: (quiz) => (
                     <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
                         {!hideActions && (
@@ -230,14 +232,14 @@ export const QuizTable = ({
                             />
                         )}
                         <span className={quiz.is_active ? 'text-sm font-medium text-success' : 'text-sm text-muted-foreground'}>
-                            {quiz.is_active ? 'Faol' : 'Yopiq'}
+                            {quiz.is_active ? t('Faol') : t('Yopiq')}
                         </span>
                     </div>
                 ),
             },
             {
                 key: 'actions',
-                header: 'Amallar',
+                header: t('Amallar'),
                 headClassName: 'text-right',
                 className: 'text-right',
                 cell: (quiz) => (
@@ -280,7 +282,7 @@ export const QuizTable = ({
                                     />
                                 )}
                                 <span className={quiz.is_active ? 'text-xs font-medium text-success' : 'text-xs text-muted-foreground'}>
-                                    {quiz.is_active ? 'Faol' : 'Yopiq'}
+                                    {quiz.is_active ? t('Faol') : t('Yopiq')}
                                 </span>
                             </div>
                             {hideActions && showStart ? renderStartActions(quiz) : !hideActions ? renderManageActions(quiz) : null}
@@ -325,15 +327,15 @@ export const QuizTable = ({
                         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-4">
                             <div>
                                 <p className="font-display text-lg font-bold text-foreground">{quiz.question_number}</p>
-                                <p className="text-xs text-muted-foreground">Savol</p>
+                                <p className="text-xs text-muted-foreground">{t('Savol')}</p>
                             </div>
                             <div>
                                 <p className="font-display text-lg font-bold text-foreground">{quiz.duration}</p>
-                                <p className="text-xs text-muted-foreground">Daqiqa</p>
+                                <p className="text-xs text-muted-foreground">{t('Daqiqa')}</p>
                             </div>
                             <div>
                                 <p className={`font-display text-lg font-bold ${quiz.is_active ? 'text-success' : 'text-muted-foreground'}`}>
-                                    {quiz.is_active ? 'Faol' : 'Yopiq'}
+                                    {quiz.is_active ? t('Faol') : t('Yopiq')}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     {quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'}
@@ -350,7 +352,7 @@ export const QuizTable = ({
                                             onCheckedChange={() => onToggleStatus?.(quiz)}
                                             disabled={isUpdatingStatusId === quiz.id || isUpdatePending}
                                         />
-                                        <span className="text-xs text-muted-foreground">Faollik</span>
+                                        <span className="text-xs text-muted-foreground">{t('Faollik')}</span>
                                     </div>
                                 )}
                                 <div className="ml-auto">

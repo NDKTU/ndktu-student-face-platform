@@ -34,23 +34,15 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Combobox } from '@/components/ui/Combobox';
 import { COURSE_TYPE_OPTIONS, courseTypeLabel, type CourseType } from '@/services/courseTypes';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
+import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
+import { useTranslation } from 'react-i18next';
+import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 
 type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
 
-type FilterOption = { value: string; label: string };
-
-/** Filtr ro'yxati uchun sahifa hajmi: qidiruv serverda, shuning uchun ko'p
- *  yuklashning hojati yo'q. */
-const FILTER_PAGE_SIZE = 50;
-
-/** Tanlangan qiymat qidiruv natijasida bo'lmasa ham ro'yxatda qolsin. */
-const withSelected = (list: FilterOption[], selected: FilterOption | null): FilterOption[] =>
-    selected && !list.some((option) => option.value === selected.value)
-        ? [selected, ...list]
-        : list;
-
 export const CoursesPage = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { user, hasPermission } = useAuth();
     const isAdmin = user?.roles?.some((role) => role.name.toLowerCase() === 'admin') ?? false;
@@ -59,7 +51,7 @@ export const CoursesPage = () => {
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
     const pageSize = 15;
 
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
@@ -70,21 +62,22 @@ export const CoursesPage = () => {
     // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
     const viewMode = useCatalogView();
 
-    const [searchTerm, setSearchTerm] = useState('');
+    // Filtrlar URL'da: yangilash va «Orqaga» ularni saqlaydi.
+    const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const [filterSubjectId, setFilterSubjectId] = useState<string>('all');
-    const [filterGroupId, setFilterGroupId] = useState<string>('all');
-    const [filterTeacherId, setFilterTeacherId] = useState<string>('all');
-    const [filterCourseType, setFilterCourseType] = useState<string>('all');
+    const [filterSubjectId, setFilterSubjectId] = useUrlState<string>('subject', 'all');
+    const [filterGroupId, setFilterGroupId] = useUrlState<string>('group', 'all');
+    const [filterTeacherId, setFilterTeacherId] = useUrlState<string>('teacher', 'all');
+    const [filterCourseType, setFilterCourseType] = useUrlState<string>('type', 'all');
     // Semestr — kuzgi (1) yoki bahorgi (2). Filtrlash serverda: `semester_number`
     // `CourseListRequest` da allaqachon bor, sahifada esa faqat saralash bor edi.
-    const [filterSemester, setFilterSemester] = useState<string>('all');
+    const [filterSemester, setFilterSemester] = useUrlState<string>('semester', 'all');
     // Arxiv — EPOS yuklamasidan yo'qolgan kurslar. Ular o'chirilmaydi (jurnal
     // ularga bog'langan), lekin faol ro'yxatda ham turmasligi kerak.
     const [showArchived, setShowArchived] = useState(false);
-    const [sortField, setSortField] = useState<SortField>('subject');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+    const [sortField, setSortField] = useUrlState<SortField>('sort', 'subject');
+    const [sortOrder, setSortOrder] = useUrlState<SortOrder>('order', 'asc');
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -172,13 +165,13 @@ export const CoursesPage = () => {
 
     const subjectOptions = useMemo(() => {
         const list = allSubjects.map((s) => ({ value: String(s.id), label: s.name }));
-        return [{ value: 'all', label: 'Barcha fanlar' }, ...withSelected(list, selectedSubjectOption)];
-    }, [allSubjects, selectedSubjectOption]);
+        return [{ value: 'all', label: t('Barcha fanlar') }, ...withSelected(list, selectedSubjectOption)];
+    }, [allSubjects, selectedSubjectOption, t]);
 
     const groupOptions = useMemo(() => {
         const list = allGroups.map((g) => ({ value: String(g.id), label: g.name }));
-        return [{ value: 'all', label: 'Barcha guruhlar' }, ...withSelected(list, selectedGroupOption)];
-    }, [allGroups, selectedGroupOption]);
+        return [{ value: 'all', label: t('Barcha guruhlar') }, ...withSelected(list, selectedGroupOption)];
+    }, [allGroups, selectedGroupOption, t]);
 
     const teacherOptions = useMemo(() => {
         const list = allTeachers.map((t) => ({
@@ -186,10 +179,10 @@ export const CoursesPage = () => {
             label: t.full_name || t.user?.username || `ID: ${t.id}`,
         }));
         return [
-            { value: 'all', label: "Barcha o'qituvchilar" },
+            { value: 'all', label: t("Barcha o'qituvchilar") },
             ...withSelected(list, selectedTeacherOption),
         ];
-    }, [allTeachers, selectedTeacherOption]);
+    }, [allTeachers, selectedTeacherOption, t]);
 
     // Filtrlarning bir qismi serverga ketadi, bir qismi (qidiruv) mijozda
     // ishlaydi — tozalash tugmasi ikkalasini ham nolga qaytaradi.
@@ -220,15 +213,15 @@ export const CoursesPage = () => {
 
     const courseTypeOptions = useMemo(
         () => [
-            { value: 'all', label: 'Barcha turlar' },
+            { value: 'all', label: t('Barcha turlar') },
             ...COURSE_TYPE_OPTIONS.map((option) => ({ value: option.value as string, label: option.label })),
         ],
-        [],
+        [t],
     );
 
     const semesterOptions = useMemo(
-        () => [{ value: 'all', label: 'Barcha semestrlar' }, ...SEMESTER_OPTIONS],
-        [],
+        () => [{ value: 'all', label: t('Barcha semestrlar') }, ...SEMESTER_OPTIONS],
+        [t],
     );
 
     const handleSort = (field: SortField) => {
@@ -263,13 +256,13 @@ export const CoursesPage = () => {
         if (!courseToDelete) return;
         deleteCourseMutation.mutate(courseToDelete.id, {
             onSuccess: () => {
-                toast.success("Kurs o'chirildi");
+                toast.success(t("Kurs o'chirildi"));
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
                 refetch();
             },
             onError: () => {
-                toast.error("Kursni o'chirishda xatolik yuz berdi");
+                toast.error(t("Kursni o'chirishda xatolik yuz berdi"));
                 setIsDeleteModalOpen(false);
                 setCourseToDelete(null);
             },
@@ -305,7 +298,7 @@ export const CoursesPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    title="Tahrirlash"
+                    title={t("Tahrirlash")}
                     onClick={(e) => handleEditCourse(course, e)}
                 >
                     <Pencil className="h-4 w-4" />
@@ -316,7 +309,7 @@ export const CoursesPage = () => {
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
-                    title="O'chirish"
+                    title={t("O'chirish")}
                     onClick={(e) => handleDeleteClick(course, e)}
                 >
                     <Trash2 className="h-4 w-4" />
@@ -330,15 +323,15 @@ export const CoursesPage = () => {
             {/* Unified Breadcrumbs Header */}
             <OrganizationBreadcrumbs
                 items={[{ label: 'Kurslar', onClick: () => {} }]}
-                title="O'quv Kurslari"
-                description="Fanlar, o'qituvchilar, guruhlar va semestrlar bo'yicha o'quv kurslari"
+                title={t("O'quv Kurslari")}
+                description={t("Fanlar, o'qituvchilar, guruhlar va semestrlar bo'yicha o'quv kurslari")}
             />
 
             {/* Controls Toolbar */}
             <OrganizationToolbar
                 search={searchTerm}
                 onSearchChange={setSearchTerm}
-                searchPlaceholder="Kurs, fan yoki o'qituvchi bo'yicha..."
+                searchPlaceholder={t("Kurs, fan yoki o'qituvchi bo'yicha...")}
                 totalCount={totalCount}
                 totalLabel="Kurslar"
                 activeFilterCount={activeFilterCount}
@@ -357,8 +350,8 @@ export const CoursesPage = () => {
                                     );
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Fan bo'yicha"
-                                searchPlaceholder="Fan nomi..."
+                                placeholder={t("Fan bo'yicha")}
+                                searchPlaceholder={t("Fan nomi...")}
                             />
                         </div>
                         <div className="w-full sm:w-[220px]">
@@ -373,8 +366,8 @@ export const CoursesPage = () => {
                                     );
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Guruh bo'yicha"
-                                searchPlaceholder="Guruh nomi..."
+                                placeholder={t("Guruh bo'yicha")}
+                                searchPlaceholder={t("Guruh nomi...")}
                             />
                         </div>
                         <div className="w-[150px] sm:w-[170px]">
@@ -385,7 +378,7 @@ export const CoursesPage = () => {
                                     setFilterCourseType(val);
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Turi bo'yicha"
+                                placeholder={t("Turi bo'yicha")}
                                 searchPlaceholder="Tur..."
                             />
                         </div>
@@ -397,7 +390,7 @@ export const CoursesPage = () => {
                                     setFilterSemester(val);
                                     setCurrentPage(1);
                                 }}
-                                placeholder="Semestr bo'yicha"
+                                placeholder={t("Semestr bo'yicha")}
                                 searchPlaceholder="Semestr..."
                             />
                         </div>
@@ -427,7 +420,7 @@ export const CoursesPage = () => {
                                         );
                                         setCurrentPage(1);
                                     }}
-                                    placeholder="O'qituvchi bo'yicha"
+                                    placeholder={t("O'qituvchi bo'yicha")}
                                     searchPlaceholder="F.I.SH..."
                                 />
                             </div>
@@ -442,7 +435,7 @@ export const CoursesPage = () => {
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>Qo'shish</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
@@ -469,16 +462,16 @@ export const CoursesPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={7}
-                        title={showArchived ? 'Arxiv bo\'sh' : 'Kurslar topilmadi'}
+                        title={showArchived ? 'Arxiv bo\'sh' : t('Kurslar topilmadi')}
                         description={
                             showArchived
-                                ? "Hech bir kurs arxivga o'tkazilmagan."
+                                ? t("Hech bir kurs arxivga o'tkazilmagan.")
                                 : searchTerm ||
                                     filterSubjectId !== 'all' ||
                                     filterGroupId !== 'all' ||
                                     filterCourseType !== 'all'
-                                  ? 'Tanlangan filtrlarga mos kurs topilmadi.'
-                                  : "Hozircha kurslar qo'shilmagan."
+                                  ? t('Tanlangan filtrlarga mos kurs topilmadi.')
+                                  : t("Hozircha kurslar qo'shilmagan.")
                         }
                     />
                 </div>
@@ -493,7 +486,7 @@ export const CoursesPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>Fan Nomi</span>
+                                    <span>{t('Fan Nomi')}</span>
                                     {renderSortIcon('subject')}
                                 </div>
                             </TableHead>
@@ -512,7 +505,7 @@ export const CoursesPage = () => {
                                 className="group cursor-pointer select-none font-bold text-xs hidden md:table-cell hover:text-foreground"
                             >
                                 <div className="flex items-center">
-                                    <span>O'qituvchi</span>
+                                    <span>{t("O'qituvchi")}</span>
                                     {renderSortIcon('teacher')}
                                 </div>
                             </TableHead>
@@ -525,7 +518,7 @@ export const CoursesPage = () => {
                                     {renderSortIcon('semester')}
                                 </div>
                             </TableHead>
-                            <TableHead className="text-right font-bold text-xs pr-5">Amallar</TableHead>
+                            <TableHead className="text-right font-bold text-xs pr-5">{t('Amallar')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -575,7 +568,7 @@ export const CoursesPage = () => {
                                                     </span>
                                                 ))
                                             ) : (
-                                                <span className="text-xs text-muted-foreground italic">Guruh yo'q</span>
+                                                <span className="text-xs text-muted-foreground italic">{t("Guruh yo'q")}</span>
                                             )}
                                         </div>
                                     </TableCell>
@@ -629,7 +622,7 @@ export const CoursesPage = () => {
                                 metrics={[
                                     { label: 'Turi', value: courseTypeLabel(course.course_type) ?? '—' },
                                     { label: 'Semestr', value: course.semester_number ? `${course.semester_number}` : '—' },
-                                    { label: 'Guruh', value: `${(course.groups || []).length} ta` },
+                                    { label: t('Guruh'), value: `${(course.groups || []).length} ta` },
                                 ]}
                                 actions={renderActions(course)}
                                 onClick={() => navigate(`/courses/${course.id}`)}
@@ -668,10 +661,10 @@ export const CoursesPage = () => {
                     setCourseToDelete(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Kursni o'chirish"
+                title={t("Kursni o'chirish")}
                 description="Ushbu kursni o'chirishni tasdiqlaysizmi? Kursga tegishli darslar ham o'chirilishi mumkin."
-                confirmText="O'chirish"
-                cancelText="Bekor qilish"
+                confirmText={t("O'chirish")}
+                cancelText={t("Bekor qilish")}
             />
         </div>
     );

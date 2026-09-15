@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace } from 
 import { useState } from 'react';
 import { faceCheckService, type AbsencePeriod, type FaceCheckStudentSummary } from '@/services/faceCheckService';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { formatTime } from '@/utils/date';
 
 /** Davrdagi statuslardan sababni ko'rsatamiz: ular bir xil og'irlikda emas. */
 const REASON_LABEL: Record<string, string> = {
@@ -10,9 +11,6 @@ const REASON_LABEL: Record<string, string> = {
     multiple_faces: 'bir nechta odam',
     different_person: 'boshqa odam',
 };
-
-const formatClock = (iso: string) =>
-    new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
 
 const formatMinutes = (seconds: number) => {
     const total = Math.round(seconds / 60);
@@ -52,14 +50,14 @@ const Timeline = ({ student }: { student: FaceCheckStudentSummary }) => {
                                 // chiziqda umuman bilinmay ketardi.
                                 width: `${Math.max(1.5, Math.min(100, width))}%`,
                             }}
-                            title={`${formatClock(period.start)} — ${period.end ? formatClock(period.end) : 'oxirigacha'}`}
+                            title={`${formatTime(period.start)} — ${period.end ? formatTime(period.end) : 'oxirigacha'}`}
                         />
                     );
                 })}
             </div>
             <div className="flex justify-between text-[11px] text-muted-foreground">
-                <span>{student.first_check ? formatClock(student.first_check) : ''}</span>
-                <span>{student.last_check ? formatClock(student.last_check) : ''}</span>
+                <span>{student.first_check ? formatTime(student.first_check) : ''}</span>
+                <span>{student.last_check ? formatTime(student.last_check) : ''}</span>
             </div>
         </div>
     );
@@ -130,7 +128,7 @@ export const LessonFaceCheckReport = ({ lessonId }: { lessonId: number }) => {
                                         {student.periods.map((period, index) => (
                                             <li key={index} className="flex flex-wrap items-center gap-2 text-xs">
                                                 <span className="font-medium">
-                                                    {formatClock(period.start)} — {period.end ? formatClock(period.end) : 'oxirigacha'}
+                                                    {formatTime(period.start)} — {period.end ? formatTime(period.end) : 'oxirigacha'}
                                                 </span>
                                                 <span className="text-muted-foreground">
                                                     {formatMinutes(period.duration_seconds)} · {periodReasons(period)}
