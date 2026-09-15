@@ -34,7 +34,11 @@ export const ExternalSourceBadge = ({ row }: { row?: ExternalRefFields | null })
 
     return (
         <span
-            className="inline-flex items-center gap-1 rounded-full bg-[#242CBB]/10 px-2 py-0.5 text-xs text-[#242CBB]"
+            /* To'q fonda brend ko'ki (#242CBB) deyarli o'qilmaydi: matn ham,
+               10% li tagfon ham qorong'i kartaga (#273142) singib ketardi.
+               Shuning uchun qorong'i mavzuda ochroq indigo — sahifadagi
+               boshqa chiplar bilan bir xil qoida. */
+            className="inline-flex items-center gap-1 rounded-full bg-[#242CBB]/10 px-2 py-0.5 text-xs text-[#242CBB] dark:bg-indigo-400/15 dark:text-indigo-300"
             title={synced ? `Синхронизировано: ${synced}` : `Источник: ${label}`}
         >
             <Database className="h-3 w-3" />
@@ -49,7 +53,7 @@ export const InactiveBadge = ({ row }: { row?: ExternalRefFields | null }) => {
     if (row?.is_active !== false) return null;
     return (
         <span
-            className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+            className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
             title="Запись отсутствует во внешней системе. Не удалена — на ней могут висеть результаты."
         >
             неактивна

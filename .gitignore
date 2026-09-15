@@ -115,3 +115,10 @@ questions_images_2/
 # WASM va worklet fayllari. Ular `@zoom/meetingsdk` paketidan `npm run
 # sync-zoom-lib` orqali ko'chiriladi, shuning uchun repozitoriyda saqlanmaydi.
 frontend/public/lib/
+
+# ── Playwright e2e ────────────────────────────────────────────
+# Test yurishi natijalari va saqlangan auth sessiyasi (token!).
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/e2e/.auth/
