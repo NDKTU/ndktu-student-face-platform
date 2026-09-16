@@ -27,6 +27,7 @@ import { useQuizzes } from '@/hooks/useQuizzes';
 import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
 import { formatDate, formatDateTime } from '@/utils/date';
+import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ const ResultsPage = () => {
     // Кафедры не сужаем по выбранному факультету: общеобразовательные кафедры
     // (математика, физика) ведут тесты у студентов всех факультетов.
     const kafedraOptions = kafedrasData?.kafedras.map(k => ({ value: String(k.id), label: k.name })) || [];
-    const subjectOptions = subjectsData?.subjects.map(s => ({ value: String(s.id), label: s.name })) || [];
+    const subjectOptions = subjectsData?.subjects.map(subjectOption) || [];
     const quizOptions   = quizzesData?.quizzes.map(q => ({ value: String(q.id), label: q.title })) || [];
 
     const results    = resultsData?.results || [];
@@ -374,11 +375,17 @@ const ResultsPage = () => {
             headClassName: 'w-[100px]',
             cell: (result) => (
                 <div className="flex items-center gap-1">
+                    {/* Faqat ikona: nomsiz tugma skrinrider uchun «button» bo'lib
+                        qoladi, sichqonchasiz esa qaysi biri o'chirish ekanini
+                        bilib bo'lmaydi. `title` — sichqoncha uchun, `aria-label`
+                        — yordamchi texnologiya uchun. */}
                     <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         onClick={e => { e.stopPropagation(); handleViewAnswers(result); }}
+                        aria-label={t('Javoblarni ko\'rish')}
+                        title={t('Javoblarni ko\'rish')}
                     >
                         <Eye className="h-3.5 w-3.5" />
                     </Button>
@@ -388,6 +395,8 @@ const ResultsPage = () => {
                         className="h-7 w-7 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
                         onClick={e => handleDeleteClick(e, result.id)}
                         disabled={isDeleting}
+                        aria-label={t('Natijani o\'chirish')}
+                        title={t('Natijani o\'chirish')}
                     >
                         {isDeleting && resultToDelete === result.id
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

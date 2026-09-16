@@ -61,12 +61,9 @@ export function MethodList({
                         </button>
                         <button
                             onClick={() => onDeleteClick(method.id)}
-                            className={`rounded-lg p-1.5 transition-colors ${
-                                deletingId === method.id
-                                    ? 'bg-destructive text-destructive-foreground'
-                                    : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                            }`}
-                            title={deletingId === method.id ? 'Tasdiqlash uchun yana bosing' : "O'chirish"}
+                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            title="O'chirish"
+                            aria-label="Metodni o'chirish"
                         >
                             {isDeletePending && deletingId === method.id
                                 ? <Loader2 className="h-4 w-4 animate-spin" />

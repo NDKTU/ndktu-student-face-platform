@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,6 +13,7 @@ from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import TeacherGroup
+from app.modules.quiz.model import Quiz
 
 from .schemas import (
     LessonCreateRequest,
@@ -289,6 +290,8 @@ class LessonRepository:
         # topshirgan bo'lsa, baholar ham yo'qoladi — bu haqda oldindan
         # ogohlantiramiz va tasdiqni so'raymiz.
         if not force:
+            warnings: list[str] = []
+
             homework_count = (
                 await session.execute(select(func.count(Homework.id)).where(Homework.lesson_id == lesson_id))
             ).scalar() or 0
@@ -300,9 +303,31 @@ class LessonRepository:
                         .where(Homework.lesson_id == lesson_id)
                     )
                 ).scalar() or 0
-                warnings = [f"{homework_count} ta uy vazifasi o'chib ketadi"]
+                warnings.append(f"{homework_count} ta uy vazifasi o'chib ketadi")
                 if submission_count:
                     warnings.append(f"{submission_count} ta topshirilgan ish va ularning baholari o'chadi")
+
+            # Test boshqacha yo'l tutadi — o'chmaydi, faqat ajraladi va so'nadi.
+            # Buni ham aytish kerak: ogohlantirish faqat «o'chadi» deganlarni
+            # sanaganda, o'qituvchi testni ham yo'qoladi deb o'ylardi.
+            quiz_count = (
+                await session.execute(select(func.count(Quiz.id)).where(Quiz.lesson_id == lesson_id))
+            ).scalar() or 0
+            if quiz_count:
+                active_quiz_count = (
+                    await session.execute(
+                        select(func.count(Quiz.id)).where(Quiz.lesson_id == lesson_id, Quiz.is_active.is_(True))
+                    )
+                ).scalar() or 0
+                warnings.append(
+                    f"{quiz_count} ta test o'chmaydi, lekin darsdan uziladi — natijalar saqlanib qoladi"
+                )
+                if active_quiz_count:
+                    warnings.append(
+                        f"shundan {active_quiz_count} tasi faol: u o'chiriladi va eski PIN bilan ishlab bo'lmaydi"
+                    )
+
+            if warnings:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
@@ -311,6 +336,20 @@ class LessonRepository:
                         "warnings": warnings,
                     },
                 )
+
+        # Test dars bilan o'chmaydi: unga natijalar bog'langan, ular bilan
+        # birga baholar ham yo'qolardi (`quizzes.lesson_id` — ON DELETE SET
+        # NULL, `quiz/model.py` ga qarang). Lekin darsdan ajralgan test faol
+        # bo'lib qolsa, u «Faol testlar» ro'yxatida turaveradi va eski PIN
+        # bilan ishlanaveradi: o'qituvchi darsni o'chirib, mavzuni yopdim deb
+        # o'ylaydi, talabalar esa test topshirishda davom etadi. Shuning uchun
+        # ajralish payti test o'chirilmaydi, faqat faolligi so'ndiriladi —
+        # kerak bo'lsa, o'qituvchi uni ongli ravishda qayta yoqadi.
+        await session.execute(
+            update(Quiz)
+            .where(Quiz.lesson_id == lesson_id, Quiz.is_active.is_(True))
+            .values(is_active=False)
+        )
 
         await session.delete(lesson)
         await session.commit()

@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userService } from '@/services/userService';
-import { getToken, clearToken } from '@/services/tokenStorage';
+import { useAuth } from '@/context/AuthContext';
+import { getToken } from '@/services/tokenStorage';
 
 // 15 минут. Должно быть <= серверного session_idle_minutes (30 мин), чтобы клиент
 // выходил первым и мягко, до того как сервер инвалидирует скользящую сессию.
@@ -9,17 +9,18 @@ const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export function useIdleTimeout() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Функция для очистки сессии и редиректа
+  // Выход по бездействию проходит через общий logout() контекста: он отзывает
+  // сессию на сервере (с токеном, снятым до очистки хранилища) и сбрасывает
+  // user. Свой clearToken() здесь оставлял AuthContext.user заполненным —
+  // токена нет, а приложение считает человека залогиненным.
   const handleLogout = useCallback(() => {
-    // Best-effort серверный отзыв сессии, затем очистка токена и редирект.
-    userService.logout().catch(() => { /* токен всё равно очищаем ниже */ });
-    clearToken();
-
+    logout();
     // Перенаправляем на логин с параметром, чтобы показать красивое сообщение
     navigate('/login?idle=1');
-  }, [navigate]);
+  }, [logout, navigate]);
 
   // Сброс таймера при любой активности пользователя
   const resetTimer = useCallback(() => {

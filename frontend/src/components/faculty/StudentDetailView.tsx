@@ -13,6 +13,7 @@ import type { Result } from '@/services/resultService';
 import { OrganizationBreadcrumbs } from './OrganizationBreadcrumbs';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { formatDate } from '@/utils/date';
+import { formatGpa } from '@/utils/gpa';
 
 interface StudentDetailViewProps {
     faculty: Faculty;
@@ -186,8 +187,10 @@ export const StudentDetailView = ({
                         <InfoRow
                             label="O'rtacha ball (GPA)"
                             value={
-                                student.avg_gpa !== null && student.avg_gpa !== undefined ? (
-                                    <span className="font-mono font-bold text-primary">{student.avg_gpa}</span>
+                                // Nol — «ma'lumot yo'q» (HEMIS ro'yxat API si), shuning
+                                // uchun qator boshqa bo'sh maydonlar kabi yashiriladi.
+                                student.avg_gpa ? (
+                                    <span className="font-mono font-bold text-primary">{formatGpa(student.avg_gpa)}</span>
                                 ) : null
                             }
                         />

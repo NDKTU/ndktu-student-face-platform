@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { formatDate } from '@/utils/date';
+import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
 
 export const QuestionsPage = () => {
@@ -146,7 +147,7 @@ export const QuestionsPage = () => {
     };
 
     const subjectOptions = useMemo(() => {
-        const list = subjects.map((s) => ({ value: String(s.id), label: s.name }));
+        const list = subjects.map(subjectOption);
         return [{ value: 'all', label: t('Barcha fanlar') }, ...list];
     }, [subjects, t]);
 

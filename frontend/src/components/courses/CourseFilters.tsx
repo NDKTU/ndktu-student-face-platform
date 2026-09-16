@@ -7,6 +7,7 @@ import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { Teacher } from '@/services/teacherService';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
+import { subjectOption } from '@/utils/subject';
 
 interface CourseFiltersProps {
     subjects: Subject[];
@@ -52,7 +53,7 @@ export const CourseFilters = ({
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">Fan bo'yicha filtri</label>
                             <Combobox
-                                options={subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
+                                options={subjects.map(subjectOption)}
                                 value={filterSubjectId?.toString()}
                                 onChange={(val) => onSubjectChange(val ? parseInt(val) : undefined)}
                                 placeholder="Barcha fanlar"

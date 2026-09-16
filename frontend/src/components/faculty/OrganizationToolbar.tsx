@@ -3,6 +3,7 @@ import { FilterX, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 export interface FilterChipOption<T extends string = string> {
     value: T;
@@ -77,6 +78,7 @@ export const ClearFiltersButton: React.FC<{
     count?: number;
     className?: string;
 }> = ({ onClick, count = 0, className }) => {
+    const { t } = useTranslation();
     if (count <= 0) return null;
     return (
         <button
@@ -89,7 +91,7 @@ export const ClearFiltersButton: React.FC<{
             )}
         >
             <FilterX className="h-3.5 w-3.5" />
-            <span>Tozalash</span>
+            <span>{t('Tozalash')}</span>
             <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-bold text-primary">{count}</span>
         </button>
     );
@@ -115,9 +117,9 @@ interface OrganizationToolbarProps {
 export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
     search,
     onSearchChange,
-    searchPlaceholder = 'Qidirish...',
+    searchPlaceholder,
     totalCount,
-    totalLabel = 'Jami',
+    totalLabel,
     chips,
     extraFilters,
     actions,
@@ -125,6 +127,11 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
     onClearFilters,
     className,
 }) => {
+    const { t } = useTranslation();
+    // Sukut yozuvlari shu yerda tarjima qilinadi: `t()` ni props sukutida
+    // chaqirib bo'lmaydi, u komponent ichida yashaydi.
+    const placeholder = searchPlaceholder ?? t('Qidirish...');
+    const countLabel = totalLabel ?? t('Jami');
     // Telefonda filtrlar bitta tugma ortiga yig'iladi: `/results` da 7 ta filtr
     // butun birinchi ekranni egallab, ma'lumot ko'rinmay qolardi. `md` dan
     // yuqorida hech narsa o'zgarmaydi — filtrlar avvalgidek qatorda turadi.
@@ -152,7 +159,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                             autoComplete="off"
                             data-1p-ignore
                             data-lpignore="true"
-                            placeholder={searchPlaceholder}
+                            placeholder={placeholder}
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
                             className="pl-9 pr-8 bg-background border-border/80 md:h-9 md:text-sm"
@@ -162,7 +169,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                                 type="button"
                                 onClick={() => onSearchChange('')}
                                 className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                                aria-label="Qidiruvni tozalash"
+                                aria-label={t('Qidiruvni tozalash')}
                             >
                                 <X className="h-3.5 w-3.5" />
                             </button>
@@ -177,7 +184,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                             className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/80 bg-background px-3 text-sm font-semibold text-foreground md:hidden"
                         >
                             <SlidersHorizontal className="h-4 w-4" />
-                            <span>Filtrlar</span>
+                            <span>{t('Filtrlar')}</span>
                             {activeFilterCount > 0 && (
                                 <span className="rounded-full bg-primary/15 px-1.5 text-xs font-bold text-primary">
                                     {activeFilterCount}
@@ -197,7 +204,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                     {/* Total Count Badge */}
                     {totalCount !== undefined && (
                         <div className="hidden sm:flex items-center rounded-xl bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                            <span>{totalLabel}:</span>
+                            <span>{countLabel}:</span>
                             <span className="ml-1 text-foreground font-bold font-mono">{totalCount}</span>
                         </div>
                     )}
@@ -221,7 +228,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
             {/* Telefondagi filtrlar varag'i. `Modal` `md` dan pastda pastdan
                 chiqadigan bottom sheet bo'lib ochiladi (components/ui/Modal.tsx). */}
             {hasFilters && (
-                <Modal isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrlar">
+                <Modal isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} title={t('Filtrlar')}>
                     <div className="flex flex-col gap-5 [&>*]:w-full [&_[class*='w-[']]:w-full">
                         {extraFilters}
                         {chips && <div className="flex flex-col gap-3 border-t border-border/50 pt-4">{chips}</div>}
@@ -235,7 +242,7 @@ export const OrganizationToolbar: React.FC<OrganizationToolbarProps> = ({
                                 className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border/80 bg-background text-sm font-semibold text-foreground"
                             >
                                 <FilterX className="h-4 w-4" />
-                                Filtrlarni tozalash
+                                {t('Filtrlarni tozalash')}
                             </button>
                         )}
                     </div>

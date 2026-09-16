@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronRight, Building2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 export interface BreadcrumbItem {
     label: string;
@@ -27,6 +28,7 @@ export const OrganizationBreadcrumbs: React.FC<OrganizationBreadcrumbsProps> = (
     actions,
     className,
 }) => {
+    const { t } = useTranslation();
     const hasBack = Boolean(onBack);
     const lastItem = items[items.length - 1];
     const displayTitle = title || lastItem?.label;
@@ -49,7 +51,7 @@ export const OrganizationBreadcrumbs: React.FC<OrganizationBreadcrumbsProps> = (
                     )}
                 >
                     <Building2 className="h-3.5 w-3.5" />
-                    <span>{items[0]?.label || 'Tuzilma'}</span>
+                    <span>{items[0]?.label || t('Tuzilma')}</span>
                 </button>
 
                 {items.slice(1).map((item, index) => {
@@ -89,10 +91,10 @@ export const OrganizationBreadcrumbs: React.FC<OrganizationBreadcrumbsProps> = (
                             size="sm"
                             onClick={onBack}
                             className="h-9 gap-1.5 border-border/80 bg-card hover:bg-muted font-medium text-xs sm:text-sm"
-                            aria-label="Orqaga"
+                            aria-label={t('Orqaga')}
                         >
                             <ArrowLeft className="h-4 w-4" />
-                            <span>Orqaga</span>
+                            <span>{t('Orqaga')}</span>
                         </Button>
                     )}
                     <div>

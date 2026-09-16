@@ -16,8 +16,22 @@ let openCount = 0;
 
 export const isComboboxOpen = () => openCount > 0;
 
+export interface ComboboxOption {
+    value: string;
+    label: string;
+    /**
+     * Yozuv ostidagi mayda qator — bir xil nomli yozuvlarni ajratish uchun.
+     *
+     * Fanlar ro'yxatida bu o'quv reja nomi: EPMOS bitta fanni har bir reja
+     * uchun alohida beradi, ya'ni «Akademik yozuv» to'rtta bo'ladi va nomning
+     * o'zi bilan ular farq qilmaydi. Nomni uzaytirish o'rniga ikkinchi qator:
+     * tanlangan qiymat tugmada qisqa ko'rinib turadi.
+     */
+    hint?: string;
+}
+
 interface ComboboxProps {
-    options: { value: string; label: string }[];
+    options: ComboboxOption[];
     value?: string;
     onChange: (value: string) => void;
     onSearchChange?: (query: string) => void;
@@ -42,9 +56,15 @@ export function Combobox({
     const containerRef = React.useRef<HTMLDivElement>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
 
-    const filteredOptions = options.filter((option) =>
-        option.label.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Qidiruv ikkinchi qatorni ham qamrab oladi: reja nomi bo'yicha izlash —
+    // takrorlar orasidan keraklisini topishning eng tabiiy yo'li.
+    const filteredOptions = options.filter((option) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            option.label.toLowerCase().includes(query)
+            || (option.hint ?? '').toLowerCase().includes(query)
+        );
+    });
 
     const selectedLabel = value
         ? options.find((option) => option.value === value)?.label
@@ -128,7 +148,7 @@ export function Combobox({
             </button>
 
             {open && (
-                <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border/80 bg-popover/98 p-1 text-popover-foreground shadow-xl backdrop-blur-md outline-none animate-fade-scale">
+                <div className="absolute z-50 mt-1.5 w-full min-w-[min(22rem,85vw)] rounded-xl border border-border/80 bg-popover/98 p-1 text-popover-foreground shadow-xl backdrop-blur-md outline-none animate-fade-scale">
                     <div className="flex items-center border-b border-border/60 px-2.5 pb-1 pt-0.5">
                         <Search className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70" />
                         <input
@@ -154,13 +174,20 @@ export function Combobox({
                                     key={option.value}
                                     onClick={() => handleSelect(option.value)}
                                     className={cn(
-                                        "relative flex cursor-pointer select-none items-center justify-between rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors duration-150 hover:bg-primary/10 hover:text-primary md:py-1.5 md:text-xs",
+                                        "relative flex cursor-pointer select-none items-start justify-between gap-2 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors duration-150 hover:bg-primary/10 hover:text-primary md:py-1.5 md:text-xs",
                                         value === option.value && "bg-primary/10 text-primary font-semibold"
                                     )}
                                 >
-                                    <span className="truncate">{option.label}</span>
+                                    <span className="flex min-w-0 flex-col">
+                                        <span className="truncate">{option.label}</span>
+                                        {option.hint && (
+                                            <span className="line-clamp-2 break-words text-[11px] font-normal leading-tight text-muted-foreground">
+                                                {option.hint}
+                                            </span>
+                                        )}
+                                    </span>
                                     {value === option.value && (
-                                        <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                                     )}
                                 </div>
                             ))

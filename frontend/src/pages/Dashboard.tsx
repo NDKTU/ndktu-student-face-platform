@@ -60,9 +60,9 @@ const Dashboard: React.FC = () => {
 
     const getGreeting = () => {
         const h = new Date().getHours();
-        if (h < 12) return 'Xayrli tong';
-        if (h < 18) return 'Xayrli kun';
-        return 'Xayrli kech';
+        if (h < 12) return t('Xayrli tong');
+        if (h < 18) return t('Xayrli kun');
+        return t('Xayrli kech');
     };
 
     return (
@@ -75,12 +75,12 @@ const Dashboard: React.FC = () => {
 
             <div className="grid items-stretch gap-6 xl:grid-cols-[2fr_1fr]">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-6">
-                    <StatCard label="Talabalar" value={students?.total ?? 0} icon={UserCheck} isLoading={isStudentsLoading} color="orange" description="Universitet talabalari" />
-                    <StatCard label="O'qituvchilar" value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="blue" description={t("Barcha kafedralar")} />
-                    <StatCard label="Foydalanuvchilar" value={users?.total ?? 0} icon={Users} isLoading={isUsersLoading} color="purple" description={t("Jami akkauntlar")} />
-                    <StatCard label="Testlar" value={quizzes?.total ?? 0} icon={BookOpen} isLoading={isQuizzesLoading} color="teal" description={t("Jami yaratilgan testlar")} />
-                    <StatCard label="Fanlar" value={subjects?.total ?? 0} icon={Book} isLoading={isSubjectsLoading} color="green" description="Fanlar katalogi" />
-                    <StatCard label="Savollar banki" value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="cyan" description={t("Jami savollar")} />
+                    <StatCard label={t("Talabalar")} value={students?.total ?? 0} icon={UserCheck} isLoading={isStudentsLoading} color="orange" description={t("Universitet talabalari")} />
+                    <StatCard label={t("O'qituvchilar")} value={teachers?.total ?? 0} icon={GraduationCap} isLoading={isTeachersLoading} color="blue" description={t("Barcha kafedralar")} />
+                    <StatCard label={t("Foydalanuvchilar")} value={users?.total ?? 0} icon={Users} isLoading={isUsersLoading} color="purple" description={t("Jami akkauntlar")} />
+                    <StatCard label={t("Testlar")} value={quizzes?.total ?? 0} icon={BookOpen} isLoading={isQuizzesLoading} color="teal" description={t("Jami yaratilgan testlar")} />
+                    <StatCard label={t("Fanlar")} value={subjects?.total ?? 0} icon={Book} isLoading={isSubjectsLoading} color="green" description={t("Fanlar katalogi")} />
+                    <StatCard label={t("Savollar banki")} value={questions?.total ?? 0} icon={FileQuestion} isLoading={isQuestionsLoading} color="cyan" description={t("Jami savollar")} />
                 </div>
                 <section className="rounded-lg bg-card shadow-[var(--surface-shadow)]">
                     <h2 className="border-b border-border px-5 py-4 text-lg font-semibold">{t('Test natijalari')}</h2>
@@ -92,7 +92,7 @@ const Dashboard: React.FC = () => {
                             <p className="text-4xl font-semibold tabular-nums">{(results?.total ?? 0).toLocaleString('uz-UZ')}</p>}
                         <p className="mt-2 text-sm text-muted-foreground">{t('Jami topshirilgan testlar')}</p>
                         <Link to="/results" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-primary/20">
-                            Natijalarni ko'rish <ArrowUpRight className="h-4 w-4" />
+                            {t("Natijalarni ko'rish")} <ArrowUpRight className="h-4 w-4" />
                         </Link>
                     </div>
                 </section>
@@ -100,18 +100,18 @@ const Dashboard: React.FC = () => {
 
             {/* Масштаб платформы одним взглядом */}
             <div className="rounded-lg bg-card shadow-[var(--surface-shadow)]">
-                <h2 className="border-b border-border px-5 py-4 text-lg font-semibold text-foreground">Platforma ko'lami</h2>
+                <h2 className="border-b border-border px-5 py-4 text-lg font-semibold text-foreground">{t("Platforma ko'lami")}</h2>
                 <div className="h-72 w-full overflow-x-auto px-2 py-5 sm:px-5">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                             data={[
-                                { name: 'Talabalar', value: students?.total ?? 0 },
-                                { name: "O'qituvchilar", value: teachers?.total ?? 0 },
-                                { name: 'Foydalanuvchilar', value: users?.total ?? 0 },
-                                { name: 'Fanlar', value: subjects?.total ?? 0 },
-                                { name: 'Savollar', value: questions?.total ?? 0 },
-                                { name: 'Testlar', value: quizzes?.total ?? 0 },
-                                { name: 'Natijalar', value: results?.total ?? 0 },
+                                { name: t('Talabalar'), value: students?.total ?? 0 },
+                                { name: t("O'qituvchilar"), value: teachers?.total ?? 0 },
+                                { name: t('Foydalanuvchilar'), value: users?.total ?? 0 },
+                                { name: t('Fanlar'), value: subjects?.total ?? 0 },
+                                { name: t('Savollar'), value: questions?.total ?? 0 },
+                                { name: t('Testlar'), value: quizzes?.total ?? 0 },
+                                { name: t('Natijalar'), value: results?.total ?? 0 },
                             ]}
                             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
                         >
@@ -155,7 +155,7 @@ const Dashboard: React.FC = () => {
 
             {/* Quick links */}
             <div>
-                <h2 className="mb-4 text-lg font-semibold text-foreground">Tezkor o'tish</h2>
+                <h2 className="mb-4 text-lg font-semibold text-foreground">{t("Tezkor o'tish")}</h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {quickLinks(t).map(({ to, label, description, icon: Icon }) => (
                         <Link

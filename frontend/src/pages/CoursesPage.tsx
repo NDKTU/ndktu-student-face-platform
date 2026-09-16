@@ -37,6 +37,7 @@ import { SEMESTER_OPTIONS } from '@/utils/semester';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
+import { subjectOption } from '@/utils/subject';
 
 type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -164,7 +165,7 @@ export const CoursesPage = () => {
     const allTeachers = allTeachersData?.teachers || [];
 
     const subjectOptions = useMemo(() => {
-        const list = allSubjects.map((s) => ({ value: String(s.id), label: s.name }));
+        const list = allSubjects.map(subjectOption);
         return [{ value: 'all', label: t('Barcha fanlar') }, ...withSelected(list, selectedSubjectOption)];
     }, [allSubjects, selectedSubjectOption, t]);
 

@@ -34,9 +34,21 @@ class TeacherGroupLinkInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeacherSubjectCurriculumInfo(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TeacherSubjectInfo(BaseModel):
     id: int
     name: str
+    #: O'quv reja va semestr — bir xil nomli fanlarni ajratish uchun. EPMOS
+    #: bitta fanni har bir reja uchun alohida yozuv qilib beradi, shuning
+    #: uchun test va kurs oynalaridagi ro'yxatda faqat nomning o'zi yetmaydi.
+    curriculum: Optional[TeacherSubjectCurriculumInfo] = None
+    semester: Optional[str] = None
+    external_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

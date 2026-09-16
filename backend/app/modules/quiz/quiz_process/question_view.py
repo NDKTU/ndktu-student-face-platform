@@ -12,7 +12,7 @@ import unicodedata
 from app.core.enums import QuestionType
 from app.modules.quiz.model import Question
 
-from .option_order import option_order, order_for
+from .option_order import LETTERS, order_for
 from .schemas import QuestionDTO
 
 # Ko'rsatiladigan matn: talaba «To'g'ri»/«Noto'g'ri» ni ko'radi, bazada esa
@@ -134,12 +134,16 @@ def grade_answer(
         # tizimini o'zgartirishni talab qiladi.
         return chosen_indexes == correct_indexes, chosen_text, correct_text
 
-    # Klassik savol: harflar tartibi eski mantiq bilan bir xil.
-    letters = option_order(result_id, question.id)
-    chosen_letter = letters[positions[0]]
-    is_correct = chosen_letter == question.correct_option
+    # Klassik savol — MULTI_SELECT bilan bir xil yo'l: ko'rsatilgan o'rin
+    # `order` orqali asl indeksga o'giriladi. Ilgari bu yerda alohida
+    # `option_order()` ishlatilardi; uning zerno satri boshqacha edi, shuning
+    # uchun tekshirish ko'rsatishdan boshqa tartibni olardi va talabaning
+    # javobi qo'shni variantga yozilardi.
+    correct_letter = (question.correct_option or LETTERS[0]).strip().lower()
+    correct_index = LETTERS.index(correct_letter) if correct_letter in LETTERS else 0
+    chosen_index = order[positions[0]]
     return (
-        is_correct,
-        getattr(question, f"option_{chosen_letter}"),
-        getattr(question, f"option_{question.correct_option}"),
+        chosen_index == correct_index,
+        options[chosen_index],
+        options[correct_index],
     )

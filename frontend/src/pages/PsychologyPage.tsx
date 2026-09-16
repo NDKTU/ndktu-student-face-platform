@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCreateMethod, useDeleteMethod, useMethods, useUpdateMethod } from '@/hooks/usePsychology';
 import { MethodBuilderModal } from '@/components/psychology/MethodBuilderModal';
 import { MethodList } from '@/components/psychology/MethodList';
@@ -47,18 +48,25 @@ export default function PsychologyPage() {
             onError: () => toast.error('Metodni saqlashda xatolik yuz berdi'),
         });
     };
-    const handleDeleteClick = (id: number) => {
-        if (deletingId === id) {
-            deleteMethod.mutate(id, {
-                onSuccess: () => {
-                    setDeletingId(null);
-                    toast.success("Metod o'chirildi");
-                },
-                onError: () => toast.error("Metodni o'chirishda xatolik yuz berdi"),
-            });
-        } else {
-            setDeletingId(id);
-        }
+    // Tasdiqlash — modal oyna orqali, tizimning qolgan qismidagi kabi. Ilgari
+    // bu yerda «ikkinchi marta bosing» edi: bir sahifada ikki xil qoida
+    // bo'lsa, odam qaysi biri qayerda ishlashini eslab qolmaydi. Metod bilan
+    // birga uning savollari va topshirilgan natijalari ham ketadi, ya'ni narx
+    // yuqori.
+    const handleDeleteClick = (id: number) => setDeletingId(id);
+
+    const confirmDelete = () => {
+        if (deletingId === null) return;
+        deleteMethod.mutate(deletingId, {
+            onSuccess: () => {
+                setDeletingId(null);
+                toast.success("Metod o'chirildi");
+            },
+            onError: () => {
+                setDeletingId(null);
+                toast.error("Metodni o'chirishda xatolik yuz berdi");
+            },
+        });
     };
 
     // Sync activeMethod with fresh data
@@ -156,6 +164,17 @@ export default function PsychologyPage() {
                     onClose={() => setActiveMethod(null)}
                 />
             )}
+
+            <ConfirmDialog
+                isOpen={deletingId !== null}
+                onClose={() => setDeletingId(null)}
+                onConfirm={confirmDelete}
+                title="Metodni o'chirish"
+                description={`«${data?.methods.find((m) => m.id === deletingId)?.name ?? ''}» metodi, uning savollari va topshirilgan natijalari o'chiriladi. Bu amalni bekor qilib bo'lmaydi.`}
+                confirmText="O'chirish"
+                cancelText="Bekor qilish"
+                isLoading={deleteMethod.isPending}
+            />
         </div>
     );
 }

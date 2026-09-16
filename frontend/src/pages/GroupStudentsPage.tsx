@@ -11,7 +11,10 @@ import { useGroup, useGroupStudents } from '@/hooks/useGroups';
 import { useAttendanceStats } from '@/hooks/useAttendance';
 import { usePermission } from '@/components/auth/PermissionGate';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { hemisOrdinal } from '@/utils/education';
+import { formatGpa } from '@/utils/gpa';
 
 const percentColor = (percent: number | null | undefined) => {
     if (percent == null) return 'text-muted-foreground';
@@ -26,6 +29,7 @@ const percentColor = (percent: number | null | undefined) => {
  * ro'yxati (`/students`) huquqi borlar uchun o'z joyida qoladi.
  */
 const GroupStudentsPage = () => {
+    const { t } = useTranslation();
     const { groupId } = useParams<{ groupId: string }>();
     const navigate = useNavigate();
     const id = Number(groupId);
@@ -44,6 +48,28 @@ const GroupStudentsPage = () => {
     const students = data?.students ?? [];
     const total = data?.total ?? 0;
 
+    // Bo'sh ro'yxatning sababi. Ilgari bu yerda hamma holat uchun bitta
+    // «talaba yo'q» turardi, holbuki ro'yxatdagi ustun EPOS'ning nol bo'lmagan
+    // sonini ko'rsatib turardi: odam 34 ni bosib, bo'sh sahifaga tushar va
+    // nima buzilganini bilmasdi. Ikki sabab butunlay boshqacha hal qilinadi,
+    // shuning uchun ular ajratib aytiladi.
+    const eposCount = group?.student_count ?? 0;
+    const hasHemisLink = Boolean(group?.hemis_group_id);
+    const emptyReason = !hasHemisLink && eposCount > 0
+        ? t(
+              "Guruh talabalar HEMIS'i bilan bog'lanmagan (EPOS'da hemis_id yo'q), shuning uchun talabalar "
+                  + 'import qilinmaydi. EPOS bu yerda {{n}} ta talaba deb hisoblaydi. Buni EPOS tomonida '
+                  + "to'g'rilash kerak — undan keyin oddiy sinxronizatsiya yetadi.",
+              { n: eposCount },
+          )
+        : eposCount > 0
+          ? t(
+                'HEMIS bu guruh uchun faol talaba qaytarmadi. EPOS {{n}} ta deb hisoblaydi — bu son '
+                    + "eskirgan bo'lishi mumkin (bitiruv, chetlatish).",
+                { n: eposCount },
+            )
+          : t("Bu guruhda hozircha talaba yo'q.");
+
     // Foiz — guruhning barcha darslari bo'yicha (kurs bilan cheklanmagan).
     const canReadAttendance = usePermission('read:attendance');
     const { data: attendance } = useAttendanceStats(
@@ -55,33 +81,40 @@ const GroupStudentsPage = () => {
         [attendance]
     );
 
+    // HEMIS «1-kurs» / «1-semestr» deb yozadi; ruscha interfeysda bu yozuvlar
+    // tarjima qilinadi, tanimagan shakl o'z holicha qoladi.
+    const ordinalLabel = (value?: string | null) => {
+        const parsed = hemisOrdinal(value);
+        return parsed ? t(parsed.key, { n: parsed.n }) : value || '—';
+    };
+
     return (
         <div className="space-y-5">
             <OrganizationBreadcrumbs
                 items={[
-                    { label: 'Guruhlar', onClick: () => navigate('/groups') },
-                    { label: group?.name || `Guruh #${id}` },
+                    { label: t('Guruhlar'), onClick: () => navigate('/groups') },
+                    { label: group?.name || t('Guruh #{{id}}', { id }) },
                 ]}
-                title={group?.name || `Guruh #${id}`}
-                description="Guruhga biriktirilgan talabalar ro'yxati"
+                title={group?.name || t('Guruh #{{id}}', { id })}
+                description={t("Guruhga biriktirilgan talabalar ro'yxati")}
             />
 
             <div className="flex flex-wrap items-center gap-3">
                 <Button variant="ghost" size="sm" onClick={() => navigate('/groups')}>
                     <ArrowLeft className="h-4 w-4 mr-1.5" />
-                    Orqaga
+                    {t('Orqaga')}
                 </Button>
                 <div className="w-full sm:w-[300px]">
                     <Input
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="F.I.SH yoki talaba ID bo'yicha..."
+                        placeholder={t("F.I.SH yoki talaba ID bo'yicha...")}
                         leftAddon={<Search className="h-4 w-4" />}
                     />
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                     <Users className="h-3.5 w-3.5" />
-                    {total} ta talaba
+                    {t('{{n}} ta talaba', { n: total })}
                 </span>
             </div>
 
@@ -97,12 +130,8 @@ const GroupStudentsPage = () => {
                 <div className="rounded-2xl border border-border bg-card p-8">
                     <TableEmpty
                         colSpan={1}
-                        title="Talaba topilmadi"
-                        description={
-                            debouncedSearch
-                                ? "Qidiruvga mos talaba yo'q."
-                                : "Bu guruhda hozircha talaba yo'q."
-                        }
+                        title={t('Talaba topilmadi')}
+                        description={debouncedSearch ? t("Qidiruvga mos talaba yo'q.") : emptyReason}
                     />
                 </div>
             ) : (
@@ -110,11 +139,11 @@ const GroupStudentsPage = () => {
                     <TableHeader className="bg-muted/40">
                         <TableRow className="border-b border-border/80">
                             <TableHead className="w-[50px] text-center font-bold font-mono text-xs">#</TableHead>
-                            <TableHead className="font-bold text-xs">Talaba F.I.SH</TableHead>
-                            <TableHead className="font-bold text-xs hidden md:table-cell">Talaba ID</TableHead>
-                            <TableHead className="font-bold text-xs hidden lg:table-cell">Kurs / semestr</TableHead>
+                            <TableHead className="font-bold text-xs">{t('Talaba F.I.SH')}</TableHead>
+                            <TableHead className="font-bold text-xs hidden md:table-cell">{t('Talaba ID')}</TableHead>
+                            <TableHead className="font-bold text-xs hidden lg:table-cell">{t('Kurs / semestr')}</TableHead>
                             {canReadAttendance && (
-                                <TableHead className="text-right font-bold text-xs">Davomat</TableHead>
+                                <TableHead className="text-right font-bold text-xs">{t('Davomat')}</TableHead>
                             )}
                             <TableHead className="text-right font-bold text-xs pr-5 hidden lg:table-cell">GPA</TableHead>
                         </TableRow>
@@ -150,7 +179,7 @@ const GroupStudentsPage = () => {
                                 </TableCell>
                                 <TableCell className="hidden lg:table-cell">
                                     <span className="text-xs text-muted-foreground">
-                                        {student.level || '—'} / {student.semester || '—'}
+                                        {ordinalLabel(student.level)} / {ordinalLabel(student.semester)}
                                     </span>
                                 </TableCell>
                                 {canReadAttendance && (
@@ -169,7 +198,7 @@ const GroupStudentsPage = () => {
                                 )}
                                 <TableCell className="text-right pr-5 hidden lg:table-cell">
                                     <span className="font-mono text-xs font-semibold">
-                                        {student.avg_gpa != null ? student.avg_gpa.toFixed(1) : '—'}
+                                        {formatGpa(student.avg_gpa)}
                                     </span>
                                 </TableCell>
                             </TableRow>

@@ -32,9 +32,11 @@ SYNC_ORDER: tuple[EduPlanEntity, ...] = (
     EduPlanEntity.kafedra,
     EduPlanEntity.speciality,
     EduPlanEntity.group,
+    # Reja fandan oldin: fan unga bog'lanadi (`subjects.curriculum_id`), va
+    # to'liq progonda reja allaqachon ko'zguda bo'lishi kerak.
+    EduPlanEntity.curriculum,
     EduPlanEntity.subject,
     EduPlanEntity.teacher,
-    EduPlanEntity.curriculum,
 )
 
 #: От чего зависит каждая сущность. Пользователь запускает любую
@@ -50,7 +52,15 @@ ENTITY_DEPENDENCIES: dict[EduPlanEntity, tuple[EduPlanEntity, ...]] = {
     EduPlanEntity.kafedra: (EduPlanEntity.faculty,),
     EduPlanEntity.speciality: (EduPlanEntity.kafedra,),
     EduPlanEntity.group: (EduPlanEntity.speciality,),
-    EduPlanEntity.subject: (EduPlanEntity.kafedra,),
+    # Reja bu yerda «ota» sifatida turadi, chunki `_with_dependencies` aynan
+    # shu ro'yxat bo'yicha ko'zgudan `external_id -> id` xaritasini yig'adi —
+    # usiz fan rejaga bog'lanmay qolardi (o'lchandi: 2958 satr yangilandi,
+    # `curriculum_id` esa bittasida ham to'lmadi). Bog'liqliklar sinxronlanmaydi,
+    # faqat o'qiladi, ya'ni fan progoni EPMOS'dan rejalarni tortmaydi.
+    #
+    # Bog'lanishning o'zi yumshoq: reja topilmasa, fan baribir saqlanadi
+    # (`upsert_subject` ma'lum qiymatni o'chirmaydi).
+    EduPlanEntity.subject: (EduPlanEntity.kafedra, EduPlanEntity.curriculum),
     EduPlanEntity.teacher: (EduPlanEntity.kafedra,),
     EduPlanEntity.curriculum: (EduPlanEntity.speciality,),
 }
@@ -100,6 +110,11 @@ class EduPlanSubject(_Lenient):
     id: int
     name: str
     department_id: int
+    #: Fan qaysi o'quv rejadan. EPMOS bir fanni har bir reja uchun alohida
+    #: yozuv qilib beradi, ya'ni aynan shu maydon bir xil nomli yozuvlarni
+    #: ajratadi. Ilgari `extra="ignore"` uni jimgina tashlab yuborardi.
+    edu_plan_id: Optional[int] = None
+    semester: Optional[str] = None
 
 
 class EduPlanCurriculum(_Lenient):

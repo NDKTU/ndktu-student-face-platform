@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Any, List, Literal, Optional
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import TashkentDatetime
+from app.core.utils.safe_url import normalize_optional_url
 
 STATUS_VALUES = Literal["draft", "published", "archived"]
 AUDIENCE_VALUES = Literal["all", "faculty", "group", "level"]
@@ -18,36 +18,10 @@ def _normalize_link(value: Optional[str]) -> Optional[str]:
     yo'l deb bilib, talabani SPA ichidagi mavjud bo'lmagan sahifaga olib
     ketardi.
 
-    Sxemasiz kiritilgan manzil (`epmos.nsumt.uz/...`) rad etilmaydi, balki
-    `https://` bilan to'ldiriladi: odamlar havolani shunday ko'chirib
-    qo'yishadi va buni xato deb qaytarish bekorga to'siq bo'lardi.
-
-    Faqat `http`/`https` qoladi. `javascript:` va `data:` ataylab rad etiladi —
-    e'lon matnini istalgan o'qituvchi yozadi, havola esa boshqa talabalarning
-    brauzerida ochiladi.
+    Qoidaning o'zi `core/utils/safe_url.py` da: dars materiali havolasi ham
+    aynan shu tekshiruvdan o'tadi, ikkita nusxa esa vaqt o'tib ajralib ketardi.
     """
-    if value is None:
-        return None
-
-    raw = value.strip()
-    if not raw:
-        return None
-
-    parts = urlsplit(raw)
-    if not parts.scheme:
-        # `//nsumt.uz/x` — sxemasiz nusxa ko'chirishning odatiy shakli:
-        # ikkinchi marta qo'shsak, `https:////nsumt.uz` bo'lib ketardi.
-        raw = f"https:{raw}" if raw.startswith("//") else f"https://{raw}"
-        parts = urlsplit(raw)
-
-    if parts.scheme not in ("http", "https"):
-        raise ValueError("Havola http:// yoki https:// bilan boshlanishi kerak")
-    # `urlsplit` hostni tekshirmaydi: `https://` ham bo'sh host bilan o'tib
-    # ketardi. Nuqta talab qilinadi — domensiz manzil havola emas.
-    if not parts.hostname or "." not in parts.hostname:
-        raise ValueError("Havolada to'g'ri domen ko'rsatilmagan")
-
-    return raw
+    return normalize_optional_url(value)
 
 
 class AnnouncementAuthorInfo(BaseModel):

@@ -3,9 +3,19 @@ import api from './api';
 export interface Subject {
     id: number;
     name: string;
+    /**
+     * O'quv reja — bir xil nomli fanlarni aynan shu ajratadi: EPMOS bitta
+     * fanni har bir reja uchun alohida yozuv qilib beradi. Qo'lda kiritilgan
+     * fanlarda bo'sh.
+     */
+    curriculum_id?: number | null;
+    curriculum?: { id: number; name: string } | null;
+    /** «kuzgi» / «bahorgi» — bitta reja ichidagi takrorlarni ajratadi. */
+    semester?: string | null;
     created_at: string;
     updated_at: string;
     // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
+    external_id?: string | null;
     external_source?: string | null;
     synced_at?: string | null;
     is_active?: boolean;

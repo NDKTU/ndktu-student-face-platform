@@ -178,10 +178,19 @@ class EduPlanRepository:
         name: str,
         kafedra_id: int | None,
         existing: Subject | None,
+        curriculum_id: int | None = None,
+        semester: str | None = None,
     ) -> Subject:
         row = existing or Subject(name=name)
         row.name = name
         row.kafedra_id = kafedra_id
+        # Reja topilmagan bo'lsa, ma'lum bog'lanishni o'chirmaymiz: keyingi
+        # progonda reja paydo bo'lishi mumkin, oradagi bo'sh qiymat esa
+        # ro'yxatdagi farqni yo'qotardi.
+        if curriculum_id is not None:
+            row.curriculum_id = curriculum_id
+        if semester:
+            row.semester = semester
         self._stamp(row, external_id)
         session.add(row)
         await session.flush()

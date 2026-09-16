@@ -36,7 +36,9 @@ async def test_quiz_title_is_generated_from_selection(auth_client, test_subject,
     )
 
     assert response.status_code == 201
-    assert response.json()["title"] == f"{test_subject.name} — {test_group['name']} — {_today()} (1-semestr)"
+    # Semestr nomi 2026-09-10 da o'zgardi: universitetda ular «1/2» emas,
+    # «kuzgi» va «bahorgi» deb ataladi (`core/enums.py::semester_label`).
+    assert response.json()["title"] == f"{test_subject.name} — {test_group['name']} — {_today()} (kuzgi semestr)"
 
 
 @pytest.mark.asyncio

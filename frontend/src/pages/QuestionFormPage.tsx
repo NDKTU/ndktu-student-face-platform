@@ -20,6 +20,7 @@ import { useLesson } from '@/hooks/useLessons';
 import { Combobox } from '@/components/ui/Combobox';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
+import { subjectOption } from '@/utils/subject';
 
 // Variantlar faqat klassik savolda majburiy: boshqa turlarda ular umuman
 // boshqa shaklda (`payload`) saqlanadi.
@@ -88,7 +89,7 @@ const QuestionFormPage = () => {
     const subjectOptions = useMemo(
         () =>
             withSelected(
-                subjects.map((s) => ({ value: String(s.id), label: s.name })),
+                subjects.map(subjectOption),
                 selectedSubjectOption,
             ),
         [subjects, selectedSubjectOption],

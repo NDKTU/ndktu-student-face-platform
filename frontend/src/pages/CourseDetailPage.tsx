@@ -29,6 +29,7 @@ import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { CourseFileLibrary } from '@/components/courses/CourseFileLibrary';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
+import { isYoutubeUrl } from '@/utils/youtube';
 import { courseTypeLabel } from '@/services/courseTypes';
 
 export default function CourseDetailPage() {
@@ -140,7 +141,7 @@ export default function CourseDetailPage() {
 
     const renderLesson = (lesson: Lesson, index: number) => {
         const video = lesson.resources?.find((resource) => resource.resource_type === 'video');
-        const isYoutube = Boolean(video?.link_url && /youtu(?:\.be|be\.com)/i.test(video.link_url));
+        const isYoutube = isYoutubeUrl(video?.link_url);
         return (
             // Qator <button> emas: ichida tahrirlash/o'chirish tugmalari bor,
             // ichma-ich <button> esa yaroqsiz HTML.
@@ -321,7 +322,7 @@ export default function CourseDetailPage() {
                 description={
                     lessonCascadeWarnings.length > 0
                         ? `${lessonCascadeWarnings.join('; ')}. Baribir o'chirilsinmi?`
-                        : `"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar va uy vazifasi ham yo'qoladi.`
+                        : `"${deletingLesson?.topic ?? ''}" darsi o'chiriladi. Unga biriktirilgan resurslar va uy vazifasi ham yo'qoladi. Testlar o'chmaydi — ular darsdan uziladi va faolligi so'ndiriladi, natijalar saqlanib qoladi.`
                 }
                 confirmText={lessonCascadeWarnings.length > 0 ? "Ha, o'chirilsin" : "O'chirish"}
                 cancelText="Bekor qilish"

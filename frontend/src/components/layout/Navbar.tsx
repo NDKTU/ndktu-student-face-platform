@@ -47,6 +47,12 @@ const PATH_LABELS: Record<string, string> = {
     '/homework':            'Uy vazifalari',
     '/results':             'Natijalar',
     '/results/answers':     'Javoblar tahlili',
+    // Nomlar `constants/resources.ts` dagi menyu yozuvlari bilan bir xil:
+    // bo'lim menyuda bir nom, sarlavhada boshqasi bo'lsa, odam adashadi.
+    '/files':                 'Fayl kutubxonasi',
+    '/teacher-assignments':   "Oʻquv yuklamasi",
+    '/announcements':         "E'lonlar",
+    '/announcements/student': "E'lonlar",
 };
 
 /* Dinamik yo'llar */

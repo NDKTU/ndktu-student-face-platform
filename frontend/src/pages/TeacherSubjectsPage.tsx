@@ -15,9 +15,16 @@ const TeacherSubjectsPage = () => {
 
     const userId = user?.id;
 
-    const { data, isLoading, isError, refetch } = useTeacherAssignedSubjects(userId);
+    const { data, isLoading, isError, error, refetch } = useTeacherAssignedSubjects(userId);
 
     const subjects = data?.subject_teachers.map((st) => st.subject) || [];
+
+    // 404 bu yerda nosozlik emas: hisobda `teacher` yozuvi yo'q (masalan,
+    // admin yoki HEMIS'dan hali kelmagan xodim). Ilgari u ham umumiy xato
+    // ekraniga tushardi va odamga «internetni tekshiring» deb yozardi —
+    // ya'ni mavjud bo'lmagan nosozlikni qidirishga yuborardi.
+    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+    const hasNoTeacherRecord = isError && status === 404;
 
     return (
         <div className="space-y-6">
@@ -32,6 +39,16 @@ const TeacherSubjectsPage = () => {
                         <Skeleton key={i} className="h-40 w-full rounded-xl" />
                     ))}
                 </div>
+            ) : hasNoTeacherRecord ? (
+                <Card className="border-dashed">
+                    <CardContent className="pt-6">
+                        <EmptyState
+                            icon={<BookOpen className="h-6 w-6" />}
+                            title="Bu sahifa o'qituvchilar uchun"
+                            description="Sizning hisobingiz o'qituvchi sifatida ro'yxatdan o'tmagan, shuning uchun biriktirilgan fanlar yo'q. Agar siz o'qituvchi bo'lsangiz, admin bilan bog'laning."
+                        />
+                    </CardContent>
+                </Card>
             ) : isError ? (
                 <Card>
                     <CardContent className="pt-6">

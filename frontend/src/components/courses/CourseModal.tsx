@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Combobox } from '@/components/ui/Combobox';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useCreateCourse, useUpdateCourse } from '@/hooks/useCourses';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
@@ -15,6 +15,7 @@ import { buildCourseName } from '@/utils/generatedNames';
 import { courseSchema, type CourseFormValues } from '@/schemas/course';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
 import { COURSE_TYPE_OPTIONS } from '@/services/courseTypes';
+import { subjectHint } from '@/utils/subject';
 
 interface CourseModalProps {
     isOpen: boolean;
@@ -79,11 +80,16 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     // (eski kurs, biriktiruvi keyin olib tashlangan) — ularni qo'shib qo'yamiz,
     // aks holda saqlashda jimgina yo'qolardi.
     const subjectOptions = useMemo(() => {
-        const options = (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
+        // Ikkinchi qator — o'quv reja: bir xil nomli fanlar boshqacha ajralmaydi.
+        const options: ComboboxOption[] = (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
             value: st.subject_id.toString(),
             label: st.subject.name,
+            hint: subjectHint(st.subject) || undefined,
         }));
         if (course?.subject && !options.some(o => o.value === course.subject_id.toString())) {
+            // Kursning joriy fani javobda faqat id va nom bilan keladi —
+            // reja yo'q, ya'ni izoh ham yo'q. Bu yagona qator, tanlangani
+            // esa tugmada ko'rinib turadi.
             options.push({ value: course.subject_id.toString(), label: course.subject.name });
         }
         return options;

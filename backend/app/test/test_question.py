@@ -169,6 +169,10 @@ async def test_question_type_persists_on_create(auth_client, test_subject):
         "option_c": "C",
         "option_d": "D",
         "question_type": "TRUE_FALSE",
+        # `QUIZ` dan boshqa turlarda javob `payload` da turadi va u majburiy
+        # (`question/schemas.py::check_type_shape`). Test 2026-08-28 dagi
+        # o'zgarishdan keyin yangilanmagan edi va 422 olardi.
+        "payload": {"correct": True},
     }
     create_resp = await auth_client.post("/question/", json=payload)
     assert create_resp.status_code == 201
@@ -197,6 +201,10 @@ async def test_question_type_persists_through_versioning_update(auth_client, tes
         "option_c": "C",
         "option_d": "D",
         "question_type": "TRUE_FALSE",
+        # `QUIZ` dan boshqa turlarda javob `payload` da turadi va u majburiy
+        # (`question/schemas.py::check_type_shape`). Test 2026-08-28 dagi
+        # o'zgarishdan keyin yangilanmagan edi va 422 olardi.
+        "payload": {"correct": True},
     }
     create_resp = await auth_client.post("/question/", json=payload)
     assert create_resp.json()["question_type"] == "TRUE_FALSE"

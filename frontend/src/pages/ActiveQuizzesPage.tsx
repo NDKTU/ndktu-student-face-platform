@@ -15,6 +15,7 @@ import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
+import { subjectOption } from '@/utils/subject';
 
 const ActiveQuizzesPage = () => {
     const { hasPermission } = useAuth();
@@ -80,7 +81,7 @@ const ActiveQuizzesPage = () => {
           }
         : null;
     const subjectOptions = withSelected(
-        (subjectOptionsData?.subjects || []).map((s) => ({ value: String(s.id), label: s.name })),
+        (subjectOptionsData?.subjects || []).map(subjectOption),
         selectedSubjectOption,
     );
     const allGroups = allGroupsData?.groups || [];

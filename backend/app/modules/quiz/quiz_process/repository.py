@@ -13,8 +13,8 @@ from app.core.security import create_face_ws_token
 from app.modules.auth.model import Student, User
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
+from . import errors
 from .attempt import grade_for, is_expired, remaining_seconds
-from .option_order import letter_at, option_order
 from .question_view import grade_answer, question_options, to_dto
 from .schemas import (
     EndQuizRequest,
@@ -44,7 +44,7 @@ class QuizProcessRepository:
         quiz = result.scalar_one_or_none()
 
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise errors.quiz_not_found()
 
         # Возвращение в уже начатую попытку проверяется ДО is_active и PIN.
         # Ответственный закрывает вход, как только все зашли; студент, у которого
@@ -72,18 +72,15 @@ class QuizProcessRepository:
                 # что успели дойти, — иначе попытка висела бы «в процессе» вечно,
                 # а студент остался бы заперт в ней.
                 await self._finalize_attempt(session, existing, reason="Vaqt tugadi")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Urinish vaqti tugagan. Yangi urinish uchun o'qituvchiga murojaat qiling.",
-                )
+                raise errors.attempt_expired(ask_teacher=True)
 
             return await self._resume_attempt(session, existing, quiz, user)
 
         if not quiz.is_active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quiz is not active")
+            raise errors.quiz_not_active()
 
         if quiz.pin != data.pin:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid PIN")
+            raise errors.invalid_pin()
 
         # Check if user is a student and restrict access based on group
         stmt_student = select(Student).where(Student.user_id == user.id)
@@ -96,10 +93,7 @@ class QuizProcessRepository:
         if student:
             # Mandate student image for quiz (Admins take it anyway)
             if not student.image_path and not is_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Sizning suratingiz topilmadi. Profilingizga surat yuklang.",
-                )
+                raise errors.student_photo_missing()
 
             # Bug#1 fix: only set image_url when it actually exists (avoid sending "None" string to WebSocket)
             if student.image_path:
@@ -107,10 +101,7 @@ class QuizProcessRepository:
 
             if quiz.group_id is not None:
                 if student.group_id != quiz.group_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="This quiz is not available for your group",
-                    )
+                    raise errors.quiz_not_for_your_group()
 
         # Prepare questions with shuffled options — only ever serve active questions;
         # a question can be soft-deleted after being linked to this quiz without a
@@ -119,10 +110,7 @@ class QuizProcessRepository:
 
         # Bug#7 fix: raise error if quiz has no questions
         if not quiz_questions:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Bu testda savollar yo'q. Iltimos administratorga murojaat qiling.",
-            )
+            raise errors.quiz_has_no_questions()
 
         num_questions = quiz.question_number
         if len(quiz_questions) > num_questions:
@@ -341,13 +329,13 @@ class QuizProcessRepository:
         result_obj = (await session.execute(select(Result).where(Result.id == data.result_id))).scalar_one_or_none()
 
         if not result_obj:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+            raise errors.attempt_not_found()
 
         if result_obj.user_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This is not your attempt")
+            raise errors.not_your_attempt()
 
         if result_obj.status != "in_progress":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This attempt is already completed")
+            raise errors.attempt_already_finished()
 
         # Срок попытки проверяется на сервере: без этого студент мог держать
         # попытку открытой сколько угодно и дописывать ответы после конца теста —
@@ -356,10 +344,7 @@ class QuizProcessRepository:
 
         if quiz and is_expired(result_obj, quiz):
             await self._finalize_attempt(session, result_obj, reason="Vaqt tugadi")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Urinish vaqti tugagan",
-            )
+            raise errors.attempt_expired()
 
         # Only a reserved row (created at start_quiz for a question actually
         # served to this student) may be answered — anything else means the
@@ -374,15 +359,12 @@ class QuizProcessRepository:
         ).scalar_one_or_none()
 
         if not reserved:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This question is not part of your attempt",
-            )
+            raise errors.question_not_in_attempt()
 
         question = (await session.execute(select(Question).where(Question.id == data.question_id))).scalar_one_or_none()
 
         if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+            raise errors.question_not_found()
 
         # Позиции: у обычного вопроса одна, у вопроса с несколькими
         # правильными — набор. Проверка и тексты — в question_view, чтобы
@@ -405,10 +387,7 @@ class QuizProcessRepository:
         if positions:
             option_count = len(question_options(question))
             if any(position < 0 or position >= option_count for position in positions):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Variant raqami noto'g'ri",
-                )
+                raise errors.invalid_option_index()
             is_correct, chosen_text, correct_text = grade_answer(data.result_id, question, positions)
             reserved.answer = chosen_text
             reserved.correct_answer = correct_text
@@ -439,16 +418,16 @@ class QuizProcessRepository:
         result_obj = (await session.execute(select(Result).where(Result.id == data.result_id))).scalar_one_or_none()
 
         if not result_obj:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+            raise errors.attempt_not_found()
 
         if result_obj.user_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This is not your attempt")
+            raise errors.not_your_attempt()
 
         if result_obj.quiz_id != data.quiz_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quiz_id does not match this attempt")
 
         if result_obj.status != "in_progress":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This attempt is already completed")
+            raise errors.attempt_already_finished()
 
         # Reserved rows at start_quiz time define the real denominator — anything
         # still unanswered here counts as wrong (student ran out of time / never got to it).
@@ -482,7 +461,7 @@ class QuizProcessRepository:
             quiz = result.scalar_one_or_none()
 
             if not quiz:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+                raise errors.quiz_not_found()
 
             # Bug#4 fix: use settings.evidence_dir (absolute path mapped to Docker volume)
             # so files survive container restarts. /evidence/ and /uploads/cheating_evidence/

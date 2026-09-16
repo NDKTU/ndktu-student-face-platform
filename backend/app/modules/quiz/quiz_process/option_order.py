@@ -1,11 +1,15 @@
 """Порядок вариантов ответа, показанный конкретному студенту.
 
-Варианты перемешиваются, поэтому буква на экране студента не совпадает с буквой
-в базе: показанный «B» может быть ``option_c``. Раньше из-за этого клиент отправлял
-не букву, а сам текст варианта, и правильность проверялась сравнением строк —
-что ломалось на одинаковых вариантах, на разных видах узбекского апострофа
-(``o'`` — U+0027, U+02BB, U+2018, U+2019 выглядят одинаково, но это разные строки)
-и на любом HTML внутри варианта.
+Варианты перемешиваются, поэтому позиция на экране студента не совпадает с
+позицией в базе: показанный «B» может быть ``option_c``. Раньше из-за этого
+клиент отправлял не позицию, а сам текст варианта, и правильность проверялась
+сравнением строк — что ломалось на одинаковых вариантах, на разных видах
+узбекского апострофа (``o'`` — U+0027, U+02BB, U+2018, U+2019 выглядят
+одинаково, но это разные строки) и на любом HTML внутри варианта.
+
+Порядок задаёт **одна** функция — :func:`order_for`. Показ и проверка обязаны
+звать именно её: две независимые реализации однажды уже разошлись по зерну и
+молча записывали студенту соседний вариант.
 
 Здесь порядок не хранится, а **вычисляется заново** из пары (попытка, вопрос).
 Так он:
@@ -30,37 +34,16 @@ from app.core.config import settings
 LETTERS = ("a", "b", "c", "d")
 
 
-def option_order(result_id: int, question_id: int) -> tuple[str, ...]:
-    """Возвращает буквы колонок в том порядке, в каком они показаны студенту.
-
-    Результат ``("c", "a", "d", "b")`` читается так: показанный вариант A — это
-    ``option_c``, показанный B — ``option_a``, и так далее.
-    """
-    seed = hashlib.sha256(f"{settings.jwt.access_token_secret}:{result_id}:{question_id}".encode()).hexdigest()
-
-    letters = list(LETTERS)
-    # random.Random с фиксированным зерном детерминирован, в отличие от hash():
-    # встроенный hash() для строк рандомизируется при каждом запуске процесса.
-    random.Random(seed).shuffle(letters)
-    return tuple(letters)
-
-
-def letter_at(result_id: int, question_id: int, position: int) -> str | None:
-    """Буква колонки, стоявшая на позиции ``position`` (0–3) у этого студента.
-
-    Возвращает None, если позиция вне диапазона — клиент прислал мусор.
-    """
-    if not 0 <= position < len(LETTERS):
-        return None
-    return option_order(result_id, question_id)[position]
-
-
 def order_for(result_id: int, question_id: int, count: int) -> list[int]:
-    """Variantlar o'rinlari, ixtiyoriy soni uchun.
+    """Variantlarning ko'rsatiladigan tartibi — barcha savol turlari uchun yagona.
 
-    `option_order` faqat to'rtta ustunli eski savolga mo'ljallangan; yangi
-    turlarda variantlar soni har xil. Zerno bir xil usulda yig'iladi,
-    shuning uchun tartib urinish davomida o'zgarmaydi.
+    Natija ``[2, 0, 1, 3]`` shunday o'qiladi: ekrandagi birinchi variant — asl
+    ro'yxatning 2-elementi, ikkinchisi — 0-elementi va hokazo.
+
+    Bu yagona manba: ko'rsatish ham (`shown_options`), baholash ham
+    (`grade_answer`) shu funksiyani chaqiradi. Ilgari baholash uchun alohida
+    `option_order()` bor edi — zerno satri `:{count}` bilan farq qilgani uchun
+    u boshqa tartib berardi va talabaning javobi qo'shni variantga yozilardi.
     """
     if count <= 0:
         return []
@@ -68,5 +51,7 @@ def order_for(result_id: int, question_id: int, count: int) -> list[int]:
         f"{settings.jwt.access_token_secret}:{result_id}:{question_id}:{count}".encode()
     ).hexdigest()
     positions = list(range(count))
+    # random.Random с фиксированным зерном детерминирован, в отличие от hash():
+    # встроенный hash() для строк рандомизируется при каждом запуске процесса.
     random.Random(seed).shuffle(positions)
     return positions

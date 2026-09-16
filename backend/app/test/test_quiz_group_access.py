@@ -205,7 +205,11 @@ async def test_student_cannot_access_other_group_quiz(student_user_and_group, te
 
     # Expect 403 Forbidden
     assert resp.status_code == 403
-    assert "not available for your group" in resp.json()["detail"]
+    # Javobda kod ham, matn ham bor: frontend tarjimani kod bo'yicha topadi,
+    # matn esa notanish kod uchun zaxira (quiz_process/errors.py).
+    detail = resp.json()["detail"]
+    assert detail["code"] == "quiz_not_for_your_group"
+    assert "guruhingiz uchun mo'ljallanmagan" in detail["message"]
 
 
 @pytest.mark.xfail(

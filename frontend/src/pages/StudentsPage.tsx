@@ -38,6 +38,7 @@ import type { Result } from '@/services/resultService';
 import { formatDate } from '@/utils/date';
 import { useTranslation } from 'react-i18next';
 import { PersonAvatar } from '@/components/ui/PersonAvatar';
+import { formatGpa } from '@/utils/gpa';
 
 type SortField = 'name' | 'user_id' | 'created_at';
 type SortOrder = 'asc' | 'desc';
@@ -715,7 +716,7 @@ const StudentDetail = ({
                         <div className="flex justify-between items-center text-sm py-1">
                             <span className="font-medium text-muted-foreground">O'rtacha ball (GPA):</span>
                             <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                {student.avg_gpa ?? '—'}
+                                {formatGpa(student.avg_gpa)}
                             </span>
                         </div>
                     </CardContent>

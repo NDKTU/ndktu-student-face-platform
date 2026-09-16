@@ -15,6 +15,8 @@ import { courseTypeLabel } from '@/services/courseTypes';
 import type { Lesson, LessonResourceInfo } from '@/services/lessonService';
 import type { Assignment } from '@/services/assignmentService';
 import { formatDate } from '@/utils/date';
+import { apiErrorMessage } from '@/utils/apiError';
+import { YOUTUBE_LINK_ERROR, youtubeVideoId } from '@/utils/youtube';
 
 /** Vazifa uchun ruxsat etilgan fayl turlari — kengaytma bo'yicha. */
 const FILE_TYPE_OPTIONS = [
@@ -207,6 +209,13 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
             setError('Guruhni tanlang');
             return;
         }
+        // Havola ixtiyoriy, lekin yozilgan bo'lsa — YouTube havolasi bo'lishi
+        // shart: dars sahifasi undan pleyer manzilini yasaydi. Bekend ham shuni
+        // tekshiradi, bu yerdagisi xatoni saqlashdan oldin ko'rsatadi.
+        if (youtubeUrl.trim() && !youtubeVideoId(youtubeUrl)) {
+            setError(YOUTUBE_LINK_ERROR);
+            return;
+        }
         // Ilgari vazifa faqat sarlavha yozilganda saqlanardi: o'qituvchi fayl
         // biriktirib, tavsif yozib «Saqlash» bossa ham dars vazifasiz
         // yaratilardi — hech qanday xabarsiz. Endi sarlavha ixtiyoriy, blokda
@@ -351,8 +360,7 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
             }
             onClose();
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || 'Darsni saqlashda xatolik yuz berdi');
+            setError(apiErrorMessage(cause, 'Darsni saqlashda xatolik yuz berdi'));
         } finally {
             setSaving(false);
         }
@@ -396,7 +404,7 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                             onChange={(event) => setYoutubeUrl(event.target.value)}
                             placeholder="https://www.youtube.com/watch?v=..."
                         />
-                        <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi qabul qilinadi.</p>
+                        <p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi (youtube.com yoki youtu.be).</p>
                     </div>
 
                     <div>

@@ -73,6 +73,16 @@ class QuizCreateResponse(BaseModel):
     group_id: Optional[int]
     subject_id: Optional[int]
     lesson_id: Optional[int] = None
+
+    #: Fan va guruh nomlari javobning o'zida keladi.
+    #:
+    #: Ilgari front `subject_id` ni o'zi qidirardi — buning uchun 1000 ta fan
+    #: alohida so'rovda yuklanardi. Bazada esa 2978 fan bor, ya'ni birinchi
+    #: mingtadan tashqaridagi test jadvalda nom o'rniga «—» ko'rsatardi.
+    #: Repozitoriy bu maydonlarni `list_quizzes` da to'ldiradi (`_attach_names`).
+    subject_name: Optional[str] = None
+    group_name: Optional[str] = None
+
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
@@ -96,6 +106,10 @@ class QuizListRequest(BaseModel):
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
     lesson_id: Optional[int] = None
+    # «Darssiz testlar» — dars o'chirilganda test qolaveradi (ON DELETE SET
+    # NULL), lekin guruhsiz qolgani uchun deyarli hech qaysi filtrga tushmaydi:
+    # bor, lekin topib bo'lmaydi. Shu bayroq ularni ataylab ko'rsatadi.
+    without_lesson: Optional[bool] = None
     faculty_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None

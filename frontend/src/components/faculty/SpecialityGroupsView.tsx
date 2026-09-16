@@ -19,11 +19,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { IdChip } from '@/components/common/IdChip';
+import { StudentCount } from '@/components/group/StudentCount';
 import { useCatalogView } from '@/hooks/useCatalogView';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4';
-type SortField = 'name' | 'course' | 'student_count';
+type SortField = 'name' | 'course' | 'local_student_count';
 type SortOrder = 'asc' | 'desc';
 
 interface Props {
@@ -127,9 +128,10 @@ export const SpecialityGroupsView = ({
             } else if (sortField === 'course') {
                 valA = a.course ?? 0;
                 valB = b.course ?? 0;
-            } else if (sortField === 'student_count') {
-                valA = a.student_count ?? 0;
-                valB = b.student_count ?? 0;
+            } else if (sortField === 'local_student_count') {
+                // Saralash — bazadagi haqiqiy son bo'yicha, ustunda ko'rinadigani ham o'sha.
+                valA = a.local_student_count ?? 0;
+                valB = b.local_student_count ?? 0;
             }
 
             if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -408,12 +410,12 @@ export const SpecialityGroupsView = ({
                                 </div>
                             </TableHead>
                             <TableHead
-                                onClick={() => handleSort('student_count')}
+                                onClick={() => handleSort('local_student_count')}
                                 className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center justify-center">
                                     <span>Talabalar</span>
-                                    {renderSortIcon('student_count')}
+                                    {renderSortIcon('local_student_count')}
                                 </div>
                             </TableHead>
                             <TableHead className="text-center font-bold text-xs">Holati</TableHead>
@@ -470,11 +472,9 @@ export const SpecialityGroupsView = ({
                                         {renderCourseBadge(group.course)}
                                     </TableCell>
 
-                                    {/* Talabalar Soni */}
+                                    {/* Talabalar soni: bazadagi haqiqiy son, farq bo'lsa — EPOS niki ostida. */}
                                     <TableCell className="text-center">
-                                        <span className="inline-flex items-center justify-center min-w-[32px] rounded-lg bg-emerald-500/10 px-2.5 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                            {group.student_count ?? '—'}
-                                        </span>
+                                        <StudentCount local={group.local_student_count} epos={group.student_count} />
                                     </TableCell>
 
                                     {/* Holati */}
@@ -520,7 +520,11 @@ export const SpecialityGroupsView = ({
                             actions={renderActions(group)}
                             metrics={[
                                 { label: 'Bosqich', value: group.course ? `${group.course}-kurs` : '—' },
-                                { label: 'Talaba', value: group.student_count ?? '—', accent: true },
+                                {
+                                    label: 'Talaba',
+                                    value: <StudentCount local={group.local_student_count} epos={group.student_count} />,
+                                    accent: true,
+                                },
                             ]}
                         />
                     ))}

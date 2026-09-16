@@ -24,7 +24,14 @@ class GroupCreateResponse(ExternalRefFields):
     speciality_id: Optional[int] = None
     course: Optional[int] = None
     education_shape: Optional[str] = None
+    #: EPOS aytgan talaba soni — ko'zgu ustuni, o'zimiz sanamaymiz.
     student_count: Optional[int] = None
+    #: Bazadagi haqiqiy talaba soni (`students` qatorlari). EPOS soni bilan
+    #: mos kelmasligi normal holat: EPOS boshqa vaqt kesimini va boshqa
+    #: hisobni beradi. Ro'yxat ikkalasini yonma-yon ko'rsatadi, chunki
+    #: «EPOS 34 / bazada 0» ning o'zi nosozlik haqidagi xabar.
+    #: `None` — sanalmagan (masalan, bitta guruh so'ralganda).
+    local_student_count: Optional[int] = None
 
     #: Guruhning EPMOS'dagi identifikatori (`external_id`). Interfeys uni
     #: «EPMOS ID» deb koʻrsatadi — ilgari u yerda bizning lokal `id` turardi
@@ -62,8 +69,9 @@ class GroupListRequest(BaseModel):
     #: uchun taqqoslash registrga bog'liq emas.
     education_shape: Optional[str] = None
 
-    #: name | course | student_count. Saralash ham serverda: aks holda
-    #: tartib faqat ochilgan sahifa ichida ishlardi.
+    #: name | course | student_count (EPOS) | local_student_count (haqiqiy).
+    #: Saralash ham serverda: aks holda tartib faqat ochilgan sahifa ichida
+    #: ishlardi.
     sort_by: Optional[str] = None
     order: str = "asc"
 

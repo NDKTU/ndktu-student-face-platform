@@ -36,3 +36,8 @@ export const normalizeExternalUrl = (raw: string): string | null | undefined => 
 
     return candidate;
 };
+
+/** Forma uchun xato matni — bekenddagi xabar bilan bir xil ma'noda. */
+export const EXTERNAL_LINK_ERROR =
+    "Havola http:// yoki https:// bilan boshlanishi va to'g'ri domenga ega bo'lishi kerak "
+    + '(masalan https://epmos.nsumt.uz)';

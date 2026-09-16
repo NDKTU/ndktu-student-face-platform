@@ -30,8 +30,14 @@ export const userService = {
     },
 
     // Отзывает текущую сессию на сервере (удаляет jti из Redis).
-    logout: async (): Promise<void> => {
-        await api.post('/user/logout');
+    //
+    // Токен принимается аргументом, а не берётся из хранилища: вызывающий код
+    // очищает localStorage сразу, не дожидаясь ответа, а request-интерсептор
+    // читает хранилище только в момент отправки. Запрос уходил без заголовка,
+    // получал 401 — и jti оставался в Redis, то есть старый JWT продолжал
+    // работать после «выхода».
+    logout: async (token?: string | null): Promise<void> => {
+        await api.post('/user/logout', null, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
     },
 
     getUsers: async (page = 1, limit = 10, username?: string, params?: UserListParams) => {

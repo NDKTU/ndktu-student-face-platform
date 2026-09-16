@@ -10,13 +10,14 @@ from sqlalchemy.orm import selectinload
 
 # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
 # from app.core.utils.visibility import apply_visibility
-from app.modules.auth.model import Teacher, User
+from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Result
 
 from .schemas import (
     GroupCreateRequest,
+    GroupCreateResponse,
     GroupListRequest,
     GroupListResponse,
 )
@@ -101,12 +102,24 @@ class GroupRepository:
 
         return group
 
+    #: Guruhdagi talabalarning haqiqiy soni — bizning bazamizdagi qatorlar.
+    #: `Group.student_count` esa EPOS aytgan son: u boshqa savolga javob
+    #: beradi va ikkovi 683 guruhdan 351 tasida mos kelmaydi (o'lchangan
+    #: 2026-09-15). Shuning uchun ikkalasi ham ko'rsatiladi, biri ikkinchisi
+    #: bilan almashtirilmaydi.
+    _LOCAL_STUDENTS = (
+        select(func.count(Student.id)).where(Student.group_id == Group.id).correlate(Group).scalar_subquery()
+    )
+
     #: Saralash mumkin bo'lgan ustunlar. Front nomni satr sifatida yuboradi,
     #: shuning uchun ro'yxat yopiq: begona qiymat sukut tartibga tushadi.
     _SORTABLE = {
         "name": Group.name,
         "course": Group.course,
+        #: EPOS soni bo'yicha — ustun ekranda qolgani uchun.
         "student_count": Group.student_count,
+        #: Haqiqiy son bo'yicha — «Talabalar» ustunini bosganda shu ishlaydi.
+        "local_student_count": _LOCAL_STUDENTS,
     }
 
     @staticmethod
@@ -216,7 +229,34 @@ class GroupRepository:
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
 
-        return GroupListResponse(total=total, page=request.page, limit=request.limit, groups=groups)
+        return GroupListResponse(
+            total=total,
+            page=request.page,
+            limit=request.limit,
+            groups=await self._with_local_counts(session, groups),
+        )
+
+    async def _with_local_counts(self, session: AsyncSession, groups) -> list[GroupCreateResponse]:
+        """Qatorlarga bazadagi haqiqiy talaba sonini qo'shadi.
+
+        Bitta so'rov — faqat ochilgan sahifadagi guruhlar bo'yicha: har bir
+        qator uchun alohida so'rov 10 ta ortiqcha borish bo'lardi.
+        """
+        items = [GroupCreateResponse.model_validate(group) for group in groups]
+        if not items:
+            return items
+
+        rows = await session.execute(
+            select(Student.group_id, func.count(Student.id))
+            .where(Student.group_id.in_([item.id for item in items]))
+            .group_by(Student.group_id)
+        )
+        counts = dict(rows.all())
+        for item in items:
+            # Bo'sh guruh ham 0 oladi, `None` emas: `None` «hisoblanmagan»
+            # degani bo'lib qoladi, front esa ikkovini ajrata olmasdi.
+            item.local_student_count = counts.get(item.id, 0)
+        return items
 
     async def update_group(self, session: AsyncSession, group_id: int, data: GroupCreateRequest) -> Group:
         stmt = select(Group).where(Group.id == group_id)

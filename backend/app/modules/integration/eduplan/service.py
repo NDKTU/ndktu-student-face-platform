@@ -455,6 +455,8 @@ class EduPlanSyncService:
                     {
                         "name": s.name,
                         "kafedra_external_id": str(s.department_id),
+                        "curriculum_external_id": str(s.edu_plan_id) if s.edu_plan_id else None,
+                        "semester": s.semester,
                     },
                     by_name,
                 )
@@ -712,12 +714,23 @@ class EduPlanSyncService:
 
             elif entity == EduPlanEntity.subject:
                 kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
+                # Reja topilmasa — `None`: fan baribir saqlanadi, faqat
+                # ro'yxatda uni nom bilan ajratib bo'lmaydi. Bu qattiq
+                # bog'liqlik emas, shuning uchun progon to'xtamaydi.
+                curriculum_external_id = changes.get("curriculum_external_id")
+                curriculum_id = (
+                    parents(EduPlanEntity.curriculum).get(curriculum_external_id)
+                    if curriculum_external_id
+                    else None
+                )
                 row = await eduplan_repository.upsert_subject(
                     session,
                     proposal.external_id,
                     changes["name"],
                     kafedra_id,
                     existing,
+                    curriculum_id,
+                    changes.get("semester"),
                 )
 
             elif entity == EduPlanEntity.curriculum:

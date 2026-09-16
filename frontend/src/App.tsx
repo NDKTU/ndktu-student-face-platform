@@ -45,7 +45,10 @@ const QuizTestPage = lazy(() => import('@/pages/QuizTestPage'));
 const UserAnswersPage = lazy(() => import('@/pages/UserAnswersPage'));
 const TeacherGroupsPage = lazy(() => import('@/pages/TeacherGroupsPage'));
 const TeacherSubjectsPage = lazy(() => import('@/pages/TeacherSubjectsPage'));
-const TeacherRankingPage = lazy(() => import('@/pages/TeacherRankingPage'));
+// Reyting vaqtincha yashirilgan — marshrut va menyu yozuvi bilan birga
+// (sabab: `constants/resources.ts`). Import ham o'chirilgan, aks holda
+// sahifa ishlatilmasa ham bundle'ga kirib qolardi.
+// const TeacherRankingPage = lazy(() => import('@/pages/TeacherRankingPage'));
 const PsychologyPage = lazy(() => import('@/pages/PsychologyPage'));
 const PsychologyTestPage = lazy(() => import('@/pages/PsychologyTestPage'));
 const PsychologyResultsPage = lazy(() => import('@/pages/PsychologyResultsPage'));
@@ -149,7 +152,13 @@ function App() {
                                         <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                                         <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
                                         <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
-                                        <Route path="/teacher-ranking" element={<PermissionRoute permission="read:teacher"><TeacherRankingPage /></PermissionRoute>} />
+                                        {/* «Reyting» vaqtincha o'chirilgan (2026-09-16): natijalar
+                                            o'qituvchiga faqat guruh bo'yicha bog'lanadi, fan hisobga
+                                            olinmaydi — bitta natija guruhdagi barcha o'qituvchilarga
+                                            tushadi. Sabab va qaytarish tartibi `constants/resources.ts`
+                                            da. Marshrut ham yopilgan: menyudan olib tashlashning o'zi
+                                            to'g'ridan-to'g'ri havolani to'smaydi.
+                                        <Route path="/teacher-ranking" element={<PermissionRoute permission="read:teacher"><TeacherRankingPage /></PermissionRoute>} /> */}
 
                                         <Route path="/faculties/*" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
                                         <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { User, Calendar, KeyRound, Save, Camera, Loader2, Trash2 } from 'lucide-react';
 import { userService } from '@/services/userService';
+import { formatGpa } from '@/utils/gpa';
 import { useRef, useState } from 'react';
 
 const credentialsSchema = z
@@ -319,7 +320,7 @@ const ProfilePage = () => {
                                             O'rtacha Baho (GPA)
                                         </label>
                                         <div className="text-base font-semibold">
-                                           {user.student.avg_gpa || '-'}
+                                           {formatGpa(user.student.avg_gpa)}
                                         </div>
                                     </div>
 

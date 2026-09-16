@@ -12,7 +12,7 @@ import {
     ClipboardList,
     ClipboardCheck,
     PlayCircle,
-    Trophy,
+    // Trophy — «Reyting» uchun edi, bo'lim yashirilgan.
     BarChart2,
     User,
     Library,
@@ -423,11 +423,20 @@ export const buildSidebar = (
     }
 
     const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');
-    // Reyting ilgari «Umumiy»da, faqat adminda ko'rinardi — o'sha shart
-    // saqlanadi, faqat joyi «Baholash»ga ko'chdi.
-    if (isAdmin) {
-        pushTo('Baholash', { name: 'Reyting', href: '/teacher-ranking', icon: Trophy, tone: 'yellow' });
-    }
+    // «Reyting» vaqtincha yashirilgan (2026-09-16).
+    //
+    // Sabab ko'rinishda emas, hisobda: natijalar o'qituvchiga faqat GURUH
+    // bo'yicha bog'lanadi (`auth/teacher/repository.py` dagi
+    // `outerjoin(Result, Result.group_id == TeacherGroup.group_id)`), fan
+    // hisobga olinmaydi. Ya'ni guruhdagi istalgan testning natijasi o'sha
+    // guruhga biriktirilgan BARCHA o'qituvchilarga tushadi: o'lchanganda
+    // bitta natija beshta o'qituvchining reytingiga kirdi.
+    //
+    // Bunday raqamga qarab kadrlar to'g'risida qaror qabul qilib bo'lmaydi,
+    // shuning uchun hisob tuzatilgunicha bo'lim ko'rsatilmaydi. Sahifaning
+    // o'zi (`pages/TeacherRankingPage.tsx`) va bekend hisoblagichi joyida
+    // qoladi — qaytarish uchun shu yerdagi qator va `App.tsx` dagi marshrutni
+    // tiklash kifoya.
 
     const sections: SidebarSection[] = isAdmin ? [ALWAYS_VISIBLE] : [];
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {

@@ -11,6 +11,29 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
+/**
+ * Darsi o'chirilgan dars testi.
+ *
+ * Dars o'chirilganda test o'chmaydi (`quizzes.lesson_id` — ON DELETE SET NULL):
+ * unga natijalar bog'langan. Lekin u guruhsiz qoladi va ro'yxatda sababsiz
+ * bo'sh qator bo'lib ko'rinadi — shuning uchun sabab aytib turiladi.
+ *
+ * Semestr yakuni va kursdan kursga o'tish testlari darsga umuman
+ * biriktirilmaydi, ular «egasiz» emas.
+ */
+/**
+ * Urinish raqami — faqat takroriy urinishlarda ko'rsatiladi.
+ *
+ * «Testni qayta yaratish» bir xil nomli ikkinchi yozuv yaratadi: ro'yxatda
+ * ular faqat PIN bilan farq qilardi, PIN esa talabada bo'ladi, ro'yxatga
+ * qaraydigan odamda emas. Natijada noto'g'ri kartochka tanlanib, talaba
+ * «Invalid PIN» olardi.
+ */
+const attemptLabel = (quiz: Quiz) => ((quiz.attempt ?? 1) > 1 ? `${quiz.attempt}-urinish` : null);
+
+const isOrphanedLessonQuiz = (quiz: Quiz) =>
+    quiz.quiz_type === 'LESSON_QUIZ' && (quiz.lesson_id === null || quiz.lesson_id === undefined);
+
 interface QuizTableProps {
     quizzes: Quiz[];
     isLoading: boolean;
@@ -182,7 +205,22 @@ export const QuizTable = ({
                 header: t('Test'),
                 cell: (quiz) => (
                     <div className="min-w-0">
-                        <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                            {attemptLabel(quiz) && (
+                                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                    {attemptLabel(quiz)}
+                                </span>
+                            )}
+                            {isOrphanedLessonQuiz(quiz) && (
+                                <span
+                                    className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+                                    title={t("Dars o'chirilgan: test darsdan uzilgan, natijalari saqlanib qolgan")}
+                                >
+                                    {t("Darsi o'chirilgan")}
+                                </span>
+                            )}
+                        </div>
                         <p className="truncate text-xs capitalize text-muted-foreground">
                             {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
                                 .filter((value) => value && value !== '-')
@@ -260,7 +298,14 @@ export const QuizTable = ({
                     <div className="space-y-2 p-4">
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="truncate font-medium capitalize text-foreground">{quiz.title}</p>
+                                    {attemptLabel(quiz) && (
+                                        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                            {attemptLabel(quiz)}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="truncate text-xs capitalize text-muted-foreground">
                                     {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
                                         .filter((value) => value && value !== '-')
@@ -318,7 +363,14 @@ export const QuizTable = ({
                                 {initialsOf(quiz.title)}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="font-display font-semibold capitalize leading-snug text-foreground">{quiz.title}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-display font-semibold capitalize leading-snug text-foreground">{quiz.title}</p>
+                                    {attemptLabel(quiz) && (
+                                        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                            {attemptLabel(quiz)}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">{subtitle || '—'}</p>
                             </div>
                             <span className="shrink-0 rounded bg-muted px-2 py-1 font-mono text-sm" title="PIN kod">{quiz.pin}</span>

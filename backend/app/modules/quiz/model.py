@@ -15,7 +15,7 @@ from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.auth.model import TeacherSubject, User
-    from app.modules.organization_structure.model import Group
+    from app.modules.organization_structure.model import Curriculum, Group
 
 
 class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
@@ -44,6 +44,24 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
         nullable=True,
         index=True,
     )
+
+    #: Qaysi oʻquv rejaga tegishli. EPMOS'da bitta fan har bir reja uchun
+    #: alohida yozuv boʻlib turadi: «Akademik yozuv» toʻrt marta — dasturiy
+    #: injiniring va sunʼiy intellekt uchun, kunduzgi va masofaviy shaklda.
+    #: Kafedra ularni ajratmaydi (toʻrtoviniki ham bitta), shuning uchun
+    #: roʻyxatlarda faqat reja nomi farqni koʻrsatadi.
+    curriculum_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("curriculums.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    #: «kuzgi» / «bahorgi» — EPMOS shu ikki qiymatni beradi. Bir rejadagi bir
+    #: nomli ikki yozuvni ham koʻpincha aynan semestr ajratadi.
+    semester: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    curriculum: Mapped["Curriculum | None"] = relationship("Curriculum", lazy="selectin")
 
     teacher_subjects: Mapped[list["TeacherSubject"]] = relationship(
         "TeacherSubject",

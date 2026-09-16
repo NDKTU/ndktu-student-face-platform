@@ -16,9 +16,25 @@ class SubjectCreateRequest(BaseModel):
         return v.strip().lower()
 
 
+class SubjectCurriculumInfo(BaseModel):
+    """O'quv rejaning ro'yxat uchun yetarli qismi."""
+
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SubjectCreateResponse(ExternalRefFields):
     id: int
     name: str
+    #: O'quv reja — bir xil nomli fanlarni aynan shu ajratadi. EPMOS bitta
+    #: fanni har bir reja uchun alohida yozuv qilib beradi («Akademik yozuv»
+    #: to'rt marta), kafedra esa to'rtoviniki ham bitta. Qo'lda kiritilgan
+    #: fanlarda `None`.
+    curriculum_id: Optional[int] = None
+    curriculum: Optional[SubjectCurriculumInfo] = None
+    #: «kuzgi» / «bahorgi» — bitta reja ichidagi takrorlarni ajratadi.
+    semester: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 

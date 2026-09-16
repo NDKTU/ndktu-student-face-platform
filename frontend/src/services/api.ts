@@ -2,9 +2,13 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/env';
 import { getToken, clearToken, setLogoutReason } from '@/services/tokenStorage';
 
-//: Kirish so'rovlari: bulardagi 401 sessiyaning tugashi emas, balki
-//  noto'g'ri parol. Global qayta yo'naltirish bularga tegmasligi kerak.
-const LOGIN_PATHS = ['/user/login', '/hemis/login'];
+//: 401 ni o'zi hal qiladigan so'rovlar — global qayta yo'naltirish bularga
+//  tegmaydi.
+//  Kirish so'rovlarida 401 sessiyaning tugashi emas, noto'g'ri parol.
+//  `/user/logout` da esa chiqishni chaqirgan kod tokenni o'zi tozalaydi va
+//  o'zi `/login` ga olib boradi; bu yerdagi `location.href` so'rovni yarim
+//  yo'lda uzib, sessiyani serverda tirik qoldirardi.
+const SELF_HANDLED_401_PATHS = ['/user/login', '/hemis/login', '/user/logout'];
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -49,9 +53,9 @@ api.interceptors.response.use(
         // qo'ygan xato matnini o'chirib yuboradi: odam bo'sh forma ko'radi va
         // nima bo'lganini tushunmaydi. Xatoni forma o'zi ko'rsatadi.
         const requestUrl: string = originalRequest?.url ?? '';
-        const isLoginRequest = LOGIN_PATHS.some((path) => requestUrl.includes(path));
+        const isSelfHandled = SELF_HANDLED_401_PATHS.some((path) => requestUrl.includes(path));
 
-        if (error.response?.status === 401 && !originalRequest._retry && !isLoginRequest) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isSelfHandled) {
             originalRequest._retry = true;
 
             // Remove token and redirect on 401.

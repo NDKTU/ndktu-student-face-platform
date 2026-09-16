@@ -26,6 +26,14 @@ export interface Quiz {
     user_id?: number;
     group_id?: number;
     subject_id?: number;
+    /**
+     * Fan va guruh nomlari serverdan keladi (`QuizCreateResponse`).
+     * Ilgari front ularni `subject_id` bo'yicha o'zi qidirardi — buning uchun
+     * 1000 ta fan alohida yuklanardi, bazada esa 2978 ta: qolganlari jadvalda
+     * «—» bo'lib chiqardi.
+     */
+    subject_name?: string | null;
+    group_name?: string | null;
     /** Test qaysi darsga biriktirilgani — dars sahifasidan tuzilgan bo'lsa. */
     lesson_id?: number | null;
     is_active: boolean;
@@ -115,6 +123,8 @@ export interface QuizListParams {
     group_id?: number;
     subject_id?: number;
     lesson_id?: number;
+    /** Darsi o'chirilgan dars testlari: bor, lekin filtrlarda topilmaydi. */
+    without_lesson?: boolean;
     faculty_id?: number;
     quiz_type?: QuizType;
     sort_dir?: string;

@@ -7,7 +7,7 @@ from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.enums import semester_label
+from app.core.enums import QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Lesson
@@ -360,19 +360,40 @@ class QuizRepository:
         return new_quiz
 
     async def get_quiz(self, session: AsyncSession, quiz_id: int) -> Quiz:
-        stmt = select(Quiz).where(Quiz.id == quiz_id)
+        stmt = (
+            select(Quiz)
+            .options(selectinload(Quiz.subject), selectinload(Quiz.group))
+            .where(Quiz.id == quiz_id)
+        )
         result = await session.execute(stmt)
         quiz = result.scalar_one_or_none()
 
         if not quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
+        self._attach_names([quiz])
         return quiz
+
+    @staticmethod
+    def _attach_names(quizzes: list[Quiz]) -> None:
+        """Fan va guruh nomlarini javob obyektiga yozib qo'yadi.
+
+        Nomlar sxemada bor (`subject_name`, `group_name`), lekin ORM'da alohida
+        maydon emas — bog'lanishdan olinadi. Front ilgari ularni o'zi qidirardi:
+        1000 ta fan alohida so'rovda yuklanib, 2978 tasidan qolgani jadvalda
+        «—» bo'lib chiqardi.
+        """
+        for quiz in quizzes:
+            quiz.subject_name = quiz.subject.name if quiz.subject else None
+            quiz.group_name = quiz.group.name if quiz.group else None
 
     async def list_quizzes(
         self, session: AsyncSession, request: QuizListRequest, current_user: User
     ) -> QuizListResponse:
-        stmt = select(Quiz)
+        # `selectinload` — ikkita qo'shimcha so'rov, lekin sahifadagi 15-20 qator
+        # uchun bu arzon; usiz `quiz.subject` ga murojaat async sessiyada
+        # MissingGreenlet beradi.
+        stmt = select(Quiz).options(selectinload(Quiz.subject), selectinload(Quiz.group))
 
         # Bootstrap-админ несёт сразу три роли (Admin + Teacher + Student), а строки
         # в `students` у него нет. Без admin-гарда студенческая ветка ниже схлопывала
@@ -444,6 +465,11 @@ class QuizRepository:
         if request.lesson_id:
             stmt = stmt.where(Quiz.lesson_id == request.lesson_id)
 
+        if request.without_lesson:
+            # Faqat dars testi: semestr yakuni va kursdan kursga o'tish
+            # testlari darsga umuman biriktirilmaydi, ular «egasiz» emas.
+            stmt = stmt.where(Quiz.lesson_id.is_(None), Quiz.quiz_type == QuizType.LESSON_QUIZ.value)
+
         if request.faculty_id:
             stmt = stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
 
@@ -486,6 +512,8 @@ class QuizRepository:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
         if request.lesson_id:
             count_stmt = count_stmt.where(Quiz.lesson_id == request.lesson_id)
+        if request.without_lesson:
+            count_stmt = count_stmt.where(Quiz.lesson_id.is_(None), Quiz.quiz_type == QuizType.LESSON_QUIZ.value)
         if request.faculty_id:
             count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
         if request.is_active is not None:
@@ -495,6 +523,8 @@ class QuizRepository:
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
+
+        self._attach_names(list(quizzes))
 
         return QuizListResponse(total=total, page=request.page, limit=request.limit, quizzes=quizzes)
 

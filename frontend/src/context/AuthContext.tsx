@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '@/services/api';
 import { userService } from '@/services/userService';
 import { getToken, setToken, clearToken } from '@/services/tokenStorage';
@@ -30,7 +30,7 @@ interface AuthContextType {
     hasPermission: (name: string) => boolean;
     hasAnyPermission: (...names: string[]) => boolean;
     login: (token: string) => Promise<void>;
-    logout: () => void;
+    logout: (options?: { revoke?: boolean }) => void;
     refreshMe: () => Promise<void>;
 }
 
@@ -48,8 +48,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error: unknown) {
             const status = (error as { response?: { status?: number } } | null)?.response?.status;
             if (status === 401) {
-                // Token is truly invalid — log the user out.
-                logout();
+                // Token is truly invalid — log the user out. Сессия на сервере
+                // уже мертва, отзывать нечего.
+                logout({ revoke: false });
             } else {
                 // 429 / 5xx / network error: don't kick the user out, leave
                 // user=null so route guards may show a spinner or render fallback.
@@ -93,14 +94,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await fetchUser();
     };
 
-    const logout = () => {
-        // Best-effort серверный отзыв сессии (удаляет jti из Redis); не блокируем UI.
-        userService.logout().catch(() => { /* токен всё равно очищаем ниже */ });
+    /**
+     * Выход: сначала отзываем сессию на сервере, потом чистим локальное состояние.
+     *
+     * Токен снимается ДО `clearToken()` и передаётся в запрос явно. Раньше
+     * `userService.logout()` вызывался без await, а `clearToken()` шёл следом
+     * синхронно: request-интерсептор читает хранилище уже в момент отправки,
+     * поэтому запрос уходил без `Authorization`, получал 401 — и ключ
+     * `user:session:{id}` оставался в Redis. Старый JWT после «выхода»
+     * продолжал открывать `/user/me` со всеми правами.
+     *
+     * Ответ не ждём: UI гасится сразу, а запрос уже несёт заголовок, так что
+     * порядок больше ничего не решает.
+     *
+     * `revoke: false` — для случая, когда сервер сам уже сказал 401: сессии
+     * там нет, а лишний заведомо неудачный запрос только шумит в логах.
+     */
+    // `useCallback` — не украшение: `useIdleTimeout` держит logout в зависимостях
+    // таймера, а провайдер перерисовывается как минимум раз в минуту (интервальный
+    // fetchUser). Новая ссылка на каждом рендере перезапускала бы отсчёт
+    // бездействия, и выход по таймауту не наступал бы никогда.
+    const logout = useCallback((options?: { revoke?: boolean }) => {
+        const token = getToken();
         clearToken();
         setUser(null);
         // Bug#14 fix: always clear loading state on explicit logout
         setIsLoading(false);
-    };
+        if (options?.revoke === false || !token) return;
+        userService.logout(token).catch((error: unknown) => {
+            // Сеть/сервер недоступны — локально мы уже вышли, но серверная
+            // сессия доживёт до idle-TTL. Это должно быть видно в логах.
+            logger.error('Failed to revoke session on logout', error);
+        });
+    }, []);
 
     const refreshMe = async () => {
         await fetchUser();

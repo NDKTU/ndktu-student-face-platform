@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { Pagination } from '@/components/ui/Pagination';
@@ -25,6 +25,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
 import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState, useUrlOptionalNumberState, useUrlOptionalBoolState } from '@/hooks/useUrlState';
+import { subjectOption } from '@/utils/subject';
 
 const QuizzesPage = () => {
     const { t } = useTranslation();
@@ -52,6 +53,9 @@ const QuizzesPage = () => {
     const [filterGroupId, setFilterGroupId] = useUrlOptionalNumberState('group');
     const [filterUserId, setFilterUserId] = useUrlOptionalNumberState('teacher');
     const [filterIsActive, setFilterIsActive] = useUrlOptionalBoolState('active');
+    // Darsi o'chirilgan testlar guruhsiz qoladi va boshqa filtrlarning
+    // hech biriga tushmaydi — ularni ataylab so'rash kerak.
+    const [filterWithoutLesson, setFilterWithoutLesson] = useUrlOptionalBoolState('orphan');
     const [sortDir, setSortDir] = useUrlState<'desc' | 'asc'>('order', 'desc');
 
     useEffect(() => {
@@ -67,6 +71,7 @@ const QuizzesPage = () => {
         limit: pageSize,
         title: debouncedSearch || undefined,
         is_active: filterIsActive,
+        without_lesson: filterWithoutLesson || undefined,
         user_id: filterUserId,
         group_id: filterGroupId,
         subject_id: filterSubjectId,
@@ -102,7 +107,7 @@ const QuizzesPage = () => {
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
     const allFaculties = allFacultiesData?.faculties || [];
-    const allSubjects = allSubjectsData?.subjects || [];
+    const allSubjects = useMemo(() => allSubjectsData?.subjects ?? [], [allSubjectsData]);
     // Tanlangan fan qidiruv natijasidan tushib qolsa, Combobox nom
     // o'rniga placeholder ko'rsatardi — go'yo filtr olib tashlangandek.
     const selectedSubjectOption = filterSubjectId
@@ -112,10 +117,10 @@ const QuizzesPage = () => {
           }
         : null;
     const subjectOptions = withSelected(
-        (subjectOptionsData?.subjects || []).map((s) => ({ value: String(s.id), label: s.name })),
+        (subjectOptionsData?.subjects || []).map(subjectOption),
         selectedSubjectOption,
     );
-    const allGroups = allGroupsData?.groups || [];
+    const allGroups = useMemo(() => allGroupsData?.groups ?? [], [allGroupsData]);
     const allTeachers = allTeachersData?.teachers || [];
 
     const handleCreateQuiz = () => {
@@ -215,8 +220,30 @@ const QuizzesPage = () => {
         });
     };
 
-    const getSubjectName = (id?: number) => allSubjects.find((s: Subject) => s.id === id)?.name || '-';
-    const getGroupName = (id?: number) => allGroups.find((g: Group) => g.id === id)?.name || '-';
+    // Nomlar avvalo javobning o'zidan olinadi (`subject_name` / `group_name`).
+    // Ro'yxatlar zaxira bo'lib qoladi: ular filtr uchun baribir yuklanadi, lekin
+    // ularga tayanib bo'lmaydi — 2978 fandan faqat 1000 tasi so'raladi va
+    // qolganlari jadvalda «—» bo'lib chiqardi.
+    const subjectNameById = useMemo(() => {
+        const map = new Map<number, string>();
+        allSubjects.forEach((s: Subject) => map.set(s.id, s.name));
+        quizzes.forEach((q) => {
+            if (q.subject_id && q.subject_name) map.set(q.subject_id, q.subject_name);
+        });
+        return map;
+    }, [allSubjects, quizzes]);
+
+    const groupNameById = useMemo(() => {
+        const map = new Map<number, string>();
+        allGroups.forEach((g: Group) => map.set(g.id, g.name));
+        quizzes.forEach((q) => {
+            if (q.group_id && q.group_name) map.set(q.group_id, q.group_name);
+        });
+        return map;
+    }, [allGroups, quizzes]);
+
+    const getSubjectName = (id?: number) => (id ? subjectNameById.get(id) : undefined) || '-';
+    const getGroupName = (id?: number) => (id ? groupNameById.get(id) : undefined) || '-';
 
     const clearFilters = () => {
         setFilterFacultyId(undefined);
@@ -224,6 +251,7 @@ const QuizzesPage = () => {
         setFilterGroupId(undefined);
         setFilterUserId(undefined);
         setFilterIsActive(undefined);
+        setFilterWithoutLesson(undefined);
         setSearchTerm('');
         setSortDir('desc');
         setCurrentPage(1);
@@ -235,6 +263,7 @@ const QuizzesPage = () => {
         filterGroupId !== undefined ||
         filterUserId !== undefined ||
         filterIsActive !== undefined ||
+        filterWithoutLesson !== undefined ||
         searchTerm !== '' ||
         sortDir !== 'desc';
 
@@ -281,6 +310,8 @@ const QuizzesPage = () => {
                 onUserChange={setFilterUserId}
                 filterIsActive={filterIsActive}
                 onIsActiveChange={setFilterIsActive}
+                filterWithoutLesson={filterWithoutLesson}
+                onWithoutLessonChange={(val) => { setFilterWithoutLesson(val); setCurrentPage(1); }}
                 sortDir={sortDir}
                 onSortDirChange={setSortDir}
                 hasActiveFilters={hasActiveFilters}

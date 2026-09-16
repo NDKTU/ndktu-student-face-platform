@@ -7,6 +7,7 @@ import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { Teacher } from '@/services/teacherService';
 import type { Faculty } from '@/services/facultyService';
+import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
 
 interface QuizFiltersProps {
@@ -30,6 +31,9 @@ interface QuizFiltersProps {
     onUserChange: (id: number | undefined) => void;
     filterIsActive?: boolean | undefined;
     onIsActiveChange?: (val: boolean | undefined) => void;
+    /** Darsi o'chirilgan dars testlari — boshqa filtrlarga tushmaydi. */
+    filterWithoutLesson?: boolean | undefined;
+    onWithoutLessonChange?: (val: boolean | undefined) => void;
     sortDir: 'desc' | 'asc';
     onSortDirChange: (dir: 'desc' | 'asc') => void;
     hasActiveFilters: boolean;
@@ -57,6 +61,8 @@ export const QuizFilters = ({
     onUserChange,
     filterIsActive,
     onIsActiveChange,
+    filterWithoutLesson,
+    onWithoutLessonChange,
     sortDir,
     onSortDirChange,
     hasActiveFilters,
@@ -86,7 +92,7 @@ export const QuizFilters = ({
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">{t("Fan bo'yicha filtri")}</label>
                             <Combobox
-                                options={subjectOptions ?? subjects.map(s => ({ value: s.id.toString(), label: s.name }))}
+                                options={subjectOptions ?? subjects.map(subjectOption)}
                                 value={filterSubjectId?.toString()}
                                 onSearchChange={onSubjectSearchChange}
                                 onChange={(val) => onSubjectChange(val ? parseInt(val) : undefined)}
@@ -133,6 +139,19 @@ export const QuizFilters = ({
                                 <option value="all">{t('Barchasi')}</option>
                                 <option value="true">{t('Faol')}</option>
                                 <option value="false">{t('Faol emas')}</option>
+                            </select>
+                        </div>
+                    )}
+                    {onWithoutLessonChange && (
+                        <div className="flex w-full flex-col gap-2 sm:w-[170px]">
+                            <label className="text-sm font-medium">{t('Darsga bog\'liqlik')}</label>
+                            <select
+                                className={selectClassName}
+                                value={filterWithoutLesson ? 'orphan' : 'all'}
+                                onChange={(e) => onWithoutLessonChange(e.target.value === 'orphan' ? true : undefined)}
+                            >
+                                <option value="all">{t('Barchasi')}</option>
+                                <option value="orphan">{t("Darsi o'chirilgan")}</option>
                             </select>
                         </div>
                     )}

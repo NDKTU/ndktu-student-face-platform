@@ -1,6 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { useGroups } from '@/hooks/useGroups';
+import { useFaculties } from '@/hooks/useReferenceData';
+import type { Group } from '@/services/groupService';
+import { educationShapeKey } from '@/utils/education';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -12,7 +16,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 const TeacherGroupsPage = () => {
-    const { user } = useAuth();
+    const { t } = useTranslation();
+    const { user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 12;
@@ -26,6 +31,25 @@ const TeacherGroupsPage = () => {
 
     const groups = data?.groups || [];
     const totalPages = data ? Math.ceil(data.total / pageSize) : 1;
+
+    // Guruh javobida faqat `faculty_id` bor — nom ma'lumotnomadan olinadi.
+    // Ilgari kartochkada ichki identifikatorlar turardi («Fakultet ID: 2»):
+    // ular o'qituvchiga hech narsa anglatmaydi va guruhni ajratishga yordam
+    // bermaydi.
+    const { data: facultiesData } = useFaculties(1, 200, undefined, hasPermission('read:faculty'));
+    const faculties = facultiesData?.faculties || [];
+    const getFacultyName = (facultyId: number) =>
+        faculties.find((faculty) => faculty.id === facultyId)?.name ?? '—';
+
+    /** Kurs va ta'lim shakli: «2-kurs · kunduzgi». Bo'shlari tushib qoladi. */
+    const groupSubtitle = (group: Group) =>
+        [
+            group.course ? t('{{n}}-kurs', { n: group.course }) : null,
+            educationShapeKey(group.education_shape),
+        ]
+            .filter(Boolean)
+            .map((part) => t(part as string))
+            .join(' · ');
 
     return (
         <div className="space-y-6">
@@ -69,7 +93,7 @@ const TeacherGroupsPage = () => {
                                     <span className="truncate">{group.name}</span>
                                     <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                                 </CardTitle>
-                                <CardDescription>Guruh ID: {group.id}</CardDescription>
+                                <CardDescription>{groupSubtitle(group) || '—'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -79,7 +103,7 @@ const TeacherGroupsPage = () => {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <BookOpen className="h-4 w-4" />
-                                        <span>Fakultet ID: {group.faculty_id}</span>
+                                        <span className="truncate">{getFacultyName(group.faculty_id)}</span>
                                     </div>
                                 </div>
                                 <Button

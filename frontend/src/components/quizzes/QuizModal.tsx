@@ -20,6 +20,7 @@ import { logger } from '@/utils/logger';
 import { buildQuizTitle } from '@/utils/generatedNames';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
 import { quizSchema, type QuizFormValues } from '@/schemas/quiz';
+import { subjectHint } from '@/utils/subject';
 
 interface QuizModalProps {
     isOpen: boolean;
@@ -106,13 +107,22 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     // — tashkilotchi ham barcha fanlar orasidan emas, shu ro'yxatdan tanlaydi.
     // Tahrirlashda testning joriy fani/guruhi ro'yxatda bo'lmasa, qo'shib qo'yiladi.
     const subjectOptions = useMemo(() => {
+        // Bir xil nomli fanlar ko'p (EPMOS ularni har bir o'quv reja uchun
+        // alohida beradi), shuning uchun ikkinchi qatorda reja ko'rsatiladi.
         const options = (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
             value: st.subject_id.toString(),
             label: st.subject.name,
+            hint: subjectHint(st.subject) || undefined,
         }));
         if (quiz?.subject_id && !options.some(o => o.value === quiz.subject_id!.toString())) {
-            const name = (allSubjectsData?.subjects ?? []).find(s => s.id === quiz.subject_id)?.name;
-            if (name) options.push({ value: quiz.subject_id.toString(), label: name });
+            const current = (allSubjectsData?.subjects ?? []).find(s => s.id === quiz.subject_id);
+            if (current) {
+                options.push({
+                    value: quiz.subject_id.toString(),
+                    label: current.name,
+                    hint: subjectHint(current) || undefined,
+                });
+            }
         }
         return options;
     }, [assignedSubjectsData, quiz, allSubjectsData]);

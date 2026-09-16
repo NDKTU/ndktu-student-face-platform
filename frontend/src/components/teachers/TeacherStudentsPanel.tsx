@@ -11,6 +11,7 @@ import { useAttendanceStats } from '@/hooks/useAttendance';
 import { usePermission } from '@/components/auth/PermissionGate';
 import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
+import { formatGpa } from '@/utils/gpa';
 
 const PAGE_SIZE = 20;
 
@@ -208,7 +209,7 @@ export const TeacherStudentsPanel = ({
                                 )}
                                 <TableCell className="text-right pr-5 hidden lg:table-cell">
                                     <span className="font-mono text-xs font-semibold">
-                                        {student.avg_gpa != null ? student.avg_gpa.toFixed(1) : '—'}
+                                        {formatGpa(student.avg_gpa)}
                                     </span>
                                 </TableCell>
                             </TableRow>

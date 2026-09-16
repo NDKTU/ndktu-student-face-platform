@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FileUp } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { useUploadQuestions } from '@/hooks/useQuestions';
 import type { Subject } from '@/services/subjectService';
+import { subjectOption } from '@/utils/subject';
 
 interface Props {
     isOpen: boolean;
@@ -33,6 +34,7 @@ export const QuestionExcelUploadModal = ({
     subjectName,
 }: Props) => {
     const [file, setFile] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [subjectId, setSubjectId] = useState<string>(defaultSubjectId ? String(defaultSubjectId) : '');
     const uploadMutation = useUploadQuestions();
 
@@ -75,7 +77,7 @@ export const QuestionExcelUploadModal = ({
                         </p>
                     ) : (
                         <Combobox
-                            options={subjects.map((s) => ({ value: String(s.id), label: s.name }))}
+                            options={subjects.map(subjectOption)}
                             value={subjectId}
                             onChange={setSubjectId}
                             placeholder="Fan tanlang"
@@ -84,22 +86,30 @@ export const QuestionExcelUploadModal = ({
                     )}
                 </div>
 
-                <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-10">
+                {/* Nativ `<input type="file">` brauzer tilida «Choose File / No
+                    file chosen» deb yozadi: u tarjima qilinmaydi va qolgan
+                    tugmalardan boshqacha ko'rinadi. Shuning uchun input
+                    yashirin, ko'rinadigan qismi — o'z tugmamiz. */}
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-10 transition-colors hover:border-primary/40 hover:bg-primary/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                     <FileUp className="mb-4 h-10 w-10 text-muted-foreground" />
-                    <p className="mb-2 text-sm text-muted-foreground">Excel fayl (.xlsx) tanlang</p>
-                    <input
-                        type="file"
-                        accept=".xlsx, .xls"
-                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                        className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/15"
-                    />
-                </div>
-
-                {file && (
-                    <div className="text-sm">
-                        Tanlangan fayl: <span className="font-medium">{file.name}</span>
-                    </div>
-                )}
+                    <span className="text-sm font-medium text-foreground">
+                        {file ? file.name : 'Excel fayl tanlash'}
+                    </span>
+                    <span className="mt-1 text-xs text-muted-foreground">
+                        {file ? "Boshqa fayl tanlash uchun bosing" : '.xlsx yoki .xls'}
+                    </span>
+                </button>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    className="hidden"
+                />
 
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={onClose}>Bekor qilish</Button>

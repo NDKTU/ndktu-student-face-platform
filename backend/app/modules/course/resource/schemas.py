@@ -23,9 +23,11 @@ class ResourceCreateRequest(BaseModel):
             raise ValueError("Exactly one of lesson_id or course_id must be set")
 
         # Видео принимается только ссылкой (YouTube): загрузка видеофайлов отключена.
-        # Zoom — тоже ссылка, но с проверкой формата: по ней собирается номер
-        # встречи для Meeting SDK, и мусор здесь сломал бы подключение уже в
-        # аудитории, а не при сохранении урока.
+        # Формат проверяется по той же причине, что и у Zoom: из ссылки собирается
+        # embed-адрес плеера, и мусор здесь ломал бы страницу урока у студента, а
+        # не форму у преподавателя.
+        # Zoom — тоже ссылка с проверкой: по ней собирается номер встречи для
+        # Meeting SDK.
         field_by_type = {
             "file": self.file_url,
             "link": self.link_url,
@@ -35,10 +37,23 @@ class ResourceCreateRequest(BaseModel):
         }
         if not field_by_type[self.resource_type]:
             raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
+        if self.resource_type == "video":
+            from app.core.utils.youtube_link import parse_youtube_link
+
+            parse_youtube_link(self.link_url or "")
         if self.resource_type == "zoom":
             from app.core.utils.zoom_link import parse_zoom_link
 
             parse_zoom_link(self.link_url or "")
+        if self.resource_type == "link":
+            # `video` va `zoom` havolasini o'z parserlari tekshiradi, `link` esa
+            # ixtiyoriy manzil — shuning uchun hech bo'lmasa sxemasi tekshiriladi.
+            # `javascript:` shu yerda to'xtatilmasa, bazaga tushadi va uni faqat
+            # React render paytida to'sadi; eksport yoki pochta xabarida esa
+            # hech kim to'smaydi.
+            from app.core.utils.safe_url import normalize_url
+
+            self.link_url = normalize_url(self.link_url or "")
         return self
 
 

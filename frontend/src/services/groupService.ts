@@ -7,7 +7,10 @@ export interface Group {
     speciality_id?: number | null;
     course?: number | null;
     education_shape?: string | null;
+    /** EPOS aytgan son — ko'zgu qiymati, o'zimiz sanamaymiz. */
     student_count?: number | null;
+    /** Bazadagi haqiqiy talaba soni. EPOS soni bilan mos kelmasligi normal. */
+    local_student_count?: number | null;
     created_at: string;
     updated_at: string;
 
@@ -112,7 +115,7 @@ export interface GroupMergeResult {
 export interface GroupListParams {
     course?: number;
     education_shape?: string;
-    sort_by?: 'name' | 'course' | 'student_count';
+    sort_by?: 'name' | 'course' | 'student_count' | 'local_student_count';
     order?: 'asc' | 'desc';
 }
 

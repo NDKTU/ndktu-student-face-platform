@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils';
 // Bug#13 fix: sanitize HTML content to prevent XSS attacks.
 // Общая реализация в utils/sanitize — список вывода HTML шире одной страницы.
 import { sanitizeHtml } from '@/utils/sanitize';
+import { apiErrorMessage } from '@/utils/apiError';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
@@ -178,9 +179,12 @@ const QuizTestPage = () => {
                 setPhase('quiz');
                 handleCloseStartModal();
             },
-            onError: (error: any) => {
-                const message = error.response?.data?.detail || error.response?.data?.message || 'Testni boshlashda xatolik yuz berdi. PIN kodni tekshiring.';
-                setStartError(typeof message === 'string' ? message : 'Testni boshlashda xatolik.');
+            onError: (error: unknown) => {
+                // Xabar `apiErrorMessage` orqali: server kodli javob qaytaradi
+                // (`{code, message}`), tarjima kod bo'yicha topiladi. Ilgari
+                // bu yerda `detail` to'g'ridan-to'g'ri o'qilardi va obyekt
+                // kelganda foydalanuvchi umumiy «xatolik» matnini ko'rardi.
+                setStartError(apiErrorMessage(error, "Testni boshlashda xatolik yuz berdi. PIN kodni tekshiring."));
             }
         });
     };

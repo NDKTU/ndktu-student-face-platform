@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.utils.course_access import can_manage
+from app.core.utils.safe_url import UnsafeUrlError, normalize_url
+from app.core.utils.youtube_link import YouTubeLinkError, parse_youtube_link
+from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.modules.auth.model import User
 from app.modules.course.model import Course, Lesson, Resource
 from app.modules.file.storage import public_url, store_upload
@@ -113,6 +116,30 @@ class ResourceRepository:
         if data.file_url is not None:
             resource.file_url = data.file_url
         if data.link_url is not None:
+            # Tur so'rovda emas, yozuvning o'zida — shuning uchun tekshiruv shu
+            # yerda, sxemada emas. Yaratishdagi qoida bilan bir xil: yaroqsiz
+            # havola tahrirlash orqali ham kirib qolmasin.
+            if resource.resource_type == "video":
+                try:
+                    parse_youtube_link(data.link_url)
+                except YouTubeLinkError as cause:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
+                    ) from cause
+            if resource.resource_type == "zoom":
+                try:
+                    parse_zoom_link(data.link_url)
+                except ZoomLinkError as cause:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
+                    ) from cause
+            if resource.resource_type == "link":
+                try:
+                    data.link_url = normalize_url(data.link_url)
+                except UnsafeUrlError as cause:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
+                    ) from cause
             resource.link_url = data.link_url
         if data.text_content is not None:
             resource.text_content = data.text_content

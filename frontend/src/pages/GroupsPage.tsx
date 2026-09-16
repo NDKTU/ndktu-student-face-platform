@@ -1,6 +1,7 @@
 // import { /* toast */ } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 import { Pagination } from '@/components/ui/Pagination';
 import { type Group } from '@/services/groupService';
 import { Button } from '@/components/ui/Button';
@@ -32,16 +33,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { IdChip } from '@/components/common/IdChip';
+import { StudentCount } from '@/components/group/StudentCount';
+import { educationShapeKey } from '@/utils/education';
 import { useTranslation } from 'react-i18next';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4' | '5';
-type SortField = 'name' | 'course' | 'student_count';
+type SortField = 'name' | 'course' | 'student_count' | 'local_student_count';
 type SortOrder = 'asc' | 'desc';
 
 export const GroupsPage = () => {
     const { t } = useTranslation();
-    const [searchParams, setSearchParams] = useSearchParams();
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
     // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
 //     const [showHidden, setShowHidden] = useState(false);
@@ -54,24 +56,30 @@ export const GroupsPage = () => {
     const openGroupStudents = (groupId: number) =>
         navigate(canReadAllStudents ? `/students?group_id=${groupId}` : `/groups/${groupId}/students`);
 
-    const facultyIdParam = searchParams.get('faculty_id');
-    const specialityIdParam = searchParams.get('speciality_id');
-
-    const [selectedFacultyFilter, setSelectedFacultyFilter] = useState<string>(facultyIdParam || 'all');
-    const [selectedSpecialityFilter, setSelectedSpecialityFilter] = useState<string>(specialityIdParam || 'all');
-    const [searchTerm, setSearchTerm] = useState('');
+    // URL — yagona manba. Ilgari bu ikkisi `useState` da yashardi va URL bilan
+    // qo'lda sinxronlanardi (`useEffect` + `setSearchParams`); qolgan filtrlar
+    // esa umuman URL'ga tushmasdi. Ikki xil yondashuv bir sahifada
+    // to'qnashardi: bitta hodisada yozilgan ikki parametrdan biri
+    // ikkinchisini o'chirib yuborardi.
+    const [selectedFacultyFilter, setSelectedFacultyFilter] = useUrlState<string>('faculty_id', 'all');
+    const [selectedSpecialityFilter, setSelectedSpecialityFilter] = useUrlState<string>('speciality_id', 'all');
+    // Filtrlar URL'da: sahifani yangilash ularni tozalab yubormasin, «Orqaga»
+    // ishlasin va tanlangan kesimni havola qilib yuborish mumkin bo'lsin.
+    // Fakultet va mutaxassislik allaqachon `faculty_id`/`speciality_id` da
+    // yashaydi — qolganlari esa faqat komponent holatida turardi.
+    const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [educationFormFilter, setEducationFormFilter] = useState<EducationFormFilter>('all');
-    const [courseLevelFilter, setCourseLevelFilter] = useState<CourseLevelFilter>('all');
+    const [educationFormFilter, setEducationFormFilter] = useUrlState<EducationFormFilter>('shape', 'all');
+    const [courseLevelFilter, setCourseLevelFilter] = useUrlState<CourseLevelFilter>('course', 'all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
     // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
     // ekran kengligiga qarab tanlaydi (hooks/useCatalogView.ts).
     const viewMode = useCatalogView();
 
-    const [sortField, setSortField] = useState<SortField>('name');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-    const [currentPage, setCurrentPage] = useState(1);
+    const [sortField, setSortField] = useUrlState<SortField>('sort', 'name');
+    const [sortOrder, setSortOrder] = useUrlState<SortOrder>('order', 'asc');
+    const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
     const pageSize = 15;
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
@@ -92,15 +100,6 @@ export const GroupsPage = () => {
         }, 350);
         return () => clearTimeout(timer);
     }, [searchTerm]);
-
-    useEffect(() => {
-        if (facultyIdParam && facultyIdParam !== selectedFacultyFilter) {
-            setSelectedFacultyFilter(facultyIdParam);
-        }
-        if (specialityIdParam && specialityIdParam !== selectedSpecialityFilter) {
-            setSelectedSpecialityFilter(specialityIdParam);
-        }
-    }, [facultyIdParam, specialityIdParam]);
 
     const facultyIdNum = selectedFacultyFilter === 'all' ? undefined : Number(selectedFacultyFilter);
     const specialityIdNum = selectedSpecialityFilter === 'all' ? undefined : Number(selectedSpecialityFilter);
@@ -134,25 +133,11 @@ export const GroupsPage = () => {
     const handleFacultyFilterChange = (val: string) => {
         setSelectedFacultyFilter(val);
         setCurrentPage(1);
-        const nextParams = new URLSearchParams(searchParams);
-        if (val === 'all') {
-            nextParams.delete('faculty_id');
-        } else {
-            nextParams.set('faculty_id', val);
-        }
-        setSearchParams(nextParams);
     };
 
     const handleSpecialityFilterChange = (val: string) => {
         setSelectedSpecialityFilter(val);
         setCurrentPage(1);
-        const nextParams = new URLSearchParams(searchParams);
-        if (val === 'all') {
-            nextParams.delete('speciality_id');
-        } else {
-            nextParams.set('speciality_id', val);
-        }
-        setSearchParams(nextParams);
     };
 
     const facultyOptions = useMemo(() => {
@@ -207,11 +192,8 @@ export const GroupsPage = () => {
         setCourseLevelFilter('all');
         setSearchTerm('');
         setCurrentPage(1);
-        // URL ham tozalanadi: aks holda sahifa yangilanganda filtr qaytib kelardi.
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.delete('faculty_id');
-        nextParams.delete('speciality_id');
-        setSearchParams(nextParams);
+        // URL o'zi tozalanadi: har bir filtr boshlang'ich qiymatga qaytganda
+        // `useUrlState` parametrni manzildan olib tashlaydi.
     };
 
     const handleSort = (field: SortField) => {
@@ -283,7 +265,9 @@ export const GroupsPage = () => {
 
         return (
             <span className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-medium border ${colorClass}`}>
-                {form}
+                {/* EPOS qiymati emas, tarjimasi: ruscha interfeysda «kunduzgi»
+                    qolib ketmasin. Tanimagan shakl o'z holicha chiqadi. */}
+                {t(educationShapeKey(form) ?? form)}
             </span>
         );
     };
@@ -292,7 +276,7 @@ export const GroupsPage = () => {
         if (!course) return <span className="text-muted-foreground text-xs">—</span>;
         return (
             <span className="inline-flex items-center justify-center rounded-lg bg-muted px-2.5 py-0.5 font-mono text-xs font-bold text-foreground border border-border">
-                {course}-kurs
+                {t('{{n}}-kurs', { n: course })}
             </span>
         );
     };
@@ -349,17 +333,17 @@ export const GroupsPage = () => {
                 onClick={() => openGroupStudents(group.id)}
             >
                 <Users className="h-3.5 w-3.5" />
-                <span>Talabalar</span>
+                <span>{t('Talabalar')}</span>
             </Button>
         </div>
     );
 
     // Breadcrumb items
     const breadcrumbItems = useMemo(() => {
-        const items = [{ label: 'Guruhlar', onClick: () => navigate('/groups') }];
+        const items = [{ label: t('Guruhlar'), onClick: () => navigate('/groups') }];
         if (currentFacultyObj) {
             items.unshift({
-                label: `Fakultet: ${currentFacultyObj.name}`,
+                label: t('Fakultet: {{name}}', { name: currentFacultyObj.name }),
                 onClick: () => navigate(`/kafedras?faculty_id=${currentFacultyObj.id}`),
             });
         }
@@ -370,7 +354,7 @@ export const GroupsPage = () => {
             });
         }
         return items;
-    }, [currentFacultyObj, currentSpecialityObj, navigate]);
+    }, [currentFacultyObj, currentSpecialityObj, navigate, t]);
 
     return (
         <div className="space-y-5">
@@ -379,10 +363,10 @@ export const GroupsPage = () => {
                 items={breadcrumbItems}
                 title={
                     currentSpecialityObj
-                        ? `${currentSpecialityObj.name} — guruhlar`
+                        ? t('{{name}} — guruhlar', { name: currentSpecialityObj.name })
                         : currentFacultyObj
-                        ? `${currentFacultyObj.name} — guruhlar`
-                        : "O'quv Guruhlari"
+                        ? t('{{name}} — guruhlar', { name: currentFacultyObj.name })
+                        : t("O'quv Guruhlari")
                 }
                 description={t("Universitet o'quv guruhlari, ta'lim shakllari va talabalar taqsimoti")}
             />
@@ -393,7 +377,7 @@ export const GroupsPage = () => {
                 onSearchChange={setSearchTerm}
                 searchPlaceholder={t("Guruh nomi bo'yicha qidirish...")}
                 totalCount={totalCount}
-                totalLabel="Guruhlar"
+                totalLabel={t('Guruhlar')}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={handleClearFilters}
                 extraFilters={
@@ -433,10 +417,10 @@ export const GroupsPage = () => {
                             }}
                             options={[
                                 { value: 'all', label: t('Barchasi') },
-                                { value: 'Kunduzgi', label: 'Kunduzgi' },
-                                { value: 'Sirtqi', label: 'Sirtqi' },
-                                { value: 'Kechki', label: 'Kechki' },
-                                { value: 'Masofaviy', label: 'Masofaviy' },
+                                { value: 'Kunduzgi', label: t('Kunduzgi') },
+                                { value: 'Sirtqi', label: t('Sirtqi') },
+                                { value: 'Kechki', label: t('Kechki') },
+                                { value: 'Masofaviy', label: t('Masofaviy') },
                             ]}
                         />
 
@@ -450,11 +434,11 @@ export const GroupsPage = () => {
                             }}
                             options={[
                                 { value: 'all', label: t('Barchasi') },
-                                { value: '1', label: '1-kurs' },
-                                { value: '2', label: '2-kurs' },
-                                { value: '3', label: '3-kurs' },
-                                { value: '4', label: '4-kurs' },
-                                { value: '5', label: '5-kurs' },
+                                { value: '1', label: t('{{n}}-kurs', { n: 1 }) },
+                                { value: '2', label: t('{{n}}-kurs', { n: 2 }) },
+                                { value: '3', label: t('{{n}}-kurs', { n: 3 }) },
+                                { value: '4', label: t('{{n}}-kurs', { n: 4 }) },
+                                { value: '5', label: t('{{n}}-kurs', { n: 5 }) },
                             ]}
                         />
                     </div>
@@ -535,13 +519,15 @@ export const GroupsPage = () => {
                                     {renderSortIcon('course')}
                                 </div>
                             </TableHead>
+                            {/* Saralash haqiqiy son bo'yicha: ustunda ko'rinib turgan
+                                asosiy raqam ham o'sha. EPOS soni pastda, kichik matnda. */}
                             <TableHead
-                                onClick={() => handleSort('student_count')}
+                                onClick={() => handleSort('local_student_count')}
                                 className="group cursor-pointer select-none text-center font-bold text-xs hover:text-foreground"
                             >
                                 <div className="flex items-center justify-center">
-                                    <span>Talabalar</span>
-                                    {renderSortIcon('student_count')}
+                                    <span>{t('Talabalar')}</span>
+                                    {renderSortIcon('local_student_count')}
                                 </div>
                             </TableHead>
                             <TableHead className="text-center font-bold text-xs">{t('Holati')}</TableHead>
@@ -617,11 +603,9 @@ export const GroupsPage = () => {
                                         {renderCourseBadge(group.course)}
                                     </TableCell>
 
-                                    {/* Talabalar Soni */}
+                                    {/* Talabalar soni: bazadagi haqiqiy son, farq bo'lsa — EPOS niki ostida. */}
                                     <TableCell className="text-center">
-                                        <span className="inline-flex items-center justify-center min-w-[32px] rounded-lg bg-emerald-500/10 px-2.5 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                            {group.student_count ?? '—'}
-                                        </span>
+                                        <StudentCount local={group.local_student_count} epos={group.student_count} />
                                     </TableCell>
 
                                     {/* Holati */}
@@ -675,7 +659,11 @@ export const GroupsPage = () => {
                             actions={renderActions(group)}
                             metrics={[
                                 { label: t('Bosqich'), value: group.course ? `${group.course}-kurs` : '—' },
-                                { label: t('Talaba'), value: group.student_count ?? '—', accent: true },
+                                {
+                                    label: t('Talaba'),
+                                    value: <StudentCount local={group.local_student_count} epos={group.student_count} />,
+                                    accent: true,
+                                },
                             ]}
                         />
                     ))}
