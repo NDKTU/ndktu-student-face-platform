@@ -30,6 +30,8 @@ from .attendance.schemas import (
     CourseAttendanceResponse,
     MyAttendanceResponse,
 )
+from .gradebook.repository import get_gradebook_repository
+from .gradebook.schemas import GradebookResponse, MyGradesResponse
 from .face_check.repository import get_face_check_repository
 from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .homework.repository import get_homework_repository
@@ -316,6 +318,22 @@ async def lesson_attendance(
     """
     return await get_attendance_repository.list_attendance(
         session=session, lesson_id=lesson_id, current_user=current_user, group_id=group_id
+    )
+
+
+@lesson_router.get("/{lesson_id}/gradebook", response_model=GradebookResponse)
+async def lesson_gradebook(
+    lesson_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:submission")),
+):
+    """Dars baholash jurnali: har bir talabaning uy vazifasi va test baholari.
+
+    Faqat dars o'qituvchisi va admin uchun — talabada ham `read:submission`
+    bor, lekin u boshqalarning bahosini ko'rmasligi kerak.
+    """
+    return await get_gradebook_repository.lesson_gradebook(
+        session=session, lesson_id=lesson_id, current_user=current_user
     )
 
 
@@ -628,6 +646,18 @@ async def attendance_stats(
 
     stats = await get_attendance_repository.stats_for_students(session, ids, course_ids)
     return AttendanceStatsResponse(students=[stats[sid] for sid in ids if sid in stats])
+
+
+@course_router.get("/{course_id}/my-grades", response_model=MyGradesResponse)
+async def my_course_grades(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:submission")),
+):
+    """Talabaning shu kursdagi baholari: har mavzu bo'yicha uy vazifasi va testlar."""
+    return await get_gradebook_repository.my_course_grades(
+        session=session, course_id=course_id, current_user=current_user
+    )
 
 
 @course_router.get("/{course_id}/attendance", response_model=CourseAttendanceResponse)

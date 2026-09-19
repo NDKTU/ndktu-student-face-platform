@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     ArrowLeft,
+    Award,
     BookOpen,
     ChevronRight,
     ClipboardCheck,
@@ -25,12 +26,16 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
 import { CourseAttendanceJournal } from '@/components/courses/CourseAttendanceJournal';
+import { MyCourseGrades } from '@/components/courses/MyCourseGrades';
+import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { CourseFileLibrary } from '@/components/courses/CourseFileLibrary';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
 import { isYoutubeUrl } from '@/utils/youtube';
 import { courseTypeLabel } from '@/services/courseTypes';
+
+type CourseTab = 'lessons' | 'grades' | 'attendance' | 'library';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -39,11 +44,14 @@ export default function CourseDetailPage() {
     const courseId = id ? Number.parseInt(id, 10) : undefined;
     const canReadLessons = hasPermission('read:lesson');
     // Jurnal o'qituvchi va adminniki: talabada `read:attendance` yo'q.
-    const canReadAttendance = hasPermission('read:attendance');
+    const canReadAttendance = ATTENDANCE_ENABLED && hasPermission('read:attendance');
+    // «Baholarim» — faqat talabaga: o'qituvchida ham `create:submission` bor,
+    // lekin u vazifa beradi, topshirmaydi (dars sahifasidagi qoida bilan bir xil).
+    const isStudent = hasPermission('create:submission') && !hasPermission('create:homework');
 
     // Ochilganda doim darslar: kursga kirgan o'qituvchi avval nima o'tilganini
     // ko'rishi kerak, jurnal esa alohida qadam.
-    const [tab, setTab] = useState<'lessons' | 'attendance' | 'library'>('lessons');
+    const [tab, setTab] = useState<CourseTab>('lessons');
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
@@ -85,6 +93,9 @@ export default function CourseDetailPage() {
     const canCreateLessons = hasPermission('create:lesson') && !isArchived;
     const canUpdateLessons = hasPermission('update:lesson') && !isArchived;
     const canDeleteLessons = hasPermission('delete:lesson') && !isArchived;
+    const canAddLibraryFiles = hasPermission('create:resource') && !isArchived;
+    const canEditLibraryFiles = hasPermission('update:resource') && !isArchived;
+    const canRemoveLibraryFiles = hasPermission('delete:resource') && !isArchived;
 
     // ── Tablar ───────────────────────────────────────────────────────────
     //
@@ -92,9 +103,12 @@ export default function CourseDetailPage() {
     // ekran pastida qolib, uni topish uchun butun dars ro'yxatini aylanish
     // kerak bo'lardi. Huquqi bo'lmagan tab chizilmaydi (talabada jurnal yo'q),
     // bitta tab qolganda esa panel umuman ko'rinmaydi.
-    const tabs: TabDef<'lessons' | 'attendance' | 'library'>[] = [
+    const tabs: TabDef<CourseTab>[] = [
         ...(canReadLessons
             ? [{ id: 'lessons' as const, label: 'Darslar', icon: <BookOpen className="h-4 w-4" /> }]
+            : []),
+        ...(isStudent
+            ? [{ id: 'grades' as const, label: 'Baholarim', icon: <Award className="h-4 w-4" /> }]
             : []),
         ...(canReadAttendance
             ? [{ id: 'attendance' as const, label: 'Davomat jurnali', icon: <ClipboardCheck className="h-4 w-4" /> }]
@@ -297,13 +311,27 @@ export default function CourseDetailPage() {
                 </section>
             )}
 
+            {activeTab === 'grades' && isStudent && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Mavzular bo'yicha baholarim
+                    </h2>
+                    <MyCourseGrades courseId={course.id} />
+                </section>
+            )}
+
             {activeTab === 'library' && canReadLessons && (
                 <section className="space-y-3">
                     <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Kurs kutubxonasi
                     </h2>
                     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
-                        <CourseFileLibrary courseId={course.id} />
+                        <CourseFileLibrary
+                            courseId={course.id}
+                            canAdd={canAddLibraryFiles}
+                            canEdit={canEditLibraryFiles}
+                            canRemove={canRemoveLibraryFiles}
+                        />
                     </div>
                 </section>
             )}

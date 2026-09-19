@@ -108,6 +108,42 @@ export interface CourseTeacherSummary {
     lesson_count: number;
 }
 
+/** Talabaning kursdagi baholari (`GET /course/{id}/my-grades`). */
+export interface MyHomeworkGrade {
+    id: number;
+    title: string;
+    max_grade: number;
+    deadline: string;
+    /** Ish topshirilmagan bo'lsa — null. */
+    status?: string | null;
+    grade?: number | null;
+    late: boolean;
+}
+
+export interface MyQuizGrade {
+    id: number;
+    title: string;
+    /** Test ishlanmagan bo'lsa — null. */
+    grade?: number | null;
+    correct_answers?: number | null;
+    wrong_answers?: number | null;
+    attempts: number;
+}
+
+export interface MyGradesTopic {
+    /** Darssiz (kurs darajasidagi) vazifa uchun null. */
+    lesson_id?: number | null;
+    topic: string;
+    date?: string | null;
+    homework?: MyHomeworkGrade | null;
+    quizzes: MyQuizGrade[];
+}
+
+export interface MyCourseGrades {
+    course_id: number;
+    topics: MyGradesTopic[];
+}
+
 export const courseService = {
     getTeacherSummaries: async (search?: string, facultyId?: number, kafedraId?: number) => {
         const response = await api.get<{ teachers: CourseTeacherSummary[] }>('/course/teachers/summary', {
@@ -140,6 +176,10 @@ export const courseService = {
         return response.data;
     },
 
+    getMyGrades: async (id: number) => {
+        const response = await api.get<MyCourseGrades>(`/course/${id}/my-grades`);
+        return response.data;
+    },
     getCourseById: async (id: number): Promise<Course> => {
         const response = await api.get<Course>(`/course/${id}`);
         return response.data;

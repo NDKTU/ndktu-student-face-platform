@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { resourceService, type ResourceCreateRequest } from '@/services/resourceService';
+import { resourceService, type ResourceCreateRequest, type ResourceUpdateRequest } from '@/services/resourceService';
 
 export const useResources = (lessonId?: number) => useQuery({
     queryKey: ['resources', 'lesson', lessonId],
@@ -11,6 +11,14 @@ export const useCreateResource = (lessonId?: number) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: ResourceCreateRequest) => resourceService.create(data),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['resources', 'lesson', lessonId] }),
+    });
+};
+
+export const useUpdateResource = (lessonId?: number) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: ResourceUpdateRequest }) => resourceService.update(id, data),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['resources', 'lesson', lessonId] }),
     });
 };

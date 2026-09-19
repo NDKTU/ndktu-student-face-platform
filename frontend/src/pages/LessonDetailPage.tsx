@@ -1,28 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BookOpen, ClipboardCheck, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, Plus, Radio, ScanFace, ScrollText, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useRoleView } from '@/hooks/useRoleView';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
-import { useCreateResource, useDeleteResource, useResources } from '@/hooks/useResources';
-import { useUpdateLesson } from '@/hooks/useLessons';
+import { useCreateResource, useDeleteResource, useResources, useUpdateResource } from '@/hooks/useResources';
 import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
-import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
 import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePanel';
-import { Switch } from '@/components/ui/Switch';
-import { toast } from 'sonner';
+import { LessonGradebook } from '@/components/courses/LessonGradebook';
+import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
-import { HomeworkSubmissionBox } from '@/components/courses/HomeworkSubmissionBox';
+import { LessonHomeworkCard } from '@/components/homework/LessonHomeworkCard';
 import { Button } from '@/components/ui/Button';
 import { CardAction } from '@/components/ui/CardAction';
-import { formatDate, formatDateTime } from '@/utils/date';
+import { formatDate } from '@/utils/date';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -39,30 +36,32 @@ import { apiErrorMessage } from '@/utils/apiError';
 import { EXTERNAL_LINK_ERROR, normalizeExternalUrl } from '@/utils/url';
 import { YOUTUBE_LINK_ERROR, youtubeEmbedUrl, youtubeVideoId } from '@/utils/youtube';
 
+type LessonTab = 'info' | 'tasks' | 'attendance' | 'grading';
+
 export default function LessonDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { hasPermission } = useAuth();
-    const { isStudent } = useRoleView();
     const lessonId = id ? Number.parseInt(id, 10) : undefined;
     const lessonQuery = useLesson(lessonId);
     const resourcesQuery = useResources(lessonId);
     const assignmentsQuery = useAssignments(lessonId ? { lesson_id: lessonId, limit: 1 } : undefined);
     const deleteResource = useDeleteResource(lessonId);
-    const updateLesson = useUpdateLesson();
     const deleteAssignment = useDeleteAssignment();
     // Kontent bitta umumiy oynada emas, har bir blokda alohida qo'shiladi:
     // o'qituvchi «video qo'shaman» deb kirsa, unga fayl/konspekt tanlash
     // kerak emas. `contentKinds` — o'sha blok uchun ruxsat etilgan turlar.
     // Ochilganda doim dars ma'lumoti: o'qituvchi avval nimani o'qitayotganini
     // ko'rishi kerak, jurnal esa alohida qadam.
-    const [tab, setTab] = useState<'info' | 'attendance' | 'grading'>('info');
+    const [tab, setTab] = useState<LessonTab>('info');
     const [contentKinds, setContentKinds] = useState<ResourceType[] | null>(null);
     // Material o'chirish qaytarib bo'lmaydigan amal: havola ham, konspekt matni
     // ham qayta yozishga to'g'ri keladi. Ilgari bitta bosishda darhol o'chardi —
     // tasodifiy bosish uchun juda arzon narx edi.
     const [resourceToDelete, setResourceToDelete] = useState<{ id: number; title: string } | null>(null);
+    const [resourceToRename, setResourceToRename] = useState<{ id: number; title: string } | null>(null);
     const [homeworkOpen, setHomeworkOpen] = useState(false);
+    const [homeworkToDelete, setHomeworkToDelete] = useState<Assignment | null>(null);
     const [editingHomework, setEditingHomework] = useState<Assignment | null>(null);
     const [quizOpen, setQuizOpen] = useState(false);
     const [excelOpen, setExcelOpen] = useState(false);
@@ -86,7 +85,6 @@ export default function LessonDetailPage() {
     // Jonli dars — Zoom havolasi. Oxirgisi olinadi: o'qituvchi havolani
     // yangilaganda eskisi qolib ketmasin.
     const zoom = [...resources].reverse().find((item) => item.resource_type === 'zoom');
-    const scripts = resources.filter((item) => item.resource_type === 'text');
     const extras = resources.filter((item) => item.resource_type === 'file' || item.resource_type === 'link');
     // Bir darsga — bitta uy vazifasi (bazada `uq_homework_per_lesson` bilan
     // kafolatlangan), shuning uchun ro'yxat emas, bitta yozuv ko'rsatiladi.
@@ -99,10 +97,6 @@ export default function LessonDetailPage() {
     const canSubmitHomework = hasPermission('create:submission') && !canManageHomework;
     const canGrade = hasPermission('update:submission');
     const canManageQuiz = hasPermission('create:quiz');
-    // Yuz nazorati faqat talabaga: darsni o'qituvchining o'zi olib boradi.
-    // Ko'rinish roli bo'yicha aniqlanadi — huquqlar to'plami emas: bir
-    // hisobda bir nechta rol bo'lishi mumkin.
-    const isStudentView = isStudent;
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
     // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,
@@ -115,19 +109,27 @@ export default function LessonDetailPage() {
     // Ilgari sakkizta karta ketma-ket turardi va Davomat yuqoridan ikkinchi
     // bo'lib chiqardi: o'qituvchi darsga kirishi bilan jurnalni ko'rar, dars
     // mazmuni esa pastda qolardi. Endi birinchi tab — darsning o'zi.
-    const canSeeAttendance = canManageContent && hasPermission('read:attendance');
-    // Baholash tab'i: testlar va uy vazifasi ishlarini tekshirish. Talabada
-    // ham testlar ko'rinadi (u ularni ishlaydi), shuning uchun shart
-    // `canSeeQuizzes` ni ham hisobga oladi.
-    const canSeeGrading = canSeeQuizzes || canGrade;
+    const canReadAttendance = canManageContent && hasPermission('read:attendance');
+    const showFaceCheck = canReadAttendance && Boolean(zoom?.link_url) && lesson.face_check_enabled;
+    // Davomat yashirilgan bo'lsa ham tab yuz nazorati hisoboti uchun qoladi.
+    const canSeeAttendance = canReadAttendance && (ATTENDANCE_ENABLED || showFaceCheck);
+    // «Topshiriqlar» — talaba nima qilishi kerak: uy vazifasi, testlar va
+    // savollar. «Baholash jurnali» — shularning natijasi: kim topshirdi,
+    // qancha baho oldi. Jurnal faqat baho qo'yadiganlarga.
+    const canSeeGrading = canGrade;
 
-    const tabs: TabDef<'info' | 'attendance' | 'grading'>[] = [
+    const tabs: TabDef<LessonTab>[] = [
         { id: 'info', label: "Dars ma'lumoti", icon: <BookOpen className="h-4 w-4" /> },
-        ...(canSeeAttendance
-            ? [{ id: 'attendance' as const, label: 'Davomat', icon: <ClipboardCheck className="h-4 w-4" /> }]
-            : []),
+        { id: 'tasks', label: 'Topshiriqlar', icon: <ClipboardList className="h-4 w-4" /> },
         ...(canSeeGrading
-            ? [{ id: 'grading' as const, label: 'Baholash', icon: <ListChecks className="h-4 w-4" /> }]
+            ? [{ id: 'grading' as const, label: 'Baholash jurnali', icon: <ListChecks className="h-4 w-4" /> }]
+            : []),
+        ...(canSeeAttendance
+            ? [
+                  ATTENDANCE_ENABLED
+                      ? { id: 'attendance' as const, label: 'Davomat', icon: <ClipboardCheck className="h-4 w-4" /> }
+                      : { id: 'attendance' as const, label: 'Yuz nazorati', icon: <ScanFace className="h-4 w-4" /> },
+              ]
             : []),
     ];
     const activeTab = tabs.some((t) => t.id === tab) ? tab : 'info';
@@ -145,45 +147,6 @@ export default function LessonDetailPage() {
             {/* ── Dars ma'lumoti ──────────────────────────────────────── */}
             {activeTab === 'info' && (
             <div className="space-y-6">
-            {(zoom?.link_url || canManageContent) && (
-                <SectionCard
-                    icon={<Radio className="h-[18px] w-[18px]" />}
-                    tone="teal"
-                    title="Jonli dars (Zoom)"
-                    description={zoom?.link_url ? 'Uchrashuv biriktirilgan' : undefined}
-                    action={canManageContent && (
-                        zoom
-                            ? <CardAction variant="ghost" className="text-destructive" onClick={() => setResourceToDelete({ id: zoom.id, title: 'Zoom havolasi' })} icon={<Trash2 className="h-4 w-4" />} label="Havolani olib tashlash" />
-                            : <CardAction onClick={() => setContentKinds(['zoom'])} icon={<Plus className="h-4 w-4" />} label="Zoom havolasi" />
-                    )}
-                >
-                    {/* Nazorat har bir darsga kerak emas — o'qituvchi o'zi hal qiladi. */}
-                    {canManageContent && zoom?.link_url && (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                            <div>
-                                <p className="flex items-center gap-2 text-sm font-medium"><ScanFace className="h-4 w-4" /> Yuz nazorati</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Talaba darsga kirishda va dars davomida tasodifiy vaqtlarda tekshiriladi.
-                                </p>
-                            </div>
-                            <Switch
-                                checked={Boolean(lesson.face_check_enabled)}
-                                disabled={updateLesson.isPending}
-                                onCheckedChange={(checked) => {
-                                    updateLesson.mutate(
-                                        { id: lesson.id, data: { face_check_enabled: checked } },
-                                        { onError: () => toast.error("Sozlamani saqlab bo'lmadi") },
-                                    );
-                                }}
-                            />
-                        </div>
-                    )}
-                    {zoom?.link_url
-                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudentView && Boolean(lesson.face_check_enabled)} />
-                        : <EmptyState icon={<Radio className="h-6 w-6" />} title="Jonli uchrashuv yo'q" description="Bu darsga Zoom havolasi biriktirilmagan." className="py-8" />}
-                </SectionCard>
-            )}
-
             <SectionCard
                 icon={<VideoIcon className="h-[18px] w-[18px]" />}
                 tone="blue"
@@ -202,14 +165,6 @@ export default function LessonDetailPage() {
                     : <EmptyState icon={<VideoIcon className="h-6 w-6" />} title="Video qo'shilmagan" description="Bu darsni video bo'lmasdan ham o'qish mumkin." className="py-8" />}
             </SectionCard>
 
-            {(scripts.length > 0 || canManageContent) && <SectionCard
-                icon={<ScrollText className="h-[18px] w-[18px]" />}
-                tone="purple"
-                title="Dars skripti / konspekti"
-                description={scripts.length > 0 ? `${scripts.length} ta yozuv` : undefined}
-                action={canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['text'])} icon={<Plus className="h-4 w-4" />} label="Konspekt qo'shish" />}
-            >{scripts.length === 0 ? <EmptyState icon={<ScrollText className="h-6 w-6" />} title="Konspekt qo'shilmagan" description="Dars matnini shu yerga qo'shish mumkin." className="py-8" /> : scripts.map((item) => <div key={item.id} className="group/item relative rounded-xl border border-border/60 bg-muted/30 p-4 transition-colors hover:border-border"><p className="whitespace-pre-wrap text-sm leading-7">{item.text_content}</p>{canManageContent && <DeleteButton onClick={() => setResourceToDelete({ id: item.id, title: item.title || 'Konspekt' })} />}</div>)}</SectionCard>}
-
             <SectionCard
                 icon={<Paperclip className="h-[18px] w-[18px]" />}
                 tone="orange"
@@ -217,18 +172,9 @@ export default function LessonDetailPage() {
                 description={extras.length > 0 ? `${extras.length} ta havola va hujjat` : undefined}
                 action={canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['file', 'link'])} icon={<Plus className="h-4 w-4" />} label="Material qo'shish" />}
             >
-                {extras.length === 0 ? <EmptyState icon={<Paperclip className="h-6 w-6" />} title="Material yo'q" description="Hozircha kitob, hujjat yoki qo'shimcha havola qo'shilmagan." className="py-8" /> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="group/item flex items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-8px_rgba(16,24,40,0.2)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{item.resource_type === 'file' ? <FileText className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}</span><a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: item.title } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium transition-colors hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all group-hover/item:translate-x-0.5 group-hover/item:text-primary" />{canManageContent && <button onClick={() => setResourceToDelete({ id: item.id, title: item.title })} aria-label="Materialni o'chirish" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/item:opacity-100"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
+                {extras.length === 0 ? <EmptyState icon={<Paperclip className="h-6 w-6" />} title="Material yo'q" description="Hozircha kitob, hujjat yoki qo'shimcha havola qo'shilmagan." className="py-8" /> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="group/item flex items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-8px_rgba(16,24,40,0.2)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{item.resource_type === 'file' ? <FileText className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}</span><a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: downloadName(item.title, item.file_url) } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium transition-colors hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all group-hover/item:translate-x-0.5 group-hover/item:text-primary" />{canManageContent && <button onClick={() => setResourceToRename({ id: item.id, title: item.title })} aria-label="Material nomini tahrirlash" title="Nomini tahrirlash" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"><Pencil className="h-4 w-4" /></button>}{canManageContent && <button onClick={() => setResourceToDelete({ id: item.id, title: item.title })} aria-label="Materialni o'chirish" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/item:opacity-100"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
             </SectionCard>
 
-            <SectionCard
-                icon={<ClipboardCheck className="h-[18px] w-[18px]" />}
-                tone="green"
-                title="Uy vazifasi"
-                description={homework ? `Muddat: ${formatDateTime(homework.deadline)}` : undefined}
-                action={canManageHomework && !homework && <CardAction onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }} icon={<Plus className="h-4 w-4" />} label="Uy vazifasi" />}
-            >
-                {!homework ? <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="Uy vazifasi yo'q" description="Bu dars uchun uy vazifasi berilmagan." className="py-8" /> : (() => { const assignment = homework; return <div key={assignment.id} className="rounded-xl border border-border/60 p-4"><div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{assignment.title}</p>{assignment.description && <p className="mt-1 text-sm text-muted-foreground">{assignment.description}</p>}<p className="mt-2 text-xs text-muted-foreground">Muddat: {formatDateTime(assignment.deadline)}</p>{/* Kim bergani faqat vazifani boshqaradiganlarga: talabaga muddat muhim, xizmat ma'lumoti emas. */}{canManageHomework && <p className="mt-1 text-xs text-muted-foreground">Bergan: {assignment.created_by_name || "noma'lum"} · {formatDateTime(assignment.created_at)}</p>}{assignment.attachments?.length > 0 && <ul className="mt-3 space-y-1.5">{assignment.attachments.map((file) => <li key={file.url}><a href={file.url} download={file.name} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"><FileText className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{file.size != null && <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>}</a></li>)}</ul>}</div>{canGrade && <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate(`/homework/${assignment.id}/submissions`)}><ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish{assignment.stats ? ` (${assignment.stats.submitted})` : ''}</Button>}{canManageHomework && <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setEditingHomework(assignment); setHomeworkOpen(true); }}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteAssignment.mutate(assignment.id)}><Trash2 className="h-4 w-4" /></Button></div>}</div>{canSubmitHomework && <HomeworkSubmissionBox assignment={assignment} />}</div>; })()}
-            </SectionCard>
 
             </div>
             )}
@@ -236,13 +182,15 @@ export default function LessonDetailPage() {
             {/* ── Davomat ─────────────────────────────────────────────── */}
             {activeTab === 'attendance' && canSeeAttendance && (
                 <div className="space-y-6">
-                    <SectionCard icon={<ClipboardCheck className="h-[18px] w-[18px]" />} tone="teal" title="Davomat">
-                        <LessonAttendancePanel lessonId={lesson.id} />
-                    </SectionCard>
+                    {ATTENDANCE_ENABLED && (
+                        <SectionCard icon={<ClipboardCheck className="h-[18px] w-[18px]" />} tone="teal" title="Davomat">
+                            <LessonAttendancePanel lessonId={lesson.id} />
+                        </SectionCard>
+                    )}
 
                     {/* Yuz nazorati jurnali — davomat bilan bir kesimda: ikkovi
                         ham «kim darsda bo'ldi» degan savolga javob beradi. */}
-                    {zoom?.link_url && lesson.face_check_enabled && (
+                    {showFaceCheck && (
                         <SectionCard icon={<ScanFace className="h-[18px] w-[18px]" />} tone="purple" title="Yuz nazorati">
                             <LessonFaceCheckReport lessonId={lesson.id} />
                         </SectionCard>
@@ -250,29 +198,36 @@ export default function LessonDetailPage() {
                 </div>
             )}
 
-            {/* ── Baholash ────────────────────────────────────────────── */}
-            {activeTab === 'grading' && (
+            {/* ── Topshiriqlar ────────────────────────────────────────── */}
+            {activeTab === 'tasks' && (
             <div className="space-y-6">
-            {/* Uy vazifasi ishlari. Vazifaning o'zi «Dars ma'lumoti» da qoladi
-                — u dars mazmunining bir qismi; bu yerda esa tekshirishga
-                kirish, ya'ni baholash ishi. */}
-            {canGrade && homework && (
-                <SectionCard icon={<ClipboardCheck className="h-[18px] w-[18px]" />} tone="green" title="Uy vazifasi ishlari">
-                    <p className="text-sm text-muted-foreground">
-                        «{homework.title}» — topshirilgan ishlarni ko'rib, baho qo'yish.
-                    </p>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/homework/${homework.id}/submissions`)}>
-                        <ClipboardCheck className="mr-2 h-4 w-4" /> Ishlarni tekshirish
-                        {homework.stats ? ` (${homework.stats.submitted})` : ''}
-                    </Button>
-                </SectionCard>
-            )}
+            <SectionCard
+                icon={<ClipboardCheck className="h-[18px] w-[18px]" />}
+                tone="green"
+                title="Uy vazifasi"
+                action={canManageHomework && (
+                    homework ? (
+                        <div className="flex shrink-0 gap-1.5">
+                            <CardAction variant="outline" onClick={() => { setEditingHomework(homework); setHomeworkOpen(true); }} icon={<Pencil className="h-4 w-4" />} label="Tahrirlash" />
+                            <CardAction variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => setHomeworkToDelete(homework)} icon={<Trash2 className="h-4 w-4" />} label="O'chirish" />
+                        </div>
+                    ) : (
+                        <CardAction onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }} icon={<Plus className="h-4 w-4" />} label="Uy vazifasi berish" />
+                    )
+                )}
+            >
+                {homework ? (
+                    <LessonHomeworkCard homework={homework} canGrade={canGrade} canManage={canManageHomework} canSubmit={canSubmitHomework} />
+                ) : (
+                    <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="Uy vazifasi yo'q" description="Bu dars uchun uy vazifasi berilmagan." className="py-8" />
+                )}
+            </SectionCard>
 
             {canSeeQuizzes && <SectionCard
                 icon={<ListChecks className="h-[18px] w-[18px]" />}
                 tone="blue"
-                title="Testlar"
-                description={quizzes.length > 0 ? `${quizzes.length} ta test` : undefined}
+                title="Testlar va savollar"
+                description={quizzes.length > 0 ? `${quizzes.length} ta test` : 'Avval savol qo\'shing, keyin ulardan test tuzing'}
                 action={
                     <div className="flex flex-wrap gap-2">
                         {canAddQuestion && (
@@ -340,6 +295,13 @@ export default function LessonDetailPage() {
             </div>
             )}
 
+            {/* ── Baholash jurnali ────────────────────────────────────── */}
+            {activeTab === 'grading' && canSeeGrading && (
+                <SectionCard icon={<ListChecks className="h-[18px] w-[18px]" />} tone="green" title="Baholash jurnali" description="Uy vazifasi va testlar bo'yicha har bir talabaning bahosi">
+                    <LessonGradebook lessonId={lesson.id} onCreateTask={() => setTab('tasks')} />
+                </SectionCard>
+            )}
+
             <ContentModal kinds={contentKinds} onClose={() => setContentKinds(null)} lessonId={lesson.id} />
             <LessonQuizModal isOpen={quizOpen} onClose={() => setQuizOpen(false)} lessonId={lesson.id} quiz={editingQuiz} />
             <QuestionExcelUploadModal
@@ -351,6 +313,20 @@ export default function LessonDetailPage() {
                 lockSubject
             />
             <AssignmentFormModal isOpen={homeworkOpen} onClose={() => setHomeworkOpen(false)} courseId={lesson.course_id} lessonId={lesson.id} editing={editingHomework} />
+            <ConfirmDialog
+                isOpen={homeworkToDelete !== null}
+                onClose={() => setHomeworkToDelete(null)}
+                onConfirm={() => {
+                    if (!homeworkToDelete) return;
+                    deleteAssignment.mutate(homeworkToDelete.id, { onSettled: () => setHomeworkToDelete(null) });
+                }}
+                title="Uy vazifasini o'chirish"
+                description={`«${homeworkToDelete?.title ?? ''}» va unga topshirilgan barcha talaba ishlari o'chiriladi. Bu amalni bekor qilib bo'lmaydi.`}
+                confirmText="O'chirish"
+                cancelText="Bekor qilish"
+                isLoading={deleteAssignment.isPending}
+            />
+            <RenameResourceModal lessonId={lesson.id} resource={resourceToRename} onClose={() => setResourceToRename(null)} />
             <ConfirmDialog
                 isOpen={resourceToDelete !== null}
                 onClose={() => setResourceToDelete(null)}
@@ -368,7 +344,64 @@ export default function LessonDetailPage() {
     );
 }
 
-function DeleteButton({ onClick }: { onClick: () => void }) { return <button onClick={onClick} className="absolute right-3 top-3 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/item:opacity-100"><Trash2 className="h-4 w-4" /></button>; }
+
+/**
+ * Yuklab olinadigan fayl nomi. Material nomi qo'lda o'zgartirilgan bo'lsa
+ * (masalan, «Atmosfera»), unda kengaytma bo'lmaydi va brauzer faylni
+ * ochib bo'lmaydigan nom bilan saqlaydi — kengaytma URL dan olinadi.
+ */
+function downloadName(title: string, url: string): string {
+    const ext = url.split(/[?#]/)[0].match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? '';
+    return ext && !title.toLowerCase().endsWith(ext.toLowerCase()) ? `${title}${ext}` : title;
+}
+
+/** Material nomini tahrirlash oynasi. */
+function RenameResourceModal({ lessonId, resource, onClose }: { lessonId: number; resource: { id: number; title: string } | null; onClose: () => void }) {
+    const updateResource = useUpdateResource(lessonId);
+    const [title, setTitle] = useState('');
+    const [error, setError] = useState('');
+    const [openedFor, setOpenedFor] = useState<number | null>(null);
+
+    // Oyna boshqa material uchun ochilganda maydon uning joriy nomi bilan to'ladi.
+    if (resource && resource.id !== openedFor) {
+        setOpenedFor(resource.id);
+        setTitle(resource.title);
+        setError('');
+    }
+    if (!resource && openedFor !== null) setOpenedFor(null);
+
+    const submit = () => {
+        if (!resource) return;
+        const next = title.trim();
+        if (!next) { setError('Nomini kiriting'); return; }
+        if (next === resource.title) { onClose(); return; }
+        setError('');
+        updateResource.mutate(
+            { id: resource.id, data: { title: next } },
+            {
+                onSuccess: onClose,
+                onError: (cause) => setError(apiErrorMessage(cause, 'Saqlashda xatolik')),
+            },
+        );
+    };
+
+    const saving = updateResource.isPending;
+    return (
+        <Modal isOpen={resource !== null} onClose={() => { if (!saving) onClose(); }} title="Material nomini tahrirlash">
+            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+                <div>
+                    <label className="mb-1 block text-sm font-medium">Nomi</label>
+                    <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" maxLength={255} autoFocus />
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+                    <Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Saqlash</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
 
 /**
  * Dars sahifasidagi bo'lim kartochkasi.

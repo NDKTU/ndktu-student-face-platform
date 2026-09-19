@@ -26,6 +26,15 @@ export const useCourseTeacherSummaries = (
     enabled,
 });
 
+/** Talabaning shu kursdagi baholari — faqat talaba uchun. */
+export const useMyCourseGrades = (id: number | undefined, enabled = true) => {
+    return useQuery({
+        queryKey: ['course-my-grades', id],
+        queryFn: () => courseService.getMyGrades(id!),
+        enabled: !!id && enabled,
+    });
+};
+
 export const useCourse = (id?: number) => {
     return useQuery({
         queryKey: ['course', id],

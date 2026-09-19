@@ -24,6 +24,15 @@ export const useLesson = (id: number | undefined) => {
     });
 };
 
+/** Dars baholash jurnali — faqat dars o'qituvchisi va admin uchun. */
+export const useLessonGradebook = (lessonId: number | undefined, enabled = true) => {
+    return useQuery({
+        queryKey: ['lesson-gradebook', lessonId],
+        queryFn: () => lessonService.gradebook(lessonId!),
+        enabled: !!lessonId && enabled,
+    });
+};
+
 export const useCreateLesson = () => {
     const queryClient = useQueryClient();
     return useMutation({

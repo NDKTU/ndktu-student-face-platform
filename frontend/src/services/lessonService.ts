@@ -128,6 +128,54 @@ export interface LessonResultUpsertItem {
     notes?: string | null;
 }
 
+/** Dars baholash jurnali (`GET /lesson/{id}/gradebook`). */
+export interface GradebookHomework {
+    id: number;
+    title: string;
+    max_grade: number;
+    deadline: string;
+}
+
+export interface GradebookQuiz {
+    id: number;
+    title: string;
+    quiz_type?: string | null;
+}
+
+export interface GradebookHomeworkCell {
+    /** `submitted` / `late` — tekshirilmagan, `graded` — baho qo'yilgan. */
+    status: string;
+    grade?: number | null;
+    submitted_at?: string | null;
+    late: boolean;
+}
+
+export interface GradebookQuizCell {
+    quiz_id: number;
+    grade?: number | null;
+    correct_answers?: number | null;
+    wrong_answers?: number | null;
+    cheating_detected: boolean;
+    /** Yakunlangan urinishlar soni; jurnalda oxirgisi ko'rsatiladi. */
+    attempts: number;
+}
+
+export interface GradebookRow {
+    student_id: number;
+    user_id?: number | null;
+    full_name: string;
+    group_name?: string | null;
+    homework?: GradebookHomeworkCell | null;
+    quizzes: GradebookQuizCell[];
+}
+
+export interface LessonGradebook {
+    lesson_id: number;
+    homework?: GradebookHomework | null;
+    quizzes: GradebookQuiz[];
+    students: GradebookRow[];
+}
+
 export const lessonService = {
     list: async (params?: LessonListParams) => {
         const response = await api.get<LessonListResponse>('/lesson/', { params });
@@ -148,6 +196,10 @@ export const lessonService = {
     /** `force` — bog'langan vazifalar bilan birga o'chirishga rozilik. */
     delete: async (id: number, force?: boolean) => {
         await api.delete(force ? `/lesson/${id}?force=true` : `/lesson/${id}`);
+    },
+    gradebook: async (lessonId: number) => {
+        const response = await api.get<LessonGradebook>(`/lesson/${lessonId}/gradebook`);
+        return response.data;
     },
     listResults: async (lessonId: number) => {
         const response = await api.get<LessonResultListResponse>(`/lesson/${lessonId}/results`);
