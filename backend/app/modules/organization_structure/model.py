@@ -109,6 +109,9 @@ class Group(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     course: Mapped[int | None] = mapped_column(Integer, nullable=True)
     education_shape: Mapped[str | None] = mapped_column(String(32), nullable=True)
     student_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Ta'lim tili: `uzbek` / `russian`. Kurs yig'ishda rus guruhlari alohida
+    # kursga ajratiladi — dars boshqa tilda o'tadi.
+    education_language: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     # Та же группа в студенческом HEMIS. external_id занят EPOS, поэтому нужен
     # отдельный столбец. Заполняется при первом однозначном совпадении по имени

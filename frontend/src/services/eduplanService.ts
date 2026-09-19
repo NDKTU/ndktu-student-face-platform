@@ -239,6 +239,8 @@ export interface CoursePlan {
     /** «Bahorgi, Kuzgi» birlashgan qiymatida semestr raqami boʻlmaydi. */
     semester_number: number | null;
     academic_year_id: number | null;
+    /** `russian` — rus guruhlari uchun alohida kurs. Oʻzbek guruhlarida `null`. */
+    education_language: string | null;
     group_ids: number[];
     group_names: string[];
 }
@@ -261,6 +263,8 @@ export interface CoursePreviewResponse {
     created: number;
     restored: number;
     archived: number;
+    /** Aralash kursdan rus kursiga koʻchirilgan guruhlar soni. */
+    moved_groups: number;
     /** Arxivlash chegaradan oshdi — sabab odatda toʻliq yuklanmagan yuklama. */
     archive_blocked: boolean;
     summary: {

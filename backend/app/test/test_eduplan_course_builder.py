@@ -291,3 +291,110 @@ async def test_both_semesters_leave_the_number_empty(async_db, workload):
 
     assert preview.plans[0].semester_number is None
     assert preview.plans[0].semester_type == "Bahorgi, Kuzgi"
+
+
+async def _make_russian(async_db, group_id: int) -> None:
+    from sqlalchemy import update
+
+    from app.modules.organization_structure.model import Group
+
+    await async_db.execute(update(Group).where(Group.id == group_id).values(education_language="russian"))
+    await async_db.commit()
+
+
+@pytest.mark.asyncio
+async def test_russian_group_gets_its_own_course(async_db, workload):
+    """Rus guruhi oʻzbek guruhlari bilan bitta kursga tushmaydi.
+
+    Dars boshqa tilda oʻtadi — materiallar ham, jurnal ham alohida. Oʻzbek
+    kursining kaliti esa oʻzgarmaydi: aks holda mavjud kurslarning hammasi
+    arxivga tushib, qaytadan yaratilardi.
+    """
+    group_ids = workload["group_ids"]
+    before = _plan(await eduplan_course_builder.build(async_db), "lecture", workload["lecturer_user_id"])
+    await _make_russian(async_db, group_ids[1])
+
+    preview = await eduplan_course_builder.build(async_db)
+    lectures = {
+        p.education_language: p
+        for p in preview.plans
+        if p.course_type == "lecture" and p.teacher_user_id == workload["lecturer_user_id"]
+    }
+
+    assert lectures[None].group_ids == [group_ids[0]]
+    assert lectures[None].external_id == before.external_id
+    assert lectures["russian"].group_ids == [group_ids[1]]
+    assert lectures["russian"].external_id == f"{before.external_id}:ru"
+
+
+@pytest.mark.asyncio
+async def test_existing_mixed_course_hands_the_russian_group_over(async_db, workload):
+    """Til hisobga olinishidan oldin yaratilgan aralash kurs.
+
+    Rus kursi yaratilganda guruh eski kursdan chiqariladi — aks holda talaba
+    ikkita bir xil kursni koʻrardi.
+    """
+    from sqlalchemy import select
+
+    from app.modules.course.model import Course, CourseGroup
+
+    group_ids = workload["group_ids"]
+    await eduplan_course_builder.apply(async_db)
+    await _make_russian(async_db, group_ids[1])
+
+    result = await eduplan_course_builder.apply(async_db)
+
+    # Maʼruza va assistentning amaliyoti — ikkalasida ham 102-23 bor edi.
+    assert result.created == 2
+    assert result.moved_groups == 2
+
+    lectures = {
+        course.external_id.endswith(":ru"): course
+        for course in (await async_db.scalars(select(Course).where(Course.course_type == "lecture"))).all()
+    }
+
+    async def groups_of(course):
+        return list(await async_db.scalars(select(CourseGroup.group_id).where(CourseGroup.course_id == course.id)))
+
+    assert await groups_of(lectures[False]) == [group_ids[0]]
+    assert await groups_of(lectures[True]) == [group_ids[1]]
+    assert "102-23" not in lectures[False].name
+
+
+@pytest.mark.asyncio
+async def test_russian_group_with_lessons_stays_in_the_mixed_course(async_db, workload):
+    """Darsi bor guruh avtomatik koʻchirilmaydi — jurnal eski kursda qolib ketardi."""
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from app.modules.auth.model import Teacher, TeacherSubject
+    from app.modules.course.model import Course, CourseGroup, Lesson
+
+    group_ids = workload["group_ids"]
+    await eduplan_course_builder.apply(async_db)
+
+    lecture = await async_db.scalar(select(Course).where(Course.course_type == "lecture"))
+    teacher = await async_db.scalar(select(Teacher).where(Teacher.user_id == workload["lecturer_user_id"]))
+    link = TeacherSubject(teacher_id=teacher.id, subject_id=workload["subject_id"])
+    async_db.add(link)
+    await async_db.flush()
+    async_db.add(
+        Lesson(
+            teacher_subject_id=link.id,
+            course_id=lecture.id,
+            group_id=group_ids[1],
+            topic="Kirish",
+            date=date(2026, 9, 1),
+        )
+    )
+    await async_db.commit()
+    await _make_russian(async_db, group_ids[1])
+
+    await eduplan_course_builder.apply(async_db)
+
+    lectures = list(await async_db.scalars(select(Course).where(Course.course_type == "lecture")))
+    assert len(lectures) == 1
+    assert sorted(
+        await async_db.scalars(select(CourseGroup.group_id).where(CourseGroup.course_id == lecture.id))
+    ) == sorted(group_ids[:2])

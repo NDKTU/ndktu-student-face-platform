@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.course_access import ROLE_MAIN
 from app.modules.auth.model import Teacher, TeacherAssignment
-from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson
+from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson, LessonAttendance
 from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
 
@@ -48,6 +48,13 @@ SEMESTER_BY_TYPE = {"Kuzgi": 1, "Bahorgi": 2}
 #: Bunday kursga bitta semestr raqamini yozib boʻlmaydi — maydon boʻsh
 #: qoladi, nomida ham semestr koʻrsatilmaydi.
 SEMESTER_SLUG = {1: "1", 2: "2"}
+
+#: Rus guruhlari oʻzbek guruhlari bilan bitta kursga tushmaydi: dars boshqa
+#: tilda, boshqa materiallar bilan oʻtadi. Kalitga qoʻshimcha faqat rus
+#: kursida qoʻshiladi — oʻzbek kurslarining mavjud kalitlari oʻzgarmasin,
+#: aks holda ularning hammasi arxivga tushib, qaytadan yaratilardi.
+LANG_RUSSIAN = "russian"
+RUSSIAN_KEY_SUFFIX = ":ru"
 
 #: Ommaviy arxivlashdan himoya. EPOS 502 qaytarsa yoki token eskirsa,
 #: ``teacher_assignments`` boʻshab qoladi va hamma kurs «yuklamada yoʻq»
@@ -70,6 +77,7 @@ class EduPlanCourseBuilder:
         teacher_user_id: int,
         semester_number: int | None,
         course_type: str,
+        education_language: str | None = None,
     ) -> str:
         """Kursning barqaror kaliti — takroriy prognda dublikat boʻlmasligi uchun.
 
@@ -81,7 +89,10 @@ class EduPlanCourseBuilder:
         """
         subject_key = subject.external_id or f"local{subject.id}"
         semester_key = SEMESTER_SLUG.get(semester_number or 0, "x")
-        return f"{academic_year_id or 0}:{subject_key}:{teacher_user_id}:{semester_key}:{course_type}"
+        key = f"{academic_year_id or 0}:{subject_key}:{teacher_user_id}:{semester_key}:{course_type}"
+        if education_language == LANG_RUSSIAN:
+            key += RUSSIAN_KEY_SUFFIX
+        return key
 
     @staticmethod
     def _key_year(external_id: str | None) -> str | None:
@@ -107,22 +118,27 @@ class EduPlanCourseBuilder:
             s.id: s
             for s in await session.scalars(select(Subject).where(Subject.id.in_({a.subject_id for a in assignments})))
         }
-        group_names = dict(
-            (
-                await session.execute(
-                    select(Group.id, Group.name).where(Group.id.in_({a.group_id for a in assignments}))
+        group_names: dict[int, str] = {}
+        group_languages: dict[int, str | None] = {}
+        for group_id, group_name, language in (
+            await session.execute(
+                select(Group.id, Group.name, Group.education_language).where(
+                    Group.id.in_({a.group_id for a in assignments})
                 )
-            ).all()
-        )
+            )
+        ).all():
+            group_names[group_id] = group_name
+            group_languages[group_id] = LANG_RUSSIAN if language == LANG_RUSSIAN else None
 
-        # (fan, semestr, tur) -> oʻqituvchi -> guruhlar
-        by_slot: dict[tuple[int, str | None, str], dict[int, set[int]]] = defaultdict(lambda: defaultdict(set))
-        # (fan, semestr, tur) -> oʻquv yili
-        academic_years: dict[tuple[int, str | None, str], int | None] = {}
+        # (fan, semestr, tur, til) -> oʻqituvchi -> guruhlar
+        Slot = tuple[int, str | None, str, str | None]
+        by_slot: dict[Slot, dict[int, set[int]]] = defaultdict(lambda: defaultdict(set))
+        # (fan, semestr, tur, til) -> oʻquv yili
+        academic_years: dict[Slot, int | None] = {}
 
         for a in assignments:
             for load_type in a.load_types or []:
-                slot = (a.subject_id, a.semester_type, load_type)
+                slot = (a.subject_id, a.semester_type, load_type, group_languages.get(a.group_id))
                 academic_years.setdefault(slot, a.academic_year_id)
                 by_slot[slot][a.teacher_id].add(a.group_id)
 
@@ -133,20 +149,23 @@ class EduPlanCourseBuilder:
 
         plans: list[CoursePlan] = []
 
-        for (subject_id, semester_type, course_type), teacher_groups in by_slot.items():
+        for slot, teacher_groups in by_slot.items():
+            subject_id, semester_type, course_type, education_language = slot
             subject = subjects.get(subject_id)
             if subject is None:
                 continue
 
             semester_number = SEMESTER_BY_TYPE.get(semester_type or "")
-            academic_year_id = academic_years.get((subject_id, semester_type, course_type))
+            academic_year_id = academic_years.get(slot)
 
             for teacher_id, groups in teacher_groups.items():
                 teacher = teachers.get(teacher_id)
                 if teacher is None:
                     continue
 
-                key = self._external_key(academic_year_id, subject, teacher.user_id, semester_number, course_type)
+                key = self._external_key(
+                    academic_year_id, subject, teacher.user_id, semester_number, course_type, education_language
+                )
                 ordered_groups = sorted(groups, key=lambda g: group_names.get(g, ""))
                 course = existing.get(key)
 
@@ -163,6 +182,7 @@ class EduPlanCourseBuilder:
                         semester_type=semester_type,
                         semester_number=semester_number,
                         academic_year_id=academic_year_id,
+                        education_language=education_language,
                         group_ids=ordered_groups,
                         group_names=[group_names.get(g, str(g)) for g in ordered_groups],
                     )
@@ -245,6 +265,76 @@ class EduPlanCourseBuilder:
         ]
 
     # ------------------------------------------------------------------ #
+    #  Aralash kursni ajratish
+    # ------------------------------------------------------------------ #
+    async def _detach_from_mixed_course(self, session: AsyncSession, plan: CoursePlan) -> int | None:
+        """Rus guruhlarini oʻzbek kursidan chiqaradi — rus kursi yaratilishidan oldin.
+
+        Til hisobga olinishidan oldin rus guruhi oʻzbek guruhlari bilan bitta
+        kursga tushardi. Endi uning kursi alohida, lekin eski kursda ham u
+        qolib ketsa, talaba ikkita bir xil kursni koʻradi.
+
+        Guruhda shu kursda dars yoki davomat boʻlsa, u koʻchirilmaydi: jurnal
+        eski kursda qolib ketardi. Bunday holda ``None`` qaytadi va rus kursi
+        yaratilmaydi — guruhni admin qoʻlda koʻchiradi.
+
+        Qaytgan son — koʻchirilgan guruhlar.
+        """
+        from app.modules.course.course.repository import get_course_repository
+
+        base = await session.scalar(
+            select(Course).where(
+                Course.external_source == SOURCE_EDUPLAN,
+                Course.external_id == plan.external_id.removesuffix(RUSSIAN_KEY_SUFFIX),
+                Course.is_active.is_(True),
+            )
+        )
+        if base is None:
+            return 0
+
+        moving = list(
+            await session.scalars(
+                select(CourseGroup.group_id).where(
+                    CourseGroup.course_id == base.id,
+                    CourseGroup.group_id.in_(plan.group_ids),
+                )
+            )
+        )
+        if not moving:
+            return 0
+
+        with_lessons = await session.scalar(
+            select(func.count(Lesson.id)).where(Lesson.course_id == base.id, Lesson.group_id.in_(moving))
+        )
+        with_attendance = await session.scalar(
+            select(func.count(LessonAttendance.id))
+            .join(Lesson, Lesson.id == LessonAttendance.lesson_id)
+            .where(Lesson.course_id == base.id, LessonAttendance.group_id.in_(moving))
+        )
+        if with_lessons or with_attendance:
+            logger.warning(
+                "EduPlan: %s kursidagi rus guruhlari (%s) koʻchirilmadi — ularda dars yoki davomat bor. "
+                "Rus kursi yaratilmadi, guruhni qoʻlda ajrating.",
+                base.name,
+                ", ".join(plan.group_names),
+            )
+            return None
+
+        for link in await session.scalars(
+            select(CourseGroup).where(CourseGroup.course_id == base.id, CourseGroup.group_id.in_(moving))
+        ):
+            await session.delete(link)
+        await session.flush()
+
+        remaining = list(
+            await session.scalars(select(CourseGroup.group_id).where(CourseGroup.course_id == base.id))
+        )
+        base.name = await get_course_repository._build_course_name(
+            session, base.subject_id, remaining, base.semester_number, base.course_type
+        )
+        return len(moving)
+
+    # ------------------------------------------------------------------ #
     #  Yaratish
     # ------------------------------------------------------------------ #
     async def apply(self, session: AsyncSession, archive: bool = False) -> CoursePreviewResponse:
@@ -278,6 +368,7 @@ class EduPlanCourseBuilder:
         created = 0
         restored = 0
         archived = 0
+        moved_groups = 0
 
         for plan in plan_set.plans:
             if plan.exists:
@@ -297,6 +388,12 @@ class EduPlanCourseBuilder:
                     plan.exists = True
                     restored += 1
                 continue
+
+            if plan.education_language == LANG_RUSSIAN:
+                moved = await self._detach_from_mixed_course(session, plan)
+                if moved is None:
+                    continue
+                moved_groups += moved
 
             name = await get_course_repository._build_course_name(
                 session, plan.subject_id, plan.group_ids, plan.semester_number, plan.course_type
@@ -339,15 +436,18 @@ class EduPlanCourseBuilder:
 
         await session.commit()
         logger.info(
-            "EduPlan: %d ta kurs yaratildi, %d tasi tiklandi, %d tasi arxivga tushdi",
+            "EduPlan: %d ta kurs yaratildi, %d tasi tiklandi, %d tasi arxivga tushdi, "
+            "%d ta rus guruhi aralash kursdan koʻchirildi",
             created,
             restored,
             archived,
+            moved_groups,
         )
 
         plan_set.created = created
         plan_set.restored = restored
         plan_set.archived = archived
+        plan_set.moved_groups = moved_groups
         return plan_set
 
 

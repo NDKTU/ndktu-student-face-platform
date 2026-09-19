@@ -132,6 +132,7 @@ class EduPlanRepository:
         student_count: int | None,
         existing: Group | None,
         hemis_group_id: str | None = None,
+        education_language: str | None = None,
     ) -> Group:
         row = existing or Group(name=name, faculty_id=faculty_id)
         row.name = name
@@ -140,6 +141,7 @@ class EduPlanRepository:
         row.course = course
         row.education_shape = education_shape
         row.student_count = student_count
+        row.education_language = education_language
         # Пустое значение из EduPlan не затирает уже известную связку: её мог
         # проставить экран сопоставления HEMIS, и потерять её из-за незаполненного
         # поля на той стороне было бы обидно.

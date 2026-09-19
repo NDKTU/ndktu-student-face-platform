@@ -718,6 +718,7 @@ const CourseGenerationCard = () => {
                 result.created ? `${result.created} ta kurs yaratildi` : '',
                 result.restored ? `${result.restored} tasi arxivdan qaytdi` : '',
                 result.archived ? `${result.archived} tasi arxivga o'tdi` : '',
+                result.moved_groups ? `${result.moved_groups} ta rus guruhi alohida kursga koʻchdi` : '',
             ].filter(Boolean);
             toast.success(parts.length ? parts.join(', ') : 'Oʻzgarish yoʻq — hammasi joyida');
             setConfirmArchive(false);
@@ -889,6 +890,7 @@ const CoursePlanTable = ({ plans }: { plans: CoursePlan[] }) => (
                         <TableCell className="font-medium">{p.subject_name}</TableCell>
                         <TableCell className="whitespace-nowrap">
                             {courseTypeLabel(p.course_type)}
+                            {p.education_language === 'russian' && <span className="ml-1.5 text-muted-foreground">· rus</span>}
                         </TableCell>
                         <TableCell>{p.teacher_name ?? '—'}</TableCell>
                         <TableCell className="whitespace-nowrap">

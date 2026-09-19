@@ -441,6 +441,7 @@ class EduPlanSyncService:
                         "course": g.course,
                         "education_shape": g.education_shape,
                         "student_count": g.student_count,
+                        "education_language": g.education_language,
                         "hemis_group_id": g.hemis_id,
                     },
                     by_name,
@@ -710,6 +711,7 @@ class EduPlanSyncService:
                     changes.get("student_count"),
                     existing,
                     changes.get("hemis_group_id"),
+                    changes.get("education_language"),
                 )
 
             elif entity == EduPlanEntity.subject:

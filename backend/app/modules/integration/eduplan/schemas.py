@@ -100,6 +100,9 @@ class EduPlanGroup(_Lenient):
     course: Optional[int] = None
     student_count: Optional[int] = None
     education_shape: Optional[str] = None
+    #: `uzbek` / `russian`. Kurs yig'ishda rus guruhlari alohida kursga
+    #: ajratiladi.
+    education_language: Optional[str] = None
     #: Та же группа в студенческом HEMIS. EPOS хранит эту связку сам, и до сих
     #: пор мы её просто выбрасывали — а потом восстанавливали голосованием по
     #: студентам и сопоставлением имён. Читаем как обычное зеркальное поле.
@@ -352,6 +355,9 @@ class CoursePlan(BaseModel):
     semester_number: Optional[int] = None
     academic_year_id: Optional[int] = None
 
+    #: ``russian`` — rus guruhlari kursi. Oʻzbek guruhlarida ``None``.
+    education_language: Optional[str] = None
+
     group_ids: list[int] = Field(default_factory=list)
     group_names: list[str] = Field(default_factory=list)
 
@@ -376,6 +382,8 @@ class CoursePreviewResponse(BaseModel):
     created: int = 0
     restored: int = 0
     archived: int = 0
+    #: Aralash kursdan rus kursiga koʻchirilgan guruhlar soni.
+    moved_groups: int = 0
     #: Arxivlash chegaradan oshib ketdi — sabab odatda boʻsh yuklama.
     archive_blocked: bool = False
 
