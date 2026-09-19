@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.model import User
 from app.modules.file.repository import get_file_repository
 from app.modules.file.schemas import (
+    CourseFileListResponse,
     FileAttachRequest,
     FileDetailResponse,
     FileListRequest,
@@ -82,7 +83,7 @@ async def upload_file(
     return await get_file_repository.upload(session, file, user, folder_id)
 
 
-@router.get("/course/{course_id}", response_model=FileListResponse)
+@router.get("/course/{course_id}", response_model=CourseFileListResponse)
 async def list_course_files(
     course_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),

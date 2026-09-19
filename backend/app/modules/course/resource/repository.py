@@ -1,4 +1,5 @@
 import logging
+from typing import get_args
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import func, select
@@ -11,9 +12,9 @@ from app.core.utils.youtube_link import YouTubeLinkError, parse_youtube_link
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.modules.auth.model import User
 from app.modules.course.model import Course, Lesson, Resource
-from app.modules.file.storage import public_url, store_upload
+from app.modules.file.storage import public_url, store_upload, sync_usages
 
-from .schemas import ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
+from .schemas import RESOURCE_TYPES, ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,17 @@ class ResourceRepository:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Faqat kurs oʻqituvchilari yoki admin material qoʻsha oladi",
             )
+
+    async def _sync_file_usage(self, session: AsyncSession, resource: Resource, user: User) -> None:
+        # Kurs kutubxonasi `file_usages` dan yigʻiladi: yozilmasa, biriktirilgan
+        # fayl u yerda koʻrinmaydi.
+        await sync_usages(
+            session,
+            entity_type="resource",
+            entity_id=resource.id,
+            urls=[resource.file_url] if resource.resource_type == "file" else [],
+            owner_user_id=user.id,
+        )
 
     async def upload_file(self, session: AsyncSession, file: UploadFile, current_user: User) -> str:
         """Kurs materialini yuklaydi va uni fayl kutubxonasiga ham yozadi.
@@ -74,6 +86,8 @@ class ResourceRepository:
             created_by_user_id=current_user.id,
         )
         session.add(resource)
+        await session.flush()
+        await self._sync_file_usage(session, resource, current_user)
         await session.commit()
 
         stmt = select(Resource).options(*self._eager_load_options()).where(Resource.id == resource.id)
@@ -87,8 +101,13 @@ class ResourceRepository:
         return resource
 
     async def list_resources(self, session: AsyncSession, request: ResourceListRequest) -> ResourceListResponse:
-        stmt = select(Resource).options(*self._eager_load_options())
-        count_stmt = select(func.count()).select_from(Resource)
+        # Faqat hozir qo'llab-quvvatlanadigan turlar. Olib tashlangan tur
+        # (masalan, `jitsi`) bazada qolib ketgan bo'lsa, javob sxemasi uni
+        # rad etadi va butun ro'yxat 500 bilan yiqiladi — darsdagi boshqa
+        # materiallar ham ko'rinmay qoladi.
+        supported = Resource.resource_type.in_(get_args(RESOURCE_TYPES))
+        stmt = select(Resource).options(*self._eager_load_options()).where(supported)
+        count_stmt = select(func.count()).select_from(Resource).where(supported)
 
         if request.lesson_id is not None:
             stmt = stmt.where(Resource.lesson_id == request.lesson_id)
@@ -146,6 +165,7 @@ class ResourceRepository:
         if data.order_index is not None:
             resource.order_index = data.order_index
 
+        await self._sync_file_usage(session, resource, current_user)
         await session.commit()
         await session.refresh(resource)
         return await self.get_resource(session, resource.id)
@@ -155,6 +175,7 @@ class ResourceRepository:
         course_id = await self._resolve_course_id(session, resource.course_id, resource.lesson_id)
         await self._check_access(session, course_id, current_user)
 
+        await sync_usages(session, entity_type="resource", entity_id=resource.id, urls=[])
         await session.delete(resource)
         await session.commit()
 

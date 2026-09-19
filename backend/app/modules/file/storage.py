@@ -8,18 +8,20 @@ koʻrinadi va uni qayta yuklamasdan boshqa kursga qoʻshish mumkin.
 import hashlib
 import logging
 import os
+import re
 import shutil
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 
 from core.config import settings
 from core.utils.image_upload import looks_like_image
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.file.model import FileBlob, StoredFile
+from app.modules.file.model import FileBlob, FileUsage, StoredFile
 
 logger = logging.getLogger(__name__)
 
@@ -206,3 +208,74 @@ async def store_upload(
     session.add(stored)
     await session.flush()
     return stored, True
+
+
+# Havoladan uploads ichidagi nisbiy yoʻlni ajratib olish — import skriptidagi
+# bilan bir xil qoida: havola absolut ham, nisbiy ham boʻlishi mumkin.
+_UPLOAD_PATH_RE = re.compile(r"/uploads/([A-Za-z0-9_\-./]+\.[A-Za-z0-9]{1,8})")
+
+
+def stored_path_from_url(url: str | None) -> str | None:
+    """``public_url`` ning teskarisi: havoladan ``FileBlob.stored_path``."""
+    if not url:
+        return None
+    prefix = settings.file_url.http.rstrip("/") + "/"
+    if url.startswith(prefix):
+        return url[len(prefix):]
+    match = _UPLOAD_PATH_RE.search(url)
+    return match.group(1) if match else None
+
+
+async def sync_usages(
+    session: AsyncSession,
+    *,
+    entity_type: str,
+    entity_id: int,
+    urls: Iterable[str | None],
+    owner_user_id: int | None = None,
+) -> None:
+    """Obyektning ``file_usages`` yozuvlarini uning hozirgi havolalariga moslaydi.
+
+    Kurs kutubxonasi va xavfsiz oʻchirish shu jadvalga tayanadi. Ilgari uni
+    faqat bir martalik import skripti toʻldirardi — natijada keyin darsga
+    biriktirilgan fayl kutubxonada koʻrinmasdi. Commit qilmaydi: chaqiruvchi
+    oʻz oʻzgarishi bilan birga saqlaydi.
+
+    Bitta blobga bir nechta yozuv ishora qilishi mumkin; biriktirgan
+    foydalanuvchiniki afzal, boʻlmasa eng eskisi.
+    """
+    paths = {p for url in urls if (p := stored_path_from_url(url))}
+
+    wanted: set[int] = set()
+    for path in paths:
+        file_id = await session.scalar(
+            select(StoredFile.id)
+            .join(StoredFile.blob)
+            .where(FileBlob.stored_path == path, StoredFile.is_active.is_(True))
+            .order_by((StoredFile.owner_user_id == owner_user_id).desc(), StoredFile.id)
+            .limit(1)
+        )
+        if file_id is not None:
+            wanted.add(file_id)
+
+    existing = set(
+        (
+            await session.scalars(
+                select(FileUsage.file_id).where(
+                    FileUsage.entity_type == entity_type, FileUsage.entity_id == entity_id
+                )
+            )
+        ).all()
+    )
+
+    stale = existing - wanted
+    if stale:
+        await session.execute(
+            delete(FileUsage).where(
+                FileUsage.entity_type == entity_type,
+                FileUsage.entity_id == entity_id,
+                FileUsage.file_id.in_(stale),
+            )
+        )
+    for file_id in wanted - existing:
+        session.add(FileUsage(file_id=file_id, entity_type=entity_type, entity_id=entity_id))

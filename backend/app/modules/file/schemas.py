@@ -50,6 +50,11 @@ class FileListRequest(BaseModel):
     folder_id: Optional[int] = None
     # Papkasi yoʻq fayllarni koʻrsatish uchun: folder_id=None "hammasi" degani.
     root_only: bool = False
+    # Boshqa odamning papkasida turgan, lekin bu foydalanuvchiga koʻrinadigan
+    # fayllar (masalan, hamkasbi yuklagan savol rasmi). Bu papkalar
+    # foydalanuvchining papkalar roʻyxatida yoʻq — papka boʻyicha
+    # navigatsiyada ular aks holda hech qayerda chiqmasdi.
+    shared_only: bool = False
     search: Optional[str] = None
     kind: Optional[Literal["image", "document"]] = None
     page: int = Field(default=1, ge=1)
@@ -58,6 +63,22 @@ class FileListRequest(BaseModel):
 
 class FileListResponse(BaseModel):
     items: List[FileResponse]
+    total: int
+    page: int
+    size: int
+
+
+class CourseFileResponse(FileResponse):
+    # Kurs darajasidagi (darssiz) materiallar — "Kitob qoʻshish" orqali
+    # qoʻshilganlar. Faylni kurs kutubxonasidan olib tashlash shularni oʻchiradi.
+    course_resource_ids: List[int] = Field(default_factory=list)
+    # Shu kursning darsi yoki uy vazifasida ham ishlatiladimi. Unda fayl
+    # kutubxonadan olib tashlanganidan keyin ham roʻyxatda qoladi.
+    used_in_lessons: bool = False
+
+
+class CourseFileListResponse(BaseModel):
+    items: List[CourseFileResponse]
     total: int
     page: int
     size: int

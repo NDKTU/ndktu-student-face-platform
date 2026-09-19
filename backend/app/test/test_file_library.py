@@ -294,6 +294,9 @@ async def test_course_library_includes_lesson_attached_files(
     listed = await auth_client.get(f"/file/course/{course.id}")
     assert listed.status_code == 200
     assert [item["id"] for item in listed.json()["items"]] == [file_id]
+    # Darsdagi material kurs kutubxonasidan olib tashlanmaydi — darsda turadi.
+    assert listed.json()["items"][0]["course_resource_ids"] == []
+    assert listed.json()["items"][0]["used_in_lessons"] is True
 
 
 @pytest.mark.asyncio
@@ -317,3 +320,79 @@ async def test_course_library_is_empty_for_unrelated_course(
     listed = await auth_client.get(f"/file/course/{course.id}")
     assert listed.status_code == 200
     assert listed.json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_course_material_created_via_api_appears_in_library(
+    auth_client: AsyncClient, async_db, temp_uploads, test_kafedra, test_subject, test_teacher
+):
+    """API orqali qo'shilgan material kutubxonaga o'zi tushadi.
+
+    Ilgari `file_usages` ni faqat bir martalik import skripti to'ldirardi:
+    keyin qo'shilgan kitob kurs kutubxonasida umuman ko'rinmasdi. Material
+    o'chirilganda esa fayl kutubxonadan chiqadi.
+    """
+    from app.modules.course.model import Course
+
+    course = Course(
+        name="Kitobli kurs",
+        kafedra_id=test_kafedra["id"],
+        subject_id=test_subject.id,
+        teacher_id=test_teacher["id"],
+    )
+    async_db.add(course)
+    await async_db.flush()
+
+    uploaded = await auth_client.post(
+        "/file/upload", files={"file": ("kitob.png", PNG + b"kitob", "image/png")}
+    )
+    assert uploaded.status_code == 201
+
+    created = await auth_client.post(
+        "/resource/",
+        json={
+            "course_id": course.id,
+            "resource_type": "file",
+            "title": "Darslik",
+            "file_url": uploaded.json()["url"],
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+
+    listed = await auth_client.get(f"/file/course/{course.id}")
+    assert [item["id"] for item in listed.json()["items"]] == [uploaded.json()["id"]]
+    # Kurs darajasidagi kitob — kutubxonadan olib tashlash shu resursni oʻchiradi.
+    item = listed.json()["items"][0]
+    assert item["course_resource_ids"] == [created.json()["id"]]
+    # Oʻqituvchi yozgan kitob nomi, fayl nomi emas.
+    assert item["title"] == "Darslik"
+    assert item["used_in_lessons"] is False
+
+    deleted = await auth_client.delete(f"/resource/{created.json()['id']}")
+    assert deleted.status_code in (200, 204)
+
+    listed = await auth_client.get(f"/file/course/{course.id}")
+    assert listed.json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_shared_only_never_lists_own_files(auth_client: AsyncClient, temp_uploads):
+    """`shared_only` — boshqa odamning papkasidagi fayllar uchun.
+
+    Oʻz papkasidagi fayl u yerda ham chiqsa, papka boʻyicha tanlash oynasida
+    ayni fayl ikki joyda koʻrinib, papkalar yana aralashib ketardi.
+    """
+    uploaded = await auth_client.post(
+        "/file/upload", files={"file": ("oziniki.png", PNG + b"oziniki", "image/png")}
+    )
+    assert uploaded.status_code == 201
+    assert uploaded.json()["folder_id"] is not None
+
+    in_folder = await auth_client.get(
+        "/file/", params={"folder_id": uploaded.json()["folder_id"]}
+    )
+    assert [item["id"] for item in in_folder.json()["items"]] == [uploaded.json()["id"]]
+
+    shared = await auth_client.get("/file/", params={"shared_only": True})
+    assert shared.status_code == 200
+    assert shared.json()["items"] == []

@@ -8,9 +8,10 @@ import {
 const FILES_KEY = 'files';
 const FOLDERS_KEY = 'file-folders';
 
-export const useFiles = (params: FileListParams) => useQuery({
+export const useFiles = (params: FileListParams, enabled = true) => useQuery({
     queryKey: [FILES_KEY, params],
     queryFn: () => fileService.list(params),
+    enabled,
 });
 
 export const useFile = (id: number | null) => useQuery({
@@ -31,9 +32,10 @@ export const useCourseFiles = (courseId: number, enabled = true) => useQuery({
     enabled,
 });
 
-export const useFileFolders = () => useQuery({
+export const useFileFolders = (enabled = true) => useQuery({
     queryKey: [FOLDERS_KEY],
     queryFn: () => fileService.listFolders(),
+    enabled,
 });
 
 /** Yuklashdan keyin papka roʻyxati ham yangilanadi: fayl soni oʻzgaradi. */

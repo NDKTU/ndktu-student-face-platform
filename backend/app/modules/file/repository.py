@@ -11,7 +11,7 @@ import re
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +21,8 @@ from app.modules.course.model import Homework, Lesson, Resource
 from app.modules.quiz.model import Question
 from app.modules.file.model import FileBlob, FileFolder, FileUsage, StoredFile
 from app.modules.file.schemas import (
+    CourseFileListResponse,
+    CourseFileResponse,
     FileAttachRequest,
     FileDetailResponse,
     FileListRequest,
@@ -237,6 +239,16 @@ class FileRepository:
 
         if request.root_only:
             stmt = stmt.where(StoredFile.folder_id.is_(None))
+        elif request.shared_only:
+            # Admin barcha papkalarni koʻradi — unda "begona" papka yoʻq.
+            if _is_admin(user):
+                stmt = stmt.where(false())
+            else:
+                own_folders = select(FileFolder.id).where(FileFolder.owner_user_id == user.id)
+                stmt = stmt.where(
+                    StoredFile.folder_id.isnot(None),
+                    StoredFile.folder_id.notin_(own_folders),
+                )
         elif request.folder_id is not None:
             stmt = stmt.where(StoredFile.folder_id == request.folder_id)
 
@@ -281,7 +293,7 @@ class FileRepository:
 
     async def list_course_files(
         self, session: AsyncSession, course_id: int
-    ) -> FileListResponse:
+    ) -> CourseFileListResponse:
         """Kursning kutubxonasi: shu kursda ishlatilayotgan barcha fayllar.
 
         Yangi jadval kerak emas — bogʻlanish allaqachon ``file_usages`` da
@@ -305,18 +317,21 @@ class FileRepository:
         """
         course_lessons = select(Lesson.id).where(Lesson.course_id == course_id)
 
-        used_in_course = (
+        resource_usage = select(FileUsage.file_id, Resource.id, Resource.title).join(
+            Resource,
+            and_(Resource.id == FileUsage.entity_id, FileUsage.entity_type == "resource"),
+        )
+        # Kurs darajasidagi material: lesson_id boʻsh.
+        course_level = resource_usage.where(
+            Resource.course_id == course_id, Resource.lesson_id.is_(None)
+        ).order_by(Resource.id)
+        in_lessons = (
             select(FileUsage.file_id)
             .join(
                 Resource,
                 and_(Resource.id == FileUsage.entity_id, FileUsage.entity_type == "resource"),
             )
-            .where(
-                or_(
-                    Resource.course_id == course_id,
-                    Resource.lesson_id.in_(course_lessons),
-                )
-            )
+            .where(Resource.lesson_id.in_(course_lessons))
         ).union(
             select(FileUsage.file_id)
             .join(
@@ -331,6 +346,22 @@ class FileRepository:
             )
         )
 
+        course_resources: dict[int, list[int]] = {}
+        # Kitob qoʻshilganda oʻqituvchi yozgan nom resursda saqlanadi, fayl
+        # yozuvida esa asl fayl nomi qoladi. Kurs kutubxonasida birinchisi
+        # koʻrinishi kerak — aks holda "Linux asoslari" oʻrniga
+        # "Linux_Komandalari.pptx" chiqadi.
+        course_titles: dict[int, str] = {}
+        for file_id, resource_id, resource_title in (await session.execute(course_level)).all():
+            course_resources.setdefault(file_id, []).append(resource_id)
+            if resource_title and resource_title.strip():
+                course_titles.setdefault(file_id, resource_title.strip())
+        lesson_file_ids = set((await session.scalars(in_lessons)).all())
+
+        used_in_course = set(course_resources) | lesson_file_ids
+        if not used_in_course:
+            return CourseFileListResponse(items=[], total=0, page=1, size=0)
+
         rows = (
             (
                 await session.execute(
@@ -340,12 +371,13 @@ class FileRepository:
                         StoredFile.id.in_(used_in_course),
                     )
                     .options(selectinload(StoredFile.blob))
-                    .order_by(StoredFile.title)
                 )
             )
             .scalars()
             .all()
         )
+        # Tartib koʻrinadigan nom boʻyicha: u kitob nomi boʻlishi mumkin.
+        rows = sorted(rows, key=lambda r: course_titles.get(r.id, r.title).lower())
 
         counts = dict(
             (
@@ -357,8 +389,18 @@ class FileRepository:
             ).all()
         )
 
-        return FileListResponse(
-            items=[self._to_response(r, counts.get(r.id, 0)) for r in rows],
+        return CourseFileListResponse(
+            items=[
+                CourseFileResponse(
+                    **{
+                        **self._to_response(r, counts.get(r.id, 0)).model_dump(),
+                        "title": course_titles.get(r.id, r.title),
+                    },
+                    course_resource_ids=course_resources.get(r.id, []),
+                    used_in_lessons=r.id in lesson_file_ids,
+                )
+                for r in rows
+            ],
             total=len(rows),
             page=1,
             size=len(rows),

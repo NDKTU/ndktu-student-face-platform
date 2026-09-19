@@ -52,10 +52,20 @@ export interface LibraryFolder {
     is_personal: boolean;
 }
 
+/** Kurs kutubxonasidagi fayl: u kursda qayerda ishlatilgani bilan. */
+export interface CourseLibraryFile extends LibraryFile {
+    /** Kurs darajasidagi (darssiz) materiallar — "Kitob qoʻshish" orqali qoʻshilganlar. */
+    course_resource_ids: number[];
+    /** Shu kursning darsi yoki uy vazifasida ham ishlatiladi. */
+    used_in_lessons: boolean;
+}
+
 export interface FileListParams {
     folder_id?: number;
     /** Papkaga solinmagan fayllar. folder_id bilan birga ishlatilmaydi. */
     root_only?: boolean;
+    /** Boshqa odamning papkasidagi, lekin menga koʻrinadigan fayllar. */
+    shared_only?: boolean;
     search?: string;
     kind?: 'image' | 'document';
     page?: number;
@@ -87,7 +97,9 @@ export const fileService = {
      * kimga ochiq (talabaga ham), chunki bu kursning o'quv materiali.
      */
     listByCourse: async (courseId: number) => {
-        const response = await api.get<FileListResponse>(`/file/course/${courseId}`);
+        const response = await api.get<Omit<FileListResponse, 'items'> & { items: CourseLibraryFile[] }>(
+            `/file/course/${courseId}`,
+        );
         return response.data;
     },
 
