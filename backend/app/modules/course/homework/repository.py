@@ -13,6 +13,7 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.core.utils.course_access import can_manage
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
+from app.modules.file.storage import sync_usages
 from app.modules.organization_structure.model import Group
 
 from .schemas import (
@@ -22,6 +23,8 @@ from .schemas import (
     HomeworkResponse,
     HomeworkStats,
     HomeworkUpdateRequest,
+    MySubmissionInfo,
+    NotSubmittedStudent,
     SubmissionFile,
     SubmissionGradeRequest,
     SubmissionListResponse,
@@ -68,6 +71,17 @@ def _expand_allowed_types(allowed_file_types: list | None) -> set[str]:
 
 
 class HomeworkRepository:
+    async def _sync_file_usage(self, session: AsyncSession, homework: Homework, user: User) -> None:
+        # Kurs kutubxonasi `file_usages` dan yigʻiladi: yozilmasa, vazifa
+        # ilovasi u yerda koʻrinmaydi.
+        await sync_usages(
+            session,
+            entity_type="homework",
+            entity_id=homework.id,
+            urls=[item.get("url") for item in homework.attachments or []],
+            owner_user_id=user.id,
+        )
+
     async def _is_admin(self, user: User) -> bool:
         return any(r.name.lower() == "admin" for r in (user.roles or []))
 
@@ -296,6 +310,8 @@ class HomeworkRepository:
             attachments=[f.model_dump() for f in data.attachments],
         )
         session.add(a)
+        await session.flush()
+        await self._sync_file_usage(session, a, current_user)
         await session.commit()
         await session.refresh(a)
         return await self._serialize_homework(session, a)
@@ -332,6 +348,7 @@ class HomeworkRepository:
         if data.attachments is not None:
             # Ro'yxat butunlay almashtiriladi: forma yakuniy holatni yuboradi.
             a.attachments = [f.model_dump() for f in data.attachments]
+            await self._sync_file_usage(session, a, current_user)
         await session.commit()
         await session.refresh(a)
         return await self._serialize_homework(session, a)
@@ -341,6 +358,7 @@ class HomeworkRepository:
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
+        await sync_usages(session, entity_type="homework", entity_id=a.id, urls=[])
         await session.delete(a)
         await session.commit()
 
@@ -384,6 +402,19 @@ class HomeworkRepository:
         stats = await self._bulk_stats(session, items)
         courses, lessons = await self._bulk_labels(session, items)
         authors = await self._bulk_authors(session, items)
+        mine: dict[int, MySubmissionInfo] = {}
+        if items:
+            my_stmt = select(
+                HomeworkSubmission.homework_id,
+                HomeworkSubmission.status,
+                HomeworkSubmission.grade,
+                HomeworkSubmission.submitted_at,
+            ).where(
+                HomeworkSubmission.user_id == current_user.id,
+                HomeworkSubmission.homework_id.in_([a.id for a in items]),
+            )
+            for homework_id, sub_status, grade, submitted_at in (await session.execute(my_stmt)).all():
+                mine[homework_id] = MySubmissionInfo(status=sub_status, grade=grade, submitted_at=submitted_at)
         return HomeworkListResponse(
             total=total,
             page=request.page,
@@ -395,7 +426,7 @@ class HomeworkRepository:
                     courses.get(a.course_id),
                     lessons.get(a.lesson_id) if a.lesson_id is not None else None,
                     authors.get(a.created_by_user_id) if a.created_by_user_id is not None else None,
-                )
+                ).model_copy(update={"my_submission": mine.get(a.id)})
                 for a in items
             ],
         )
@@ -634,8 +665,26 @@ class HomeworkRepository:
         )
         items = (await session.execute(stmt)).scalars().all()
         names = await self._resolve_names(session, [sub.user_id for sub in items])
+
+        # `_bulk_stats` dagi «kursdagi talaba» bilan bir xil to'plam: kurs
+        # guruhlaridagi talabalar. Hisob bog'lanmagan talaba (user_id yo'q)
+        # ish topshira olmaydi — u ro'yxatga kirmaydi.
+        submitted_ids = {sub.user_id for sub in items}
+        roster_stmt = (
+            select(Student.user_id, Student.full_name, Group.name)
+            .join(CourseGroup, CourseGroup.group_id == Student.group_id)
+            .outerjoin(Group, Group.id == Student.group_id)
+            .where(CourseGroup.course_id == a.course_id, Student.user_id.isnot(None))
+            .order_by(Group.name, Student.full_name)
+        )
+        not_submitted = [
+            NotSubmittedStudent(user_id=user_id, full_name=full_name, group=group_name)
+            for user_id, full_name, group_name in (await session.execute(roster_stmt)).all()
+            if user_id not in submitted_ids
+        ]
         return SubmissionListResponse(
             submissions=[await self._serialize_submission(sub, names) for sub in items],
+            not_submitted=not_submitted,
         )
 
     async def grade_submission(

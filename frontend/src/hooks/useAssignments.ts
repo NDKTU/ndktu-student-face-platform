@@ -71,6 +71,7 @@ export const useSubmitAssignment = (assignmentId: number | undefined) => {
         mutationFn: (data: SubmissionSubmitRequest) => assignmentService.submit(assignmentId!, data),
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['my-submission', assignmentId] });
+            qc.invalidateQueries({ queryKey: ['course-my-grades'] });
             qc.invalidateQueries({ queryKey: ['submissions', assignmentId] });
             qc.invalidateQueries({ queryKey: ['assignments'] });
         },
@@ -85,6 +86,7 @@ export const useGradeSubmission = (assignmentId: number | undefined) => {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['submissions', assignmentId] });
             qc.invalidateQueries({ queryKey: ['assignments'] });
+            qc.invalidateQueries({ queryKey: ['lesson-gradebook'] });
         },
     });
 };

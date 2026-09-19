@@ -1,24 +1,19 @@
 import { useEffect, useState } from 'react';
-import { FileText, Loader2, Send, UploadCloud, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { AlertTriangle, FileText, Loader2, Send, UploadCloud, X } from 'lucide-react';
 import { useMySubmission, useSubmitAssignment } from '@/hooks/useAssignments';
-import { assignmentService, type Assignment, type SubmissionFile, type SubmissionStatus } from '@/services/assignmentService';
+import { assignmentService, type Assignment, type SubmissionFile } from '@/services/assignmentService';
 import { Button } from '@/components/ui/Button';
-
-const STATUS_LABEL: Record<SubmissionStatus, string> = {
-    draft: 'Qoralama',
-    submitted: 'Topshirildi',
-    late: 'Kech topshirildi',
-    graded: 'Baholandi',
-    returned: 'Qaytarildi',
-};
-
-const STATUS_CLASS: Record<SubmissionStatus, string> = {
-    draft: 'bg-muted text-muted-foreground',
-    submitted: 'bg-primary/10 text-primary',
-    late: 'bg-amber-500/10 text-amber-600',
-    graded: 'bg-emerald-500/10 text-emerald-600',
-    returned: 'bg-destructive/10 text-destructive',
-};
+import {
+    LATE_CLASS,
+    REVIEW_CLASS,
+    answerFormatLabel,
+    deadlineHint,
+    lateBy,
+} from '@/components/homework/homeworkStatus';
+import { apiErrorMessage } from '@/utils/apiError';
+import { formatDateTime } from '@/utils/date';
+import { cn } from '@/lib/utils';
 
 const DEFAULT_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar'];
 
@@ -66,22 +61,25 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                 setFiles((prev) => [...prev, uploaded]);
             }
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || 'Faylni yuklashda xatolik');
+            setError(apiErrorMessage(cause, 'Faylni yuklashda xatolik'));
         } finally {
             setUploading(false);
         }
     };
 
+    const isEmpty = !text.trim() && files.length === 0;
+
     const handleSubmit = () => {
+        if (isEmpty) {
+            setError(assignment.allow_text ? 'Javob yozing yoki fayl biriktiring' : 'Avval fayl biriktiring');
+            return;
+        }
         setError('');
         submitMut.mutate(
             { submitted_text: text.trim() || null, submitted_files: files },
             {
-                onError: (cause) => {
-                    const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                    setError(detail || 'Topshirishda xatolik');
-                },
+                onSuccess: () => toast.success(submission ? 'Javobingiz yangilandi' : "Javobingiz o'qituvchiga yuborildi"),
+                onError: (cause) => setError(apiErrorMessage(cause, 'Topshirishda xatolik')),
             },
         );
     };
@@ -90,21 +88,34 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
         return <div className="mt-4 border-t border-border/60 pt-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
     }
 
+    const late = lateBy(submission?.submitted_at, assignment.deadline);
+
     return (
         <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold">Mening javobim</p>
-                {submission && (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_CLASS[submission.status]}`}>
-                        {STATUS_LABEL[submission.status]}
+                {!submission ? (
+                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', isLate ? LATE_CLASS : 'border-primary/25 bg-primary/10 text-primary')}>
+                        {isLate ? 'Topshirilmagan · muddat tugagan' : 'Hali topshirilmagan'}
+                    </span>
+                ) : isGraded ? (
+                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', REVIEW_CLASS.graded)}>
+                        Baholandi: {submission.grade} / {assignment.max_grade}
+                    </span>
+                ) : (
+                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', REVIEW_CLASS.pending)}>
+                        Topshirildi · o'qituvchi tekshirmoqda
                     </span>
                 )}
-                {isGraded && (
-                    <span className="text-xs font-medium text-emerald-600">
-                        Baho: {submission?.grade} / {assignment.max_grade}
+                {late && (
+                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', LATE_CLASS)}>
+                        {late} kech topshirilgan
                     </span>
                 )}
             </div>
+            {submission?.submitted_at && (
+                <p className="text-xs text-muted-foreground">Topshirilgan vaqt: {formatDateTime(submission.submitted_at)}</p>
+            )}
 
             {isGraded ? (
                 <div className="space-y-2">
@@ -113,14 +124,18 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                     )}
                     <SubmittedFiles files={submission?.submitted_files ?? []} />
                     {submission?.feedback && (
-                        <p className="rounded-lg bg-emerald-500/5 px-3 py-2 text-sm">
+                        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm">
                             <span className="font-medium">O'qituvchi izohi: </span>{submission.feedback}
                         </p>
                     )}
-                    <p className="text-xs text-muted-foreground">Baholangan ish qayta topshirilmaydi.</p>
+                    <p className="text-xs text-muted-foreground">Ish baholangan — endi uni o'zgartirib bo'lmaydi.</p>
                 </div>
             ) : (
                 <>
+                    <p className="text-xs text-muted-foreground">
+                        {answerFormatLabel(assignment.allow_text, assignment.allow_file)} ·{' '}
+                        <span className={cn(isLate && 'text-destructive')}>{deadlineHint(assignment.deadline)}</span>
+                    </p>
                     {assignment.allow_text && (
                         <textarea
                             className="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -185,15 +200,23 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                         </div>
                     )}
 
-                    {isLate && !submission && (
-                        <p className="text-xs text-amber-600">Muddat o'tgan — ish «kech topshirildi» deb belgilanadi.</p>
+                    {isLate && (
+                        <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            Muddat tugagan — hozir yuborilgan javob «kech topshirilgan» deb belgilanadi.
+                        </p>
                     )}
                     {error && <p className="text-sm text-destructive">{error}</p>}
 
-                    <div className="flex justify-end">
-                        <Button size="sm" onClick={handleSubmit} disabled={busy}>
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                        {submission && (
+                            <p className="mr-auto text-xs text-muted-foreground">
+                                Baho qo'yilgunicha javobni o'zgartirish mumkin — yangisi avvalgisining o'rniga saqlanadi.
+                            </p>
+                        )}
+                        <Button size="sm" onClick={handleSubmit} disabled={busy || isEmpty}>
                             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                            {submission ? 'Qayta topshirish' : 'Topshirish'}
+                            {submission ? 'Javobni yangilash' : 'Topshirish'}
                         </Button>
                     </div>
                 </>

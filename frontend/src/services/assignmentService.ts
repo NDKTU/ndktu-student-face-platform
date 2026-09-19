@@ -16,6 +16,13 @@ export interface AssignmentStats {
     late: number;
 }
 
+/** Talabaning shu vazifadagi o'z holati (faqat ro'yxatda, ish bo'lsa). */
+export interface MySubmissionInfo {
+    status: SubmissionStatus;
+    grade?: number | null;
+    submitted_at?: string | null;
+}
+
 export interface Assignment {
     id: number;
     course_id: number;
@@ -36,6 +43,7 @@ export interface Assignment {
     /** O'qituvchi biriktirgan fayllar (shart, namuna, tarqatma material). */
     attachments: SubmissionFile[];
     stats?: AssignmentStats | null;
+    my_submission?: MySubmissionInfo | null;
     created_at: string;
     updated_at: string;
 }
@@ -97,8 +105,16 @@ export interface Submission {
     updated_at: string;
 }
 
+export interface NotSubmittedStudent {
+    user_id: number;
+    full_name?: string | null;
+    group?: string | null;
+}
+
 export interface SubmissionListResponse {
     submissions: Submission[];
+    /** Kurs guruhlaridagi, hali ish topshirmagan talabalar. */
+    not_submitted?: NotSubmittedStudent[];
 }
 
 export interface SubmissionSubmitRequest {

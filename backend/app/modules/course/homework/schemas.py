@@ -54,6 +54,14 @@ class HomeworkStats(BaseModel):
     late: int
 
 
+class MySubmissionInfo(BaseModel):
+    """Talabaning shu vazifadagi o'z holati — umumiy ro'yxat uchun."""
+
+    status: str
+    grade: Optional[int] = None
+    submitted_at: Optional[TashkentDatetime] = None
+
+
 class HomeworkResponse(BaseModel):
     id: int
     course_id: int
@@ -73,6 +81,10 @@ class HomeworkResponse(BaseModel):
     allowed_file_types: List[str] = []
     attachments: List[SubmissionFile] = []
     stats: Optional[HomeworkStats] = None
+    # Faqat ro'yxatda va faqat so'rovchining o'z ishi bo'lsa: talaba
+    # «Uy vazifalari» sahifasida qaysi birini topshirgani, qaysi biri
+    # baholanganini ko'rsin. Ilgari u faqat muddatni ko'rardi.
+    my_submission: Optional[MySubmissionInfo] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
@@ -140,5 +152,14 @@ class SubmissionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class NotSubmittedStudent(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    group: Optional[str] = None
+
+
 class SubmissionListResponse(BaseModel):
     submissions: List[SubmissionResponse]
+    # Kurs guruhlaridagi, hali ish topshirmagan talabalar. Ilgari o'qituvchi
+    # faqat «30 dan 5 tasi topshirdi» sonini ko'rardi, kim qolganini emas.
+    not_submitted: List[NotSubmittedStudent] = []

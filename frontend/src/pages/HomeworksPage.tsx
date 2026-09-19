@@ -22,16 +22,62 @@ import { StatCard } from '@/components/ui/StatCard';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/utils/date';
 import { cn } from '@/lib/utils';
+import { LATE_CLASS, REVIEW_CLASS, deadlineHint, lateBy } from '@/components/homework/homeworkStatus';
 
-type Filter = 'all' | 'pending' | 'overdue';
+/**
+ * `pending` — o'qituvchida «tekshirilmagan ishi bor», talabada «hali
+ * topshirmagan». `graded` faqat talabada.
+ */
+type Filter = 'all' | 'pending' | 'graded' | 'overdue';
 
 /** Sana formati butun ilovada bir xil — `utils/date.ts`. */
 const shortDeadline = formatDateTime;
 
-/** Muddat o'tgan-o'tmaganini hisoblash */
+/** Topshirish muddati tugaganmi (vazifaning o'zi, talabaning ishi emas). */
 const isOverdue = (item: Assignment) => new Date(item.deadline).getTime() < Date.now();
 const pendingCount = (item: Assignment) =>
     item.stats ? item.stats.submitted - item.stats.graded : 0;
+
+/** Talabaning shu vazifadagi holati. */
+type MyState = 'todo' | 'missed' | 'waiting' | 'graded';
+const myState = (item: Assignment): MyState => {
+    const mine = item.my_submission;
+    if (!mine) return isOverdue(item) ? 'missed' : 'todo';
+    return mine.status === 'graded' ? 'graded' : 'waiting';
+};
+
+const MY_STATE_LABEL: Record<MyState, string> = {
+    todo: 'Topshirilmagan',
+    missed: 'Topshirilmagan · muddat tugagan',
+    waiting: 'Topshirildi · tekshirilmoqda',
+    graded: 'Baholandi',
+};
+
+const MY_STATE_CLASS: Record<MyState, string> = {
+    todo: 'border-primary/25 bg-primary/10 text-primary',
+    missed: LATE_CLASS,
+    waiting: REVIEW_CLASS.pending,
+    graded: REVIEW_CLASS.graded,
+};
+
+function MyStateBadge({ item }: { item: Assignment }) {
+    const state = myState(item);
+    const late = lateBy(item.my_submission?.submitted_at, item.deadline);
+    return (
+        <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold', MY_STATE_CLASS[state])}>
+                {state === 'graded' && item.my_submission?.grade != null
+                    ? `Baho: ${item.my_submission.grade} / ${item.max_grade}`
+                    : MY_STATE_LABEL[state]}
+            </span>
+            {late && (
+                <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold', LATE_CLASS)}>
+                    {late} kech
+                </span>
+            )}
+        </div>
+    );
+}
 
 export default function HomeworksPage() {
     const navigate = useNavigate();
@@ -53,20 +99,39 @@ export default function HomeworksPage() {
         const pending = homeworks.reduce((sum, h) => sum + pendingCount(h), 0);
         const overdue = homeworks.filter(isOverdue).length;
         const active = total - overdue;
-        return { total, pending, overdue, active: active >= 0 ? active : 0 };
+        const count = (state: MyState) => homeworks.filter((h) => myState(h) === state).length;
+        return {
+            total,
+            pending,
+            overdue,
+            active: active >= 0 ? active : 0,
+            todo: count('todo'),
+            missed: count('missed'),
+            waiting: count('waiting'),
+            graded: count('graded'),
+        };
     }, [homeworks]);
+
+    // Filtr ma'nosi rolga bog'liq: o'qituvchida «tekshirish kerak»,
+    // talabada «topshirish kerak».
+    const matchesFilter = (item: Assignment, value: Filter) => {
+        if (value === 'overdue') return isOverdue(item);
+        if (value === 'pending') return canGrade ? pendingCount(item) > 0 : myState(item) === 'todo';
+        if (value === 'graded') return myState(item) === 'graded';
+        return true;
+    };
 
     const visible = useMemo(() => {
         const needle = search.trim().toLowerCase();
         return homeworks.filter((item) => {
-            if (filter === 'pending' && pendingCount(item) === 0) return false;
-            if (filter === 'overdue' && !isOverdue(item)) return false;
+            if (!matchesFilter(item, filter)) return false;
             if (!needle) return true;
             return [item.title, item.course_name, item.lesson_topic]
                 .filter(Boolean)
                 .some((value) => value!.toLowerCase().includes(needle));
         });
-    }, [homeworks, search, filter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesFilter faqat canGrade ga bog'liq
+    }, [homeworks, search, filter, canGrade]);
 
     const openHomework = (item: Assignment) => {
         if (canGrade) navigate(`/homework/${item.id}/submissions`);
@@ -95,6 +160,7 @@ export default function HomeworksPage() {
             cell: (item) => {
                 const overdue = isOverdue(item);
                 return (
+                    <div>
                     <span
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
@@ -106,8 +172,17 @@ export default function HomeworksPage() {
                         <Clock className="h-3 w-3" />
                         {shortDeadline(item.deadline)}
                     </span>
+                    <p className={cn('mt-1 text-[11px]', overdue ? 'text-destructive' : 'text-muted-foreground')}>
+                        {deadlineHint(item.deadline)}
+                    </p>
+                    </div>
                 );
             },
+        },
+        {
+            key: 'mine',
+            header: 'Mening holatim',
+            cell: (item) => <MyStateBadge item={item} />,
         },
         {
             key: 'author',
@@ -122,7 +197,7 @@ export default function HomeworksPage() {
         },
         {
             key: 'submitted',
-            header: 'Topshirdi',
+            header: 'Topshirganlar',
             hideBelow: 'lg',
             cell: (item) =>
                 item.stats ? (
@@ -159,7 +234,11 @@ export default function HomeworksPage() {
                         onClick={(event) => { event.stopPropagation(); openHomework(item); }}
                     >
                         {canGrade ? <ClipboardCheck className="h-4 w-4 text-primary" /> : <BookOpen className="h-4 w-4 text-primary" />}
-                        <span>{canGrade ? 'Tekshirish' : 'Darsga o\'tish'}</span>
+                        <span>
+                            {canGrade
+                                ? pendingCount(item) > 0 ? `Tekshirish (${pendingCount(item)})` : "Ishlarni ko'rish"
+                                : myState(item) === 'todo' ? 'Topshirish' : "Ko'rish"}
+                        </span>
                     </Button>
                     {canDelete && (
                         <Button
@@ -178,20 +257,25 @@ export default function HomeworksPage() {
     ];
 
     const columns = canGrade
-        ? allColumns
+        ? allColumns.filter((column) => column.key !== 'mine')
         : allColumns.filter((column) => !['submitted', 'pending'].includes(column.key));
 
-    const filters: Array<{ value: Filter; label: string; count: number }> = [
-        { value: 'all', label: 'Hammasi', count: homeworks.length },
-        ...(canGrade
-            ? [{
-                value: 'pending' as Filter,
-                label: 'Tekshirilmagan',
-                count: homeworks.filter((i) => pendingCount(i) > 0).length,
-            }]
-            : []),
-        { value: 'overdue', label: "Muddati o'tgan", count: homeworks.filter(isOverdue).length },
-    ];
+    const filterDefs: Array<{ value: Filter; label: string }> = canGrade
+        ? [
+            { value: 'all', label: 'Hammasi' },
+            { value: 'pending', label: 'Tekshirilmagan ishi bor' },
+            { value: 'overdue', label: 'Muddati tugagan' },
+        ]
+        : [
+            { value: 'all', label: 'Hammasi' },
+            { value: 'pending', label: 'Topshirishim kerak' },
+            { value: 'graded', label: 'Baholangan' },
+            { value: 'overdue', label: 'Muddati tugagan' },
+        ];
+    const filters = filterDefs.map((item) => ({
+        ...item,
+        count: homeworks.filter((h) => matchesFilter(h, item.value)).length,
+    }));
 
     return (
         <div className="space-y-6 animate-fade-in-up">
@@ -206,36 +290,69 @@ export default function HomeworksPage() {
             />
 
             {/* Wowdash CRM Statistics Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                    label="Jami vazifalar"
-                    value={statsMetrics.total}
-                    icon={ClipboardList}
-                    color="blue"
-                    description="Barcha vazifalar"
-                />
-                <StatCard
-                    label="Tekshirilmagan"
-                    value={statsMetrics.pending}
-                    icon={Clock}
-                    color="orange"
-                    description="Baholash kutilmoqda"
-                />
-                <StatCard
-                    label="Faol topshiriqlar"
-                    value={statsMetrics.active}
-                    icon={CheckCircle2}
-                    color="green"
-                    description="Muddati amalda"
-                />
-                <StatCard
-                    label="Muddati o'tgan"
-                    value={statsMetrics.overdue}
-                    icon={AlertCircle}
-                    color="red"
-                    description="Kechikkan ishlar"
-                />
-            </div>
+            {canGrade ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
+                        label="Jami vazifalar"
+                        value={statsMetrics.total}
+                        icon={ClipboardList}
+                        color="blue"
+                        description="Kurslaringizdagi barcha vazifalar"
+                    />
+                    <StatCard
+                        label="Tekshirilmagan ishlar"
+                        value={statsMetrics.pending}
+                        icon={Clock}
+                        color="orange"
+                        description="Talabalar topshirgan, baho qo'yilmagan"
+                    />
+                    <StatCard
+                        label="Topshirish davom etmoqda"
+                        value={statsMetrics.active}
+                        icon={CheckCircle2}
+                        color="green"
+                        description="Muddati hali tugamagan vazifalar"
+                    />
+                    <StatCard
+                        label="Muddati tugagan"
+                        value={statsMetrics.overdue}
+                        icon={AlertCircle}
+                        color="red"
+                        description="Endi faqat kech topshirish mumkin"
+                    />
+                </div>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
+                        label="Topshirishim kerak"
+                        value={statsMetrics.todo}
+                        icon={Clock}
+                        color="blue"
+                        description="Muddati hali tugamagan"
+                    />
+                    <StatCard
+                        label="Tekshirilmoqda"
+                        value={statsMetrics.waiting}
+                        icon={ClipboardList}
+                        color="orange"
+                        description="Topshirdim, baho kutilmoqda"
+                    />
+                    <StatCard
+                        label="Baholangan"
+                        value={statsMetrics.graded}
+                        icon={CheckCircle2}
+                        color="green"
+                        description="O'qituvchi baho qo'ygan"
+                    />
+                    <StatCard
+                        label="Topshirilmay qolgan"
+                        value={statsMetrics.missed}
+                        icon={AlertCircle}
+                        color="red"
+                        description="Muddat tugagan — kech topshirish mumkin"
+                    />
+                </div>
+            )}
 
             {/* Filters & Search Bar in Wowdash style */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -312,12 +429,13 @@ export default function HomeworksPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
-                            {item.stats && (
+                            {!canGrade && <MyStateBadge item={item} />}
+                            {canGrade && item.stats && (
                                 <span className="font-medium">
-                                    Topshirdi: <strong className="text-foreground">{item.stats.submitted}</strong>/{item.stats.total_students}
+                                    Topshirganlar: <strong className="text-foreground">{item.stats.submitted}</strong>/{item.stats.total_students}
                                 </span>
                             )}
-                            {pendingCount(item) > 0 && (
+                            {canGrade && pendingCount(item) > 0 && (
                                 <span className="rounded-full bg-warning/15 px-2 py-0.5 font-bold text-warning">
                                     Tekshirilmagan: {pendingCount(item)}
                                 </span>
