@@ -71,7 +71,7 @@ export const StudentsPage = () => {
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const deleteMutation = useDeleteStudent();
 
@@ -530,14 +530,15 @@ export const StudentsPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isStudentsLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isStudentsLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Modals */}
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
@@ -805,6 +806,7 @@ const StudentDetail = ({
                                     totalPages={totalPages}
                                     onPageChange={setCurrentPage}
                                     isLoading={isResultsLoading}
+                                    totalItems={resultsData?.total ?? 0}
                                 />
                             )}
                         </div>

@@ -64,6 +64,7 @@ export const FacultyPage = () => {
     //     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
@@ -74,7 +75,7 @@ export const FacultyPage = () => {
 
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     // Resolved Hierarchy Entity States for deep links / refreshing
     const [resolvedFaculty, setResolvedFaculty] = useState<Faculty | null>(null);
@@ -212,6 +213,7 @@ export const FacultyPage = () => {
             setFaculties(data.faculties);
             setStats(new Map(statsList.map((s) => [s.faculty_id, s])));
             setTotalPages(Math.ceil(data.total / pageSize) || 1);
+            setTotalCount(data.total);
         } catch (error) {
             logger.error('Failed to fetch faculties', error);
             setIsError(true);
@@ -232,7 +234,7 @@ export const FacultyPage = () => {
         if (hierarchyLevel === 'faculties') {
             void fetchData();
         }
-    }, [currentPage, debouncedSearch, hierarchyLevel]);
+    }, [currentPage, pageSize, debouncedSearch, hierarchyLevel]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -778,14 +780,15 @@ export const FacultyPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Modals */}
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi — entity platformada yaratilmaydi/oʻzgartirilmaydi/oʻchirilmaydi.

@@ -22,7 +22,7 @@ const ActiveQuizzesPage = () => {
     const navigate = useNavigate();
 
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -167,6 +167,9 @@ const ActiveQuizzesPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isQuizzesLoading}
+                totalItems={quizzesData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

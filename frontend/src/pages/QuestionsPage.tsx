@@ -53,7 +53,7 @@ export const QuestionsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -449,14 +449,15 @@ export const QuestionsPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isQuestionsLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isQuestionsLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Question Detail Modal */}
             {selectedQuestion && (

@@ -43,7 +43,7 @@ export const GroupStudentsView = ({
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [studentToMove, setStudentToMove] = useState<Student | null>(null);
 
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -217,14 +217,15 @@ export const GroupStudentsView = ({
                 </CardContent>
             </Card>
 
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
             <ChangeGroupModal

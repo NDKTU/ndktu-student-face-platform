@@ -39,10 +39,22 @@ const QuizzesPage = () => {
     const [cascadeWarnings, setCascadeWarnings] = useState<string[]>([]);
     // Filtrlar, saralash va sahifa URL'da.
     const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
     const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    // O'qituvchi faqat o'z testlarini ko'radi — fakultet bo'yicha filtr unga
+    // hech narsa bermaydi, shuning uchun ruxsat bazada berilgan bo'lsa ham
+    // ko'rsatilmaydi (ro'yxat ham so'ralmaydi, URL'dagi eski qiymat ham
+    // e'tiborga olinmaydi).
+    const canFilterByFaculty = !isTeacher && hasPermission('read:faculty');
+
+    // O'qituvchi testni dars sahifasidan yaratadi, bu yerdan emas.
+    // Ruxsat ham tekshiriladi: `read:quiz` qo'lda berilib qolgan talabaga
+    // sahifa ochilardi va «Test yaratish» tugmasi ko'rinib turardi,
+    // bosilganda esa backend 403 qaytarardi.
+    const canCreateQuiz = !isTeacher && hasPermission('create:quiz');
 
     const [isRepeatConfirmOpen, setIsRepeatConfirmOpen] = useState(false);
     const [quizToRepeat, setQuizToRepeat] = useState<Quiz | null>(null);
@@ -75,11 +87,11 @@ const QuizzesPage = () => {
         user_id: filterUserId,
         group_id: filterGroupId,
         subject_id: filterSubjectId,
-        faculty_id: filterFacultyId,
+        faculty_id: canFilterByFaculty ? filterFacultyId : undefined,
         sort_dir: sortDir,
     });
 
-    const { data: allFacultiesData } = useFaculties(1, 200, undefined, hasPermission('read:faculty'));
+    const { data: allFacultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
     // Ikkita alohida so'rov, ataylab:
     //  * `allSubjectsData` — jadvalda fan NOMINI ko'rsatish uchun
     //    (`getSubjectName`). Quiz javobida faqat `subject_id` bor,
@@ -258,7 +270,7 @@ const QuizzesPage = () => {
     };
 
     const hasActiveFilters =
-        filterFacultyId !== undefined ||
+        (canFilterByFaculty && filterFacultyId !== undefined) ||
         filterSubjectId !== undefined ||
         filterGroupId !== undefined ||
         filterUserId !== undefined ||
@@ -283,7 +295,7 @@ const QuizzesPage = () => {
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        {!isTeacher && (
+                        {canCreateQuiz && (
                             <Button onClick={handleCreateQuiz}>
                                 <Plus className="mr-2 h-4 w-4" />
                                 {t('Test yaratish')}
@@ -299,9 +311,9 @@ const QuizzesPage = () => {
                 onSubjectSearchChange={setSubjectQuery}
                 groups={allGroups}
                 teachers={allTeachers}
-                faculties={allFaculties}
+                faculties={canFilterByFaculty ? allFaculties : undefined}
                 filterFacultyId={filterFacultyId}
-                onFacultyChange={(id) => { setFilterFacultyId(id); setCurrentPage(1); }}
+                onFacultyChange={canFilterByFaculty ? (id) => { setFilterFacultyId(id); setCurrentPage(1); } : undefined}
                 filterSubjectId={filterSubjectId}
                 onSubjectChange={setFilterSubjectId}
                 filterGroupId={filterGroupId}
@@ -342,6 +354,9 @@ const QuizzesPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isQuizzesLoading}
+                totalItems={quizzesData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
 
             <QuizModal

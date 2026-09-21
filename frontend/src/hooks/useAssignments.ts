@@ -87,6 +87,7 @@ export const useGradeSubmission = (assignmentId: number | undefined) => {
             qc.invalidateQueries({ queryKey: ['submissions', assignmentId] });
             qc.invalidateQueries({ queryKey: ['assignments'] });
             qc.invalidateQueries({ queryKey: ['lesson-gradebook'] });
+            qc.invalidateQueries({ queryKey: ['course-gradebook'] });
         },
     });
 };

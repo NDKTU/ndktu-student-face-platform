@@ -8,7 +8,8 @@ import { Loader2, Brain, ListOrdered, Play } from 'lucide-react';
 export default function StudentPsychologyPage() {
     const navigate = useNavigate();
     const [page, setPage] = useState(1);
-    const { data, isLoading, isError } = useMethods(page, 20);
+    const [pageSize, setPageSize] = useState(20);
+    const { data, isLoading, isError } = useMethods(page, pageSize);
 
     return (
         <div>
@@ -79,15 +80,14 @@ export default function StudentPsychologyPage() {
                                 })}
                             </div>
 
-                            {data.total > 20 && (
-                                <div className="mt-4">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={Math.ceil(data.total / 20)}
-                                        onPageChange={setPage}
-                                    />
-                                </div>
-                            )}
+                            <Pagination
+                                currentPage={page}
+                                totalPages={Math.ceil(data.total / pageSize)}
+                                onPageChange={setPage}
+                                totalItems={data.total}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
+                            />
                         </>
                     )}
                 </CardContent>

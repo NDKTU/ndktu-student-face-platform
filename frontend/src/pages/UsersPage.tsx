@@ -75,7 +75,7 @@ export const UsersPage = () => {
 
     const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -445,14 +445,15 @@ export const UsersPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isUsersLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isUsersLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* User Create / Edit Modal */}
             <UserModal

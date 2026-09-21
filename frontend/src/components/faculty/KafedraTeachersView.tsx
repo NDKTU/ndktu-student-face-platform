@@ -48,7 +48,7 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
     // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
 //     const [teacherToAssign, setTeacherToAssign] = useState<Teacher | null>(null);
 
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -269,6 +269,9 @@ export const KafedraTeachersView = ({ faculty, kafedra, onBackToFaculty, onBackT
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isTeachersLoading}
+                totalItems={teachersData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
 
             {/* Note: In a real scenario we'd pass kafedra.id to TeacherModal to pre-select the kafedra */}

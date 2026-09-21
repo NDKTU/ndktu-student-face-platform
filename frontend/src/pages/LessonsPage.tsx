@@ -28,7 +28,7 @@ export default function LessonsPage() {
 
     const [page, setPage] = useState(1);
     const [filterGroupId, setFilterGroupId] = useState<string>('');
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
 
     const filterGroupNum = filterGroupId ? parseInt(filterGroupId, 10) : undefined;
     const { data, isLoading, isError, refetch } = useLessons({ page, limit: pageSize, group_id: filterGroupNum });
@@ -271,6 +271,9 @@ export default function LessonsPage() {
                 totalPages={totalPages}
                 onPageChange={setPage}
                 isLoading={isLoading}
+                totalItems={data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
 
             <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Darsni tahrirlash' : 'Yangi dars qo\'shish'}>

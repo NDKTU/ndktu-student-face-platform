@@ -96,6 +96,7 @@ export const useMyResults = (params?: {
     faculty_id?: number;
     group_id?: number;
     page?: number;
+    limit?: number;
 }) =>
     useQuery({
         queryKey: ['psychology-my-results', params],

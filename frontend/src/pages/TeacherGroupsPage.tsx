@@ -20,7 +20,7 @@ const TeacherGroupsPage = () => {
     const { user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 12;
+    const [pageSize, setPageSize] = useState(12);
 
     // Assuming user.id is the teacher's ID
     const teacherId = user?.id;
@@ -127,6 +127,9 @@ const TeacherGroupsPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isLoading}
+                totalItems={data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

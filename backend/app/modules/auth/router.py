@@ -368,27 +368,34 @@ student_router = APIRouter(prefix="/students", tags=["Students"])
 async def list_students_with_users(
     data: StudentListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:student")),
+    current_user: User = Depends(PermissionRequired("read:student")),
 ):
-    return await student_repository.list_students_with_users(session=session, request=data)
+    return await student_repository.list_students_with_users(
+        session=session, request=data, current_user=current_user
+    )
 
 
 @student_router.get("/", response_model=StudentListResponse)
 async def list_students(
     data: StudentListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:student")),
+    current_user: User = Depends(PermissionRequired("read:student")),
 ):
-    return await student_repository.list_students(session=session, request=data)
+    """Talabalar ro'yxati.
+
+    O'qituvchiga faqat o'zi dars o'tadigan guruhlarning talabalari ko'rinadi
+    (`StudentRepository.visible_group_ids`), admin esa hammasini ko'radi.
+    """
+    return await student_repository.list_students(session=session, request=data, current_user=current_user)
 
 
 @student_router.get("/{student_id}", response_model=StudentResponse)
 async def get_student(
     student_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:student")),
+    current_user: User = Depends(PermissionRequired("read:student")),
 ):
-    return await student_repository.get_student(session, student_id)
+    return await student_repository.get_student(session, student_id, current_user=current_user)
 
 
 # EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da

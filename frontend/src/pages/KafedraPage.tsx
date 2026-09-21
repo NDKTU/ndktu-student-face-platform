@@ -56,7 +56,7 @@ export const KafedraPage = () => {
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
     // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
 //     const [showHidden, setShowHidden] = useState(false);
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -522,14 +522,15 @@ export const KafedraPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isKafedrasLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isKafedrasLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Modals */}
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).

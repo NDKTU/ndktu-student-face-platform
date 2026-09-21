@@ -20,7 +20,8 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 export default function PsychologyPage() {
     const navigate = useNavigate();
     const [page, setPage] = useState(1);
-    const { data, isLoading, isError, refetch } = useMethods(page, 20);
+    const [pageSize, setPageSize] = useState(20);
+    const { data, isLoading, isError, refetch } = useMethods(page, pageSize);
     const createMethod = useCreateMethod();
     const updateMethod = useUpdateMethod();
     const deleteMethod = useDeleteMethod();
@@ -133,15 +134,14 @@ export default function PsychologyPage() {
                                 onDeleteClick={handleDeleteClick}
                             />
 
-                            {data.total > 20 && (
-                                <div className="mt-4">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={Math.ceil(data.total / 20)}
-                                        onPageChange={setPage}
-                                    />
-                                </div>
-                            )}
+                            <Pagination
+                                currentPage={page}
+                                totalPages={Math.ceil(data.total / pageSize)}
+                                onPageChange={setPage}
+                                totalItems={data.total}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
+                            />
                         </>
                     )}
                 </CardContent>

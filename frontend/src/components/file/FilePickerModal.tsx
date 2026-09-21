@@ -30,6 +30,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
 import { formatSize } from '@/utils/fileSize';
 
@@ -362,33 +363,14 @@ export const FilePickerModal = ({
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {totalPages > 1 && (
-                            <>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={page === 1}
-                                    onClick={() => setPage((value) => value - 1)}
-                                >
-                                    Oldingi
-                                </Button>
-                                <span className="tabular-nums">
-                                    {page} / {totalPages}
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage((value) => value + 1)}
-                                >
-                                    Keyingi
-                                </Button>
-                            </>
-                        )}
-                    </div>
+                    {/* Modal ichida panel ramkasiz: pastdagi tugmalar qatoriga qo'shiladi. */}
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        isLoading={isLoading}
+                        className="mt-0 rounded-none border-0 bg-transparent p-0"
+                    />
 
                     <div className="flex items-center gap-2">
                         <Button type="button" variant="outline" onClick={onClose}>

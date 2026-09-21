@@ -32,7 +32,7 @@ interface TeacherQuestionsListProps {
 export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuestionsListProps) => {
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -234,6 +234,9 @@ export const TeacherQuestionsList = ({ teacher, subject, onBack }: TeacherQuesti
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isQuestionsLoading}
+                totalItems={questionsData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
 
             <ConfirmDialog

@@ -23,6 +23,7 @@ import { useFaculties, useSpecialities } from '@/hooks/useReferenceData';
 import { useCatalogView } from '@/hooks/useCatalogView';
 import { Combobox } from '@/components/ui/Combobox';
 import { /* PermissionGate, */ usePermission } from '@/components/auth/PermissionGate';
+import { useRoleView } from '@/hooks/useRoleView';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
 // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
 // import { HiddenBadge, ShowHiddenSwitch, VisibilityButton } from '@/components/common/VisibilityControls';
@@ -53,6 +54,8 @@ export const GroupsPage = () => {
     // yo'q, `/students` esa shu huquq bilan yopilgan: ilgari uning bosishi
     // hech qayerga olib bormasdi.
     const canReadAllStudents = usePermission('read:student');
+    const canReadFaculty = usePermission('read:faculty');
+    const canReadSpeciality = usePermission('read:speciality');
     const openGroupStudents = (groupId: number) =>
         navigate(canReadAllStudents ? `/students?group_id=${groupId}` : `/groups/${groupId}/students`);
 
@@ -80,7 +83,7 @@ export const GroupsPage = () => {
     const [sortField, setSortField] = useUrlState<SortField>('sort', 'name');
     const [sortOrder, setSortOrder] = useUrlState<SortOrder>('order', 'asc');
     const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -119,8 +122,17 @@ export const GroupsPage = () => {
         order: sortOrder,
     });
 
-    const { data: facultiesData } = useFaculties();
-    const { data: specialitiesData } = useSpecialities(1, 200);
+    // Fakultet va mutaxassislik maʼlumotnomasi oʻqituvchiga yopiq: bekend
+    // uni `PermissionRequiredExceptTeacher` bilan to'saydi, ya'ni so'rov 403
+    // bilan qaytadi. Shuning uchun so'rovning o'zi yuborilmaydi — aks holda
+    // har ochilishda ikkita 403 va `app:refresh-me` to'lqini chiqardi.
+    // Filtrlar va «Fakultet / Mutaxassislik» ustuni ham shu bayroq bo'yicha
+    // chiqadi: nomsiz «ID: 42» ko'rsatishning ma'nosi yo'q.
+    const { isTeacherOnly } = useRoleView();
+    const canSeeFaculties = !isTeacherOnly && canReadFaculty;
+    const canSeeSpecialities = !isTeacherOnly && canReadSpeciality;
+    const { data: facultiesData } = useFaculties(1, 100, undefined, canSeeFaculties);
+    const { data: specialitiesData } = useSpecialities(1, 200, undefined, undefined, canSeeSpecialities);
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const deleteGroupMutation = useDeleteGroup();
 
@@ -383,6 +395,7 @@ export const GroupsPage = () => {
                 extraFilters={
                     <>
                     <div className="flex flex-wrap items-center gap-2">
+                        {canSeeFaculties && (
                         <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={facultyOptions}
@@ -391,6 +404,8 @@ export const GroupsPage = () => {
                                 placeholder={t("Fakultet bo'yicha")}
                             />
                         </div>
+                        )}
+                        {canSeeSpecialities && (
                         <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={specialityOptions}
@@ -399,6 +414,7 @@ export const GroupsPage = () => {
                                 placeholder={t("Mutaxassislik bo'yicha")}
                             />
                         </div>
+                        )}
                     </div>
                         {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                         <ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />
@@ -506,7 +522,9 @@ export const GroupsPage = () => {
                                     {renderSortIcon('name')}
                                 </div>
                             </TableHead>
-                            <TableHead className="font-bold text-xs hidden lg:table-cell">{t('Fakultet / Mutaxassislik')}</TableHead>
+                            {canSeeFaculties && (
+                                <TableHead className="font-bold text-xs hidden lg:table-cell">{t('Fakultet / Mutaxassislik')}</TableHead>
+                            )}
                             <TableHead className="text-center font-bold text-xs">EPMOS ID</TableHead>
                             <TableHead className="text-center font-bold text-xs">HEMIS ID</TableHead>
                             <TableHead className="text-center font-bold text-xs">{t("Ta'lim Shakli")}</TableHead>
@@ -568,6 +586,7 @@ export const GroupsPage = () => {
                                     </TableCell>
 
                                     {/* Fakultet / Mutaxassislik */}
+                                    {canSeeFaculties && (
                                     <TableCell className="hidden lg:table-cell">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-xs font-medium text-foreground">
@@ -580,6 +599,7 @@ export const GroupsPage = () => {
                                             )}
                                         </div>
                                     </TableCell>
+                                    )}
 
                                     {/* EPMOS ID — guruhning EPMOS'dagi identifikatori.
                                         Ilgari bu yerda bizning lokal `id` turardi va ustun
@@ -642,9 +662,11 @@ export const GroupsPage = () => {
                             title={group.name}
                             subtitle={
                                 <div className="flex flex-col gap-1">
-                                    <span className="badge badge-primary text-xs w-fit">
-                                        {getFacultyName(group.faculty_id)}
-                                    </span>
+                                    {canSeeFaculties && (
+                                        <span className="badge badge-primary text-xs w-fit">
+                                            {getFacultyName(group.faculty_id)}
+                                        </span>
+                                    )}
                                     <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
                                         <span>{group.education_shape || t('Guruh')}</span>
                                         <ExternalSourceBadge row={group} />
@@ -671,14 +693,15 @@ export const GroupsPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isGroupsLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isGroupsLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Modals */}
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).

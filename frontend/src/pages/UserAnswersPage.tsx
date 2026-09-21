@@ -41,7 +41,7 @@ const UserAnswersPage = () => {
     const resultId = searchParams.get('result_id') ? Number(searchParams.get('result_id')) : undefined;
 
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 50;
+    const [pageSize, setPageSize] = useState(50);
 
     const { data, isLoading, isError, refetch } = useUserAnswers({
         page: currentPage,
@@ -204,6 +204,9 @@ const UserAnswersPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isLoading}
+                totalItems={total}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

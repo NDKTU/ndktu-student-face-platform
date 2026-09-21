@@ -102,3 +102,79 @@ async def user_has_permission(session: AsyncSession, user: User, permission_name
     )
     result = await session.execute(stmt)
     return result.scalars().first() is not None
+
+
+class PermissionRequiredExceptRole(PermissionRequired):
+    """`PermissionRequired`, ustiga — bitta rolni to'sish.
+
+    Ruxsatni roldan olib tashlashning o'zi kifoya qilmaydi: ruxsatlar
+    Rollar oynasidan qo'lda ham beriladi, seed esa ortiqchasini OLIB
+    TASHLAMAYDI (`core/lifespan/defaults.py`). Shuning uchun ba'zi
+    chegaralar endpointning o'zida turadi.
+
+    `PermissionRequired` dan meros olingani muhim: ishga tushishda
+    ruxsatlar route'lardan aynan shu tur bo'yicha topiladi
+    (`core/lifespan/discovery.py`), alohida sinf esa ruxsatni bazadan
+    yo'qotib yuborardi.
+    """
+
+    #: Shu roldagi foydalanuvchi endpointga kiritilmaydi.
+    BLOCKED_ROLE = ""
+
+    #: Rolining nomi shu to'plamda ham bo'lsa, chegara qo'llanmaydi.
+    EXEMPT_ROLES = frozenset({"admin"})
+
+    #: 403 javobidagi izoh.
+    DENIAL_DETAIL = "Access denied"
+
+    async def __call__(
+        self,
+        user_id: int = Depends(get_current_user_id),
+        session: AsyncSession = Depends(db_helper.session_getter),
+    ) -> User:
+        user = await super().__call__(user_id=user_id, session=session)
+
+        role_names = {role.name.lower() for role in (user.roles or [])}
+        if self.BLOCKED_ROLE in role_names and not (role_names & self.EXEMPT_ROLES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=self.DENIAL_DETAIL,
+            )
+
+        return user
+
+
+class PermissionRequiredExceptTeacher(PermissionRequiredExceptRole):
+    """Tashkiliy tuzilma spravochniklari — o'qituvchiga yopiq.
+
+    Fakultet, kafedra, mutaxassislik, o'quv reja — ma'muriyat ma'lumoti:
+    ularni EPOS/HEMIS to'ldiradi, platformada esa faqat o'qiladi.
+    O'qituvchining kundalik ishida butun universitetning bo'linmalari
+    kerak emas — uning guruhlari, kurslari va darslari o'z bo'limlarida.
+
+    Admin va psixolog (`psixologik`) bundan tashqarida: psixologiya
+    natijalari fakultet bo'yicha filtrlanadi, shuning uchun unga
+    fakultetlar ro'yxati kerak.
+    """
+
+    BLOCKED_ROLE = "teacher"
+    EXEMPT_ROLES = frozenset({"admin", "psixologik"})
+    DENIAL_DETAIL = "Access denied: organization structure is not available for teachers"
+
+
+class PermissionRequiredExceptStudent(PermissionRequiredExceptRole):
+    """Test yaratish — talabaga yopiq.
+
+    Talabaning testdagi ishi `quiz_process:*` ruxsatlari bilan chegaralanadi:
+    boshlash, javob yuborish, yakunlash. Testni yig'ish esa o'qituvchi va
+    ma'muriyat ishi.
+
+    `create:quiz` talaba roliga hech qachon berilmagan, lekin `read:quiz`
+    qo'lda berilib qolgan edi — natijada talabada butun universitetning
+    «Testlar» sahifasi «Test yaratish» tugmasi bilan ochilib turardi.
+    Grantlar `a4c7e2b91d05` migratsiyasida olib tashlandi, bu chegara esa
+    ularning qaytib kelishidan qat'i nazar ishlaydi.
+    """
+
+    BLOCKED_ROLE = "student"
+    DENIAL_DETAIL = "Access denied: quiz authoring is not available for students"

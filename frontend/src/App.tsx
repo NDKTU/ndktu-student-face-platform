@@ -8,6 +8,7 @@ import FocusLayout from '@/components/layout/FocusLayout';
 import { Toaster } from '@/components/ui/Toaster';
 
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
+import { useRoleView } from '@/hooks/useRoleView';
 import { useGlobalErrorLogger } from '@/hooks/useGlobalErrorLogger';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -97,6 +98,99 @@ const PermissionRoute = ({ permission, children }: { permission: string | string
     return children;
 };
 
+/**
+ * Faqat admin koʻrinishidagi boʻlim.
+ *
+ * Ruxsat bu yerda hal qilmaydi: masalan `read:teacher_assignment`
+ * oʻqituvchida ham boʻlishi mumkin (bekend unga oʻz yuklamasinigina
+ * beradi), lekin boʻlimning oʻzi maʼmuriy. Menyudan olib tashlashning oʻzi
+ * toʻgʻridan-toʻgʻri havolani toʻsmaydi — shuning uchun marshrut ham
+ * yopiladi.
+ */
+const AdminRoute = ({ children }: { children: React.ReactElement }) => {
+    const { isLoading } = useAuth();
+    const { isAdmin } = useRoleView();
+
+    if (isLoading) {
+        return <PageSpinner />;
+    }
+
+    if (!isAdmin) {
+        return <AccessDenied reason="Boʻlim faqat administrator koʻrinishida ochiladi" />;
+    }
+    return children;
+};
+
+/**
+ * Oʻqituvchi koʻrinishida yopiladigan boʻlim.
+ *
+ * Ruxsat bu yerda hal qilmaydi: `read:psychology`, `read:teacher` va
+ * tashkiliy tuzilma ruxsatlari baʼzi oʻqituvchilarda baribir bor (qoʻlda
+ * berilgan yoki eski migratsiyadan qolgan). Menyudan olib tashlash
+ * (`constants/resources.ts` dagi TEACHER_HIDDEN_RESOURCES) toʻgʻridan-toʻgʻri
+ * havolani toʻsmaydi — shuning uchun marshrut ham yopiladi.
+ *
+ * Rollar `buildSidebar` dagi `isTeacherOnly` bilan bir xil sanaladi: admin
+ * yoki psixolog roli aralashgan boʻlsa boʻlim ochiq qoladi, aks holda menyu
+ * va marshrut bir-biriga zid javob berardi.
+ */
+const TeacherBlockedRoute = ({
+    reason,
+    children,
+}: {
+    reason: string;
+    children: React.ReactElement;
+}) => {
+    const { isLoading } = useAuth();
+    const { isTeacherOnly } = useRoleView();
+
+    if (isLoading) {
+        return <PageSpinner />;
+    }
+
+    if (isTeacherOnly) {
+        return <AccessDenied reason={reason} />;
+    }
+    return children;
+};
+
+/**
+ * Psixologiya boʻlimi — psixolog xizmatining ishi (`psixologik` roli).
+ *
+ * Talabaning oʻz sahifasi (`/psychology/student`) bunga kirmaydi.
+ */
+const PsychologyRoute = ({ children }: { children: React.ReactElement }) => (
+    <TeacherBlockedRoute reason="Boʻlim psixolog xizmati uchun">{children}</TeacherBlockedRoute>
+);
+
+/**
+ * Oʻqituvchilar maʼlumotnomasi — maʼmuriyat ishi.
+ *
+ * Roʻyxatda butun universitetning professor-oʻqituvchilari: kafedrasi,
+ * biriktirilgan fanlari va guruhlari bilan. Oʻqituvchiga hamkasblarining
+ * roʻyxati kerak emas, oʻzining maʼlumotlari esa Profil sahifasida.
+ */
+const TeacherDirectoryRoute = ({ children }: { children: React.ReactElement }) => (
+    <TeacherBlockedRoute reason="Boʻlim maʼmuriyat uchun: oʻz maʼlumotlaringiz Profil sahifasida">
+        {children}
+    </TeacherBlockedRoute>
+);
+
+/**
+ * Tashkiliy tuzilma — fakultet, kafedra, mutaxassislik va oʻquv reja.
+ *
+ * Maʼlumotnomani EPOS/HEMIS toʻldiradi, platformada faqat oʻqiladi va u
+ * maʼmuriyatning ishi. Oʻqituvchiga butun universitetning boʻlinmalari
+ * kerak emas: guruhlari, kurslari va darslari oʻz boʻlimlarida. Bekend ham
+ * shu chegarani qoʻyadi (`PermissionRequiredExceptTeacher`) — bu yerdagisi
+ * 403 oʻrniga sababni koʻrsatish uchun.
+ */
+const OrganizationStructureRoute = ({ children }: { children: React.ReactElement }) => (
+    <TeacherBlockedRoute reason="Boʻlim maʼmuriyat uchun: oʻz guruhlaringiz «Guruhlar» boʻlimida">
+        {children}
+    </TeacherBlockedRoute>
+);
+
 const DashboardRedirect = () => {
     const { user, activeRole } = useAuth();
     // Bir nechta roli borlar uchun tanlangan ko'rinish hal qiladi.
@@ -151,7 +245,7 @@ function App() {
                                         <Route path="/roles" element={<PermissionRoute permission="read:role"><RolesPage /></PermissionRoute>} />
                                         <Route path="/roles/:id/permissions" element={<PermissionRoute permission="read:role"><RolePermissionsPage /></PermissionRoute>} />
                                         <Route path="/permissions" element={<PermissionRoute permission="read:permission"><PermissionsPage /></PermissionRoute>} />
-                                        <Route path="/teachers" element={<PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute>} />
+                                        <Route path="/teachers" element={<TeacherDirectoryRoute><PermissionRoute permission="read:teacher"><TeachersPage /></PermissionRoute></TeacherDirectoryRoute>} />
                                         {/* «Reyting» vaqtincha o'chirilgan (2026-09-16): natijalar
                                             o'qituvchiga faqat guruh bo'yicha bog'lanadi, fan hisobga
                                             olinmaydi — bitta natija guruhdagi barcha o'qituvchilarga
@@ -160,18 +254,18 @@ function App() {
                                             to'g'ridan-to'g'ri havolani to'smaydi.
                                         <Route path="/teacher-ranking" element={<PermissionRoute permission="read:teacher"><TeacherRankingPage /></PermissionRoute>} /> */}
 
-                                        <Route path="/faculties/*" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
-                                        <Route path="/faculties" element={<PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute>} />
-                                        <Route path="/kafedras" element={<PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute>} />
-                                        <Route path="/teacher-assignments" element={<PermissionRoute permission="read:teacher_assignment"><TeacherAssignmentsPage /></PermissionRoute>} />
+                                        <Route path="/faculties/*" element={<OrganizationStructureRoute><PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute></OrganizationStructureRoute>} />
+                                        <Route path="/faculties" element={<OrganizationStructureRoute><PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute></OrganizationStructureRoute>} />
+                                        <Route path="/kafedras" element={<OrganizationStructureRoute><PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute></OrganizationStructureRoute>} />
+                                        <Route path="/teacher-assignments" element={<AdminRoute><PermissionRoute permission="read:teacher_assignment"><TeacherAssignmentsPage /></PermissionRoute></AdminRoute>} />
                                         <Route path="/files" element={<PermissionRoute permission="read:file"><FilesPage /></PermissionRoute>} />
                                         {/* Boshqaruv ro'yxati va talaba lentasi alohida huquqda:
                                             talabaga `read:announcement` berilsa, unga tahrirlash
                                             sahifasi ham ochilib ketardi. */}
                                         <Route path="/announcements" element={<PermissionRoute permission="read:announcement"><AnnouncementsPage /></PermissionRoute>} />
                                         <Route path="/announcements/student" element={<PermissionRoute permission="announcement:feed"><StudentAnnouncementsPage /></PermissionRoute>} />
-                                        <Route path="/specialities" element={<PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute>} />
-                                        <Route path="/curriculums" element={<PermissionRoute permission="read:curriculum"><CurriculumsPage /></PermissionRoute>} />
+                                        <Route path="/specialities" element={<OrganizationStructureRoute><PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute></OrganizationStructureRoute>} />
+                                        <Route path="/curriculums" element={<OrganizationStructureRoute><PermissionRoute permission="read:curriculum"><CurriculumsPage /></PermissionRoute></OrganizationStructureRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />
                                         {/* `read:group` yetarli: backend o'qituvchiga faqat o'z guruhini ochadi. */}
                                         <Route path="/groups/:groupId/students" element={<PermissionRoute permission="read:group"><GroupStudentsPage /></PermissionRoute>} />
@@ -185,8 +279,8 @@ function App() {
                                         {/* Ishlarni tekshirish — `update:submission` faqat o'qituvchi/adminda:
                                             talabada `read:submission` bor, lekin bu sahifa unga emas. */}
                                         <Route path="/homework/:id/submissions" element={<PermissionRoute permission="update:submission"><HomeworkSubmissionsPage /></PermissionRoute>} />
-                                        <Route path="/psychology" element={<PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute>} />
-                                        <Route path="/psychology/results" element={<PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute>} />
+                                        <Route path="/psychology" element={<PsychologyRoute><PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute></PsychologyRoute>} />
+                                        <Route path="/psychology/results" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />

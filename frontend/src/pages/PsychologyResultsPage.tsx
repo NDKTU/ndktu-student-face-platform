@@ -77,6 +77,7 @@ function ResultDetailModal({ result, onClose }: { result: TestResultResponse | n
 
 export default function PsychologyResultsPage() {
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [methodFilter, setMethodFilter] = useState<number | undefined>(undefined);
     const [facultyFilter, setFacultyFilter] = useState<string>('');
     const [groupFilter, setGroupFilter] = useState<string>('');
@@ -106,6 +107,7 @@ export default function PsychologyResultsPage() {
         faculty_id: facultyFilter ? Number(facultyFilter) : undefined,
         group_id: groupFilter ? Number(groupFilter) : undefined,
         page,
+        limit: pageSize,
     });
 
     return (
@@ -253,15 +255,14 @@ export default function PsychologyResultsPage() {
                                 ))}
                             </div>
 
-                            {data.total > 20 && (
-                                <div className="mt-4">
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={Math.ceil(data.total / 20)}
-                                        onPageChange={setPage}
-                                    />
-                                </div>
-                            )}
+                            <Pagination
+                                currentPage={page}
+                                totalPages={Math.ceil(data.total / pageSize)}
+                                onPageChange={setPage}
+                                totalItems={data.total}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
+                            />
                         </>
                     )}
                 </CardContent>

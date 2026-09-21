@@ -12,6 +12,15 @@ ruxsatlar ham, yetishmasa qo'shiladi. Boshqa rollarga tegilmaydi.
 
 ADMIN_ROLE_NAME = "Admin"
 
+# Kurs ruxsatlari ataylab yo'q: `read:course` ni `e2a4f8c15d97`
+# migratsiyasi beradi, `create:course` va `update:course` esa
+# `e7b3a1c92d68` da olib tashlangan — kursni ma'muriyat tuzadi. Bu ro'yxat
+# yetishmaganini har ishga tushishda qaytaradi, shuning uchun ularni bu
+# yerga qo'shish o'sha qarorni bekor qiladi.
+#
+# Shu sabab bilan tashkiliy tuzilma ham yo'q: `read:faculty`,
+# `read:kafedra`, `read:speciality` va `read:curriculum` `b9d6f2a41c73` da
+# o'qituvchidan olib tashlangan.
 TEACHER_PERMISSIONS = (
     "announcement:feed",
     "announcement:register",
@@ -53,6 +62,11 @@ TEACHER_PERMISSIONS = (
     "user_answers:read",
 )
 
+# Test yig'ish ruxsatlari ataylab yo'q: `read:quiz` va yozuv ruxsatlari
+# `a4c7e2b91d05` migratsiyasida `student` rolidan olib tashlangan —
+# talaba testni faqat ishlaydi. Bu ro'yxat yetishmaganini har ishga
+# tushishda qaytaradi, shuning uchun ularni bu yerga qo'shish o'sha
+# qarorni bekor qiladi.
 STUDENT_PERMISSIONS = (
     "announcement:feed",
     "announcement:register",

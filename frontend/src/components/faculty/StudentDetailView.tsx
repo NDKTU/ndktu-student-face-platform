@@ -223,6 +223,7 @@ export const StudentDetailView = ({
                                 totalPages={resultsTotalPages}
                                 onPageChange={setResultsPage}
                                 isLoading={isResultsLoading}
+                                totalItems={resultsData?.total ?? 0}
                             />
                         </div>
                     )}

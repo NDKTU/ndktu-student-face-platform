@@ -13,7 +13,7 @@ import { initialsOf, tileFor } from '@/lib/avatarTiles';
 import { cn } from '@/lib/utils';
 import { formatGpa } from '@/utils/gpa';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 const percentColor = (percent: number | null | undefined) => {
     if (percent == null) return 'text-muted-foreground';
@@ -37,6 +37,7 @@ export const TeacherStudentsPanel = ({
     teacherUserId?: number;
 }) => {
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -51,7 +52,7 @@ export const TeacherStudentsPanel = ({
 
     const { data, isLoading, isError, refetch } = useTeacherStudents(teacherId, {
         page,
-        limit: PAGE_SIZE,
+        limit: pageSize,
         search: debouncedSearch || undefined,
         group_id: groupFilter === 'all' ? undefined : Number(groupFilter),
     });
@@ -71,7 +72,7 @@ export const TeacherStudentsPanel = ({
         [attendance]
     );
     const total = data?.total ?? 0;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     const groupOptions = useMemo(
         () => [
@@ -162,7 +163,7 @@ export const TeacherStudentsPanel = ({
                         {students.map((student, index) => (
                             <TableRow key={student.id} className="border-b border-border/50">
                                 <TableCell className="text-center font-mono text-xs font-semibold text-muted-foreground">
-                                    {(page - 1) * PAGE_SIZE + index + 1}
+                                    {(page - 1) * pageSize + index + 1}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
@@ -223,6 +224,9 @@ export const TeacherStudentsPanel = ({
                 totalPages={totalPages}
                 onPageChange={setPage}
                 isLoading={isLoading}
+                totalItems={total}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

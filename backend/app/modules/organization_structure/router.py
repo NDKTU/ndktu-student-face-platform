@@ -1,7 +1,11 @@
 import logging
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired, user_has_permission
+from core.dependencies.role_checker import (
+    PermissionRequired,
+    PermissionRequiredExceptTeacher,
+    user_has_permission,
+)
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +95,7 @@ faculty_router = APIRouter(
 @faculty_router.get("/stats", response_model=FacultyStatsResponse)
 async def get_faculty_stats(
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:faculty")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:faculty")),
 ):
     return await get_faculty_repository.get_faculty_stats(session=session)
 
@@ -100,7 +104,7 @@ async def get_faculty_stats(
 async def get_faculty(
     faculty_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:faculty")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:faculty")),
 ):
     return await get_faculty_repository.get_faculty(session=session, faculty_id=faculty_id)
 
@@ -109,7 +113,7 @@ async def get_faculty(
 async def list_faculties(
     data: FacultyListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("read:faculty")),
+    current_user: User = Depends(PermissionRequiredExceptTeacher("read:faculty")),
 ):
     return await get_faculty_repository.list_faculties(session=session, request=data, current_user=current_user)
 
@@ -180,7 +184,7 @@ kafedra_router = APIRouter(
 async def get_kafedra_stats(
     faculty_id: int | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:kafedra")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:kafedra")),
 ):
     return await get_kafedra_repository.get_kafedra_stats(session=session, faculty_id=faculty_id)
 
@@ -189,7 +193,7 @@ async def get_kafedra_stats(
 async def get_kafedra(
     kafedra_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:kafedra")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:kafedra")),
 ):
     return await get_kafedra_repository.get_kafedra(session=session, kafedra_id=kafedra_id)
 
@@ -198,7 +202,7 @@ async def get_kafedra(
 async def list_kafedras(
     data: KafedraListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("read:kafedra")),
+    current_user: User = Depends(PermissionRequiredExceptTeacher("read:kafedra")),
 ):
     return await get_kafedra_repository.list_kafedras(session=session, request=data, current_user=current_user)
 
@@ -326,12 +330,20 @@ async def get_group_students(
 ):
     """Guruh talabalari.
 
-    Huquq ikki bosqichli. `read:student` bo'lgan foydalanuvchi (admin yoki
-    huquq berilgani) istalgan guruhni ochadi. Bo'lmasa — faqat o'ziga
-    biriktirilgan guruh: guruhlar ro'yxati o'qituvchi uchun allaqachon shunday
+    Huquq ikki bosqichli. Admin istalgan guruhni ochadi, o'qituvchi esa —
+    faqat o'ziga biriktirilganini: guruhlar ro'yxati unga allaqachon shunday
     cheklangan, ochilmaydigan qator ko'rsatish esa mantiqsiz bo'lardi.
+
+    `read:student` o'qituvchini bu chegaradan chiqarmaydi. Ilgari chiqarardi
+    va bu ruxsat ba'zi o'qituvchilarda bor (qo'lda berilgan yoki eski
+    migratsiyadan qolgan) — natijada o'qituvchi begona guruhning talabalarini
+    ochib ko'ra olardi. Ruxsati bor boshqa rollar (psixolog, tutor) avvalgidek
+    istalgan guruhni ochadi.
     """
-    if not await user_has_permission(session, current_user, "read:student"):
+    is_teacher = not any(role.name.lower() == "admin" for role in (current_user.roles or [])) and any(
+        role.name.lower() == "teacher" for role in (current_user.roles or [])
+    )
+    if is_teacher or not await user_has_permission(session, current_user, "read:student"):
         if not await get_group_repository.is_group_assigned_to_user(session, current_user, group_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -339,7 +351,7 @@ async def get_group_students(
             )
 
     request = StudentListRequest(page=page, limit=limit, search=search, group_id=group_id)
-    return await student_repository.list_students(session=session, request=request)
+    return await student_repository.list_students(session=session, request=request, current_user=current_user)
 
 
 # EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da
@@ -431,7 +443,7 @@ speciality_router = APIRouter(
 async def get_speciality_stats(
     kafedra_id: int | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:speciality")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:speciality")),
 ):
     return await get_speciality_repository.get_speciality_stats(session=session, kafedra_id=kafedra_id)
 
@@ -440,7 +452,7 @@ async def get_speciality_stats(
 async def list_specialities(
     data: SpecialityListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("read:speciality")),
+    current_user: User = Depends(PermissionRequiredExceptTeacher("read:speciality")),
 ):
     return await get_speciality_repository.list_specialities(session=session, request=data, current_user=current_user)
 
@@ -449,7 +461,7 @@ async def list_specialities(
 async def get_speciality(
     speciality_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:speciality")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:speciality")),
 ):
     return await get_speciality_repository.get_speciality(session=session, speciality_id=speciality_id)
 
@@ -582,7 +594,7 @@ curriculum_router = APIRouter(
 async def list_curriculums(
     data: CurriculumListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("read:curriculum")),
+    current_user: User = Depends(PermissionRequiredExceptTeacher("read:curriculum")),
 ):
     """Oʻquv rejalar roʻyxati.
 
@@ -604,7 +616,7 @@ async def list_curriculums(
 async def get_curriculum(
     curriculum_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("read:curriculum")),
+    _: PermissionRequired = Depends(PermissionRequiredExceptTeacher("read:curriculum")),
 ):
     """Bitta oʻquv reja."""
     return await get_curriculum_repository.get_curriculum(session, curriculum_id)

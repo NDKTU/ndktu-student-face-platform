@@ -17,7 +17,7 @@ import type { Announcement, AnnouncementStatus } from '@/services/announcementSe
 import { formatDateTime } from '@/utils/date';
 import { cn } from '@/lib/utils';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 const STATUS_FILTERS: { value: AnnouncementStatus | 'all'; label: string }[] = [
     { value: 'all', label: 'Hammasi' },
@@ -34,6 +34,7 @@ const STATUS_CLASS: Record<AnnouncementStatus, string> = {
 
 export default function AnnouncementsPage() {
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [status, setStatus] = useState<AnnouncementStatus | 'all'>('all');
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Announcement | null>(null);
@@ -44,18 +45,18 @@ export default function AnnouncementsPage() {
     const params = useMemo(
         () => ({
             page,
-            limit: PAGE_SIZE,
+            limit: pageSize,
             status: status === 'all' ? undefined : status,
             search: search.trim() || undefined,
         }),
-        [page, status, search],
+        [page, pageSize, status, search],
     );
 
     const query = useAnnouncements(params);
     const deleteAnnouncement = useDeleteAnnouncement();
 
     const rows = query.data?.announcements ?? [];
-    const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / PAGE_SIZE)) : 1;
+    const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / pageSize)) : 1;
 
     const openCreate = () => { setEditing(null); setIsFormOpen(true); };
     const openEdit = (row: Announcement) => { setEditing(row); setIsFormOpen(true); };
@@ -209,9 +210,14 @@ export default function AnnouncementsPage() {
                 }
             />
 
-            {totalPages > 1 && (
-                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-            )}
+            <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={query.data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             <Modal
                 isOpen={isFormOpen}

@@ -35,9 +35,10 @@ const RolesPage = () => {
     const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const navigate = useNavigate();
 
     const fetchData = async () => {
@@ -47,6 +48,7 @@ const RolesPage = () => {
             const data = await roleService.getRoles(currentPage, pageSize, debouncedSearch);
             setRoles(data.roles);
             setTotalPages(Math.ceil(data.total / pageSize));
+            setTotalCount(data.total);
         } catch (error) {
             logger.error('Failed to fetch roles', error);
             setIsError(true);
@@ -63,7 +65,7 @@ const RolesPage = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    useEffect(() => { fetchData(); }, [currentPage, debouncedSearch]);
+    useEffect(() => { fetchData(); }, [currentPage, pageSize, debouncedSearch]);
 
     const handleDeleteClick = (role: Role) => {
         setRoleToDelete(role);
@@ -216,6 +218,9 @@ const RolesPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
 
             <RoleModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} role={selectedRole}

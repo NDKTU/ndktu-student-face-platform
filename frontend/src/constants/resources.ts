@@ -356,12 +356,71 @@ const STAFF_BESPOKE_ITEMS: {
     },
 ];
 
+// Ruxsati bo'lsa ham faqat admin ko'rinishida chiqadigan punktlar.
+//
+// `read:teacher_assignment` o'qituvchida ham uchraydi va bu to'g'ri: bekend
+// unga yuklamaning o'z qatorlarinigina beradi (`teacher_assignment/
+// repository.py` dagi `is_admin` shoxi). Lekin «O'quv yuklamasi» — EPOS
+// ko'zgusi, ma'muriy ma'lumotnoma; o'qituvchining kundalik ishida u kerak
+// emas va menyuni behuda to'ldiradi. Ruxsatni rolidan olib tashlash bilan
+// hal qilib bo'lmaydi: u boshqa joyda ham asqotadi va seed hech qachon
+// ruxsat OLIB TASHLAMAYDI (`core/lifespan/defaults.py`).
+const ADMIN_ONLY_RESOURCES = new Set(['teacher_assignment']);
+
+// Ruxsati bo'lsa ham o'qituvchi ko'rinishida chiqmaydigan punktlar.
+//
+// Psixologiya — psixolog xizmatining ishi: metodikalarni u tuzadi va
+// natijalarni u o'qiydi (`psixologik` roli, `App.tsx` dagi
+// DashboardRedirect o'shani `/psychology` ga olib boradi). O'qituvchining
+// darsiga bu bo'lim aloqador emas, menyuda esa «Baholash» ichida ko'zga
+// tashlanadigan guruh bo'lib turadi.
+//
+// «O'qituvchilar» — kadrlar ma'lumotnomasi: butun universitetning
+// professor-o'qituvchilari, kafedrasi va biriktirmalari bilan. Bu ma'muriyat
+// ishi; o'qituvchiga hamkasblarining ro'yxati kerak emas. O'zining
+// ma'lumotlari Profil sahifasida (`teacher:me`).
+//
+// «Tashkiliy tuzilma» (fakultet, kafedra, mutaxassislik, o'quv reja) —
+// ma'muriyat ma'lumotnomasi: uni EPOS/HEMIS to'ldiradi, platformada faqat
+// o'qiladi. O'qituvchiga butun universitetning bo'linmalari kerak emas —
+// guruhlari, kurslari va darslari o'z bo'limlarida. To'rttasi birdan
+// yashiringani uchun yig'iluvchi guruhning o'zi ham chiqmaydi.
+//
+// `read:psychology`, `read:psychology_results`, `read:teacher` va tashkiliy
+// tuzilma ruxsatlari ba'zi o'qituvchilarda baribir mavjud (qo'lda berilgan
+// yoki eski migratsiyadan qolgan), roldan olib tashlash bilan ham hal
+// bo'lmaydi: seed ruxsat OLIB TASHLAMAYDI (`core/lifespan/defaults.py`).
+// Shuning uchun filtr shu yerda. Tashkiliy tuzilma uchun grantlar
+// `b9d6f2a41c73` migratsiyasida ham o'chiriladi, endpointlar esa
+// `PermissionRequiredExceptTeacher` bilan yopilgan.
+//
+// «Foydalanuvchilar» guruhida shundan keyin bitta punkt — «Talabalar» —
+// qoladi va u guruhsiz, o'z holicha chiqadi (pastdagi bitta bolali guruhni
+// yoyish qoidasi).
+const TEACHER_HIDDEN_RESOURCES = new Set([
+    'psychology',
+    'psychology_results',
+    'teacher',
+    'faculty',
+    'kafedra',
+    'speciality',
+    'curriculum',
+]);
+
 export const buildSidebar = (
     permissions: ReadonlySet<string>,
     roleNames: ReadonlyArray<string>
 ): SidebarSection[] => {
     const isStudent = roleNames.some((r) => r.toLowerCase() === 'student');
     if (isStudent) return buildStudentSidebar(permissions);
+
+    const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');
+    // Faqat o'qituvchi ko'rinishi: admin yoki psixolog roli aralashgan
+    // bo'lsa, ularning punktlari to'liq qoladi.
+    const isTeacherOnly =
+        !isAdmin &&
+        roleNames.some((r) => r.toLowerCase() === 'teacher') &&
+        !roleNames.some((r) => r.toLowerCase() === 'psixologik');
 
     // Qaysi resurs qaysi yig'iluvchi guruhga tegishli.
     const groupOf = new Map<string, SidebarGroupSpec>();
@@ -381,6 +440,8 @@ export const buildSidebar = (
 
     for (const resource of SIDEBAR_RESOURCE_ORDER) {
         if (!permissions.has(`read:${resource}`)) continue;
+        if (!isAdmin && ADMIN_ONLY_RESOURCES.has(resource)) continue;
+        if (isTeacherOnly && TEACHER_HIDDEN_RESOURCES.has(resource)) continue;
         const meta = RESOURCES[resource];
         if (!meta?.href || !meta.icon || !meta.section) continue;
 
@@ -422,7 +483,6 @@ export const buildSidebar = (
         }
     }
 
-    const isAdmin = roleNames.some((r) => r.toLowerCase() === 'admin');
     // «Reyting» vaqtincha yashirilgan (2026-09-16).
     //
     // Sabab ko'rinishda emas, hisobda: natijalar o'qituvchiga faqat GURUH

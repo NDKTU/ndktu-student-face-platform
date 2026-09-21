@@ -11,17 +11,18 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useAnnouncementFeed, useToggleRegistration } from '@/hooks/useAnnouncements';
 import type { Announcement } from '@/services/announcementService';
 
-const PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 12;
 
 export default function StudentAnnouncementsPage() {
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [onlyEvents, setOnlyEvents] = useState(false);
 
-    const query = useAnnouncementFeed({ page, limit: PAGE_SIZE, only_events: onlyEvents || undefined });
+    const query = useAnnouncementFeed({ page, limit: pageSize, only_events: onlyEvents || undefined });
     const toggle = useToggleRegistration();
 
     const rows = query.data?.announcements ?? [];
-    const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / PAGE_SIZE)) : 1;
+    const totalPages = query.data ? Math.max(1, Math.ceil(query.data.total / pageSize)) : 1;
 
     const onToggle = (announcement: Announcement) => {
         toggle.mutate(
@@ -89,9 +90,14 @@ export default function StudentAnnouncementsPage() {
                 </div>
             )}
 
-            {totalPages > 1 && (
-                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-            )}
+            <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={query.data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
         </div>
     );
 }

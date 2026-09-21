@@ -69,7 +69,7 @@ const QuizTestPage = () => {
 
     // Start phase
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const { data: quizzesData, isLoading: isLoadingQuizzes, isFetching: isFetchingQuizzes, isError: isQuizzesError } = useActiveQuizzes(currentPage, pageSize);
     const [selectedQuiz, setSelectedQuiz] = useState<{ id: number; title: string } | null>(null);
     const [pin, setPin] = useState('');
@@ -496,14 +496,15 @@ const QuizTestPage = () => {
                     </CardContent>
                 </Card>
 
-                {totalPages > 1 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={setCurrentPage}
-                        isLoading={isFetchingQuizzes}
-                    />
-                )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    isLoading={isFetchingQuizzes}
+                    totalItems={quizzesData?.total ?? 0}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
+                />
 
                 <Modal
                     isOpen={isModalOpen}

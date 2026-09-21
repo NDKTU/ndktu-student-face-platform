@@ -1,5 +1,6 @@
 import api from './api';
 import type { CourseType } from './courseTypes';
+import type { GradebookHomework, GradebookHomeworkCell, GradebookQuiz, GradebookQuizCell } from './lessonService';
 
 export interface CourseSubjectInfo {
     id: number;
@@ -117,7 +118,10 @@ export interface MyHomeworkGrade {
     /** Ish topshirilmagan bo'lsa — null. */
     status?: string | null;
     grade?: number | null;
+    submitted_at?: string | null;
     late: boolean;
+    /** O'qituvchi izohi — faqat baholangan ishda. */
+    feedback?: string | null;
 }
 
 export interface MyQuizGrade {
@@ -142,6 +146,41 @@ export interface MyGradesTopic {
 export interface MyCourseGrades {
     course_id: number;
     topics: MyGradesTopic[];
+}
+
+/** Kurs baholash jurnali (`GET /course/{id}/gradebook`) — bitta guruh bo'yicha. */
+export interface CourseGradebookGroup {
+    id: number;
+    name: string;
+    student_count: number;
+}
+
+export interface CourseGradebookLesson {
+    id: number;
+    topic: string;
+    date: string;
+    homework?: GradebookHomework | null;
+    quizzes: GradebookQuiz[];
+}
+
+export interface CourseGradebookRow {
+    student_id: number;
+    full_name: string;
+    student_id_number?: string | null;
+    /** Kalit — uy vazifasi id si; topshirilmagan ish uchun kalit yo'q. */
+    homeworks: Record<string, GradebookHomeworkCell>;
+    /** Kalit — test id si; ishlanmagan test uchun kalit yo'q. */
+    quizzes: Record<string, GradebookQuizCell>;
+}
+
+export interface CourseGradebook {
+    course_id: number;
+    group_id?: number | null;
+    groups: CourseGradebookGroup[];
+    lessons: CourseGradebookLesson[];
+    /** Darsga bog'lanmagan (kurs darajasidagi) uy vazifalari. */
+    course_homeworks: GradebookHomework[];
+    students: CourseGradebookRow[];
 }
 
 export const courseService = {
@@ -178,6 +217,12 @@ export const courseService = {
 
     getMyGrades: async (id: number) => {
         const response = await api.get<MyCourseGrades>(`/course/${id}/my-grades`);
+        return response.data;
+    },
+    getGradebook: async (id: number, groupId?: number) => {
+        const response = await api.get<CourseGradebook>(`/course/${id}/gradebook`, {
+            params: groupId ? { group_id: groupId } : undefined,
+        });
         return response.data;
     },
     getCourseById: async (id: number): Promise<Course> => {

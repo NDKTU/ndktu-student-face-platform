@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/Table';
 import { ExternalSourceBadge, InactiveBadge } from '@/components/common/ExternalSourceBadge';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 /** EPMOS'dagi ta'lim shakllari. Bo'sh qiymat — «hammasi». */
 const EDUCATION_FORMS = ['Kunduzgi', 'Kechki', 'Sirtqi', 'Masofaviy'];
@@ -43,6 +43,7 @@ export const CurriculumsPage = () => {
     const [form, setForm] = useState('all');
     const [type, setType] = useState('all');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -83,14 +84,14 @@ export const CurriculumsPage = () => {
     const filters = useMemo(
         () => ({
             page,
-            limit: PAGE_SIZE,
+            limit: pageSize,
             name: debouncedSearch || undefined,
             faculty_id: faculty !== 'all' ? Number(faculty) : undefined,
             kafedra_id: kafedra !== 'all' ? Number(kafedra) : undefined,
             education_form: form !== 'all' ? form : undefined,
             education_type: type !== 'all' ? type : undefined,
         }),
-        [page, debouncedSearch, faculty, kafedra, form, type],
+        [page, pageSize, debouncedSearch, faculty, kafedra, form, type],
     );
 
     const { data, isLoading, isError, refetch } = useQuery({
@@ -108,7 +109,7 @@ export const CurriculumsPage = () => {
     );
 
     const rows = data?.curriculums ?? [];
-    const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
+    const totalPages = Math.ceil((data?.total ?? 0) / pageSize);
 
     const resetFilters = () => {
         setSearch('');
@@ -301,6 +302,9 @@ export const CurriculumsPage = () => {
                 totalPages={totalPages}
                 onPageChange={setPage}
                 isLoading={isLoading}
+                totalItems={data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

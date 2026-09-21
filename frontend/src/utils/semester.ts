@@ -19,3 +19,9 @@ export const semesterLabel = (semesterNumber?: number | null): string | null => 
     const name = SEMESTER_LABELS[semesterNumber];
     return name ? `${name.toLowerCase()} semestr` : `${semesterNumber}-semestr`;
 };
+
+/** Jadval va kartochkalar uchun qisqa nom: «Kuzgi» / «Bahorgi». */
+export const semesterShortLabel = (semesterNumber?: number | null): string | null => {
+    if (!semesterNumber) return null;
+    return SEMESTER_LABELS[semesterNumber] ?? `${semesterNumber}-semestr`;
+};

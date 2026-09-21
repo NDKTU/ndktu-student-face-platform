@@ -54,7 +54,7 @@ import { MoveFileModal } from '@/components/file/MoveFileModal';
 import { cn } from '@/lib/utils';
 import { formatSize } from '@/utils/fileSize';
 
-const PAGE_SIZE = 24;
+const DEFAULT_PAGE_SIZE = 24;
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
 
@@ -74,6 +74,7 @@ export const FilesPage = () => {
     const [kindFilter, setKindFilter] = useState<FileKindFilter>('all');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [isDragging, setIsDragging] = useState(false);
 
     // Koʻrinish holati (kartochkalar yoki jadval)
@@ -106,13 +107,13 @@ export const FilesPage = () => {
     const listParams = useMemo(
         () => ({
             page,
-            size: PAGE_SIZE,
+            size: pageSize,
             search: search.trim() || undefined,
             kind: kindFilter === 'all' ? undefined : kindFilter,
             folder_id: folderFilter.kind === 'folder' ? folderFilter.id : undefined,
             root_only: folderFilter.kind === 'root' || undefined,
         }),
-        [page, search, kindFilter, folderFilter],
+        [page, pageSize, search, kindFilter, folderFilter],
     );
 
     const { data, isLoading, isError, refetch } = useFiles(listParams);
@@ -126,7 +127,7 @@ export const FilesPage = () => {
     const renameFolder = useRenameFolder();
     const deleteFolder = useDeleteFolder();
 
-    const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+    const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
 
     // Hozirgi tanlangan papka
     const activeFolder = useMemo(() => {
@@ -890,13 +891,16 @@ export const FilesPage = () => {
                     )}
 
                     {/* Sahifalash (Pagination) */}
-                    {totalPages > 1 && (
+                    {(data?.total ?? 0) > 0 && (
                         <div className="pt-2 border-t border-border/50">
                             <Pagination
                                 currentPage={page}
                                 totalPages={totalPages}
                                 onPageChange={setPage}
                                 isLoading={isLoading}
+                                totalItems={data?.total ?? 0}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
                             />
                         </div>
                     )}

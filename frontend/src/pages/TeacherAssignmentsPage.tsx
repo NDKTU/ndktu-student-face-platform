@@ -12,7 +12,7 @@ import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 /**
  * EPOS yuklamasi bitta jadvalda.
@@ -29,16 +29,17 @@ export const TeacherAssignmentsPage = () => {
     const [kafedra, setKafedra] = useState<string>('all');
     const [loadType, setLoadType] = useState<string>('all');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
     const params = useMemo(
         () => ({
             page,
-            limit: PAGE_SIZE,
+            limit: pageSize,
             search: search.trim() || undefined,
             kafedra_id: kafedra !== 'all' ? Number(kafedra) : undefined,
             load_type: loadType !== 'all' ? loadType : undefined,
         }),
-        [page, search, kafedra, loadType],
+        [page, pageSize, search, kafedra, loadType],
     );
 
     const { data, isLoading, isError, refetch } = useTeacherAssignments(params);
@@ -75,7 +76,7 @@ export const TeacherAssignmentsPage = () => {
         ];
     }, [data]);
 
-    const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+    const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
 
     const columns: DataTableColumn<TeacherAssignment>[] = [
         {
@@ -231,14 +232,15 @@ export const TeacherAssignmentsPage = () => {
                 }
             />
 
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                    isLoading={isLoading}
-                />
-            )}
+            <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                isLoading={isLoading}
+                totalItems={data?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
         </div>
     );
 };

@@ -153,6 +153,7 @@ const KafedraRankTable = ({ items }: { items: KafedraRankItem[] }) => {
 // ─── Tab panels ───────────────────────────────────────────────────────────────
 const TeachersPanel = () => {
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [facultyId, setFacultyId] = useState<string>('');
@@ -179,7 +180,7 @@ const TeachersPanel = () => {
 
     const { data, isLoading, isFetching } = useTeacherRanking({ 
         page, 
-        limit: 10,
+        limit: pageSize,
         search: debouncedSearch || undefined,
         faculty_id: facultyId ? parseInt(facultyId) : undefined,
         kafedra_id: kafedraId ? parseInt(kafedraId) : undefined,
@@ -345,12 +346,15 @@ const TeachersPanel = () => {
             ) : (
                 <div className={isFetching ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
                     <TeacherRankTable items={data?.teachers ?? []} />
-                    {data && data.total > 10 && (
+                    {data && (
                         <Pagination
                             currentPage={page}
-                            totalPages={Math.ceil(data.total / 10)}
+                            totalPages={Math.ceil(data.total / pageSize)}
                             onPageChange={setPage}
                             isLoading={isFetching}
+                            totalItems={data.total}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     )}
                 </div>
@@ -361,19 +365,23 @@ const TeachersPanel = () => {
 
 const FacultyPanel = () => {
     const [page, setPage] = useState(1);
-    const { data, isLoading } = useFacultyRanking({ page, limit: 10 });
+    const [pageSize, setPageSize] = useState(10);
+    const { data, isLoading } = useFacultyRanking({ page, limit: pageSize });
 
     if (isLoading) return <Spinner />;
 
     return (
         <div className="space-y-4">
             <FacultyRankTable items={data?.faculties ?? []} />
-            {data && data.total > 10 && (
+            {data && (
                 <Pagination
                     currentPage={page}
-                    totalPages={Math.ceil(data.total / 10)}
+                    totalPages={Math.ceil(data.total / pageSize)}
                     onPageChange={setPage}
                     isLoading={isLoading}
+                    totalItems={data.total}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
                 />
             )}
         </div>
@@ -382,19 +390,23 @@ const FacultyPanel = () => {
 
 const KafedraPanel = () => {
     const [page, setPage] = useState(1);
-    const { data, isLoading } = useKafedraRanking({ page, limit: 10 });
+    const [pageSize, setPageSize] = useState(10);
+    const { data, isLoading } = useKafedraRanking({ page, limit: pageSize });
 
     if (isLoading) return <Spinner />;
 
     return (
         <div className="space-y-4">
             <KafedraRankTable items={data?.kafedras ?? []} />
-            {data && data.total > 10 && (
+            {data && (
                 <Pagination
                     currentPage={page}
-                    totalPages={Math.ceil(data.total / 10)}
+                    totalPages={Math.ceil(data.total / pageSize)}
                     onPageChange={setPage}
                     isLoading={isLoading}
+                    totalItems={data.total}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
                 />
             )}
         </div>

@@ -33,7 +33,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Combobox } from '@/components/ui/Combobox';
 import { COURSE_TYPE_OPTIONS, courseTypeLabel, type CourseType } from '@/services/courseTypes';
-import { SEMESTER_OPTIONS } from '@/utils/semester';
+import { SEMESTER_OPTIONS, semesterShortLabel } from '@/utils/semester';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
@@ -53,7 +53,7 @@ export const CoursesPage = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
     const [currentPage, setCurrentPage] = useUrlNumberState('page', 1);
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
 
@@ -531,6 +531,7 @@ export const CoursesPage = () => {
                                 course.teacher?.username ||
                                 'Biriktirilmagan';
                             const groups = course.groups || [];
+                            const semesterName = semesterShortLabel(course.semester_number);
 
                             return (
                                 <TableRow
@@ -583,8 +584,8 @@ export const CoursesPage = () => {
 
                                     {/* Semestr */}
                                     <TableCell className="text-center">
-                                        <span className="inline-flex items-center justify-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground border border-border/80">
-                                            {course.semester_number ? `${course.semester_number}-semestr` : '—'}
+                                        <span className="inline-flex items-center justify-center rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-foreground border border-border/80">
+                                            {semesterName ? t(semesterName) : '—'}
                                         </span>
                                     </TableCell>
 
@@ -603,6 +604,7 @@ export const CoursesPage = () => {
                     {courses.map((course) => {
                         const subjectName = course.subject?.name || `Fan #${course.subject_id}`;
                         const teacherName = course.teacher?.full_name || course.teacher?.username || '—';
+                        const semesterName = semesterShortLabel(course.semester_number);
                         return (
                             <CatalogCard
                                 key={course.id}
@@ -622,7 +624,7 @@ export const CoursesPage = () => {
                                 }
                                 metrics={[
                                     { label: 'Turi', value: courseTypeLabel(course.course_type) ?? '—' },
-                                    { label: 'Semestr', value: course.semester_number ? `${course.semester_number}` : '—' },
+                                    { label: 'Semestr', value: semesterName ? t(semesterName) : '—' },
                                     { label: t('Guruh'), value: `${(course.groups || []).length} ta` },
                                 ]}
                                 actions={renderActions(course)}
@@ -634,14 +636,15 @@ export const CoursesPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isCoursesLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isCoursesLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Course Modal */}
             <CourseModal

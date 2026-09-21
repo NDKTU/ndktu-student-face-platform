@@ -20,5 +20,14 @@ export const useRoleView = () => {
         isAdmin,
         isTeacher: !isAdmin && has('teacher'),
         isStudent: !isAdmin && has('student'),
+        /**
+         * Sof o'qituvchi ko'rinishi: ma'muriy bo'limlar shu holatda yopiladi.
+         *
+         * Psixolog roli aralashgan bo'lsa yopilmaydi — psixologiya natijalari
+         * fakultet kesimida o'qiladi, ya'ni unga ma'lumotnoma kerak.
+         * `constants/resources.ts` dagi `isTeacherOnly` bilan bir xil
+         * hisoblanadi: menyu va marshrut bir-biriga zid javob bermasin.
+         */
+        isTeacherOnly: !isAdmin && has('teacher') && !has('psixologik'),
     };
 };

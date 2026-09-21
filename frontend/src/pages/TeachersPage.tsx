@@ -90,7 +90,7 @@ export const TeachersPage = () => {
     // Guruh/fan biriktirish 2026-09-11 da frontenddan olib tashlandi (backend endpointlari joyida qoldi).
 //     const [teacherToAssign, setTeacherToAssign] = useState<Teacher | null>(null);
 
-    const pageSize = 15;
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -588,14 +588,15 @@ export const TeachersPage = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    isLoading={isTeachersLoading}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isTeachersLoading}
+                totalItems={totalCount}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+            />
 
             {/* Modals */}
             {/* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).

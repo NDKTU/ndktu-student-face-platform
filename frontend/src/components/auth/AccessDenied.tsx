@@ -16,10 +16,16 @@ import { Button } from '@/components/ui/Button';
 
 interface AccessDeniedProps {
     /** Yetishmayotgan ruxsat(lar) — adminга aytish uchun koʻrsatiladi. */
-    required: string[];
+    required?: string[];
+    /**
+     * Boʻlim rol boʻyicha yopilgan boʻlsa — sababi. Bunda ruxsat nomini
+     * koʻrsatish chalgʻitardi: u rolda bor boʻlishi ham mumkin, sahifa
+     * baribir ochilmaydi.
+     */
+    reason?: string;
 }
 
-export const AccessDenied = ({ required }: AccessDeniedProps) => {
+export const AccessDenied = ({ required, reason }: AccessDeniedProps) => {
     const navigate = useNavigate();
 
     return (
@@ -39,7 +45,7 @@ export const AccessDenied = ({ required }: AccessDeniedProps) => {
             {/* Ruxsat nomi ataylab koʻrsatiladi: admin uni /roles sahifasidan
                 qidirib topishi kerak, «ruxsat yoʻq» degan umumiy gap yetarli emas. */}
             <p className="font-mono text-xs text-muted-foreground">
-                Kerakli ruxsat: {required.join(' yoki ')}
+                {reason ?? `Kerakli ruxsat: ${(required ?? []).join(' yoki ')}`}
             </p>
 
             <div className="flex gap-2">

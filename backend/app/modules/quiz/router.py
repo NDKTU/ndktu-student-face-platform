@@ -1,7 +1,7 @@
 import logging
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from core.dependencies.role_checker import PermissionRequired, PermissionRequiredExceptStudent
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
@@ -325,7 +325,7 @@ quiz_router = APIRouter(
 async def create_quiz(
     data: QuizCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("create:quiz")),
+    current_user: User = Depends(PermissionRequiredExceptStudent("create:quiz")),
 ):
     # Создателя берём из токена, а не из тела запроса: иначе организатор мог бы
     # записать создание теста на чужое имя.
@@ -342,7 +342,7 @@ async def get_available_questions(
     lecturer_id: int,
     subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: User = Depends(PermissionRequired("create:quiz")),
+    _: User = Depends(PermissionRequiredExceptStudent("create:quiz")),
 ):
     """Сколько вопросов лектора доступно для сборки теста.
 
@@ -453,7 +453,7 @@ async def get_quiz_delete_info(
 async def repeat_quiz(
     quiz_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("create:quiz")),
+    current_user: User = Depends(PermissionRequiredExceptStudent("create:quiz")),
 ):
     result = await get_quiz_repository.repeat_quiz(
         session=session,
@@ -471,7 +471,7 @@ async def repeat_quiz(
 async def upload_quiz_image(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: User = Depends(PermissionRequired("create:quiz")),
+    current_user: User = Depends(PermissionRequiredExceptStudent("create:quiz")),
 ):
     url = await get_quiz_repository.upload_image(
         session=session, file=file, current_user=current_user

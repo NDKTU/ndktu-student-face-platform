@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import type { Assignment } from '@/services/assignmentService';
 import { Button } from '@/components/ui/Button';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -21,6 +22,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatCard } from '@/components/ui/StatCard';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/utils/date';
+import { splitCourseName } from '@/utils/generatedNames';
 import { cn } from '@/lib/utils';
 import { LATE_CLASS, REVIEW_CLASS, deadlineHint, lateBy } from '@/components/homework/homeworkStatus';
 
@@ -60,6 +62,39 @@ const MY_STATE_CLASS: Record<MyState, string> = {
     graded: REVIEW_CLASS.graded,
 };
 
+/**
+ * Kurs filtri variantlari — faqat vazifasi bor kurslar, har birida nechta vazifa.
+ *
+ * Kurs nomi uzun («Fan — 19A-26, 19B-26, 19G-26 +1 (ma'ruza, bahorgi semestr)»)
+ * va tugmaga sig'maydi. Shuning uchun birinchi qatorda fan va tur, ikkinchisida
+ * guruhlar, semestr va vazifalar soni. Bir fanning ma'ruza va amaliyot kursi
+ * tur bilan ajraladi; tur ham bir xil bo'lsa — guruhlar bilan.
+ */
+function buildCourseOptions(homeworks: Assignment[]): ComboboxOption[] {
+    const counts = new Map<number, { name: string; count: number }>();
+    for (const item of homeworks) {
+        const entry = counts.get(item.course_id);
+        if (entry) entry.count += 1;
+        else counts.set(item.course_id, { name: item.course_name || `Kurs #${item.course_id}`, count: 1 });
+    }
+    const courses = [...counts].map(([id, { name, count }]) => {
+        const parts = splitCourseName(name);
+        return { id, name, count, parts, label: parts.type ? `${parts.subject} (${parts.type})` : parts.subject };
+    });
+    const sameLabel = new Map<string, number>();
+    for (const course of courses) sameLabel.set(course.label, (sameLabel.get(course.label) ?? 0) + 1);
+
+    return courses
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((course) => ({
+            value: String(course.id),
+            label: (sameLabel.get(course.label) ?? 0) > 1 && course.parts.groups
+                ? `${course.label} — ${course.parts.groups}`
+                : course.label,
+            hint: [course.parts.groups, course.parts.semester, `${course.count} ta vazifa`].filter(Boolean).join(' · '),
+        }));
+}
+
 function MyStateBadge({ item }: { item: Assignment }) {
     const state = myState(item);
     const late = lateBy(item.my_submission?.submitted_at, item.deadline);
@@ -90,8 +125,19 @@ export default function HomeworksPage() {
     const query = useAssignments({ page: 1, limit: 200 });
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<Filter>('all');
+    const [course, setCourse] = useState('');
 
-    const homeworks = useMemo(() => query.data?.homeworks ?? [], [query.data]);
+    const allHomeworks = useMemo(() => query.data?.homeworks ?? [], [query.data]);
+    const courseOptions = useMemo(() => buildCourseOptions(allHomeworks), [allHomeworks]);
+    // Tanlangan kursning oxirgi vazifasi o'chirilsa, filtr bo'sh ro'yxatda
+    // qotib qolmasin — «Barcha kurslar» ga qaytamiz.
+    const activeCourse = courseOptions.some((option) => option.value === course) ? course : '';
+    // Kurs tanlansa, statistika va holat filtrlaridagi sonlar ham shu kurs
+    // bo'yicha: aks holda «Topshirishim kerak: 3» ro'yxatdagi 1 ta bilan chalg'itardi.
+    const homeworks = useMemo(
+        () => (activeCourse ? allHomeworks.filter((item) => String(item.course_id) === activeCourse) : allHomeworks),
+        [allHomeworks, activeCourse],
+    );
 
     // Hisob-kitoblar (Statistika vidjetlari uchun)
     const statsMetrics = useMemo(() => {
@@ -148,7 +194,7 @@ export default function HomeworksPage() {
                 <div className="min-w-0">
                     <p className="truncate font-semibold text-foreground hover:text-primary transition-colors">{item.title}</p>
                     <p className="truncate text-xs font-medium text-muted-foreground mt-0.5">
-                        {[item.course_name, item.lesson_topic].filter(Boolean).join(' · ') || '—'}
+                        {[activeCourse ? null : item.course_name, item.lesson_topic].filter(Boolean).join(' · ') || '—'}
                     </p>
                 </div>
             ),
@@ -355,7 +401,7 @@ export default function HomeworksPage() {
             )}
 
             {/* Filters & Search Bar in Wowdash style */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="flex flex-wrap gap-2">
                     {filters.map((item) => (
                         <button
@@ -383,14 +429,31 @@ export default function HomeworksPage() {
                     ))}
                 </div>
 
-                <div className="relative sm:w-72">
-                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Vazifa, kurs yoki dars..."
-                        className="pl-10 h-10 rounded-xl bg-background border-border/80 text-sm focus:border-primary"
-                    />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center 2xl:shrink-0">
+                    {courseOptions.length > 0 && (
+                        <div className="sm:w-80" title="Kurs bo'yicha filtr">
+                            <Combobox
+                                options={[
+                                    { value: '', label: 'Barcha kurslar', hint: `${allHomeworks.length} ta vazifa` },
+                                    ...courseOptions,
+                                ]}
+                                value={activeCourse}
+                                onChange={setCourse}
+                                placeholder="Barcha kurslar"
+                                searchPlaceholder="Kurs yoki guruh..."
+                                className="md:h-10"
+                            />
+                        </div>
+                    )}
+                    <div className="relative sm:w-72">
+                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Vazifa, kurs yoki dars..."
+                            className="pl-10 h-10 rounded-xl bg-background border-border/80 text-sm focus:border-primary"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -412,7 +475,7 @@ export default function HomeworksPage() {
                             <div className="min-w-0">
                                 <p className="font-bold text-foreground text-sm line-clamp-1">{item.title}</p>
                                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                    {[item.course_name, item.lesson_topic].filter(Boolean).join(' · ') || '—'}
+                                    {[activeCourse ? null : item.course_name, item.lesson_topic].filter(Boolean).join(' · ') || '—'}
                                 </p>
                             </div>
                             <span
@@ -446,7 +509,7 @@ export default function HomeworksPage() {
                 emptyIcon={<ClipboardList className="h-8 w-8 text-primary" />}
                 emptyTitle="Uy vazifasi yo'q"
                 emptyDescription={
-                    search || filter !== 'all'
+                    search || filter !== 'all' || activeCourse
                         ? "Filtrga mos keluvchi vazifa topilmadi."
                         : canGrade
                             ? "Dars sahifasiga o'tib yangi «Uy vazifasi» yarating."

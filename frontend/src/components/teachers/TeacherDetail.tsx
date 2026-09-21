@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ArrowLeft, BookOpen, ArrowRight, GraduationCap, Users } from 'lucide-react';
 import type { Teacher } from '@/services/teacherService';
 import { cn } from '@/lib/utils';
+import { semesterLabel } from '@/utils/semester';
 import { TeacherQuestionsList } from './TeacherQuestionsList';
 import { TeacherStudentsPanel } from './TeacherStudentsPanel';
 import { usePermission } from '@/components/auth/PermissionGate';
@@ -94,7 +95,7 @@ export const TeacherDetail = ({ teacher, onBack }: { teacher: Teacher; onBack: (
                                             <p className="truncate text-sm font-semibold">{course.name}</p>
                                             <p className="text-xs text-muted-foreground">
                                                 {course.subject_name || "Fan ko'rsatilmagan"}
-                                                {course.semester_number ? ` — ${course.semester_number}-semestr` : ''}
+                                                {course.semester_number ? ` — ${semesterLabel(course.semester_number)}` : ''}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-2">

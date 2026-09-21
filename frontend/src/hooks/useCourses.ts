@@ -35,6 +35,17 @@ export const useMyCourseGrades = (id: number | undefined, enabled = true) => {
     });
 };
 
+/** Kurs baholash jurnali — faqat kurs o'qituvchilari va admin uchun. */
+export const useCourseGradebook = (id: number | undefined, groupId?: number, enabled = true) => {
+    return useQuery({
+        queryKey: ['course-gradebook', id, groupId ?? null],
+        queryFn: () => courseService.getGradebook(id!, groupId),
+        enabled: !!id && enabled,
+        // Guruh almashganda jadval bo'shab, sakrab ketmasin.
+        placeholderData: (previousData) => previousData,
+    });
+};
+
 export const useCourse = (id?: number) => {
     return useQuery({
         queryKey: ['course', id],

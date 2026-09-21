@@ -31,7 +31,7 @@ from .attendance.schemas import (
     MyAttendanceResponse,
 )
 from .gradebook.repository import get_gradebook_repository
-from .gradebook.schemas import GradebookResponse, MyGradesResponse
+from .gradebook.schemas import CourseGradebookResponse, GradebookResponse, MyGradesResponse
 from .face_check.repository import get_face_check_repository
 from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .homework.repository import get_homework_repository
@@ -657,6 +657,23 @@ async def my_course_grades(
     """Talabaning shu kursdagi baholari: har mavzu bo'yicha uy vazifasi va testlar."""
     return await get_gradebook_repository.my_course_grades(
         session=session, course_id=course_id, current_user=current_user
+    )
+
+
+@course_router.get("/{course_id}/gradebook", response_model=CourseGradebookResponse)
+async def course_gradebook(
+    course_id: int,
+    group_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:submission")),
+):
+    """Kurs baholash jurnali: guruh talabalari × barcha darslar (uy vazifasi, testlar).
+
+    Faqat kurs o'qituvchilari va admin uchun — talabada ham `read:submission`
+    bor, lekin u boshqalarning bahosini ko'rmasligi kerak.
+    """
+    return await get_gradebook_repository.course_gradebook(
+        session=session, course_id=course_id, current_user=current_user, group_id=group_id
     )
 
 

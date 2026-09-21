@@ -150,7 +150,7 @@ const HeroStats = ({ results, total }: HeroStatsProps) => {
 
 const ResultsPage = () => {
     const { t } = useTranslation();
-    const { user, activeRole, isLoading: isAuthLoading } = useAuth();
+    const { user, activeRole, isLoading: isAuthLoading, hasPermission } = useAuth();
     const navigate = useNavigate();
 
     // Tanlangan ko'rinishga bo'ysunadi: bir nechta roli bor foydalanuvchi
@@ -158,7 +158,14 @@ const ResultsPage = () => {
     const roleScope = activeRole ? [activeRole] : (user?.roles ?? []);
     const isStudent = roleScope.some(role => role.name.toLowerCase() === 'student');
     const isAdmin = roleScope.some(role => role.name.toLowerCase() === 'admin');
+    const isTeacher = !isAdmin && roleScope.some(role => role.name.toLowerCase() === 'teacher');
     const isAdminOrTeacher = !isStudent;
+    // O'qituvchi faqat o'z testlarining natijalarini ko'radi: ular bitta
+    // kafedraga tegishli, talabalar esa istalgan fakultetdan bo'lishi mumkin —
+    // bu ikki filtr unga hech narsa bermaydi. Shuning uchun ruxsat bazada
+    // berib yuborilgan bo'lsa ham ko'rsatilmaydi.
+    const canFilterByFaculty = isAdminOrTeacher && !isTeacher && hasPermission('read:faculty');
+    const canFilterByKafedra = isAdminOrTeacher && !isTeacher && hasPermission('read:kafedra');
 
     const { mutate: deleteResult, isPending: isDeleting } = useDeleteResult();
     const [resultToDelete, setResultToDelete] = useState<number | null>(null);
@@ -188,7 +195,10 @@ const ResultsPage = () => {
     };
 
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = isStudent ? 12 : 10;
+    // Talabaga kartochkalar 12 tadan chiqadi, boshqalarga jadval 10 tadan —
+    // foydalanuvchi o'zgartirmaguncha shu qiymat ishlatiladi.
+    const [customPageSize, setCustomPageSize] = useState<number | null>(null);
+    const pageSize = customPageSize ?? (isStudent ? 12 : 10);
 
     const [selectedFaculty, setSelectedFaculty] = useState('');
     const [selectedKafedra, setSelectedKafedra] = useState('');
@@ -225,8 +235,8 @@ const ResultsPage = () => {
     const { data: resultsData, isLoading: isResultsLoading, isError: isResultsError, refetch: refetchResults } =
         useResults(resultFilters, !isAuthLoading);
 
-    const { data: facultiesData } = useFaculties(1, 200, undefined, isAdminOrTeacher);
-    const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, isAdminOrTeacher);
+    const { data: facultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
+    const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, canFilterByKafedra);
     const { data: groupsData }   = useGroups(1, 1000, '', undefined, undefined, isAdminOrTeacher);
     const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher);
     const { data: quizzesData }  = useQuizzes({ page: 1, limit: 1000 }, isAdminOrTeacher);
@@ -423,7 +433,7 @@ const ResultsPage = () => {
                 </div>
             )}
 
-            {isAdminOrTeacher && (
+            {canFilterByFaculty && (
                 <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Talabaning fakulteti">Fakultet</label>
                     <Combobox
@@ -436,7 +446,7 @@ const ResultsPage = () => {
                 </div>
             )}
 
-            {isAdminOrTeacher && (
+            {canFilterByKafedra && (
                 <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" title="Testni yaratgan o'qituvchining kafedrasi">Kafedra</label>
                     <Combobox
@@ -662,6 +672,9 @@ const ResultsPage = () => {
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isResultsLoading}
+                totalItems={resultsData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setCustomPageSize}
             />
 
             <ConfirmDialog

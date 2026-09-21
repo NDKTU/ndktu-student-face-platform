@@ -7,7 +7,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Student
+from app.core.utils.group_scope import teacher_group_ids
+from app.modules.auth.model import Student, User
 
 from .schemas import (
     StudentCreateRequest,
@@ -36,7 +37,36 @@ class StudentRepository:
         await session.refresh(new_student)
         return new_student
 
-    async def get_student(self, session: AsyncSession, student_id: int) -> Student:
+    @staticmethod
+    async def visible_group_ids(session: AsyncSession, current_user: User | None) -> list[int] | None:
+        """O'qituvchi ko'ra oladigan guruhlar; `None` — cheklov yo'q.
+
+        `read:student` o'qituvchida ham uchraydi (qo'lda berilgan yoki eski
+        migratsiyadan qolgan) va uni roldan olib tashlash bilan hal qilib
+        bo'lmaydi: seed ruxsat OLIB TASHLAMAYDI
+        (`core/lifespan/defaults.py`). Ruxsat o'z holicha qolgani uchun
+        chegara shu yerda: o'qituvchi universitetning 20 mingta talabasini
+        emas, o'zi dars o'tadigan guruhlarnikini ko'radi.
+
+        Qoida `teacher_group_ids` dan olinadi — guruh talabalari sahifasi va
+        davomat ham shu manbadan ishlaydi, ikkita ta'rif bo'lsa ular vaqt
+        o'tib ajralib ketardi.
+
+        Boshqa rollarga (admin, psixolog, tutor) tegilmaydi: ularga ruxsat
+        ataylab berilgan va butun ro'yxat kerak.
+        """
+        if current_user is None:
+            return None
+
+        roles = {role.name.lower() for role in (current_user.roles or [])}
+        if "admin" in roles or "teacher" not in roles:
+            return None
+
+        return sorted(await teacher_group_ids(session, current_user.id))
+
+    async def get_student(
+        self, session: AsyncSession, student_id: int, current_user: User | None = None
+    ) -> Student:
         stmt = (
             select(Student)
             .where(Student.id == student_id)
@@ -48,10 +78,25 @@ class StudentRepository:
         if not student:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
+        # Begona talaba uchun ataylab 404, 403 emas: ro'yxatda ko'rinmagan
+        # talabaning bor-yo'qligini id bo'yicha bilib olish mumkin bo'lmasin.
+        scope = await self.visible_group_ids(session, current_user)
+        if scope is not None and student.group_id not in scope:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
         return student
 
-    async def list_students(self, session: AsyncSession, request: StudentListRequest) -> StudentListResponse:
+    async def list_students(
+        self,
+        session: AsyncSession,
+        request: StudentListRequest,
+        current_user: User | None = None,
+    ) -> StudentListResponse:
         stmt = select(Student).options(selectinload(Student.user), selectinload(Student.group))
+
+        scope = await self.visible_group_ids(session, current_user)
+        if scope is not None:
+            stmt = stmt.where(Student.group_id.in_(scope))
 
         if request.search:
             stmt = stmt.where(
@@ -82,6 +127,9 @@ class StudentRepository:
         students = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Student)
+        if scope is not None:
+            count_stmt = count_stmt.where(Student.group_id.in_(scope))
+
         if request.search:
             count_stmt = count_stmt.where(
                 (Student.first_name.ilike(f"%{request.search}%"))
@@ -106,10 +154,11 @@ class StudentRepository:
         )
 
     async def list_students_with_users(
-        self, session: AsyncSession, request: StudentListRequest
+        self,
+        session: AsyncSession,
+        request: StudentListRequest,
+        current_user: User | None = None,
     ) -> StudentWithUserListResponse:
-        from app.modules.auth.model import User
-
         # Query students that have a user_id and filter by student role
         stmt = (
             select(Student)
@@ -117,6 +166,10 @@ class StudentRepository:
             .options(selectinload(Student.user), selectinload(Student.group))
             .where(Student.user_id.isnot(None))
         )
+
+        scope = await self.visible_group_ids(session, current_user)
+        if scope is not None:
+            stmt = stmt.where(Student.group_id.in_(scope))
 
         # Filter by search (name, username, or student_id_number)
         if request.search:
@@ -170,6 +223,8 @@ class StudentRepository:
             .join(User, Student.user_id == User.id)
             .where(Student.user_id.isnot(None))
         )
+        if scope is not None:
+            count_stmt = count_stmt.where(Student.group_id.in_(scope))
 
         if request.search:
             count_stmt = count_stmt.where(

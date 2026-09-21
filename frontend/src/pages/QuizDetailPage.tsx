@@ -24,7 +24,7 @@ const QuizDetailPage = () => {
     const navigate = useNavigate();
     const quizId = Number(useParams().id);
     const [page, setPage] = useState(1);
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
     const quiz = useQuiz(quizId);
     const analytics = useQuizAnalytics(quizId);
     const results = useResults({ page, limit: pageSize, quiz_id: quizId });
@@ -95,7 +95,15 @@ const QuizDetailPage = () => {
                             </TableBody>
                         </Table>
                     )}
-                    <div className="mt-4"><Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} isLoading={results.isLoading} /></div>
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        isLoading={results.isLoading}
+                        totalItems={results.data?.total ?? 0}
+                        pageSize={pageSize}
+                        onPageSizeChange={setPageSize}
+                    />
                 </CardContent>
             </Card>
 

@@ -10,6 +10,7 @@ import {
     FolderOpen,
     Clock3,
     GripVertical,
+    ListChecks,
     Pencil,
     Plus,
     Trash2,
@@ -27,6 +28,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CourseLessonModal } from '@/components/courses/CourseLessonModal';
 import { CourseAttendanceJournal } from '@/components/courses/CourseAttendanceJournal';
 import { MyCourseGrades } from '@/components/courses/MyCourseGrades';
+import { CourseGradebook } from '@/components/courses/CourseGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { CourseFileLibrary } from '@/components/courses/CourseFileLibrary';
@@ -35,7 +37,7 @@ import { semesterLabel } from '@/utils/semester';
 import { isYoutubeUrl } from '@/utils/youtube';
 import { courseTypeLabel } from '@/services/courseTypes';
 
-type CourseTab = 'lessons' | 'grades' | 'attendance' | 'library';
+type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -48,6 +50,9 @@ export default function CourseDetailPage() {
     // «Baholarim» — faqat talabaga: o'qituvchida ham `create:submission` bor,
     // lekin u vazifa beradi, topshirmaydi (dars sahifasidagi qoida bilan bir xil).
     const isStudent = hasPermission('create:submission') && !hasPermission('create:homework');
+    // Baholash jurnali — baho qo'yadiganlarga (dars sahifasidagi jurnal bilan
+    // bir xil huquq). Kimning kursi ekanini bekend tekshiradi.
+    const canSeeGradebook = hasPermission('update:submission');
 
     // Ochilganda doim darslar: kursga kirgan o'qituvchi avval nima o'tilganini
     // ko'rishi kerak, jurnal esa alohida qadam.
@@ -109,6 +114,9 @@ export default function CourseDetailPage() {
             : []),
         ...(isStudent
             ? [{ id: 'grades' as const, label: 'Baholarim', icon: <Award className="h-4 w-4" /> }]
+            : []),
+        ...(canSeeGradebook
+            ? [{ id: 'gradebook' as const, label: 'Baholash jurnali', icon: <ListChecks className="h-4 w-4" /> }]
             : []),
         ...(canReadAttendance
             ? [{ id: 'attendance' as const, label: 'Davomat jurnali', icon: <ClipboardCheck className="h-4 w-4" /> }]
@@ -317,6 +325,17 @@ export default function CourseDetailPage() {
                         Mavzular bo'yicha baholarim
                     </h2>
                     <MyCourseGrades courseId={course.id} />
+                </section>
+            )}
+
+            {activeTab === 'gradebook' && canSeeGradebook && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Baholash jurnali — barcha darslar bo'yicha
+                    </h2>
+                    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                        <CourseGradebook courseId={course.id} />
+                    </div>
                 </section>
             )}
 

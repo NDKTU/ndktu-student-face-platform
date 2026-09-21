@@ -22,7 +22,7 @@ export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup, hideHeader }: 
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState(10);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -118,6 +118,9 @@ export const FacultyGroupsView = ({ faculty, onBack, onOpenGroup, hideHeader }: 
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 isLoading={isLoading}
+                totalItems={groupsData?.total ?? 0}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
             />
         </div>
     );

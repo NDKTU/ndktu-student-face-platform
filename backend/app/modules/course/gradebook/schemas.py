@@ -1,5 +1,5 @@
 from datetime import date as Date
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -55,6 +55,44 @@ class GradebookResponse(BaseModel):
     students: List[GradebookRow] = []
 
 
+# ── Kurs baholash jurnali ─────────────────────────────────────────────────
+
+
+class CourseGradebookGroup(BaseModel):
+    id: int
+    name: str
+    student_count: int = 0
+
+
+class CourseGradebookLesson(BaseModel):
+    id: int
+    topic: str
+    date: Date
+    homework: Optional[GradebookHomework] = None
+    quizzes: List[GradebookQuiz] = []
+
+
+class CourseGradebookRow(BaseModel):
+    student_id: int
+    full_name: str
+    student_id_number: Optional[str] = None
+    # Kalit — uy vazifasi / test id si. Ish topshirmagan yoki test
+    # ishlamagan bo'lsa, kalit umuman bo'lmaydi.
+    homeworks: Dict[int, GradebookHomeworkCell] = {}
+    quizzes: Dict[int, GradebookQuizCell] = {}
+
+
+class CourseGradebookResponse(BaseModel):
+    course_id: int
+    # Jurnal doim bitta guruh bo'yicha — qog'oz jurnal ham shunday.
+    group_id: Optional[int] = None
+    groups: List[CourseGradebookGroup] = []
+    lessons: List[CourseGradebookLesson] = []
+    # Darsga bog'lanmagan (kurs darajasidagi) uy vazifalari.
+    course_homeworks: List[GradebookHomework] = []
+    students: List[CourseGradebookRow] = []
+
+
 # ── Talabaning o'z baholari ──────────────────────────────────────────────
 
 
@@ -66,7 +104,11 @@ class MyHomeworkGrade(BaseModel):
     # Ish topshirilmagan bo'lsa — None.
     status: Optional[str] = None
     grade: Optional[int] = None
+    submitted_at: Optional[TashkentDatetime] = None
     late: bool = False
+    # O'qituvchining baho bilan qoldirgan izohi — talaba nima uchun shu baho
+    # olganini bilsin.
+    feedback: Optional[str] = None
 
 
 class MyQuizGrade(BaseModel):
