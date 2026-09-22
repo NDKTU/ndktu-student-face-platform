@@ -90,7 +90,16 @@ export const CourseGradebook = ({ courseId }: { courseId: number }) => {
                         <Combobox
                             options={groupOptions}
                             value={data.group_id ? String(data.group_id) : ''}
-                            onChange={(value) => setGroupId(Number(value))}
+                            onChange={(value) => {
+                                // Tanlangan guruhni qayta bosish Combobox da «tanlovni
+                                // bekor qilish» (`''`) — jurnal esa guruhsiz ochilmaydi
+                                // va bekend birinchi guruhga qaytarib yuborardi.
+                                if (!value) return;
+                                setGroupId(Number(value));
+                                // Oldingi guruhda yozilgan ism yangi guruhda topilmaydi
+                                // va butun ro'yxatni yashirib qo'yardi.
+                                setSearch('');
+                            }}
                             placeholder="Guruhni tanlang"
                         />
                     </div>
@@ -127,13 +136,17 @@ export const CourseGradebook = ({ courseId }: { courseId: number }) => {
                 )}
             </div>
 
-            {data.lessons.length === 0 && data.course_homeworks.length === 0 ? (
-                <EmptyState
-                    icon={<BookOpen className="h-6 w-6" />}
-                    title="Dars yo'q"
-                    description="Bu guruhga dars yaratilmagan — jurnalda ustun yo'q."
-                />
-            ) : data.students.length === 0 ? (
+            {/* Darsi yo'q guruhda ham ro'yxat ko'rinadi: ilgari bu holatda jadval
+                o'rniga «Dars yo'q» chiqib, guruh tanlangandan keyin uning
+                talabalari umuman ko'rinmasdi. */}
+            {columnGroups.length === 0 && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Bu guruhga hali dars yaratilmagan — baholar darslar qo'shilgach shu jadvalda paydo bo'ladi.</span>
+                </div>
+            )}
+
+            {data.students.length === 0 ? (
                 <EmptyState
                     icon={<Users className="h-6 w-6" />}
                     title="Talaba yo'q"
