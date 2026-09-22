@@ -8,6 +8,7 @@ kirmaydi — u fayllarni faqat vazifa topshirish orqali yuklaydi.
 import html
 import logging
 import re
+from collections.abc import Iterable
 
 from core.config import settings
 from fastapi import HTTPException, UploadFile, status
@@ -35,7 +36,13 @@ from app.modules.file.schemas import (
     FolderResponse,
     FolderUpdateRequest,
 )
-from app.modules.file.storage import DOCUMENT_EXTS, IMAGE_EXTS, public_url, store_upload
+from app.modules.file.storage import (
+    DOCUMENT_EXTS,
+    IMAGE_EXTS,
+    public_url,
+    store_upload,
+    stored_path_from_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +67,12 @@ def _plain_text(raw: str | None, limit: int = 80) -> str | None:
 
 def _is_admin(user: User) -> bool:
     return any(role.name == "Admin" for role in user.roles)
+
+
+def _is_teacher_only(user: User) -> bool:
+    """Oʻqituvchi roli bor, admin emas — kutubxonadan tanlash qoidasi shunga."""
+    names = {role.name.lower() for role in (user.roles or [])}
+    return "teacher" in names and "admin" not in names
 
 
 class FileRepository:
@@ -88,6 +101,43 @@ class FileRepository:
             .where(Question.subject_id.in_(subject_ids))
         )
         return or_(own, StoredFile.id.in_(used_in_my_subjects))
+
+    async def ensure_teacher_library_urls(
+        self, session: AsyncSession, urls: Iterable[str | None], user: User
+    ) -> None:
+        """Oʻqituvchi biriktirayotgan fayllar uning kutubxonasidanmi.
+
+        Oʻqituvchi kurs materiali va uy vazifasiga faylni faqat «Fayllar
+        kutubxonasi»dan tanlaydi. Qurilmadan yuklash yoʻli (`/resource/upload`)
+        unga yopiq, lekin havolani soʻrovga qoʻlda yozish mumkin — shuning
+        uchun har bir havola kutubxonadagi, unga koʻrinadigan faylga olib
+        borishi shart. Admin va boshqa rollarga tegilmaydi.
+
+        Chaqiruvchi faqat YANGI havolalarni beradi: yozuvda avvaldan turgan
+        fayl (masalan, hamkasbi biriktirgani) tahrirlashda qayta tekshirilmaydi.
+        """
+        if not _is_teacher_only(user):
+            return
+
+        paths = {url: stored_path_from_url(url) for url in urls if url}
+        if not paths:
+            return
+
+        visible = await self._visible_filter(session, user)
+        for url, path in paths.items():
+            found = None
+            if path:
+                found = await session.scalar(
+                    select(StoredFile.id)
+                    .join(StoredFile.blob)
+                    .where(FileBlob.stored_path == path, StoredFile.is_active.is_(True), visible)
+                    .limit(1)
+                )
+            if found is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Faylni «Fayllar kutubxonasi»dan tanlang",
+                )
 
     async def _get_visible(self, session: AsyncSession, file_id: int, user: User) -> StoredFile:
         """Koʻrish va ishlatish uchun. Oʻzgartirish uchun ``_get_owned``."""

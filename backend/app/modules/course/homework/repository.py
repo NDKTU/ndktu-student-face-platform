@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import uuid
 
 from core.config import settings
@@ -13,6 +14,7 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive as _utcnow
 from app.core.utils.course_access import can_manage
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
+from app.modules.file.repository import get_file_repository
 from app.modules.file.storage import sync_usages
 from app.modules.organization_structure.model import Group
 
@@ -56,6 +58,26 @@ _ALLOWED_EXTS = {
 _IMAGE_EXTS = {"jpg", "jpeg", "png", "webp"}
 _IMAGE_MAX = 5 * 1024 * 1024
 _DOC_MAX = 20 * 1024 * 1024
+
+
+# `upload_submission_file` beradigan nom: uuid4 va kengaytma.
+_SUBMISSION_NAME_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,8}")
+
+
+def _is_device_upload(url: str) -> bool:
+    """Havola talabaning o'z qurilmasidan yuklagan fayliga olib boradimi.
+
+    Talaba javobiga faylni faqat `/homework/{id}/upload` orqali biriktiradi.
+    U qaytargan havola `homework_submissions/` ga ishora qiladi va fayl
+    diskda turadi — kutubxonadagi yoki begona havola bu shartdan o'tmaydi.
+    """
+    prefix = f"{settings.file_url.http}/homework_submissions/"
+    if not url.startswith(prefix):
+        return False
+    name = url[len(prefix):]
+    if not _SUBMISSION_NAME_RE.fullmatch(name):
+        return False
+    return (settings.homework_submission_upload_dir / name).is_file()
 
 
 def _expand_allowed_types(allowed_file_types: list | None) -> set[str]:
@@ -293,6 +315,9 @@ class HomeworkRepository:
     ) -> HomeworkResponse:
         await self._check_course_owner(session, data.course_id, current_user)
         await self._ensure_lesson_free(session, data.lesson_id)
+        await get_file_repository.ensure_teacher_library_urls(
+            session, [f.url for f in data.attachments], current_user
+        )
 
         title = (data.title or "").strip() or await self._default_title(session, data.lesson_id)
 
@@ -346,6 +371,12 @@ class HomeworkRepository:
                     val = _to_naive_utc(val)
                 setattr(a, field, val)
         if data.attachments is not None:
+            # Faqat yangi qo'shilganlar tekshiriladi: avvaldan turgan ilova
+            # (hamkasbi biriktirgani ham) tahrirlashni to'smasin.
+            kept = {item.get("url") for item in a.attachments or []}
+            await get_file_repository.ensure_teacher_library_urls(
+                session, [f.url for f in data.attachments if f.url not in kept], current_user
+            )
             # Ro'yxat butunlay almashtiriladi: forma yakuniy holatni yuboradi.
             a.attachments = [f.model_dump() for f in data.attachments]
             await self._sync_file_usage(session, a, current_user)
@@ -593,6 +624,17 @@ class HomeworkRepository:
             HomeworkSubmission.user_id == current_user.id,
         )
         sub = (await session.execute(existing_stmt)).scalar_one_or_none()
+
+        # Talaba faylni faqat o'z qurilmasidan yuklaydi — «Fayllar
+        # kutubxonasi»dagi yoki begona havola javobga kirmaydi. Avvalgi
+        # javobda turgan fayl qayta yuborilganda tekshirilmaydi.
+        kept = {item.get("url") for item in (sub.submitted_files if sub else None) or []}
+        for f in data.submitted_files:
+            if f.url not in kept and not _is_device_upload(f.url):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Faylni o'z qurilmangizdan yuklang",
+                )
 
         now = _utcnow()
         deadline = a.deadline.replace(tzinfo=None) if a.deadline.tzinfo else a.deadline

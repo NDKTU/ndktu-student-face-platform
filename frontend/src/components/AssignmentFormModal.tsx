@@ -148,7 +148,7 @@ export const AssignmentFormModal = ({
 
                 <div>
                     {/* Shart, namuna yoki tarqatma material — talaba yuklab oladi.
-                        Ikkala manba ham teng koʻrinadi: qurilma va kutubxona. */}
+                        Manbani rol hal qiladi: oʻqituvchi faqat kutubxonadan tanlaydi. */}
                     <FileSourceField
                         label="Vazifa fayllari"
                         multiple

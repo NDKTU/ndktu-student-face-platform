@@ -291,7 +291,11 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
 // STUDENT_BESPOKE_ITEMS), or the permission is granted to students purely to
 // unblock an API call (e.g. QuizTestPage's own active-quiz fetch) and was
 // never meant to expose the admin management page itself.
-const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz', 'announcement']);
+//
+// `file` — «Fayllar kutubxonasi» talabaga yopiq: u faylni faqat o'z
+// qurilmasidan yuklaydi (App.tsx dagi FileLibraryRoute, bekendda
+// FileLibraryExceptStudent).
+const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz', 'announcement', 'file']);
 
 const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {
     const grouped: Record<string, SidebarItem[]> = {};

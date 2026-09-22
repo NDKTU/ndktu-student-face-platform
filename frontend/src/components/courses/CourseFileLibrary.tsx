@@ -328,7 +328,8 @@ function RenameCourseFileModal({ file, onClose }: { file: CourseLibraryFile | nu
 
 /**
  * Kursga fayl qo'shish oynasi: qurilmadan yuklash yoki shaxsiy
- * kutubxonadan tanlash. Natija — kurs darajasidagi `file` materiali.
+ * kutubxonadan tanlash (o'qituvchi — faqat kutubxonadan, qarang
+ * `FileSourceField`). Natija — kurs darajasidagi `file` materiali.
  */
 function AddCourseFileModal({ courseId, isOpen, onClose }: { courseId: number; isOpen: boolean; onClose: () => void }) {
     const queryClient = useQueryClient();

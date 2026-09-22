@@ -1,5 +1,5 @@
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,10 @@ from app.modules.file.schemas import (
 
 router = APIRouter(prefix="/file", tags=["File library"])
 
+# Kutubxona talabaga yopiq (`FileLibraryExceptStudent`): talaba faylni faqat
+# o'z qurilmasidan yuklaydi. Yagona istisno — kurs kutubxonasi ro'yxati
+# (`/file/course/{id}`): bu kursning o'quv materiali, uni talaba ham ko'radi.
+
 
 # ─── Papkalar ─────────────────────────────────────────────────────────
 # Fayl marshrutlaridan OLDIN turishi shart: /file/folder aks holda
@@ -31,7 +35,7 @@ router = APIRouter(prefix="/file", tags=["File library"])
 @router.get("/folder/", response_model=FolderListResponse)
 async def list_folders(
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("read:file")),
+    user: User = Depends(FileLibraryExceptStudent("read:file")),
 ):
     items = await get_file_repository.list_folders(session, user)
     return FolderListResponse(items=items)
@@ -41,7 +45,7 @@ async def list_folders(
 async def create_folder(
     data: FolderCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("create:file")),
+    user: User = Depends(FileLibraryExceptStudent("create:file")),
 ):
     return await get_file_repository.create_folder(session, data, user)
 
@@ -51,7 +55,7 @@ async def update_folder(
     folder_id: int,
     data: FolderUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("update:file")),
+    user: User = Depends(FileLibraryExceptStudent("update:file")),
 ):
     return await get_file_repository.update_folder(session, folder_id, data, user)
 
@@ -60,7 +64,7 @@ async def update_folder(
 async def delete_folder(
     folder_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("delete:file")),
+    user: User = Depends(FileLibraryExceptStudent("delete:file")),
 ):
     await get_file_repository.delete_folder(session, folder_id, user)
 
@@ -73,7 +77,7 @@ async def upload_file(
     file: UploadFile = File(...),
     folder_id: int | None = Query(default=None),
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("create:file")),
+    user: User = Depends(FileLibraryExceptStudent("create:file")),
 ):
     """Faylni kutubxonaga yuklaydi.
 
@@ -103,7 +107,7 @@ async def list_course_files(
 async def list_files(
     request: FileListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("read:file")),
+    user: User = Depends(FileLibraryExceptStudent("read:file")),
 ):
     return await get_file_repository.list_files(session, request, user)
 
@@ -112,7 +116,7 @@ async def list_files(
 async def get_file(
     file_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("read:file")),
+    user: User = Depends(FileLibraryExceptStudent("read:file")),
 ):
     return await get_file_repository.get_file(session, file_id, user)
 
@@ -122,7 +126,7 @@ async def update_file(
     file_id: int,
     data: FileUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("update:file")),
+    user: User = Depends(FileLibraryExceptStudent("update:file")),
 ):
     return await get_file_repository.update_file(session, file_id, data, user)
 
@@ -131,7 +135,7 @@ async def update_file(
 async def delete_file(
     file_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("delete:file")),
+    user: User = Depends(FileLibraryExceptStudent("delete:file")),
 ):
     """Faylni kutubxonadan olib tashlaydi.
 
@@ -146,7 +150,7 @@ async def attach_file(
     file_id: int,
     data: FileAttachRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("update:file")),
+    user: User = Depends(FileLibraryExceptStudent("update:file")),
 ):
     return await get_file_repository.attach(session, file_id, data, user)
 
@@ -156,6 +160,6 @@ async def detach_file(
     file_id: int,
     data: FileAttachRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("update:file")),
+    user: User = Depends(FileLibraryExceptStudent("update:file")),
 ):
     await get_file_repository.detach(session, file_id, data, user)

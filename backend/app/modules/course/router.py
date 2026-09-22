@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from core.dependencies.role_checker import DeviceUploadExceptTeacher, PermissionRequired
 from core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -551,8 +551,12 @@ async def list_resources(
 async def upload_resource_file(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("create:resource")),
+    current_user: "User" = Depends(DeviceUploadExceptTeacher("create:resource")),
 ):
+    """Kurs materialini qurilmadan yuklash — admin uchun.
+
+    O'qituvchi faylni «Fayllar kutubxonasi»dan tanlaydi: bu yo'l unga yopiq.
+    """
     url = await get_resource_repository.upload_file(
         session=session, file=file, current_user=current_user
     )

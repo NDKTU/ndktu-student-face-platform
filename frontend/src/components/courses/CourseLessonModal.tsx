@@ -531,8 +531,8 @@ export function CourseLessonModal({ isOpen, onClose, course, lesson }: Props) {
                         {showResources && (
                             <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
                                 <div>
-                                    {/* Brauzerning «No files selected» tugmasi o'rniga ikki teng
-                                        yoʻl: qurilmadan yuklash yoki kutubxonadan tanlash. */}
+                                    {/* Brauzerning «No files selected» tugmasi o'rniga ikonkali
+                                        kartalar; oʻqituvchiga faqat kutubxonadan tanlash ko'rinadi. */}
                                     <FileSourceField
                                         label="Hujjat yoki kitob"
                                         multiple

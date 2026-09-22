@@ -178,3 +178,35 @@ class PermissionRequiredExceptStudent(PermissionRequiredExceptRole):
 
     BLOCKED_ROLE = "student"
     DENIAL_DETAIL = "Access denied: quiz authoring is not available for students"
+
+
+class DeviceUploadExceptTeacher(PermissionRequiredExceptRole):
+    """Kurs materialini qurilmadan yuklash — o'qituvchiga yopiq.
+
+    O'qituvchi darsga, kurs kutubxonasiga va uy vazifasiga faylni faqat
+    «Fayllar kutubxonasi»dan tanlaydi. Yangi faylni u avval kutubxonaning
+    o'ziga (`/file/upload`) yuklaydi — bu yo'l ochiq qoladi, aks holda
+    tanlashga hech narsa bo'lmasdi.
+
+    Admin bundan tashqarida: uning yuklash imkoniyatlari o'zgarmaydi.
+    """
+
+    BLOCKED_ROLE = "teacher"
+    DENIAL_DETAIL = "O'qituvchi faylni faqat «Fayllar kutubxonasi»dan tanlay oladi"
+
+
+class FileLibraryExceptStudent(PermissionRequiredExceptRole):
+    """«Fayllar kutubxonasi» — talabaga yopiq.
+
+    Talaba uy vazifasiga faylni faqat o'z qurilmasidan yuklaydi
+    (`/homework/{id}/upload`). `read:file` talaba roliga berilmagan, lekin
+    Rollar oynasidan qo'lda berilishi mumkin — chegara shundan qat'i
+    nazar ishlaydi.
+
+    O'qituvchi roli ham bor foydalanuvchi bundan tashqarida: kutubxona
+    uning ish quroli.
+    """
+
+    BLOCKED_ROLE = "student"
+    EXEMPT_ROLES = frozenset({"admin", "teacher"})
+    DENIAL_DETAIL = "Talaba faylni faqat o'z qurilmasidan yuklay oladi"

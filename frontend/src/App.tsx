@@ -155,6 +155,29 @@ const TeacherBlockedRoute = ({
 };
 
 /**
+ * «Fayllar kutubxonasi» — talaba koʻrinishida yopiq.
+ *
+ * Talaba faylni faqat oʻz qurilmasidan yuklaydi (uy vazifasi javobida).
+ * `read:file` unga berilmagan, lekin Rollar oynasidan qoʻlda berilishi
+ * mumkin — shuning uchun marshrut ham yopiladi. Bekend ham shu chegarani
+ * qoʻyadi (`FileLibraryExceptStudent`); oʻqituvchi roli ham bor hisob
+ * bundan tashqarida.
+ */
+const FileLibraryRoute = ({ children }: { children: React.ReactElement }) => {
+    const { isLoading } = useAuth();
+    const { isStudent, isTeacher } = useRoleView();
+
+    if (isLoading) {
+        return <PageSpinner />;
+    }
+
+    if (isStudent && !isTeacher) {
+        return <AccessDenied reason="Talaba faylni faqat oʻz qurilmasidan yuklaydi" />;
+    }
+    return children;
+};
+
+/**
  * Psixologiya boʻlimi — psixolog xizmatining ishi (`psixologik` roli).
  *
  * Talabaning oʻz sahifasi (`/psychology/student`) bunga kirmaydi.
@@ -258,7 +281,7 @@ function App() {
                                         <Route path="/faculties" element={<OrganizationStructureRoute><PermissionRoute permission="read:faculty"><FacultyPage /></PermissionRoute></OrganizationStructureRoute>} />
                                         <Route path="/kafedras" element={<OrganizationStructureRoute><PermissionRoute permission="read:kafedra"><KafedraPage /></PermissionRoute></OrganizationStructureRoute>} />
                                         <Route path="/teacher-assignments" element={<AdminRoute><PermissionRoute permission="read:teacher_assignment"><TeacherAssignmentsPage /></PermissionRoute></AdminRoute>} />
-                                        <Route path="/files" element={<PermissionRoute permission="read:file"><FilesPage /></PermissionRoute>} />
+                                        <Route path="/files" element={<FileLibraryRoute><PermissionRoute permission="read:file"><FilesPage /></PermissionRoute></FileLibraryRoute>} />
                                         {/* Boshqaruv ro'yxati va talaba lentasi alohida huquqda:
                                             talabaga `read:announcement` berilsa, unga tahrirlash
                                             sahifasi ham ochilib ketardi. */}

@@ -12,6 +12,7 @@ from app.core.utils.youtube_link import YouTubeLinkError, parse_youtube_link
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.modules.auth.model import User
 from app.modules.course.model import Course, Lesson, Resource
+from app.modules.file.repository import get_file_repository
 from app.modules.file.storage import public_url, store_upload, sync_usages
 
 from .schemas import RESOURCE_TYPES, ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
@@ -73,6 +74,8 @@ class ResourceRepository:
     async def create_resource(self, session: AsyncSession, data: ResourceCreateRequest, current_user: User) -> Resource:
         course_id = await self._resolve_course_id(session, data.course_id, data.lesson_id)
         await self._check_access(session, course_id, current_user)
+        if data.resource_type == "file":
+            await get_file_repository.ensure_teacher_library_urls(session, [data.file_url], current_user)
 
         resource = Resource(
             lesson_id=data.lesson_id,
@@ -133,6 +136,10 @@ class ResourceRepository:
         if data.title is not None:
             resource.title = data.title
         if data.file_url is not None:
+            # Avvaldan turgan fayl qayta tekshirilmaydi — nomini tahrirlash
+            # hamkasbi biriktirgan fayl tufayli yiqilmasin.
+            if resource.resource_type == "file" and data.file_url != resource.file_url:
+                await get_file_repository.ensure_teacher_library_urls(session, [data.file_url], current_user)
             resource.file_url = data.file_url
         if data.link_url is not None:
             # Tur so'rovda emas, yozuvning o'zida — shuning uchun tekshiruv shu
