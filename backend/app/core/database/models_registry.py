@@ -66,6 +66,7 @@ from app.modules.auth.hemis.model import (
 from app.modules.course.model import (
     Course,
     CourseGroup,
+    CourseMessage,
     CourseTeacher,
     Homework,
     HomeworkSubmission,

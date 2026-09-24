@@ -23,6 +23,13 @@ from .course.schemas import (
     CourseUpdateRequest,
 )
 from .attendance.repository import get_attendance_repository
+from .chat.repository import get_course_chat_repository
+from .chat.schemas import (
+    CourseMessageCreateRequest,
+    CourseMessageListRequest,
+    CourseMessageListResponse,
+    CourseMessageResponse,
+)
 from .attendance.schemas import (
     AttendanceBulkRequest,
     AttendanceListResponse,
@@ -691,6 +698,60 @@ async def course_attendance(
     """Kurs jurnali: darslar × talabalar matritsasi va har biriga foiz."""
     return await get_attendance_repository.course_attendance(
         session=session, course_id=course_id, current_user=current_user, group_id=group_id
+    )
+
+
+# ── Kurs chati ──────────────────────────────────────────────────────────────
+# Huquq kursni ko'rish bilan bir xil (`read:course` + kursga tegishlilik):
+# talabada ham, o'qituvchida ham u bor.
+
+
+@course_router.get("/{course_id}/messages", response_model=CourseMessageListResponse)
+async def list_course_messages(
+    course_id: int,
+    data: CourseMessageListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
+):
+    """Kurs chatining oxirgi xabarlari (eskidan yangiga). `before_id` — eskiroqlari."""
+    return await get_course_chat_repository.list_messages(
+        session=session, course_id=course_id, request=data, current_user=current_user
+    )
+
+
+@course_router.post(
+    "/{course_id}/messages",
+    response_model=CourseMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    # Kalit foydalanuvchi bo'yicha: bitta auditoriya talabalari umumiy NAT
+    # orqasida bo'ladi (yuz tekshiruvidagi sabab bilan bir xil).
+    dependencies=[Depends(RateLimiter(times=20, seconds=60, identifier=user_identifier))],
+)
+async def create_course_message(
+    course_id: int,
+    data: CourseMessageCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
+):
+    return await get_course_chat_repository.create_message(
+        session=session, course_id=course_id, data=data, current_user=current_user
+    )
+
+
+@course_router.delete(
+    "/{course_id}/messages/{message_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=user_identifier))],
+)
+async def delete_course_message(
+    course_id: int,
+    message_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:course")),
+):
+    """Muallif o'z xabarini, kurs o'qituvchilari va admin — istalganini o'chiradi."""
+    await get_course_chat_repository.delete_message(
+        session=session, course_id=course_id, message_id=message_id, current_user=current_user
     )
 
 

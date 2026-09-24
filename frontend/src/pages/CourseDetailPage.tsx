@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    ArrowLeft,
     Award,
     BookOpen,
     ChevronRight,
     ClipboardCheck,
     FolderOpen,
     Clock3,
-    GripVertical,
+    Info,
     ListChecks,
+    MessagesSquare,
     Pencil,
+    Play,
     Plus,
+    Search,
     Trash2,
     UserRound,
 } from 'lucide-react';
@@ -20,7 +22,6 @@ import { useCourse } from '@/hooks/useCourses';
 import { useDeleteLesson, useLessons } from '@/hooks/useLessons';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { CardAction } from '@/components/ui/CardAction';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -32,12 +33,15 @@ import { CourseGradebook } from '@/components/courses/CourseGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { CourseFileLibrary } from '@/components/courses/CourseFileLibrary';
+import { CourseChat } from '@/components/courses/CourseChat';
 import type { Lesson } from '@/services/lessonService';
 import { semesterLabel } from '@/utils/semester';
 import { isYoutubeUrl } from '@/utils/youtube';
 import { courseTypeLabel } from '@/services/courseTypes';
+import { initialsOf } from '@/lib/avatarTiles';
+import './CourseDetailPage.css';
 
-type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library';
+type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library' | 'chat';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -53,11 +57,13 @@ export default function CourseDetailPage() {
     // Baholash jurnali — baho qo'yadiganlarga (dars sahifasidagi jurnal bilan
     // bir xil huquq). Kimning kursi ekanini bekend tekshiradi.
     const canSeeGradebook = hasPermission('update:submission');
+    const canReadCourse = hasPermission('read:course');
 
     // Ochilganda doim darslar: kursga kirgan o'qituvchi avval nima o'tilganini
     // ko'rishi kerak, jurnal esa alohida qadam.
     const [tab, setTab] = useState<CourseTab>('lessons');
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
+    const [lessonSearch, setLessonSearch] = useState('');
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
     // Bekend 409 bilan «nima yo'qoladi» ro'yxatini qaytaradi — uni ko'rsatib,
@@ -73,6 +79,9 @@ export default function CourseDetailPage() {
 
     // Darslar sana bo'yicha keladi — kursning o'tilish tartibi shu.
     const lessons = lessonsQuery.data?.lessons ?? [];
+    const visibleLessons = lessons
+        .map((lesson, index) => ({ lesson, index }))
+        .filter(({ lesson }) => lesson.topic.toLocaleLowerCase().includes(lessonSearch.trim().toLocaleLowerCase()));
 
     if (!courseId || Number.isNaN(courseId)) {
         return <EmptyState title="Kurs topilmadi" description="Kurs identifikatori noto'g'ri." />;
@@ -91,6 +100,8 @@ export default function CourseDetailPage() {
     if (courseQuery.isError) return <ErrorState onRetry={() => courseQuery.refetch()} />;
     const course = courseQuery.data;
     if (!course) return <EmptyState title="Kurs topilmadi" description="Bu kurs o'chirilgan yoki mavjud emas." />;
+    const courseTitle = course.subject?.name || course.name;
+    const teacherName = course.teacher?.full_name || course.teacher?.username || "O'qituvchi ko'rsatilmagan";
 
     // Arxivdagi kurs faqat o'qish uchun: jurnal va materiallar joyida qoladi,
     // lekin unga yangi dars qo'shish ma'nosiz — u yuklamada endi yo'q.
@@ -125,6 +136,11 @@ export default function CourseDetailPage() {
         // kursni ko'ra oladigan har kimga (talabaga ham) ochiq.
         ...(canReadLessons
             ? [{ id: 'library' as const, label: 'Kutubxona', icon: <FolderOpen className="h-4 w-4" /> }]
+            : []),
+        // Muloqot kursni ko'ra oladigan hammaga: o'qituvchi, assistent va
+        // kurs guruhlari talabalari. Kimning kursi ekanini bekend tekshiradi.
+        ...(canReadCourse
+            ? [{ id: 'chat' as const, label: 'Muloqot', icon: <MessagesSquare className="h-4 w-4" /> }]
             : []),
     ];
     // Tanlangan tab huquq bilan yo'qolib qolgan bo'lsa, birinchisiga qaytamiz.
@@ -164,47 +180,37 @@ export default function CourseDetailPage() {
     const renderLesson = (lesson: Lesson, index: number) => {
         const video = lesson.resources?.find((resource) => resource.resource_type === 'video');
         const isYoutube = isYoutubeUrl(video?.link_url);
+        const lessonType = lesson.lesson_type === 'independent'
+            ? "Mustaqil ta'lim"
+            : courseTypeLabel(lesson.lesson_type ?? course.course_type) ?? 'Dars';
         return (
-            // Qator <button> emas: ichida tahrirlash/o'chirish tugmalari bor,
-            // ichma-ich <button> esa yaroqsiz HTML.
             <div
                 key={lesson.id}
-                className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-border/60 bg-card px-3 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-6px_rgba(16,24,40,0.18)] sm:px-4"
+                className="course-lesson-row group"
             >
-                {/* Chap chetdagi urg'u chizig'i — faqat hover'da chiqadi va
-                    qatorni ro'yxat ichida ajratib ko'rsatadi. */}
-                <span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 w-0.5 origin-top scale-y-0 bg-primary transition-transform duration-200 group-hover:scale-y-100"
-                />
-                <GripVertical className="hidden h-4 w-4 shrink-0 cursor-grab text-muted-foreground/30 transition-colors group-hover:text-muted-foreground/60 sm:block" />
                 <button
                     type="button"
                     onClick={() => navigate(`/lessons/${lesson.id}`)}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    className="course-lesson-link"
                 >
-                {/* Tartib raqami: dumaloq va kontrastli — ro'yxatda ko'z avval
-                    shunga tushadi, hover'da esa to'liq primary rangga o'tadi. */}
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold tabular-nums text-primary ring-1 ring-inset ring-primary/20 transition-all duration-200 group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
-                    {index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">{lesson.topic}</span>
-                {video && (
-                    <span className={`hidden shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset sm:inline-flex ${
-                        isYoutube
-                            ? 'bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400'
-                            : 'bg-primary/10 text-primary ring-primary/20'
-                    }`}>
-                        {isYoutube ? 'YouTube' : 'Video dars'}
+                    <span className="course-lesson-number">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="course-lesson-text">
+                        <span className="course-lesson-title">{lesson.topic}</span>
+                        <span className="course-lesson-subtitle">{lessonType} · {String(index + 1).padStart(2, '0')}-mavzu</span>
                     </span>
-                )}
-                {lesson.duration_minutes && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-medium tabular-nums text-muted-foreground">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        {lesson.duration_minutes} daq
+                    <span className="course-lesson-badges">
+                        <span className="course-lesson-type">{lessonType}</span>
+                        {video && (
+                            <span className={`course-lesson-video ${isYoutube ? 'is-youtube' : ''}`}>
+                                <Play aria-hidden="true" size={10} fill="currentColor" />
+                                Video
+                            </span>
+                        )}
+                        {lesson.duration_minutes && (
+                            <span className="course-lesson-duration"><Clock3 size={12} />{lesson.duration_minutes} daq</span>
+                        )}
                     </span>
-                )}
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary" />
+                    <ChevronRight className="course-lesson-chevron" size={18} />
                 </button>
                 {canUpdateLessons && (
                     <Button
@@ -235,80 +241,81 @@ export default function CourseDetailPage() {
     };
 
     return (
-        <div className="space-y-5">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/courses')} className="-ml-2">
-                <ArrowLeft className="h-4 w-4" />
-                Kurslarga qaytish
-            </Button>
+        <div className="course-detail-page">
+            <nav aria-label="Kurs yo'li" className="course-breadcrumb">
+                <button type="button" onClick={() => navigate('/courses')}>Kurslar</button>
+                <ChevronRight size={14} aria-hidden="true" />
+                <span aria-current="page">{courseTitle}</span>
+            </nav>
 
-            <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                        <BookOpen className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex flex-wrap gap-2">
-                            {course.groups.map((group) => (
-                                <span key={group.id} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                                    {group.name}
-                                </span>
-                            ))}
-                        </div>
-                        <h1 className="page-title">{course.name}</h1>
-                        {isArchived && (
-                            <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                                Arxivda — EPOS yuklamasida bu kurs yo'q
-                            </p>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5"><UserRound className="h-4 w-4" />{course.teacher?.full_name || course.teacher?.username}</span>
-                            {course.kafedra?.name && <><span>·</span><span>{course.kafedra.name}</span></>}
-                            {courseTypeLabel(course.course_type) && (
-                                <><span>·</span><span>{courseTypeLabel(course.course_type)}</span></>
-                            )}
-                            {course.semester_number && <><span>·</span><span className="capitalize">{semesterLabel(course.semester_number)}</span></>}
-                            <><span>·</span><span>{lessons.length} ta dars</span></>
-                        </div>
+            <section className="course-hero" aria-labelledby="course-title">
+                <svg className="course-hero-art" viewBox="0 0 470 220" fill="none" aria-hidden="true">
+                    <path d="M8 142 108 87l91 45 74-85 105 37 71-70M108 87l15 117 76-72 120 50 59-98 71 86M273 47l46 135 130-12" stroke="currentColor" strokeWidth="1.3" />
+                    <circle cx="199" cy="132" r="31" stroke="currentColor" />
+                    <circle cx="378" cy="84" r="24" stroke="currentColor" />
+                    <g fill="currentColor" stroke="none"><circle cx="108" cy="87" r="6"/><circle cx="199" cy="132" r="5"/><circle cx="273" cy="47" r="6"/><circle cx="319" cy="182" r="5"/><circle cx="378" cy="84" r="7"/><circle cx="449" cy="170" r="4"/></g>
+                </svg>
+                <div className="course-hero-content">
+                    <span className="course-hero-eyebrow"><span />Fan kursi{course.semester_number ? ` · ${semesterLabel(course.semester_number)}` : ''}</span>
+                    <h1 id="course-title">{courseTitle}</h1>
+                    <p>{course.description || `${courseTitle} bo'yicha darslar va o'quv materiallari.`}</p>
+                    <div className="course-hero-meta">
+                        {course.semester_number && <span><Clock3 size={13} />{semesterLabel(course.semester_number)}</span>}
+                        {courseTypeLabel(course.course_type) && <span><BookOpen size={13} />{courseTypeLabel(course.course_type)}</span>}
+                        <span><ListChecks size={13} />{lessonsQuery.data?.total ?? course.lesson_count} ta dars</span>
+                        {isArchived && <span>Arxivda</span>}
                     </div>
                 </div>
             </section>
 
-            <TabBar tabs={tabs} active={activeTab} onChange={setTab} />
+            <div className="course-detail-grid">
+                <div className="course-detail-main">
+                    <TabBar tabs={tabs} active={activeTab} onChange={setTab} className="course-detail-tabs" />
 
-            {activeTab === 'lessons' && canReadLessons && (
-                <section className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 px-0.5">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Darslar</h2>
-                        {canCreateLessons && (
-                            <CardAction
-                                onClick={openNewLesson}
-                                icon={<Plus className="h-4 w-4" />}
-                                label="Dars qo'shish"
-                            />
-                        )}
-                    </div>
-
-                    {lessonsQuery.isLoading ? (
-                        <div className="space-y-3">
-                            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-16 rounded-2xl" />)}
-                        </div>
-                    ) : lessonsQuery.isError ? (
-                        <ErrorState onRetry={() => { void lessonsQuery.refetch(); }} />
-                    ) : lessons.length === 0 ? (
-                        <div className="rounded-2xl border border-border/60 bg-card py-8">
-                            <EmptyState
-                                icon={<BookOpen className="h-6 w-6" />}
-                                title="Darslar yo'q"
-                                description="Birinchi darsni qo'shing — ular o'tilgan sana bo'yicha tartiblanadi."
-                            />
-                        </div>
-                    ) : (
-                        <div className="space-y-2.5">
-                            {lessons.map(renderLesson)}
-                        </div>
+                    {activeTab === 'lessons' && canReadLessons && (
+                        <section className="course-lessons-section">
+                            <div className="course-section-heading">
+                                <h2>Darslar</h2>
+                                <p>Kursdagi barcha mavzular bir joyda</p>
+                            </div>
+                            <div className="course-lesson-toolbar">
+                                <label className="course-lesson-search">
+                                    <Search size={18} aria-hidden="true" />
+                                    <input
+                                        type="search"
+                                        value={lessonSearch}
+                                        onChange={(event) => setLessonSearch(event.target.value)}
+                                        placeholder="Mavzu nomi bo'yicha qidirish..."
+                                        aria-label="Darslarni mavzu bo'yicha qidirish"
+                                    />
+                                </label>
+                                {canCreateLessons && (
+                                    <Button onClick={openNewLesson} className="course-add-lesson">
+                                        <Plus size={18} />Dars qo'shish
+                                    </Button>
+                                )}
+                            </div>
+                            {lessonsQuery.isLoading ? (
+                                <div className="space-y-3">
+                                    {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-[76px] rounded-2xl" />)}
+                                </div>
+                            ) : lessonsQuery.isError ? (
+                                <ErrorState onRetry={() => { void lessonsQuery.refetch(); }} />
+                            ) : lessons.length === 0 ? (
+                                <div className="course-lessons-empty">
+                                    <EmptyState icon={<BookOpen className="h-6 w-6" />} title="Darslar yo'q" description="Birinchi darsni qo'shing — ular o'tilgan sana bo'yicha tartiblanadi." />
+                                </div>
+                            ) : visibleLessons.length === 0 ? (
+                                <div className="course-lessons-empty">
+                                    <EmptyState icon={<Search className="h-6 w-6" />} title="Dars topilmadi" description="Boshqa mavzu nomi bilan qidirib ko'ring." />
+                                </div>
+                            ) : (
+                                <div className="course-lesson-list">
+                                    {visibleLessons.map(({ lesson, index }) => renderLesson(lesson, index))}
+                                </div>
+                            )}
+                        </section>
                     )}
-                </section>
-            )}
 
             {activeTab === 'attendance' && canReadAttendance && (
                 <section className="space-y-3">
@@ -354,6 +361,45 @@ export default function CourseDetailPage() {
                     </div>
                 </section>
             )}
+
+            {activeTab === 'chat' && canReadCourse && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Kurs bo'yicha muloqot
+                    </h2>
+                    <CourseChat courseId={course.id} readOnly={isArchived} />
+                </section>
+            )}
+                </div>
+
+                <aside className="course-detail-aside" aria-label="Kurs ma'lumotlari">
+                    <section className="course-info-card">
+                        <h2>Kurs haqida</h2>
+                        <div className="course-teacher-label">
+                            <span className="course-info-icon"><UserRound size={17} /></span>
+                            <strong>O'qituvchi</strong>
+                        </div>
+                        <div className="course-teacher-detail">
+                            <span className="course-teacher-avatar" aria-hidden="true">{initialsOf(teacherName)}</span>
+                            <span><strong>{teacherName}</strong>{course.kafedra?.name && <small>{course.kafedra.name}</small>}</span>
+                        </div>
+                    </section>
+                    {course.groups.length > 0 && (
+                        <section className="course-info-card">
+                            <h2>Biriktirilgan guruhlar</h2>
+                            <div className="course-group-list">
+                                {course.groups.map((group) => (
+                                    <div key={group.id} className="course-group-row"><strong>{group.name}</strong>{courseTypeLabel(course.course_type) && <span>{courseTypeLabel(course.course_type)}</span>}</div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                    <div className="course-aside-note">
+                        <Info size={18} aria-hidden="true" />
+                        <div><strong>Kurs materiallari</strong><p>Darslar, baholar va fayllarni yuqoridagi bo'limlar orqali ko'rishingiz mumkin.</p></div>
+                    </div>
+                </aside>
+            </div>
 
             <CourseLessonModal
                 isOpen={lessonModalOpen}

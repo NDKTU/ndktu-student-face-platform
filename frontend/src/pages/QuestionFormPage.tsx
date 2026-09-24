@@ -606,10 +606,19 @@ const QuestionFormPage = () => {
                                     disabled={isEditMode}
                                 >
                                     <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
-                                    <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
                                     <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
-                                    <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
-                                    <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
+                                    {/* Yangi savol faqat yuqoridagi ikki turda yaratiladi. Qolgan
+                                        turlar faqat ilgari yaratilgan savolni tahrirlashda
+                                        ko'rinadi — aks holda select bo'sh qolardi. */}
+                                    {isEditMode && questionType === 'TRUE_FALSE' && (
+                                        <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
+                                    )}
+                                    {isEditMode && questionType === 'TYPE_ANSWER' && (
+                                        <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
+                                    )}
+                                    {isEditMode && questionType === 'PUZZLE' && (
+                                        <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
+                                    )}
                                 </select>
                                 {isEditMode && (
                                     <p className="text-xs text-muted-foreground">

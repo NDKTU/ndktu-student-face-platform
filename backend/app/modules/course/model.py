@@ -422,3 +422,32 @@ class Resource(Base, IdIntPk, TimestampMixin):
 
     def __str__(self):
         return f"Resource {self.id} ({self.resource_type}: {self.title})"
+
+
+class CourseMessage(Base, IdIntPk, TimestampMixin):
+    """Kurs chati: o'qituvchi va talabalarning umumiy muloqoti.
+
+    Bitta kursga bitta umumiy xona — guruhlar bo'yicha bo'linmaydi: oqim
+    kursida o'qituvchi e'lonni hamma guruhga birdan yozadi. Kim o'qiy va
+    yoza olishi kursni ko'rish huquqi bilan bir xil.
+
+    ``user_id`` bo'sh bo'lishi mumkin: foydalanuvchi o'chirilsa, uning
+    xabari suhbatdan yo'qolmaydi, aks holda javoblar kontekstsiz qolardi.
+    """
+
+    __tablename__ = "course_messages"
+    __table_args__ = (Index("ix_course_messages_course_id_id", "course_id", "id"),)
+
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    course: Mapped["Course"] = relationship("Course")
+    user: Mapped["User | None"] = relationship("User")
+
+    def __str__(self):
+        return f"CourseMessage {self.id} course={self.course_id}"
