@@ -317,7 +317,8 @@ async def _enrolled_student_homework(async_db, test_kafedra, test_subject, test_
         deadline=datetime.now() + timedelta(days=7),
         max_grade=5,
         allow_file=True,
-        allow_text=True,
+        allow_text=False,
+        allowed_file_types=["pdf", "jpg,jpeg,png"],
     )
     async_db.add(homework)
     await async_db.commit()
@@ -340,6 +341,66 @@ async def test_student_submits_device_uploaded_file(
         f"/homework/{homework.id}/submit", json={"submitted_files": [uploaded.json()]}, headers=headers
     )
     assert submitted.status_code == 201, submitted.text
+
+    delete_homework = await auth_client.delete(f"/homework/{homework.id}")
+    assert delete_homework.status_code == 409, delete_homework.text
+
+    # Bir marta topshirilgan javobni boshqa fayl bilan almashtirish yoki
+    # fayllarsiz yuborib o'chirishga server ham ruxsat bermaydi.
+    retry_upload = await async_client.post(
+        f"/homework/{homework.id}/upload", files={"file": ("boshqa.png", PNG, "image/png")}, headers=headers
+    )
+    assert retry_upload.status_code == 409, retry_upload.text
+    for files in ([], [uploaded.json()]):
+        retry_submit = await async_client.post(
+            f"/homework/{homework.id}/submit", json={"submitted_files": files}, headers=headers
+        )
+        assert retry_submit.status_code == 409, retry_submit.text
+
+
+@pytest.mark.asyncio
+async def test_student_upload_limited_to_2mb(
+    async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher
+):
+    """Javob fayli turidan qat'i nazar 2 MB dan oshmaydi."""
+    _, homework = await _enrolled_student_homework(async_db, test_kafedra, test_subject, test_group, test_teacher)
+    headers = await _headers(async_client, "fs_student")
+
+    too_big = await async_client.post(
+        f"/homework/{homework.id}/upload",
+        files={"file": ("javob.pdf", b"x" * (2 * 1024 * 1024 + 1), "application/pdf")},
+        headers=headers,
+    )
+    assert too_big.status_code == 400, too_big.text
+
+    exact = await async_client.post(
+        f"/homework/{homework.id}/upload",
+        files={"file": ("javob.pdf", b"x" * (2 * 1024 * 1024), "application/pdf")},
+        headers=headers,
+    )
+    assert exact.status_code == 200, exact.text
+
+
+@pytest.mark.asyncio
+async def test_student_submits_only_one_file(
+    async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher
+):
+    """Bitta vazifaga — bitta fayl."""
+    _, homework = await _enrolled_student_homework(async_db, test_kafedra, test_subject, test_group, test_teacher)
+    headers = await _headers(async_client, "fs_student")
+
+    files = []
+    for name in ("a.png", "b.png"):
+        uploaded = await async_client.post(
+            f"/homework/{homework.id}/upload", files={"file": (name, PNG, "image/png")}, headers=headers
+        )
+        assert uploaded.status_code == 200, uploaded.text
+        files.append(uploaded.json())
+
+    response = await async_client.post(
+        f"/homework/{homework.id}/submit", json={"submitted_files": files}, headers=headers
+    )
+    assert response.status_code == 400, response.text
 
 
 @pytest.mark.asyncio
@@ -368,10 +429,10 @@ async def test_student_cannot_submit_library_file(
 
 
 @pytest.mark.asyncio
-async def test_student_resubmits_with_previously_attached_file(
+async def test_student_cannot_resubmit_previously_attached_file(
     async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher
 ):
-    """Avvalgi javobdagi fayl qayta yuborilganda tekshirilmaydi — eski javoblar buzilmaydi."""
+    """Eski javoblar ham topshirilgach o'zgarmaydi."""
     from app.modules.course.model import HomeworkSubmission
 
     student, homework = await _enrolled_student_homework(
@@ -392,7 +453,44 @@ async def test_student_resubmits_with_previously_attached_file(
 
     response = await async_client.post(
         f"/homework/{homework.id}/submit",
-        json={"submitted_text": "Tuzatildi", "submitted_files": [legacy]},
+        json={"submitted_files": [legacy]},
         headers=headers,
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test_homework_answer_is_pdf_or_image_only(
+    async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher
+):
+    """Javob formati sozlanmaydi: faqat fayl, PDF yoki rasm. Formadan kelgan
+    eski maydonlar (`allow_text`, `allowed_file_types`) e'tiborsiz qoladi."""
+    _, homework = await _enrolled_student_homework(async_db, test_kafedra, test_subject, test_group, test_teacher)
+
+    created = await auth_client.post(
+        "/homework/",
+        json={
+            "course_id": homework.course_id,
+            "deadline": (datetime.now() + timedelta(days=3)).isoformat(),
+            "allow_text": True,
+            "allowed_file_types": ["doc,docx"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["allow_file"] is True
+    assert body["allow_text"] is False
+    assert body["allowed_file_types"] == ["pdf", "jpg,jpeg,png"]
+
+    headers = await _headers(async_client, "fs_student")
+    docx = await async_client.post(
+        f"/homework/{homework.id}/upload",
+        files={"file": ("javob.docx", b"x", "application/octet-stream")},
+        headers=headers,
+    )
+    assert docx.status_code == 400, docx.text
+
+    text_only = await async_client.post(
+        f"/homework/{homework.id}/submit", json={"submitted_text": "Javob"}, headers=headers
+    )
+    assert text_only.status_code == 400, text_only.text

@@ -256,7 +256,8 @@ class Homework(Base, IdIntPk, TimestampMixin):
     # yozuvlar unga tayanadi, lekin qiymat endi doim 5.
     max_grade: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     allow_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Talaba javobi faqat fayl (PDF yoki rasm) — `SUBMISSION_FILE_TYPES`.
+    allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     allowed_file_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     # O'qituvchi ilova qiladigan fayllar: shart, namuna, tarqatma material.
     # `allow_file` esa buning aksi — talaba fayl yubora oladimi, degani.

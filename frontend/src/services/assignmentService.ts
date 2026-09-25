@@ -63,9 +63,6 @@ export interface AssignmentCreateRequest {
     description?: string | null;
     deadline: string;
     max_grade?: number;
-    allow_file?: boolean;
-    allow_text?: boolean;
-    allowed_file_types?: string[];
     attachments?: SubmissionFile[];
 }
 
@@ -75,9 +72,6 @@ export interface AssignmentUpdateRequest {
     description?: string | null;
     deadline?: string;
     max_grade?: number;
-    allow_file?: boolean;
-    allow_text?: boolean;
-    allowed_file_types?: string[];
     attachments?: SubmissionFile[];
 }
 

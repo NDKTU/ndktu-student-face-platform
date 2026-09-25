@@ -306,6 +306,9 @@ class FileRepository:
             pattern = f"%{request.search}%"
             stmt = stmt.where(StoredFile.title.ilike(pattern))
 
+        if request.unused_only:
+            stmt = stmt.where(StoredFile.id.notin_(select(FileUsage.file_id)))
+
         if request.kind:
             exts = IMAGE_EXTS if request.kind == "image" else DOCUMENT_EXTS
             # Kengaytma stored_path oxirida turadi; mime_type ga tayanmaymiz,

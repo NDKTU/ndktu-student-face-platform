@@ -431,3 +431,94 @@ class KafedraRankingResponse(BaseModel):
     page: int = 1
     limit: int = 10
     kafedras: list[KafedraRankItem]
+
+
+# ── Oʻqituvchi dashboardi ─────────────────────────────────────────────────────
+
+
+class TeacherDashboardTotals(BaseModel):
+    courses: int = 0
+    groups: int = 0
+    students: int = 0
+    subjects: int = 0
+    lessons: int = 0
+    #: Bugundan boshlab rejalashtirilgan darslar.
+    upcoming_lessons: int = 0
+    #: Muddati hali oʻtmagan uy vazifalari.
+    active_homeworks: int = 0
+    #: Topshirilgan, lekin hali baholanmagan ishlar.
+    submissions_to_grade: int = 0
+    quizzes: int = 0
+    active_quizzes: int = 0
+    questions: int = 0
+    #: Oʻqituvchining testlari boʻyicha yakunlangan urinishlar.
+    results: int = 0
+
+
+class TeacherDashboardAttendance(BaseModel):
+    present: int = 0
+    late: int = 0
+    absent: int = 0
+    excused: int = 0
+    #: `None` — jurnal hali toʻldirilmagan (0% bilan bir xil emas).
+    percent: Optional[float] = None
+
+
+class TeacherDashboardAttendanceWeek(BaseModel):
+    week_start: str
+    present: int = 0
+    late: int = 0
+    absent: int = 0
+    percent: Optional[float] = None
+
+
+class TeacherDashboardGrades(BaseModel):
+    """Test baholari taqsimoti (2–5) va oʻrtachasi."""
+
+    avg_grade: Optional[float] = None
+    grade_5: int = 0
+    grade_4: int = 0
+    grade_3: int = 0
+    grade_2: int = 0
+    cheating: int = 0
+
+
+class TeacherDashboardGroup(BaseModel):
+    id: int
+    name: str
+    course: Optional[int] = None
+    student_count: int = 0
+    attendance_percent: Optional[float] = None
+    avg_grade: Optional[float] = None
+    results: int = 0
+
+
+class TeacherDashboardLesson(BaseModel):
+    id: int
+    topic: str
+    date: str
+    lesson_type: Optional[str] = None
+    course_id: int
+    course_name: str
+    group_id: Optional[int] = None
+    group_name: Optional[str] = None
+
+
+class TeacherDashboardHomework(BaseModel):
+    id: int
+    title: str
+    deadline: TashkentDatetime
+    course_id: int
+    course_name: str
+    submitted: int = 0
+    to_grade: int = 0
+
+
+class TeacherDashboardResponse(BaseModel):
+    totals: TeacherDashboardTotals
+    attendance: TeacherDashboardAttendance
+    attendance_trend: list[TeacherDashboardAttendanceWeek] = []
+    grades: TeacherDashboardGrades
+    groups: list[TeacherDashboardGroup] = []
+    upcoming_lessons: list[TeacherDashboardLesson] = []
+    homeworks: list[TeacherDashboardHomework] = []

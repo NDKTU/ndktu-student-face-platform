@@ -209,7 +209,7 @@ export default function LessonDetailPage() {
                     homework ? (
                         <div className="flex shrink-0 gap-1.5">
                             <CardAction variant="outline" onClick={() => { setEditingHomework(homework); setHomeworkOpen(true); }} icon={<Pencil className="h-4 w-4" />} label="Tahrirlash" />
-                            <CardAction variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => setHomeworkToDelete(homework)} icon={<Trash2 className="h-4 w-4" />} label="O'chirish" />
+                            {(homework.stats?.submitted ?? 0) === 0 && <CardAction variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => setHomeworkToDelete(homework)} icon={<Trash2 className="h-4 w-4" />} label="O'chirish" />}
                         </div>
                     ) : (
                         <CardAction onClick={() => { setEditingHomework(null); setHomeworkOpen(true); }} icon={<Plus className="h-4 w-4" />} label="Uy vazifasi berish" />
@@ -321,7 +321,7 @@ export default function LessonDetailPage() {
                     deleteAssignment.mutate(homeworkToDelete.id, { onSettled: () => setHomeworkToDelete(null) });
                 }}
                 title="Uy vazifasini o'chirish"
-                description={`«${homeworkToDelete?.title ?? ''}» va unga topshirilgan barcha talaba ishlari o'chiriladi. Bu amalni bekor qilib bo'lmaydi.`}
+                description={`«${homeworkToDelete?.title ?? ''}» vazifasi o‘chiriladi. Talaba javobi yuklangan vazifani o‘chirib bo‘lmaydi.`}
                 confirmText="O'chirish"
                 cancelText="Bekor qilish"
                 isLoading={deleteAssignment.isPending}

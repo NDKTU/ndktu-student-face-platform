@@ -80,6 +80,23 @@ class FileUrl(BaseModel):
     upload_dir: str
 
 
+class FileQuotaConfig(BaseModel):
+    """Oʻqituvchining fayl yuklash limiti.
+
+    ``default_bytes`` — zaxira qiymat: admin «Fayl yuklash limitlari»
+    sahifasida umumiy limitni hali saqlamagan boʻlsa shu ishlaydi. Saqlangan
+    qiymat ``app_settings`` jadvalida turadi va undan ustun.
+    """
+
+    default_bytes: int = 500 * 1024 * 1024
+    #: Admin kirita oladigan eng katta limit — xato bilan «5000 GB» yozib
+    #: yuborilmasligi uchun.
+    max_bytes: int = 100 * 1024 * 1024 * 1024
+    #: Oʻchirilgan fayl baytlari diskdan shuncha kundan keyin tozalanadi.
+    #: Shu muddat ichida xato oʻchirilgan faylni bazadan tiklash mumkin.
+    cleanup_grace_days: int = 30
+
+
 class HemisConfig(BaseModel):
     # Студенческий портал.
     login_url: str
@@ -212,6 +229,7 @@ class AppConfig(BaseSettings):
     eduplan: EduPlanConfig = EduPlanConfig()
     face_service: FaceServiceConfig = FaceServiceConfig()
     file_url: FileUrl
+    file_quota: FileQuotaConfig = FileQuotaConfig()
     redis: RedisConfig
     cors: CorsConfig = CorsConfig()
     admin: AdminConfig = AdminConfig()

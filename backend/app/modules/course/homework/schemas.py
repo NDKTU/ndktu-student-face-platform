@@ -29,9 +29,6 @@ class HomeworkCreateRequest(BaseModel):
     description: Optional[str] = None
     deadline: datetime
     max_grade: int = Field(default=GRADE_MAX, ge=GRADE_MIN, le=GRADE_MAX)
-    allow_file: bool = True
-    allow_text: bool = True
-    allowed_file_types: List[str] = []
     attachments: List[SubmissionFile] = []
 
 
@@ -41,9 +38,6 @@ class HomeworkUpdateRequest(BaseModel):
     description: Optional[str] = None
     deadline: Optional[datetime] = None
     max_grade: Optional[int] = Field(default=None, ge=GRADE_MIN, le=GRADE_MAX)
-    allow_file: Optional[bool] = None
-    allow_text: Optional[bool] = None
-    allowed_file_types: Optional[List[str]] = None
     attachments: Optional[List[SubmissionFile]] = None
 
 

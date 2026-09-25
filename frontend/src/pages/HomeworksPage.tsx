@@ -286,7 +286,7 @@ export default function HomeworksPage() {
                                 : myState(item) === 'todo' ? 'Topshirish' : "Ko'rish"}
                         </span>
                     </Button>
-                    {canDelete && (
+                    {canDelete && (item.stats?.submitted ?? 0) === 0 && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -532,11 +532,10 @@ export default function HomeworksPage() {
                     });
                 }}
                 title="Vazifani o'chirish"
-                description={`"${deleting?.title ?? ''}" vazifasi va unga topshirilgan barcha talabalar ishlari butunlay o'chiriladi.`}
+                description={`"${deleting?.title ?? ''}" vazifasi o‘chiriladi. Talaba javobi yuklangan vazifani o‘chirib bo‘lmaydi.`}
                 confirmText="O'chirish"
                 cancelText="Bekor qilish"
             />
         </div>
     );
 }
-

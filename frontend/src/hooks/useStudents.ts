@@ -81,3 +81,11 @@ export const useStudent = (id: number) => {
 //         },
 //     });
 // };
+
+export const useMyStudentDashboard = (enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['student-dashboard'],
+        queryFn: () => studentService.getMyDashboard(),
+        enabled,
+    });
+};

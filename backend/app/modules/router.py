@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from .announcement.router import router as announcement_router
 from .auth.router import router as auth_router
 from .course.router import router as course_router
+from .file.quota_router import router as file_quota_router
 from .file.router import router as file_router
 from .integration.router import router as integration_router
 from .logs.router import router as logs_router
@@ -17,6 +18,8 @@ router.include_router(organization_structure_router)
 router.include_router(quiz_router)
 router.include_router(psychology_router)
 router.include_router(course_router)
+# Kvota routeri fayl routeridan oldin: `/file/quota` `/file/{file_id}` ga tushmasligi uchun.
+router.include_router(file_quota_router)
 router.include_router(file_router)
 router.include_router(integration_router)
 router.include_router(logs_router)

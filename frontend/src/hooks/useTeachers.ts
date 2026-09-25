@@ -153,3 +153,11 @@ export const useKafedraRanking = (params?: { page?: number; limit?: number }) =>
         placeholderData: (prev) => prev,
     });
 };
+
+export const useMyTeacherDashboard = (enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['teacher-dashboard'],
+        queryFn: () => teacherService.getMyDashboard(),
+        enabled,
+    });
+};

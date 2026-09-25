@@ -1,65 +1,77 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, FileText, Loader2, Send, UploadCloud, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, UploadCloud } from 'lucide-react';
 import { useMySubmission, useSubmitAssignment } from '@/hooks/useAssignments';
-import { assignmentService, type Assignment, type SubmissionFile } from '@/services/assignmentService';
+import { assignmentService, type Assignment, type Submission, type SubmissionFile } from '@/services/assignmentService';
 import { Button } from '@/components/ui/Button';
-import {
-    LATE_CLASS,
-    REVIEW_CLASS,
-    answerFormatLabel,
-    deadlineHint,
-    lateBy,
-} from '@/components/homework/homeworkStatus';
+import { deadlineHint, lateBy } from '@/components/homework/homeworkStatus';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatDateTime } from '@/utils/date';
-import { cn } from '@/lib/utils';
 
-const DEFAULT_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar'];
+// Backend bilan bir xil: bitta vazifaga bitta fayl, 2 MB gacha.
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
-/** O'qituvchi tanlagan guruhlar ("doc,docx") alohida kengaytmalarga yoyiladi. */
-function expandExts(allowedFileTypes: string[]): string[] {
-    const exts = allowedFileTypes
-        .flatMap((group) => group.split(','))
-        .map((ext) => ext.trim().replace(/^\./, '').toLowerCase())
-        .filter(Boolean);
-    return exts.length > 0 ? exts : DEFAULT_EXTS;
-}
+// Backend bilan bir xil: javob faqat PDF yoki rasm.
+const DEFAULT_EXTS = ['pdf', 'jpg', 'jpeg', 'png'];
 
 export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }) => {
     const submissionQuery = useMySubmission(assignment.id);
     const submitMut = useSubmitAssignment(assignment.id);
-    const submission = submissionQuery.data ?? null;
+    const [confirmed, setConfirmed] = useState<Submission | null>(null);
+    const submission = submissionQuery.data ?? confirmed;
 
-    const [text, setText] = useState('');
     const [files, setFiles] = useState<SubmissionFile[]>([]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
 
-    // Mavjud javob kelgach formani to'ldiramiz, aks holda talaba o'z ishini
-    // ko'rmay, bo'sh forma ustiga qayta yozib yuborardi.
     useEffect(() => {
-        setText(submission?.submitted_text ?? '');
-        setFiles(submission?.submitted_files ?? []);
-    }, [submission]);
+        setFiles([]);
+        setConfirmed(null);
+    }, [assignment.id]);
 
     // Sahifada bir nechta vazifa bo'ladi — `id` har biriga alohida bo'lishi shart,
     // aks holda label doim birinchi inputni ochadi.
     const inputId = `homework-submission-${assignment.id}`;
-    const exts = expandExts(assignment.allowed_file_types);
     const isGraded = submission?.status === 'graded';
     const isLate = new Date(assignment.deadline).getTime() < Date.now();
     const busy = uploading || submitMut.isPending;
 
+    const submitFile = async (uploaded: SubmissionFile) => {
+        setError('');
+        try {
+            const saved = await submitMut.mutateAsync({ submitted_text: null, submitted_files: [uploaded] });
+            setConfirmed(saved);
+            setFiles([]);
+            toast.success('Vazifa yuklandi');
+        } catch (cause) {
+            const latest = await submissionQuery.refetch();
+            if (latest.data) {
+                setConfirmed(latest.data);
+                setFiles([]);
+                toast.success('Vazifa yuklandi');
+            } else {
+                setError(apiErrorMessage(cause, 'Topshirishda xatolik. Qayta urinib ko‘ring.'));
+            }
+        }
+    };
+
     const handleUpload = async (picked: FileList | null) => {
-        if (!picked || picked.length === 0) return;
+        const file = picked?.[0];
+        if (!file || submission || busy) return;
+        if (!DEFAULT_EXTS.includes(file.name.split('.').pop()?.toLowerCase() ?? '')) {
+            setError('Faqat PDF, JPG yoki PNG fayl yuklash mumkin');
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            setError('Fayl hajmi 2 MB dan oshmasligi kerak');
+            return;
+        }
         setUploading(true);
         setError('');
         try {
-            for (const file of Array.from(picked)) {
-                const uploaded = await assignmentService.uploadSubmissionFile(assignment.id, file);
-                setFiles((prev) => [...prev, uploaded]);
-            }
+            const uploaded = await assignmentService.uploadSubmissionFile(assignment.id, file);
+            setFiles([uploaded]);
+            await submitFile(uploaded);
         } catch (cause) {
             setError(apiErrorMessage(cause, 'Faylni yuklashda xatolik'));
         } finally {
@@ -67,25 +79,11 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
         }
     };
 
-    const isEmpty = !text.trim() && files.length === 0;
-
-    const handleSubmit = () => {
-        if (isEmpty) {
-            setError(assignment.allow_text ? 'Javob yozing yoki fayl biriktiring' : 'Avval fayl biriktiring');
-            return;
-        }
-        setError('');
-        submitMut.mutate(
-            { submitted_text: text.trim() || null, submitted_files: files },
-            {
-                onSuccess: () => toast.success(submission ? 'Javobingiz yangilandi' : "Javobingiz o'qituvchiga yuborildi"),
-                onError: (cause) => setError(apiErrorMessage(cause, 'Topshirishda xatolik')),
-            },
-        );
-    };
-
     if (submissionQuery.isLoading) {
         return <div className="mt-4 border-t border-border/60 pt-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
+    }
+    if (submissionQuery.isError && !submission) {
+        return <div className="mt-4 border-t border-border/60 pt-4 text-sm text-destructive">Javob holatini yuklab bo‘lmadi. <Button variant="link" onClick={() => void submissionQuery.refetch()}>Qayta urinish</Button></div>;
     }
 
     const late = lateBy(submission?.submitted_at, assignment.deadline);
@@ -94,64 +92,27 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
         <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold">Mening javobim</p>
-                {!submission ? (
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', isLate ? LATE_CLASS : 'border-primary/25 bg-primary/10 text-primary')}>
-                        {isLate ? 'Topshirilmagan · muddat tugagan' : 'Hali topshirilmagan'}
-                    </span>
-                ) : isGraded ? (
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', REVIEW_CLASS.graded)}>
-                        Baholandi: {submission.grade} / {assignment.max_grade}
-                    </span>
-                ) : (
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', REVIEW_CLASS.pending)}>
-                        Topshirildi · o'qituvchi tekshirmoqda
-                    </span>
-                )}
-                {late && (
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', LATE_CLASS)}>
-                        {late} kech topshirilgan
-                    </span>
-                )}
+                {submission && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Vazifa yuklandi</span>}
             </div>
-            {submission?.submitted_at && (
-                <p className="text-xs text-muted-foreground">Topshirilgan vaqt: {formatDateTime(submission.submitted_at)}</p>
-            )}
-
-            {isGraded ? (
-                <div className="space-y-2">
-                    {submission?.submitted_text && (
-                        <p className="whitespace-pre-wrap rounded-lg bg-muted/40 px-3 py-2 text-sm">{submission.submitted_text}</p>
-                    )}
-                    <SubmittedFiles files={submission?.submitted_files ?? []} />
-                    {submission?.feedback && (
-                        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm">
-                            <span className="font-medium">O'qituvchi izohi: </span>{submission.feedback}
-                        </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Ish baholangan — endi uni o'zgartirib bo'lmaydi.</p>
+            {submission ? (
+                <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+                    <p className="text-sm text-emerald-900 dark:text-emerald-200">{isGraded ? `Baholandi: ${submission.grade} / ${assignment.max_grade}` : 'Javobingiz o‘qituvchiga yuborildi va tekshirilmoqda.'}</p>
+                    {submission.submitted_at && <p className="text-xs text-muted-foreground">Topshirilgan vaqt: {formatDateTime(submission.submitted_at)}</p>}
+                    <SubmittedFiles files={submission.submitted_files ?? []} />
+                    {submission.feedback && <p className="rounded-lg bg-background/70 px-3 py-2 text-sm"><span className="font-medium">O‘qituvchi izohi: </span>{submission.feedback}</p>}
+                    {late && <p className="text-xs text-amber-700 dark:text-amber-400">{late} kech topshirilgan</p>}
+                    <p className="text-xs text-muted-foreground">Topshirilgan faylni o‘chirish yoki almashtirish mumkin emas.</p>
                 </div>
             ) : (
                 <>
                     <p className="text-xs text-muted-foreground">
-                        {answerFormatLabel(assignment.allow_text, assignment.allow_file)} ·{' '}
-                        <span className={cn(isLate && 'text-destructive')}>{deadlineHint(assignment.deadline)}</span>
+                        PDF yoki rasm · Bitta fayl, 2 MB gacha · {deadlineHint(assignment.deadline)}
                     </p>
-                    {assignment.allow_text && (
-                        <textarea
-                            className="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                            value={text}
-                            onChange={(event) => setText(event.target.value)}
-                            placeholder="Javobingizni shu yerga yozing..."
-                        />
-                    )}
-
                     {assignment.allow_file && (
                         <div>
-                            {/* Brauzerning «Browse… No files selected» maydoni o'rniga
-                                dars modalidagi kabi ikonkali zona. */}
                             <label
                                 htmlFor={inputId}
-                                className="flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-input bg-muted/20 px-4 py-5 text-center transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+                                className="flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.035] px-4 py-6 text-center transition-colors hover:border-primary hover:bg-primary/[0.07] focus-within:ring-2 focus-within:ring-ring"
                             >
                                 {uploading ? (
                                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -159,18 +120,18 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                                     <UploadCloud className="h-5 w-5 text-muted-foreground" />
                                 )}
                                 <span className="text-sm font-medium text-foreground">
-                                    {uploading ? 'Yuklanmoqda...' : 'Fayl biriktirish uchun bosing'}
+                                    {busy ? 'Yuklanmoqda va topshirilmoqda...' : 'Faylni tanlang va topshiring'}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                    {exts.map((ext) => ext.toUpperCase()).join(', ')}
+                                    PDF, JPG, JPEG, PNG
                                 </span>
+                                <span className="text-xs text-muted-foreground">Tanlangan fayl avtomatik yuboriladi</span>
                             </label>
                             <input
                                 id={inputId}
                                 type="file"
-                                multiple
-                                className="hidden"
-                                accept={exts.map((ext) => `.${ext}`).join(',')}
+                                className="sr-only"
+                                accept={DEFAULT_EXTS.map((ext) => `.${ext}`).join(',')}
                                 disabled={busy}
                                 onChange={(event) => { void handleUpload(event.target.files); event.target.value = ''; }}
                             />
@@ -183,16 +144,7 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                                             {file.size != null && (
                                                 <span className="shrink-0 text-[11px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
                                             )}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label="Faylni olib tashlash"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                onClick={() => setFiles((prev) => prev.filter((item) => item.url !== file.url))}
-                                            >
-                                                <X className="h-3.5 w-3.5" />
-                                            </Button>
+                                            <Button size="sm" onClick={() => void submitFile(file)} disabled={busy}>Qayta yuborish</Button>
                                         </li>
                                     ))}
                                 </ul>
@@ -208,17 +160,6 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
                     )}
                     {error && <p className="text-sm text-destructive">{error}</p>}
 
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                        {submission && (
-                            <p className="mr-auto text-xs text-muted-foreground">
-                                Baho qo'yilgunicha javobni o'zgartirish mumkin — yangisi avvalgisining o'rniga saqlanadi.
-                            </p>
-                        )}
-                        <Button size="sm" onClick={handleSubmit} disabled={busy || isEmpty}>
-                            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                            {submission ? 'Javobni yangilash' : 'Topshirish'}
-                        </Button>
-                    </div>
                 </>
             )}
         </div>

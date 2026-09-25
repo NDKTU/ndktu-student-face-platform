@@ -68,8 +68,28 @@ export interface FileListParams {
     shared_only?: boolean;
     search?: string;
     kind?: 'image' | 'document';
+    /** Hech qayerda ishlatilmayotgan — ya'ni o'chirsa bo'ladigan fayllar. */
+    unused_only?: boolean;
     page?: number;
     size?: number;
+}
+
+/**
+ * Yuklash limiti. `limit_bytes: null` — cheklanmagan (admin).
+ *
+ * Ishlatilgan hajm serverda hisoblanadi: faol fayllar hajmi yig'indisi.
+ * Fayl o'chirilsa, u o'z-o'zidan kamayadi.
+ */
+export interface FileQuota {
+    limit_bytes: number | null;
+    used_bytes: number;
+    remaining_bytes: number | null;
+    file_count: number;
+    /** Admin shu foydalanuvchiga alohida limit qo'ygan. */
+    is_custom: boolean;
+    is_unlimited: boolean;
+    max_document_bytes: number;
+    max_image_bytes: number;
 }
 
 export interface FileListResponse {
@@ -82,6 +102,11 @@ export interface FileListResponse {
 export const fileService = {
     list: async (params: FileListParams) => {
         const response = await api.get<FileListResponse>('/file/', { params });
+        return response.data;
+    },
+
+    quota: async () => {
+        const response = await api.get<FileQuota>('/file/quota');
         return response.data;
     },
 

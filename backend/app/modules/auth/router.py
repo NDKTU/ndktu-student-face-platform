@@ -43,8 +43,10 @@ from .role.schemas import (
     RoleListResponse,
     RolePermissionAssignRequest,
 )
+from .student.dashboard import build_student_dashboard
 from .student.repository import student_repository
 from .student.schemas import (
+    StudentDashboardResponse,
     StudentListRequest,
     StudentListResponse,
     StudentResponse,
@@ -53,6 +55,7 @@ from .student.schemas import (
 )
 from .teacher_assignment.repository import get_teacher_assignment_repository
 from .teacher_assignment.schemas import AssignmentListRequest, AssignmentListResponse
+from .teacher.dashboard import build_teacher_dashboard
 from .teacher.repository import get_teacher_repository
 from .teacher.schemas import (
     FacultyRankingResponse,
@@ -61,6 +64,7 @@ from .teacher.schemas import (
     TeacherAssignedSubjectsResponse,
 #    TeacherCreateRequest,
     TeacherCreateResponse,
+    TeacherDashboardResponse,
     TeacherGroupAssignRequest,
     TeacherListRequest,
     TeacherListResponse,
@@ -389,6 +393,21 @@ async def list_students(
     return await student_repository.list_students(session=session, request=data, current_user=current_user)
 
 
+# "/me/..." "/{student_id}" dan oldin turadi — tartib shu yerda ham saqlanadi.
+@student_router.get("/me/dashboard", response_model=StudentDashboardResponse)
+async def get_my_student_dashboard(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("student:me")),
+):
+    """Talabaning bosh sahifasi: davomat, baholar, darslar va uy vazifalari.
+
+    Faqat joriy foydalanuvchining oʻzi — boshqa talabani soʻrash uchun
+    parametr ataylab yoʻq. Alohida huquq (`student:me`): `read:student`
+    oʻqituvchi va adminniki, u bilan talabalar roʻyxati ochilib ketardi.
+    """
+    return await build_student_dashboard(session=session, user=current_user)
+
+
 @student_router.get("/{student_id}", response_model=StudentResponse)
 async def get_student(
     student_id: int,
@@ -493,6 +512,19 @@ async def update_my_teacher_profile(
     current_user: User = Depends(PermissionRequired("teacher:me")),
 ):
     return await get_teacher_repository.update_my_profile(session=session, user_id=current_user.id, data=data)
+
+
+@teacher_router.get("/me/dashboard", response_model=TeacherDashboardResponse)
+async def get_my_teacher_dashboard(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("teacher:me")),
+):
+    """Oʻqituvchining bosh sahifasi: guruhlari, darslari, davomat va test natijalari.
+
+    Hammasi joriy foydalanuvchining oʻz doirasida — boshqa oʻqituvchining
+    statistikasini soʻrash uchun parametr ataylab yoʻq.
+    """
+    return await build_teacher_dashboard(session=session, user=current_user)
 
 
 @teacher_router.get("/{teacher_id}/students", response_model=TeacherStudentListResponse)

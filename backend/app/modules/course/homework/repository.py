@@ -37,27 +37,13 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Talaba yuklashi mumkin bo'lgan kengaytmalar. O'qituvchi formasidagi
-# `FILE_TYPE_OPTIONS` bilan bir xil to'plam (arxiv uchun `rar` ham bor).
-_ALLOWED_EXTS = {
-    "pdf",
-    "doc",
-    "docx",
-    "xls",
-    "xlsx",
-    "ppt",
-    "pptx",
-    "txt",
-    "jpg",
-    "jpeg",
-    "png",
-    "webp",
-    "zip",
-    "rar",
-}
-_IMAGE_EXTS = {"jpg", "jpeg", "png", "webp"}
-_IMAGE_MAX = 5 * 1024 * 1024
-_DOC_MAX = 20 * 1024 * 1024
+# Talaba javobi faqat fayl — PDF yoki rasm. O'qituvchi buni sozlamaydi:
+# matnli javob va boshqa turlar (Word, arxiv...) qabul qilinmaydi.
+SUBMISSION_FILE_TYPES = ["pdf", "jpg,jpeg,png"]
+_ALLOWED_EXTS = {"pdf", "jpg", "jpeg", "png"}
+# Bitta vazifaga — bitta fayl, turidan qat'i nazar 2 MB gacha.
+_SUBMISSION_MAX = 2 * 1024 * 1024
+_SUBMISSION_MAX_FILES = 1
 
 
 # `upload_submission_file` beradigan nom: uuid4 va kengaytma.
@@ -329,9 +315,9 @@ class HomeworkRepository:
             description=data.description,
             deadline=_to_naive_utc(data.deadline),
             max_grade=data.max_grade,
-            allow_file=data.allow_file,
-            allow_text=data.allow_text,
-            allowed_file_types=data.allowed_file_types,
+            allow_file=True,
+            allow_text=False,
+            allowed_file_types=SUBMISSION_FILE_TYPES,
             attachments=[f.model_dump() for f in data.attachments],
         )
         session.add(a)
@@ -361,9 +347,6 @@ class HomeworkRepository:
             "description",
             "deadline",
             "max_grade",
-            "allow_file",
-            "allow_text",
-            "allowed_file_types",
         ):
             val = getattr(data, field)
             if val is not None:
@@ -389,6 +372,14 @@ class HomeworkRepository:
         if not a:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
+        has_submission = (await session.execute(
+            select(HomeworkSubmission.id).where(HomeworkSubmission.homework_id == homework_id).limit(1)
+        )).scalar_one_or_none()
+        if has_submission is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Talabalar javob yuklagan vazifani o'chirib bo'lmaydi",
+            )
         await sync_usages(session, entity_type="homework", entity_id=a.id, urls=[])
         await session.delete(a)
         await session.commit()
@@ -536,6 +527,18 @@ class HomeworkRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
         await self._ensure_course_access(session, a.course_id, current_user)
 
+        existing = (await session.execute(
+            select(HomeworkSubmission.id).where(
+                HomeworkSubmission.homework_id == homework_id,
+                HomeworkSubmission.user_id == current_user.id,
+            )
+        )).scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi",
+            )
+
         if not a.allow_file:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -557,7 +560,7 @@ class HomeworkRepository:
                 detail=f"Ruxsat etilmagan fayl turi: .{ext}",
             )
 
-        max_size = _IMAGE_MAX if ext in _IMAGE_EXTS else _DOC_MAX
+        max_size = _SUBMISSION_MAX
         upload_dir = settings.homework_submission_upload_dir
         os.makedirs(upload_dir, exist_ok=True)
         stored_name = f"{uuid.uuid4()}.{ext}"
@@ -570,7 +573,7 @@ class HomeworkRepository:
                     if size > max_size:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"File must not exceed {max_size // (1024 * 1024)}MB",
+                            detail=f"Fayl hajmi {max_size // (1024 * 1024)} MB dan oshmasligi kerak",
                         )
                     buffer.write(chunk)
         except Exception:
@@ -593,6 +596,17 @@ class HomeworkRepository:
 
         await self._ensure_course_access(session, a.course_id, current_user)
 
+        existing_stmt = select(HomeworkSubmission).where(
+            HomeworkSubmission.homework_id == homework_id,
+            HomeworkSubmission.user_id == current_user.id,
+        )
+        sub = (await session.execute(existing_stmt)).scalar_one_or_none()
+        if sub is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi",
+            )
+
         text = (data.submitted_text or "").strip() or None
         if text and not a.allow_text:
             raise HTTPException(
@@ -609,6 +623,11 @@ class HomeworkRepository:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Javob bo'sh: matn yozing yoki fayl biriktiring",
             )
+        if len(data.submitted_files) > _SUBMISSION_MAX_FILES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bitta vazifaga faqat bitta fayl biriktirish mumkin",
+            )
         allowed = _expand_allowed_types(a.allowed_file_types)
         if allowed:
             for f in data.submitted_files:
@@ -619,18 +638,10 @@ class HomeworkRepository:
                         detail=f"Ruxsat etilmagan fayl turi: .{ext}",
                     )
 
-        existing_stmt = select(HomeworkSubmission).where(
-            HomeworkSubmission.homework_id == homework_id,
-            HomeworkSubmission.user_id == current_user.id,
-        )
-        sub = (await session.execute(existing_stmt)).scalar_one_or_none()
-
         # Talaba faylni faqat o'z qurilmasidan yuklaydi — «Fayllar
-        # kutubxonasi»dagi yoki begona havola javobga kirmaydi. Avvalgi
-        # javobda turgan fayl qayta yuborilganda tekshirilmaydi.
-        kept = {item.get("url") for item in (sub.submitted_files if sub else None) or []}
+        # kutubxonasi»dagi yoki begona havola javobga kirmaydi.
         for f in data.submitted_files:
-            if f.url not in kept and not _is_device_upload(f.url):
+            if not _is_device_upload(f.url):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Faylni o'z qurilmangizdan yuklang",
@@ -641,26 +652,15 @@ class HomeworkRepository:
         is_late = now > deadline
         new_status = "late" if is_late else "submitted"
 
-        if sub is None:
-            sub = HomeworkSubmission(
-                homework_id=homework_id,
-                user_id=current_user.id,
-                submitted_text=text,
-                submitted_files=[f.model_dump() for f in data.submitted_files],
-                submitted_at=now,
-                status=new_status,
-            )
-            session.add(sub)
-        else:
-            if sub.status == "graded":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Submission already graded, cannot resubmit",
-                )
-            sub.submitted_text = text
-            sub.submitted_files = [f.model_dump() for f in data.submitted_files]
-            sub.submitted_at = now
-            sub.status = new_status
+        sub = HomeworkSubmission(
+            homework_id=homework_id,
+            user_id=current_user.id,
+            submitted_text=text,
+            submitted_files=[f.model_dump() for f in data.submitted_files],
+            submitted_at=now,
+            status=new_status,
+        )
+        session.add(sub)
 
         await session.commit()
         await session.refresh(sub)

@@ -27,6 +27,7 @@ import {
     useDeleteFolder,
     useFile,
     useFileFolders,
+    useFileQuota,
     useFiles,
     useRenameFolder,
     useUpdateFile,
@@ -51,12 +52,16 @@ import {
 import { getFileTypeMeta } from '@/components/file/fileIcons';
 import { FileCard } from '@/components/file/FileCard';
 import { MoveFileModal } from '@/components/file/MoveFileModal';
+import { QuotaBar } from '@/components/file/QuotaBar';
 import { cn } from '@/lib/utils';
 import { formatSize } from '@/utils/fileSize';
 
 const DEFAULT_PAGE_SIZE = 24;
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+/** Server rasm deb qabul qiladigan kengaytmalar — ularning hajm chegarasi alohida. */
+const UPLOAD_IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
 
 /** Ishlatilish turini oʻqiladigan soʻzga aylantiradi. */
 const USAGE_LABEL: Record<string, string> = {
@@ -72,6 +77,9 @@ type FileKindFilter = 'all' | 'document' | 'image';
 export const FilesPage = () => {
     const [folderFilter, setFolderFilter] = useState<FolderFilter>({ kind: 'all' });
     const [kindFilter, setKindFilter] = useState<FileKindFilter>('all');
+    // Ishlatilmayotgan fayllar — limitga yetgan o'qituvchi o'chirsa
+    // bo'ladiganlarini shu bilan topadi.
+    const [unusedOnly, setUnusedOnly] = useState(false);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -110,15 +118,17 @@ export const FilesPage = () => {
             size: pageSize,
             search: search.trim() || undefined,
             kind: kindFilter === 'all' ? undefined : kindFilter,
+            unused_only: unusedOnly || undefined,
             folder_id: folderFilter.kind === 'folder' ? folderFilter.id : undefined,
             root_only: folderFilter.kind === 'root' || undefined,
         }),
-        [page, pageSize, search, kindFilter, folderFilter],
+        [page, pageSize, search, kindFilter, unusedOnly, folderFilter],
     );
 
     const { data, isLoading, isError, refetch } = useFiles(listParams);
     const { data: folders = [] } = useFileFolders();
     const { data: detail } = useFile(detailId);
+    const { data: quota } = useFileQuota();
 
     const upload = useUploadFile();
     const update = useUpdateFile();
@@ -181,7 +191,26 @@ export const FilesPage = () => {
 
         let uploaded = 0;
         let reused = 0;
+        // Qolgan joy har yuklashdan keyin shu yerda kamaytiriladi: kesh
+        // sikl tugaguncha yangilanmaydi. Bu faqat oldindan ogohlantirish —
+        // haqiqiy tekshiruv serverda.
+        let remaining = quota?.remaining_bytes ?? null;
         for (const file of Array.from(files)) {
+            if (quota) {
+                const maxFile = UPLOAD_IMAGE_EXT.test(file.name) ? quota.max_image_bytes : quota.max_document_bytes;
+                if (file.size > maxFile) {
+                    toast.error(`${file.name}: fayl hajmi ${formatSize(maxFile)} dan oshmasligi kerak`);
+                    continue;
+                }
+            }
+            if (remaining !== null && file.size > remaining) {
+                toast.error(
+                    remaining === 0
+                        ? 'Fayl yuklash limitingiz tugagan. Qolgan hajm: 0 MB.'
+                        : `${file.name}: fayl hajmi (${formatSize(file.size)}) qolgan hajmdan (${formatSize(remaining)}) katta.`,
+                );
+                continue;
+            }
             try {
                 // Dublikatni server aytadi: roʻyxat uzunligiga qarab taxmin
                 // qilib boʻlmaydi — u filtrlangan, sahifalangan va bu sikl
@@ -189,6 +218,7 @@ export const FilesPage = () => {
                 // almashadi, ishlab turgan closure esa eski qiymatni koʻradi).
                 const result = await upload.mutateAsync({ file, folderId });
                 if (result.deduplicated) reused += 1;
+                else if (remaining !== null) remaining -= result.size_bytes;
                 uploaded += 1;
             } catch (error) {
                 const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -447,6 +477,8 @@ export const FilesPage = () => {
             <div className="grid gap-6 lg:grid-cols-[260px_1fr] items-start">
                 {/* ─── Chap Panel: Katalog & Papkalar ───────────────────────────── */}
                 <aside className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 shadow-xs">
+                    <QuotaBar quota={quota} />
+
                     {/* Asosiy navigatsiya */}
                     <div className="space-y-1">
                         <p className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -745,6 +777,25 @@ export const FilesPage = () => {
                                     </button>
                                 ))}
                             </div>
+
+                            {/* Ishlatilmayotgan fayllar — o'chirib joy bo'shatish uchun */}
+                            <button
+                                type="button"
+                                aria-pressed={unusedOnly}
+                                onClick={() => {
+                                    setUnusedOnly((value) => !value);
+                                    setPage(1);
+                                }}
+                                title="Hech qayerda ishlatilmayotgan fayllar — ularni o'chirib joy bo'shatish mumkin"
+                                className={cn(
+                                    'rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                    unusedOnly
+                                        ? 'border-primary/40 bg-primary/10 text-primary'
+                                        : 'border-border/80 bg-muted/30 text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                Ishlatilmaganlar
+                            </button>
                         </div>
 
                         {/* Koʻrinish almashtirgich (Grid / List) */}

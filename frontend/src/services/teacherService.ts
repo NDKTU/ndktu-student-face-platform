@@ -138,6 +138,90 @@ export interface TeacherListParams {
     order?: 'asc' | 'desc';
 }
 
+// ── O'qituvchi dashboardi (`GET /teacher/me/dashboard`) ────────────────────
+
+export interface TeacherDashboardTotals {
+    courses: number;
+    groups: number;
+    students: number;
+    subjects: number;
+    lessons: number;
+    upcoming_lessons: number;
+    active_homeworks: number;
+    submissions_to_grade: number;
+    quizzes: number;
+    active_quizzes: number;
+    questions: number;
+    results: number;
+}
+
+export interface TeacherDashboardAttendance {
+    present: number;
+    late: number;
+    absent: number;
+    excused: number;
+    /** `null` — jurnal hali to'ldirilmagan (0% bilan bir xil emas). */
+    percent: number | null;
+}
+
+export interface TeacherDashboardAttendanceWeek {
+    week_start: string;
+    present: number;
+    late: number;
+    absent: number;
+    percent: number | null;
+}
+
+export interface TeacherDashboardGrades {
+    avg_grade: number | null;
+    grade_5: number;
+    grade_4: number;
+    grade_3: number;
+    grade_2: number;
+    cheating: number;
+}
+
+export interface TeacherDashboardGroup {
+    id: number;
+    name: string;
+    course: number | null;
+    student_count: number;
+    attendance_percent: number | null;
+    avg_grade: number | null;
+    results: number;
+}
+
+export interface TeacherDashboardLesson {
+    id: number;
+    topic: string;
+    date: string;
+    lesson_type: string | null;
+    course_id: number;
+    course_name: string;
+    group_id: number | null;
+    group_name: string | null;
+}
+
+export interface TeacherDashboardHomework {
+    id: number;
+    title: string;
+    deadline: string;
+    course_id: number;
+    course_name: string;
+    submitted: number;
+    to_grade: number;
+}
+
+export interface TeacherDashboard {
+    totals: TeacherDashboardTotals;
+    attendance: TeacherDashboardAttendance;
+    attendance_trend: TeacherDashboardAttendanceWeek[];
+    grades: TeacherDashboardGrades;
+    groups: TeacherDashboardGroup[];
+    upcoming_lessons: TeacherDashboardLesson[];
+    homeworks: TeacherDashboardHomework[];
+}
+
 export const teacherService = {
     getTeachers: async (
         page = 1,
@@ -158,6 +242,12 @@ export const teacherService = {
                 order: params?.sort_by ? (params.order ?? 'asc') : undefined,
             },
         });
+        return response.data;
+    },
+
+    /** Joriy o'qituvchining bosh sahifa statistikasi — faqat o'z doirasi. */
+    getMyDashboard: async (): Promise<TeacherDashboard> => {
+        const response = await api.get<TeacherDashboard>('/teacher/me/dashboard');
         return response.data;
     },
 

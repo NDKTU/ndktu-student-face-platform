@@ -21,6 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.file import quota
 from app.modules.file.model import FileBlob, FileUsage, StoredFile
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,47 @@ async def _get_or_create_blob(
     return blob
 
 
+async def _check_quota(
+    session: AsyncSession, owner_user_id: int, *, sha256: str, size: int
+) -> StoredFile | None:
+    """Yuklash limitini tekshiradi. Faylning oʻzi shu foydalanuvchida bor
+    boʻlsa, oʻsha yozuvni qaytaradi — u limitdan qayta ayirilmaydi.
+
+    Tartib muhim. Avval qulf: parallel yuklashlar navbat bilan hisoblanadi.
+    Keyin dublikat: oʻzida bor faylni qayta yuklash joy egallamaydi va limit
+    toʻla boʻlsa ham rad etilmasligi kerak. Oxirida limit — blob hali
+    yaratilmagan, shuning uchun rad etilgan fayl diskda iz qoldirmaydi.
+
+    Hajm oqim tugagach, aniq bayt soni bilan tekshiriladi. Fayl bittasi
+    20 MB dan oshmaydi, shuning uchun uni oxirigacha qabul qilish arzon, aniq
+    hajm esa dublikatni toʻgʻri ajratishga imkon beradi.
+    """
+    limit, _ = await quota.effective_limit(session, owner_user_id)
+    if limit is not None:
+        await quota.lock(session, owner_user_id)
+
+    duplicate = await session.scalar(
+        select(StoredFile)
+        .join(FileBlob, FileBlob.id == StoredFile.blob_id)
+        .where(
+            StoredFile.owner_user_id == owner_user_id,
+            FileBlob.sha256 == sha256,
+            StoredFile.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if duplicate is not None or limit is None:
+        return duplicate
+
+    used, _ = await quota.usage(session, owner_user_id)
+    if used + size > limit:
+        logger.info(
+            "Yuklash limiti: user=%s used=%s size=%s limit=%s", owner_user_id, used, size, limit
+        )
+        raise quota.exceeded_error(limit, used, size)
+    return None
+
+
 async def store_upload(
     session: AsyncSession,
     file: UploadFile,
@@ -171,9 +213,22 @@ async def store_upload(
     biladi, shuning uchun chaqiruvchiga aynan shu yerdan aytiladi — mijoz uni
     roʻyxat uzunligiga qarab taxmin qila olmaydi (roʻyxat filtrlangan va
     sahifalangan).
+
+    Egasi koʻrsatilgan boʻlsa, yuklash limiti shu yerda tekshiriladi
+    (``_check_quota``) — toʻrtala yuklash yoʻli ham shu funksiyadan oʻtadi.
     """
     ext = _extension(file.filename)
     tmp_path, sha256, size = await _stream_to_temp(file, ext)
+
+    if owner_user_id is not None:
+        try:
+            duplicate = await _check_quota(session, owner_user_id, sha256=sha256, size=size)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        if duplicate is not None:
+            tmp_path.unlink(missing_ok=True)
+            return duplicate, False
 
     blob = await _get_or_create_blob(
         session,
@@ -184,19 +239,6 @@ async def store_upload(
         mime_type=file.content_type,
         subdir=subdir,
     )
-
-    # Ayni foydalanuvchi shu faylni allaqachon yuklagan boʻlsa, kutubxonasini
-    # bir xil yozuvlar bilan toʻldirmaymiz.
-    if owner_user_id is not None:
-        duplicate = await session.scalar(
-            select(StoredFile).where(
-                StoredFile.owner_user_id == owner_user_id,
-                StoredFile.blob_id == blob.id,
-                StoredFile.is_active.is_(True),
-            )
-        )
-        if duplicate:
-            return duplicate, False
 
     stored = StoredFile(
         blob_id=blob.id,

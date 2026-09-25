@@ -7,6 +7,7 @@ import {
 
 const FILES_KEY = 'files';
 const FOLDERS_KEY = 'file-folders';
+const QUOTA_KEY = 'file-quota';
 
 export const useFiles = (params: FileListParams, enabled = true) => useQuery({
     queryKey: [FILES_KEY, params],
@@ -36,16 +37,27 @@ export const useCourseFiles = (
     enabled,
 });
 
+/** Joriy foydalanuvchining yuklash limiti. */
+export const useFileQuota = (enabled = true) => useQuery({
+    queryKey: [QUOTA_KEY],
+    queryFn: () => fileService.quota(),
+    enabled,
+});
+
 export const useFileFolders = (enabled = true) => useQuery({
     queryKey: [FOLDERS_KEY],
     queryFn: () => fileService.listFolders(),
     enabled,
 });
 
-/** Yuklashdan keyin papka roʻyxati ham yangilanadi: fayl soni oʻzgaradi. */
+/**
+ * Yuklashdan keyin papka roʻyxati ham yangilanadi: fayl soni oʻzgaradi.
+ * Limit ham: yuklash va oʻchirish ishlatilgan hajmni oʻzgartiradi.
+ */
 const invalidateAll = (queryClient: ReturnType<typeof useQueryClient>) => {
     queryClient.invalidateQueries({ queryKey: [FILES_KEY] });
     queryClient.invalidateQueries({ queryKey: [FOLDERS_KEY] });
+    queryClient.invalidateQueries({ queryKey: [QUOTA_KEY] });
 };
 
 export const useUploadFile = () => {
@@ -54,6 +66,9 @@ export const useUploadFile = () => {
         mutationFn: ({ file, folderId }: { file: File; folderId?: number }) =>
             fileService.upload(file, folderId),
         onSuccess: () => invalidateAll(queryClient),
+        // Rad etilgan yuklash (413) ham limitni yangilashi kerak: boshqa
+        // oynada yuklangan fayllar tufayli ekrandagi raqam eskirgan bo'lishi mumkin.
+        onError: () => queryClient.invalidateQueries({ queryKey: [QUOTA_KEY] }),
     });
 };
 

@@ -131,3 +131,99 @@ class StudentWithUserListResponse(BaseModel):
     page: int
     limit: int
     students: list[StudentWithUserResponse]
+
+
+# ── Talaba dashboardi ─────────────────────────────────────────────────────────
+
+
+class StudentDashboardProfile(BaseModel):
+    group_id: Optional[int] = None
+    group_name: Optional[str] = None
+    level: Optional[str] = None
+    semester: Optional[str] = None
+    specialty: Optional[str] = None
+    faculty: Optional[str] = None
+    avg_gpa: Optional[float] = None
+
+
+class StudentDashboardTotals(BaseModel):
+    courses: int = 0
+    #: Bugundan boshlab rejalashtirilgan darslar.
+    upcoming_lessons: int = 0
+    #: Muddati oʻtmagan va hali topshirilmagan vazifalar.
+    homeworks_pending: int = 0
+    #: Topshirilgan, baholanishi kutilayotganlar.
+    homeworks_submitted: int = 0
+    homeworks_graded: int = 0
+    #: Muddati oʻtib ketgan va topshirilmagan vazifalar.
+    homeworks_missed: int = 0
+    #: Yakunlangan testlar.
+    quizzes_taken: int = 0
+
+
+class StudentDashboardAttendanceCourse(BaseModel):
+    course_id: int
+    course_name: str
+    percent: Optional[float] = None
+    absent: int = 0
+
+
+class StudentDashboardAttendance(BaseModel):
+    present: int = 0
+    late: int = 0
+    absent: int = 0
+    excused: int = 0
+    #: `None` — jurnal hali toʻldirilmagan (0% bilan bir xil emas).
+    percent: Optional[float] = None
+    courses: list[StudentDashboardAttendanceCourse] = []
+
+
+class StudentDashboardGrades(BaseModel):
+    """Test baholari taqsimoti (2–5) va oʻrtachasi, uy vazifalari oʻrtacha foizi."""
+
+    avg_grade: Optional[float] = None
+    grade_5: int = 0
+    grade_4: int = 0
+    grade_3: int = 0
+    grade_2: int = 0
+    #: Uy vazifasi baholari `max_grade` ga nisbatan foizda: vazifalarning
+    #: shkalasi har xil boʻlishi mumkin.
+    homework_percent: Optional[float] = None
+
+
+class StudentDashboardLesson(BaseModel):
+    id: int
+    topic: str
+    date: str
+    lesson_type: Optional[str] = None
+    course_id: int
+    course_name: str
+
+
+class StudentDashboardHomework(BaseModel):
+    id: int
+    title: str
+    deadline: TashkentDatetime
+    course_id: int
+    course_name: str
+    lesson_id: Optional[int] = None
+
+
+class StudentDashboardResult(BaseModel):
+    id: int
+    quiz_title: Optional[str] = None
+    subject_name: Optional[str] = None
+    grade: Optional[int] = None
+    correct_answers: Optional[int] = None
+    wrong_answers: Optional[int] = None
+    finished_at: Optional[TashkentDatetime] = None
+
+
+class StudentDashboardResponse(BaseModel):
+    profile: StudentDashboardProfile
+    totals: StudentDashboardTotals
+    attendance: StudentDashboardAttendance
+    grades: StudentDashboardGrades
+    upcoming_lessons: list[StudentDashboardLesson] = []
+    homeworks: list[StudentDashboardHomework] = []
+    recent_results: list[StudentDashboardResult] = []

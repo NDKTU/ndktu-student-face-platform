@@ -49,7 +49,100 @@ export interface StudentListParams {
     order?: 'asc' | 'desc';
 }
 
+// ── Talaba dashboardi (`GET /students/me/dashboard`) ───────────────────────
+
+export interface StudentDashboardProfile {
+    group_id: number | null;
+    group_name: string | null;
+    level: string | null;
+    semester: string | null;
+    specialty: string | null;
+    faculty: string | null;
+    avg_gpa: number | null;
+}
+
+export interface StudentDashboardTotals {
+    courses: number;
+    upcoming_lessons: number;
+    homeworks_pending: number;
+    homeworks_submitted: number;
+    homeworks_graded: number;
+    homeworks_missed: number;
+    quizzes_taken: number;
+}
+
+export interface StudentDashboardAttendanceCourse {
+    course_id: number;
+    course_name: string;
+    percent: number | null;
+    absent: number;
+}
+
+export interface StudentDashboardAttendance {
+    present: number;
+    late: number;
+    absent: number;
+    excused: number;
+    /** `null` — jurnal hali to'ldirilmagan (0% bilan bir xil emas). */
+    percent: number | null;
+    courses: StudentDashboardAttendanceCourse[];
+}
+
+export interface StudentDashboardGrades {
+    avg_grade: number | null;
+    grade_5: number;
+    grade_4: number;
+    grade_3: number;
+    grade_2: number;
+    /** Uy vazifasi baholari `max_grade` ga nisbatan foizda. */
+    homework_percent: number | null;
+}
+
+export interface StudentDashboardLesson {
+    id: number;
+    topic: string;
+    date: string;
+    lesson_type: string | null;
+    course_id: number;
+    course_name: string;
+}
+
+export interface StudentDashboardHomework {
+    id: number;
+    title: string;
+    deadline: string;
+    course_id: number;
+    course_name: string;
+    lesson_id: number | null;
+}
+
+export interface StudentDashboardResult {
+    id: number;
+    quiz_title: string | null;
+    subject_name: string | null;
+    grade: number | null;
+    correct_answers: number | null;
+    wrong_answers: number | null;
+    finished_at: string | null;
+}
+
+export interface StudentDashboard {
+    profile: StudentDashboardProfile;
+    totals: StudentDashboardTotals;
+    attendance: StudentDashboardAttendance;
+    grades: StudentDashboardGrades;
+    upcoming_lessons: StudentDashboardLesson[];
+    homeworks: StudentDashboardHomework[];
+    recent_results: StudentDashboardResult[];
+}
+
 export const studentService = {
+    /** Joriy talabaning bosh sahifa statistikasi — faqat o'zi. */
+    getMyDashboard: async (): Promise<StudentDashboard> => {
+        const response = await api.get<StudentDashboard>('/students/me/dashboard');
+        return response.data;
+    },
+
     getStudents: async (
         page = 1,
         limit = 10,

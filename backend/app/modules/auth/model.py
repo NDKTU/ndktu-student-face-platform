@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     Float,
@@ -49,6 +50,10 @@ class User(Base, IdIntPk, TimestampMixin):
     # yuklaydigan surat — yuz nazoratida etalon sifatida birinchi bo'lib
     # shu ishlatiladi.
     avatar_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Fayl yuklash limiti (bayt). Bo'sh — umumiy limit ishlaydi
+    # (`modules/file/quota.py`). Qiymatni faqat admin o'zgartiradi.
+    storage_quota_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     roles: Mapped[list["Role"]] = relationship(
         "Role", secondary="user_roles", back_populates="users", overlaps="user_roles"

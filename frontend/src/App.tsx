@@ -17,6 +17,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 const Login = lazy(() => import('@/pages/Login'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const StudentDashboardPage = lazy(() => import('@/pages/StudentDashboardPage'));
+const TeacherDashboardPage = lazy(() => import('@/pages/TeacherDashboardPage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
 const UsersPage = lazy(() => import('@/pages/UsersPage'));
 const QuizzesPage = lazy(() => import('@/pages/QuizzesPage'));
@@ -31,6 +32,7 @@ const KafedraPage = lazy(() => import('@/pages/KafedraPage'));
 const SpecialitiesPage = lazy(() => import('@/pages/SpecialitiesPage'));
 const CurriculumsPage = lazy(() => import('@/pages/CurriculumsPage'));
 const FilesPage = lazy(() => import('@/pages/FilesPage'));
+const FileQuotasPage = lazy(() => import('@/pages/FileQuotasPage'));
 const AnnouncementsPage = lazy(() => import('@/pages/AnnouncementsPage'));
 const StudentAnnouncementsPage = lazy(() => import('@/pages/StudentAnnouncementsPage'));
 const TeacherAssignmentsPage = lazy(() => import('@/pages/TeacherAssignmentsPage'));
@@ -231,7 +233,7 @@ const DashboardRedirect = () => {
     }
 
     if (isTeacher) {
-        return <Navigate to="/questions" replace />;
+        return <TeacherDashboardPage />;
     }
 
     return <Dashboard />;
@@ -295,6 +297,7 @@ function App() {
                                         <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />
                                         <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
                                         <Route path="/admin/eduplan-sync" element={<PermissionRoute permission="sync:eduplan"><EduPlanSyncPage /></PermissionRoute>} />
+                                        <Route path="/admin/file-quotas" element={<PermissionRoute permission="read:file_quota"><FileQuotasPage /></PermissionRoute>} />
 
                                         <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                                         <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />

@@ -14,10 +14,8 @@ import {
     PlayCircle,
     // Trophy — «Reyting» uchun edi, bo'lim yashirilgan.
     BarChart2,
-    User,
     Library,
     Database,
-    Home,
     Megaphone,
     RefreshCw,
     Award,
@@ -30,6 +28,7 @@ import {
     Timer,
     ChartColumnBig,
     ListChecks,
+    HardDrive,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -84,6 +83,9 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     // статуса интеграции) и ведёт на экран синхронизации оргструктуры.
     // Живёт в «Tizim» — как системная настройка, а не ежедневный раздел.
     eduplan:       { label: 'EPMOS sinxronizatsiyasi', href: '/admin/eduplan-sync', icon: Database, section: 'Tizim', tone: 'blue' },
+    // O'qituvchilarning fayl yuklash limitlari. `read:file_quota` faqat
+    // adminda — o'qituvchi o'z limitini «Fayl kutubxonasi» sahifasida ko'radi.
+    file_quota:    { label: 'Fayl yuklash limitlari', href: '/admin/file-quotas', icon: HardDrive, section: 'Tizim', tone: 'orange' },
 
     faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: "Ma'lumotnoma", tone: 'purple' },
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: "Ma'lumotnoma", tone: 'blue' },
@@ -160,11 +162,11 @@ const ALWAYS_VISIBLE: SidebarSection = {
     ],
 };
 
+// Profil sidebarda yo'q: u navbar'dagi profil menyusidan ochiladi.
 const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
     label: 'Umumiy',
     items: [
-        { name: 'Bosh sahifa', href: '/', icon: Home, tone: 'teal' },
-        { name: 'Profil', href: '/profile', icon: User, tone: 'blue' },
+        { name: 'Dashboard', href: '/', icon: BarChart2, tone: 'teal' },
     ],
 };
 
@@ -206,6 +208,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'role',
     'permission',
     'eduplan',
+    'file_quota',
 ];
 
 /**
@@ -262,7 +265,7 @@ export const SIDEBAR_GROUPS: SidebarGroupSpec[] = [
         name: 'Sozlamalar',
         icon: SlidersHorizontal,
         section: 'Tizim',
-        resources: ['role', 'permission', 'eduplan'],
+        resources: ['role', 'permission', 'eduplan', 'file_quota'],
         href: '/roles',
         tone: 'yellow',
     },
@@ -502,7 +505,14 @@ export const buildSidebar = (
     // qoladi — qaytarish uchun shu yerdagi qator va `App.tsx` dagi marshrutni
     // tiklash kifoya.
 
-    const sections: SidebarSection[] = isAdmin ? [ALWAYS_VISIBLE] : [];
+    // «Dashboard» — `/`. O'qituvchi u yerda o'z dashboardini ko'radi
+    // (`TeacherDashboardPage`). Psixolog roli aralashgan bo'lsa `/`
+    // psixologiyaga yo'naltiradi (`DashboardRedirect`), shuning uchun u
+    // holda punkt ko'rsatilmaydi — aks holda «Dashboard» boshqa sahifani ochardi.
+    const isTeacher = roleNames.some((r) => r.toLowerCase() === 'teacher');
+    const isPsixologik = roleNames.some((r) => r.toLowerCase() === 'psixologik');
+    const showDashboard = isAdmin || (isTeacher && !isPsixologik);
+    const sections: SidebarSection[] = showDashboard ? [ALWAYS_VISIBLE] : [];
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
         if (sectionLabel === 'Umumiy') continue;
         const items = grouped[sectionLabel];

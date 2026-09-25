@@ -122,6 +122,29 @@ class StoredFile(Base, IdIntPk, TimestampMixin):
         return f"StoredFile {self.id} ({self.title})"
 
 
+class FileQuotaChange(Base, IdIntPk, TimestampMixin):
+    """Limit oʻzgarishlari tarixi: kim, qachon, qanday qiymatdan qanchaga.
+
+    Oʻqituvchi «limitim nega kamaydi?» deb soʻraganda javob shu yerda.
+    ``user_id`` boʻsh — umumiy limit oʻzgargan. ``new_bytes`` boʻsh —
+    individual limit olib tashlangan va oʻqituvchi umumiy limitga qaytgan.
+    """
+
+    __tablename__ = "file_quota_changes"
+
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    old_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    new_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    changed_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    def __str__(self):
+        return f"FileQuotaChange {self.id} (user={self.user_id})"
+
+
 class FileUsage(Base, IdIntPk, TimestampMixin):
     """Fayl qayerda ishlatilayotgani. Xavfsiz oʻchirishning asosi."""
 

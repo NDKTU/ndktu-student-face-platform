@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply link-answers link-answers-apply restore-dates restore-dates-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply cleanup-files cleanup-files-apply cleanup-files-cron link-answers link-answers-apply restore-dates restore-dates-apply
 
 .DEFAULT_GOAL := help
 
@@ -32,6 +32,9 @@ help:
 	@echo "make fix-image-urls-apply - Rewrite them (dumps affected tables first)"
 	@echo "make import-files         - Show files to move into the file library (dry run)"
 	@echo "make import-files-apply   - Move them (dumps library tables first)"
+	@echo "make cleanup-files        - Show deleted files whose bytes can be removed (dry run)"
+	@echo "make cleanup-files-apply  - Remove them from disk (dumps library tables first)"
+	@echo "make cleanup-files-cron   - Print the crontab line for a nightly cleanup"
 	@echo "make link-answers         - Show answers to link to their attempts (dry run)"
 	@echo "make link-answers-apply   - Link them (dumps user_answers first)"
 	@echo "make restore-dates        - Show result dates recoverable from answers (dry run)"
@@ -150,6 +153,17 @@ import-files:
 
 import-files-apply:
 	@./scripts/import_files.sh --apply
+
+# Oʻchirilgan fayllarning baytlarini diskdan tozalash
+cleanup-files:
+	@./scripts/cleanup_files.sh $(ARGS)
+
+cleanup-files-apply:
+	@./scripts/cleanup_files.sh --apply $(ARGS)
+
+cleanup-files-cron:
+	@echo "# File library cleanup — nightly at 03:30"
+	@echo "30 3 * * * $(CURDIR)/scripts/cleanup_files.sh --apply >> /dev/null 2>&1"
 
 # Javoblarni urinishlarga bogʻlash (bir martalik)
 link-answers:

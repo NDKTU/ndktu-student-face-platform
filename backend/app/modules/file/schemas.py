@@ -57,6 +57,10 @@ class FileListRequest(BaseModel):
     shared_only: bool = False
     search: Optional[str] = None
     kind: Optional[Literal["image", "document"]] = None
+    # Hech qayerda ishlatilmayotgan fayllar. Limitga yetgan oʻqituvchi
+    # oʻchirsa boʻladigan fayllarni shu bilan topadi: ishlatilayotganini
+    # oʻchirib boʻlmaydi (409).
+    unused_only: bool = False
     page: int = Field(default=1, ge=1)
     size: int = Field(default=40, ge=1, le=200)
 
@@ -121,3 +125,69 @@ class FolderListResponse(BaseModel):
 class FileAttachRequest(BaseModel):
     entity_type: USAGE_ENTITY
     entity_id: int
+
+
+# ─── Yuklash limiti ───────────────────────────────────────────────────
+
+
+class QuotaResponse(BaseModel):
+    """Joriy foydalanuvchining limiti. ``limit_bytes=None`` — cheklanmagan."""
+
+    limit_bytes: Optional[int] = None
+    used_bytes: int
+    remaining_bytes: Optional[int] = None
+    file_count: int
+    is_custom: bool
+    is_unlimited: bool
+    #: Bitta fayl uchun chegaralar — frontend tanlangan faylni oldindan
+    #: tekshirishi uchun. Asosiy tekshiruv baribir serverda.
+    max_document_bytes: int
+    max_image_bytes: int
+
+
+class QuotaDefaultResponse(BaseModel):
+    limit_bytes: int
+    min_limit_bytes: int
+    max_limit_bytes: int
+
+
+class QuotaLimitUpdateRequest(BaseModel):
+    limit_bytes: int = Field(gt=0)
+
+
+class TeacherQuotaUpdateRequest(BaseModel):
+    #: ``None`` — individual limit olib tashlanadi, umumiy limit ishlaydi.
+    limit_bytes: Optional[int] = Field(default=None, gt=0)
+
+
+class TeacherQuotaListRequest(BaseModel):
+    search: Optional[str] = None
+    kafedra_id: Optional[int] = None
+    sort: Literal["used_desc", "remaining_asc", "name"] = "used_desc"
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=20, ge=1, le=200)
+
+
+class TeacherQuotaItem(BaseModel):
+    user_id: int
+    full_name: str
+    kafedra_name: Optional[str] = None
+    #: Individual limit; boʻsh boʻlsa umumiy limit ishlaydi.
+    custom_limit_bytes: Optional[int] = None
+    #: Amaldagi limit. ``None`` — cheklanmagan (admin).
+    limit_bytes: Optional[int] = None
+    used_bytes: int
+    remaining_bytes: Optional[int] = None
+    #: Admin limitni ishlatilgan hajmdan past qilgan boʻlsa — qanchaga oshgan.
+    over_limit_bytes: int = 0
+    file_count: int
+    is_custom: bool
+    is_unlimited: bool
+
+
+class TeacherQuotaListResponse(BaseModel):
+    items: List[TeacherQuotaItem]
+    total: int
+    page: int
+    size: int
+    default_limit_bytes: int

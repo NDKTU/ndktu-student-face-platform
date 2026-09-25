@@ -11,6 +11,7 @@ const SPECIAL_PERMISSIONS: Record<string, { resource: string; label: string }> =
     'user_answers:read': { resource: 'result', label: "Test javoblarini ko'rish" },
     'user:me': { resource: 'me', label: "O'z profilini ko'rish va boshqarish" },
     'teacher:me': { resource: 'me', label: "O'z o'qituvchi profilini ko'rish va tahrirlash" },
+    'student:me': { resource: 'me', label: "O'z talaba dashboardini ko'rish" },
     'attendance:me': { resource: 'attendance', label: "O'z davomatini ko'rish" },
     'read:attendance': { resource: 'attendance', label: "Davomatni ko'rish" },
     'mark:attendance': { resource: 'attendance', label: 'Davomatni belgilash' },

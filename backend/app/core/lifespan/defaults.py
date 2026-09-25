@@ -80,6 +80,8 @@ STUDENT_PERMISSIONS = (
     "read:resource",
     "read:result",
     "read:submission",
+    # Bosh sahifa (`/students/me/dashboard`).
+    "student:me",
     # Test ishlash — talabaning asosiy amali. Uchtasi ham shart:
     # `read:active_quiz` faqat ro'yxatni ko'rsatadi, ishlash uchun
     # `/quiz_process/start_quiz`, `/submit_answer` va `/end_quiz` kerak
