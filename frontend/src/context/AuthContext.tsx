@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import api from '@/services/api';
+import { useQueryClient } from '@tanstack/react-query';
+import api, { setActiveRoleHeader } from '@/services/api';
 import { userService } from '@/services/userService';
 import { getToken, setToken, clearToken } from '@/services/tokenStorage';
 import { logger } from '@/utils/logger';
@@ -39,7 +40,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
+    /** Shu sessiyada qo'lda tanlangan rol; `null` — saqlangan yoki sukutdagi. */
+    const [chosenRoleId, setChosenRoleId] = useState<number | null>(null);
+    const queryClient = useQueryClient();
 
     const fetchUser = async () => {
         try {
@@ -118,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = getToken();
         clearToken();
         setUser(null);
+        setChosenRoleId(null);
         // Bug#14 fix: always clear loading state on explicit logout
         setIsLoading(false);
         if (options?.revoke === false || !token) return;
@@ -154,37 +158,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
     }, [user]);
 
-    // Saqlangan tanlov foydalanuvchida qolmagan bo'lishi mumkin (rollari
-    // o'zgargan) — bunday holda hech narsa toraytirilmaydi.
-    const activeRole = useMemo<UserRole | null>(
-        () => availableRoles.find((role) => role.id === activeRoleId) ?? null,
-        [availableRoles, activeRoleId],
-    );
-
-    useEffect(() => {
-        if (!user) {
-            setActiveRoleId(null);
-            return;
-        }
-        const stored = readStoredRole(user.id);
-        const roles = user.roles ?? [];
-        if (stored !== null && roles.some((role) => role.id === stored)) {
-            setActiveRoleId(stored);
-            return;
-        }
+    /**
+     * Faol ko'rinish render paytida hisoblanadi, effektda emas.
+     *
+     * Effekt ota komponentda bolalarnikidan keyin ishlaydi: foydalanuvchi
+     * yuklangan zahoti sahifa o'z so'rovlarini `X-Active-Role` siz yuborar,
+     * backend esa barcha rollar bo'yicha (admin sifatida) javob berib,
+     * natija keshda qolardi.
+     *
+     * Tartib: shu sessiyadagi tanlov → saqlangan tanlov → huquqi eng keng
+     * rol. Saqlangan tanlov foydalanuvchida qolmagan bo'lishi mumkin
+     * (rollari o'zgargan) — unda keyingisiga o'tiladi.
+     */
+    const activeRole = useMemo<UserRole | null>(() => {
+        if (!user) return null;
+        const byId = (id: number | null) =>
+            id === null ? undefined : availableRoles.find((role) => role.id === id);
+        const picked = byId(chosenRoleId) ?? byId(readStoredRole(user.id));
+        if (picked) return picked;
         // Ko'rinish har doim aniq bo'lsin: saqlangan tanlov bo'lmasa, huquqi
         // eng keng rol olinadi — shunda foydalanuvchi hech narsani yo'qotmaydi,
         // kerak bo'lsa o'zi torroq ko'rinishga o'tadi.
-        const widest = roles.reduce<UserRole | null>(
+        return availableRoles.reduce<UserRole | null>(
             (best, role) =>
                 best === null || (role.permissions?.length ?? 0) > (best.permissions?.length ?? 0) ? role : best,
             null,
         );
-        setActiveRoleId(widest?.id ?? null);
-    }, [user]);
+    }, [user, availableRoles, chosenRoleId]);
+
+    // Axios interseptori shu qiymatni o'qiydi; bolalar render bo'lishidan
+    // oldin o'rnatilishi kerak (yuqoridagi izohga qarang).
+    setActiveRoleHeader(activeRole?.id ?? null);
 
     const setActiveRole = (roleId: number | null) => {
-        setActiveRoleId(roleId);
+        setChosenRoleId(roleId);
         if (!user) return;
         try {
             if (roleId === null) localStorage.removeItem(activeRoleKey(user.id));
@@ -192,6 +199,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch {
             // xotira mavjud bo'lmasa ham tanlov joriy sessiyada ishlaydi
         }
+        // Keshdagi javoblar oldingi ko'rinish uchun olingan (admin — hamma
+        // kurslar/guruhlar). Sarlavha darhol yangilanadi, so'ng kesh qayta so'raladi.
+        if (roleId !== null) setActiveRoleHeader(roleId);
+        queryClient.resetQueries();
     };
 
     const permissions = useMemo<ReadonlySet<string>>(() => {

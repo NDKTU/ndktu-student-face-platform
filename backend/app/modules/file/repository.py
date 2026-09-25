@@ -342,7 +342,7 @@ class FileRepository:
         )
 
     async def list_course_files(
-        self, session: AsyncSession, course_id: int
+        self, session: AsyncSession, course_id: int, category: str = "library"
     ) -> CourseFileListResponse:
         """Kursning kutubxonasi: shu kursda ishlatilayotgan barcha fayllar.
 
@@ -364,6 +364,10 @@ class FileRepository:
 
         Topshirilgan ishlar (``submission``) ataylab kirmaydi: ular
         talabalarning shaxsiy ishlari va kurs materiali emas.
+
+        ``category="document"`` — «Fan hujjatlari»: faqat shu toifada kursga
+        qoʻshilgan fayllar. Dars materiallari u yerga tushmaydi, fan
+        hujjatlari esa kutubxonada koʻrinmaydi (darsda ham ishlatilmasa).
         """
         course_lessons = select(Lesson.id).where(Lesson.course_id == course_id)
 
@@ -373,7 +377,9 @@ class FileRepository:
         )
         # Kurs darajasidagi material: lesson_id boʻsh.
         course_level = resource_usage.where(
-            Resource.course_id == course_id, Resource.lesson_id.is_(None)
+            Resource.course_id == course_id,
+            Resource.lesson_id.is_(None),
+            Resource.category == category,
         ).order_by(Resource.id)
         in_lessons = (
             select(FileUsage.file_id)
@@ -408,7 +414,9 @@ class FileRepository:
                 course_titles.setdefault(file_id, resource_title.strip())
         lesson_file_ids = set((await session.scalars(in_lessons)).all())
 
-        used_in_course = set(course_resources) | lesson_file_ids
+        used_in_course = set(course_resources)
+        if category == "library":
+            used_in_course |= lesson_file_ids
         if not used_in_course:
             return CourseFileListResponse(items=[], total=0, page=1, size=0)
 

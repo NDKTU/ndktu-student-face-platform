@@ -182,6 +182,10 @@ class UserService:
                 selectinload(User.teacher).selectinload(Teacher.kafedra),
                 selectinload(User.student).selectinload(Student.group),
             )
+            # `PermissionRequired` shu so'rovda `user.roles` ni faol rolga
+            # toraytirgan bo'lishi mumkin (`apply_active_role`). `/user/me`
+            # esa ko'rinish tanlovi uchun barcha rollarni qaytarishi kerak.
+            .execution_options(populate_existing=True)
         )
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()

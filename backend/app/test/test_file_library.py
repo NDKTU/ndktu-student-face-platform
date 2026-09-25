@@ -376,6 +376,58 @@ async def test_course_material_created_via_api_appears_in_library(
 
 
 @pytest.mark.asyncio
+async def test_course_documents_are_separate_from_library(
+    auth_client: AsyncClient, async_db, temp_uploads, test_kafedra, test_subject, test_teacher
+):
+    """«Fan hujjatlari» kutubxonadan alohida: har biri faqat oʻz toifasini koʻradi."""
+    from app.modules.course.model import Course
+
+    course = Course(
+        name="Hujjatli kurs",
+        kafedra_id=test_kafedra["id"],
+        subject_id=test_subject.id,
+        teacher_id=test_teacher["id"],
+    )
+    async_db.add(course)
+    await async_db.flush()
+
+    book = await auth_client.post("/file/upload", files={"file": ("k.png", PNG + b"k", "image/png")})
+    doc = await auth_client.post("/file/upload", files={"file": ("d.png", PNG + b"d", "image/png")})
+    for uploaded, category, title in ((book, "library", "Darslik"), (doc, "document", "Sillabus")):
+        created = await auth_client.post(
+            "/resource/",
+            json={
+                "course_id": course.id,
+                "resource_type": "file",
+                "category": category,
+                "title": title,
+                "file_url": uploaded.json()["url"],
+            },
+        )
+        assert created.status_code in (200, 201), created.text
+        assert created.json()["category"] == category
+
+    library = await auth_client.get(f"/file/course/{course.id}")
+    assert [item["title"] for item in library.json()["items"]] == ["Darslik"]
+
+    documents = await auth_client.get(f"/file/course/{course.id}", params={"category": "document"})
+    assert [item["title"] for item in documents.json()["items"]] == ["Sillabus"]
+
+
+@pytest.mark.asyncio
+async def test_document_category_requires_course_level_file(auth_client: AsyncClient):
+    """Fan hujjati — faqat kurs darajasidagi fayl: darsga yoki havola sifatida boʻlmaydi."""
+    for payload in (
+        {"lesson_id": 1, "resource_type": "file", "file_url": "/uploads/x.pdf"},
+        {"course_id": 1, "resource_type": "link", "link_url": "https://example.com"},
+    ):
+        response = await auth_client.post(
+            "/resource/", json={**payload, "category": "document", "title": "Sillabus"}
+        )
+        assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test_shared_only_never_lists_own_files(auth_client: AsyncClient, temp_uploads):
     """`shared_only` — boshqa odamning papkasidagi fayllar uchun.
 

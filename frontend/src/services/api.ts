@@ -10,6 +10,16 @@ import { getToken, clearToken, setLogoutReason } from '@/services/tokenStorage';
 //  yo'lda uzib, sessiyani serverda tirik qoldirardi.
 const SELF_HANDLED_401_PATHS = ['/user/login', '/hemis/login', '/user/logout'];
 
+/** Faol ko'rinish roli (`AuthContext` o'rnatadi). Backend `X-Active-Role`
+ *  bo'yicha foydalanuvchi rollarini shu so'rov uchun toraytiradi: admin va
+ *  o'qituvchi rollari bor odam o'qituvchi ko'rinishida faqat o'z kurslari,
+ *  guruhlari va talabalarini oladi. */
+let activeRoleId: number | null = null;
+
+export const setActiveRoleHeader = (roleId: number | null): void => {
+    activeRoleId = roleId;
+};
+
 const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 10000,
@@ -23,6 +33,9 @@ api.interceptors.request.use(
         const token = getToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        }
+        if (activeRoleId !== null) {
+            config.headers['X-Active-Role'] = String(activeRoleId);
         }
         if (config.data instanceof FormData) {
             delete config.headers['Content-Type'];

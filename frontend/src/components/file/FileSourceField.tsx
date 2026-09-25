@@ -32,6 +32,8 @@ interface FileSourceFieldProps {
     deviceHint?: string;
     /** Kutubxona kartasi ostidagi izoh. */
     libraryHint?: string;
+    /** `false` — rol qanday boʻlmasin, faqat kutubxonadan tanlanadi. */
+    allowDevice?: boolean;
     /** Kartalar ostida koʻrsatiladigan tanlangan fayllar roʻyxati. */
     children?: ReactNode;
     className?: string;
@@ -48,6 +50,7 @@ export const FileSourceField = ({
     onPickLibrary,
     deviceHint,
     libraryHint = 'Platformaga oldin yuklangan fayllar',
+    allowDevice = true,
     children,
     className,
 }: FileSourceFieldProps) => {
@@ -55,8 +58,8 @@ export const FileSourceField = ({
     const { isTeacher, isStudent } = useRoleView();
     // Ikkala roli bor hisobda oʻqituvchi qoidasi ustun: bu maydon
     // oʻqituvchi formalarida turadi.
-    const showDevice = !isTeacher;
-    const showLibrary = isTeacher || !isStudent;
+    const showDevice = allowDevice && !isTeacher;
+    const showLibrary = isTeacher || !isStudent || !allowDevice;
 
     return (
         <div className={className}>

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
@@ -90,6 +92,7 @@ async def upload_file(
 @router.get("/course/{course_id}", response_model=CourseFileListResponse)
 async def list_course_files(
     course_id: int,
+    category: Literal["library", "document"] = Query("library"),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: User = Depends(PermissionRequired("read:lesson")),
 ):
@@ -100,7 +103,7 @@ async def list_course_files(
     talaba ham. `read:file` esa shaxsiy kutubxonaning huquqi va
     talabada u yoʻq.
     """
-    return await get_file_repository.list_course_files(session, course_id)
+    return await get_file_repository.list_course_files(session, course_id, category)
 
 
 @router.get("/", response_model=FileListResponse)

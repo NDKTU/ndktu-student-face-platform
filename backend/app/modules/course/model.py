@@ -405,6 +405,11 @@ class Resource(Base, IdIntPk, TimestampMixin):
     )
 
     resource_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Kurs darajasidagi fayl qaysi bo'limda turadi: «Kutubxona» (library)
+    # yoki «Fan hujjatlari» (document). Dars materialida doim library.
+    category: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="library", server_default="library"
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
 
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

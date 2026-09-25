@@ -26,9 +26,13 @@ export const useFile = (id: number | null) => useQuery({
  * Kesh kaliti kurs bo'yicha, `files` ostida: darsga fayl biriktirilganda
  * `invalidateAll` bu ro'yxatni ham yangilaydi.
  */
-export const useCourseFiles = (courseId: number, enabled = true) => useQuery({
-    queryKey: [FILES_KEY, 'course', courseId],
-    queryFn: () => fileService.listByCourse(courseId),
+export const useCourseFiles = (
+    courseId: number,
+    category: 'library' | 'document' = 'library',
+    enabled = true,
+) => useQuery({
+    queryKey: [FILES_KEY, 'course', courseId, category],
+    queryFn: () => fileService.listByCourse(courseId, category),
     enabled,
 });
 

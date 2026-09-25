@@ -95,10 +95,12 @@ export const fileService = {
      *
      * Shaxsiy kutubxonadan farqli — bu ro'yxat kursni ko'ra oladigan har
      * kimga ochiq (talabaga ham), chunki bu kursning o'quv materiali.
+     * `document` — «Fan hujjatlari» bo'limi.
      */
-    listByCourse: async (courseId: number) => {
+    listByCourse: async (courseId: number, category: 'library' | 'document' = 'library') => {
         const response = await api.get<Omit<FileListResponse, 'items'> & { items: CourseLibraryFile[] }>(
             `/file/course/${courseId}`,
+            { params: { category } },
         );
         return response.data;
     },

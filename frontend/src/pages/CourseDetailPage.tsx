@@ -6,6 +6,7 @@ import {
     BookOpen,
     ChevronRight,
     ClipboardCheck,
+    FileStack,
     FolderOpen,
     Clock3,
     Info,
@@ -41,7 +42,7 @@ import { courseTypeLabel } from '@/services/courseTypes';
 import { initialsOf } from '@/lib/avatarTiles';
 import './CourseDetailPage.css';
 
-type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library' | 'chat';
+type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library' | 'documents' | 'chat';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -136,6 +137,10 @@ export default function CourseDetailPage() {
         // kursni ko'ra oladigan har kimga (talabaga ham) ochiq.
         ...(canReadLessons
             ? [{ id: 'library' as const, label: 'Kutubxona', icon: <FolderOpen className="h-4 w-4" /> }]
+            : []),
+        // Fan hujjatlari (o'quv dastur, sillabus) — kutubxona bilan bir huquqda.
+        ...(canReadLessons
+            ? [{ id: 'documents' as const, label: 'Fan hujjatlari', icon: <FileStack className="h-4 w-4" /> }]
             : []),
         // Muloqot kursni ko'ra oladigan hammaga: o'qituvchi, assistent va
         // kurs guruhlari talabalari. Kimning kursi ekanini bekend tekshiradi.
@@ -354,6 +359,23 @@ export default function CourseDetailPage() {
                     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
                         <CourseFileLibrary
                             courseId={course.id}
+                            canAdd={canAddLibraryFiles}
+                            canEdit={canEditLibraryFiles}
+                            canRemove={canRemoveLibraryFiles}
+                        />
+                    </div>
+                </section>
+            )}
+
+            {activeTab === 'documents' && canReadLessons && (
+                <section className="space-y-3">
+                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Fan hujjatlari
+                    </h2>
+                    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+                        <CourseFileLibrary
+                            courseId={course.id}
+                            category="document"
                             canAdd={canAddLibraryFiles}
                             canEdit={canEditLibraryFiles}
                             canRemove={canRemoveLibraryFiles}

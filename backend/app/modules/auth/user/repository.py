@@ -265,7 +265,15 @@ class UserRepository:
 
     async def assign_roles(self, session: AsyncSession, data: UserRoleAssignRequest) -> None:
         # 1. Fetch User
-        stmt = select(User).where(User.id == data.user_id).options(selectinload(User.roles))
+        # populate_existing: admin o'z rollarini tahrirlaganda identity map
+        # faol rolga toraytirilgan obyektni qaytaradi (`apply_active_role`),
+        # va o'zgarishlar farqi noto'g'ri hisoblanardi.
+        stmt = (
+            select(User)
+            .where(User.id == data.user_id)
+            .options(selectinload(User.roles))
+            .execution_options(populate_existing=True)
+        )
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 

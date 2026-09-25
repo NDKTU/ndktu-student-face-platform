@@ -5,12 +5,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.core.schemas import TashkentDatetime
 
 RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom"]
+# «Kutubxona» — kitob va qo'llanmalar, «Fan hujjatlari» — o'quv dastur,
+# sillabus kabi rasmiy hujjatlar. Ikkalasi ham kurs darajasidagi fayl.
+RESOURCE_CATEGORIES = Literal["library", "document"]
 
 
 class ResourceCreateRequest(BaseModel):
     lesson_id: Optional[int] = None
     course_id: Optional[int] = None
     resource_type: RESOURCE_TYPES
+    category: RESOURCE_CATEGORIES = "library"
     title: str = Field(min_length=1, max_length=255)
     file_url: Optional[str] = None
     link_url: Optional[str] = None
@@ -21,6 +25,9 @@ class ResourceCreateRequest(BaseModel):
     def check_parent_and_content(self):
         if (self.lesson_id is None) == (self.course_id is None):
             raise ValueError("Exactly one of lesson_id or course_id must be set")
+        # Fan hujjati — kurs darajasidagi fayl: darsda bunday bo'lim yo'q.
+        if self.category == "document" and (self.course_id is None or self.resource_type != "file"):
+            raise ValueError("document category is only for course-level file resources")
 
         # Видео принимается только ссылкой (YouTube): загрузка видеофайлов отключена.
         # Формат проверяется по той же причине, что и у Zoom: из ссылки собирается
@@ -82,6 +89,7 @@ class ResourceResponse(BaseModel):
     lesson_id: Optional[int] = None
     course_id: Optional[int] = None
     resource_type: RESOURCE_TYPES
+    category: RESOURCE_CATEGORIES = "library"
     title: str
     file_url: Optional[str] = None
     link_url: Optional[str] = None

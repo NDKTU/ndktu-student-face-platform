@@ -23,6 +23,7 @@ import { useGroups } from '@/hooks/useGroups';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useTeachers } from '@/hooks/useTeachers';
 import { useCatalogView } from '@/hooks/useCatalogView';
+import { useRoleView } from '@/hooks/useRoleView';
 import type { Course } from '@/services/courseService';
 import { CourseModal } from '@/components/courses/CourseModal';
 import { OrganizationBreadcrumbs } from '@/components/faculty/OrganizationBreadcrumbs';
@@ -47,6 +48,10 @@ export const CoursesPage = () => {
     const navigate = useNavigate();
     const { user, hasPermission } = useAuth();
     const isAdmin = user?.roles?.some((role) => role.name.toLowerCase() === 'admin') ?? false;
+    const { isStudent, isTeacher } = useRoleView();
+    // Talaba faqat oʻz guruhi kurslarini koʻradi — guruh ustuni va filtri
+    // unga ortiqcha maʼlumot.
+    const hideGroups = isStudent && !isTeacher;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -105,7 +110,7 @@ export const CoursesPage = () => {
         limit: pageSize,
         teacherId: parsedTeacherId,
         subjectId: parsedSubjectId,
-        groupId: parsedGroupId,
+        groupId: hideGroups ? undefined : parsedGroupId,
         courseType: parsedCourseType,
         semesterNumber: parsedSemester,
         isActive: showArchived ? false : undefined,
@@ -138,7 +143,7 @@ export const CoursesPage = () => {
         debouncedGroupQuery,
         undefined,
         undefined,
-        hasPermission('read:group'),
+        hasPermission('read:group') && !hideGroups,
     );
     const { data: allTeachersData } = useTeachers(
         1,
@@ -355,7 +360,7 @@ export const CoursesPage = () => {
                                 searchPlaceholder={t("Fan nomi...")}
                             />
                         </div>
-                        <div className="w-full sm:w-[220px]">
+                        {!hideGroups && <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={groupOptions}
                                 value={filterGroupId}
@@ -370,7 +375,7 @@ export const CoursesPage = () => {
                                 placeholder={t("Guruh bo'yicha")}
                                 searchPlaceholder={t("Guruh nomi...")}
                             />
-                        </div>
+                        </div>}
                         <div className="w-[150px] sm:w-[170px]">
                             <Combobox
                                 options={courseTypeOptions}
@@ -500,7 +505,9 @@ export const CoursesPage = () => {
                                     {renderSortIcon('type')}
                                 </div>
                             </TableHead>
-                            <TableHead className="font-bold text-xs">Biriktirilgan Guruhlar</TableHead>
+                            {!hideGroups && (
+                                <TableHead className="font-bold text-xs">Biriktirilgan Guruhlar</TableHead>
+                            )}
                             <TableHead
                                 onClick={() => handleSort('teacher')}
                                 className="group cursor-pointer select-none font-bold text-xs hidden md:table-cell hover:text-foreground"
@@ -561,19 +568,21 @@ export const CoursesPage = () => {
                                     </TableCell>
 
                                     {/* Biriktirilgan Guruhlar */}
-                                    <TableCell>
-                                        <div className="flex flex-wrap items-center gap-1 max-w-[280px]">
-                                            {groups.length > 0 ? (
-                                                groups.map((g) => (
-                                                    <span key={g.id} className="badge badge-primary text-xs">
-                                                        {g.name}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground italic">{t("Guruh yo'q")}</span>
-                                            )}
-                                        </div>
-                                    </TableCell>
+                                    {!hideGroups && (
+                                        <TableCell>
+                                            <div className="flex flex-wrap items-center gap-1 max-w-[280px]">
+                                                {groups.length > 0 ? (
+                                                    groups.map((g) => (
+                                                        <span key={g.id} className="badge badge-primary text-xs">
+                                                            {g.name}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">{t("Guruh yo'q")}</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    )}
 
                                     {/* O'qituvchi */}
                                     <TableCell className="hidden md:table-cell">
@@ -613,19 +622,23 @@ export const CoursesPage = () => {
                                 subtitle={
                                     <div className="flex flex-col gap-1 mt-0.5">
                                         <span className="text-xs text-muted-foreground">{teacherName}</span>
-                                        <div className="flex flex-wrap gap-1">
-                                            {(course.groups || []).map((g) => (
-                                                <span key={g.id} className="badge badge-primary text-[10px]">
-                                                    {g.name}
-                                                </span>
-                                            ))}
-                                        </div>
+                                        {!hideGroups && (
+                                            <div className="flex flex-wrap gap-1">
+                                                {(course.groups || []).map((g) => (
+                                                    <span key={g.id} className="badge badge-primary text-[10px]">
+                                                        {g.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 }
                                 metrics={[
                                     { label: 'Turi', value: courseTypeLabel(course.course_type) ?? '—' },
                                     { label: 'Semestr', value: semesterName ? t(semesterName) : '—' },
-                                    { label: t('Guruh'), value: `${(course.groups || []).length} ta` },
+                                    ...(hideGroups
+                                        ? []
+                                        : [{ label: t('Guruh'), value: `${(course.groups || []).length} ta` }]),
                                 ]}
                                 actions={renderActions(course)}
                                 onClick={() => navigate(`/courses/${course.id}`)}

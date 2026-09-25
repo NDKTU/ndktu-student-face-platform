@@ -81,6 +81,7 @@ class ResourceRepository:
             lesson_id=data.lesson_id,
             course_id=data.course_id,
             resource_type=data.resource_type,
+            category=data.category,
             title=data.title,
             file_url=data.file_url,
             link_url=data.link_url,

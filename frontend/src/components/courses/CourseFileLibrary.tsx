@@ -5,6 +5,7 @@ import { ExternalLink, FileText, FolderOpen, Image as ImageIcon, Loader2, Pencil
 import { useCourseFiles } from '@/hooks/useFiles';
 import { resourceService } from '@/services/resourceService';
 import type { CourseLibraryFile, LibraryFile } from '@/services/fileService';
+import type { ResourceCategory } from '@/services/resourceService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -18,6 +19,42 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { formatSize } from '@/utils/fileSize';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+/** Bo'limga qarab o'zgaradigan matnlar: tuzilma ikkalasida bir xil. */
+const TEXTS = {
+    library: {
+        add: "Kitob qo'shish",
+        addTitle: "Kutubxonaga kitob qo'shish",
+        added: "Kutubxonaga qo'shildi",
+        loadError: "Kutubxonani yuklab bo'lmadi",
+        emptyTitle: "Kutubxona bo'sh",
+        emptyCanAdd: "Kursga kitob yoki qo'llanma qo'shing. Darslarga biriktirilgan materiallar ham shu yerda to'planadi.",
+        emptyReadOnly: "Darslarga material yoki uy vazifasiga ilova biriktirilgach, ular shu yerda to'planadi.",
+        removeTitle: 'Kutubxonadan olib tashlash',
+        removed: 'Kutubxonadan olib tashlandi',
+        removeFrom: 'kurs kutubxonasidan',
+        renameTitle: 'Kitob nomini tahrirlash',
+        namePlaceholder: "Kitob yoki qo'llanma nomi",
+        pickerTitle: 'Kitobni tanlash',
+        fallbackTitle: 'Kitob',
+    },
+    document: {
+        add: "Hujjat qo'shish",
+        addTitle: "Fan hujjatini qo'shish",
+        added: "Fan hujjatlariga qo'shildi",
+        loadError: "Fan hujjatlarini yuklab bo'lmadi",
+        emptyTitle: "Fan hujjatlari yo'q",
+        emptyCanAdd: "O'quv dastur, sillabus va boshqa fan hujjatlarini fayllar kutubxonasidan qo'shing.",
+        emptyReadOnly: "O'qituvchi fan hujjatlarini qo'shgach, ular shu yerda ko'rinadi.",
+        removeTitle: 'Fan hujjatlaridan olib tashlash',
+        removed: 'Fan hujjatlaridan olib tashlandi',
+        removeFrom: 'fan hujjatlaridan',
+        renameTitle: 'Hujjat nomini tahrirlash',
+        namePlaceholder: "Masalan: O'quv dastur, Sillabus",
+        pickerTitle: 'Hujjatni tanlash',
+        fallbackTitle: 'Hujjat',
+    },
+} satisfies Record<ResourceCategory, Record<string, string>>;
 
 /**
  * Kursning umumiy kutubxonasi.
@@ -36,20 +73,27 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
  * shu yerdan olib tashlanadi. Darsga biriktirilgan fayl esa bu yerdan
  * olib tashlanmaydi: bu darsdagi materialni ko'rinmas tarzda o'chirib
  * yuborardi — uni dars sahifasida olib tashlash kerak.
+ *
+ * `category="document"` — «Fan hujjatlari» bo'limi: tuzilma o'sha, lekin
+ * ro'yxatda faqat shu bo'limga qo'shilgan fayllar (dars materiallari
+ * tushmaydi) va fayl faqat «Fayllar kutubxonasi»dan tanlanadi.
  */
 export const CourseFileLibrary = ({
     courseId,
+    category = 'library',
     canAdd = false,
     canEdit = false,
     canRemove = false,
 }: {
     courseId: number;
+    category?: ResourceCategory;
     canAdd?: boolean;
     canEdit?: boolean;
     canRemove?: boolean;
 }) => {
     const queryClient = useQueryClient();
-    const { data, isLoading, isError, refetch } = useCourseFiles(courseId);
+    const text = TEXTS[category];
+    const { data, isLoading, isError, refetch } = useCourseFiles(courseId, category);
     const [search, setSearch] = useState('');
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [removing, setRemoving] = useState<CourseLibraryFile | null>(null);
@@ -67,9 +111,10 @@ export const CourseFileLibrary = ({
                 queryClient.invalidateQueries({ queryKey: ['resources'] }),
             ]);
             toast.success(
-                removing.used_in_lessons
-                    ? "Kutubxonadan olib tashlandi. Fayl darslarda ishlatilgani uchun ro'yxatda qoladi"
-                    : "Kutubxonadan olib tashlandi",
+                // Fan hujjatlariga dars materiallari tushmaydi — fayl ro'yxatdan ketadi.
+                removing.used_in_lessons && category === 'library'
+                    ? `${text.removed}. Fayl darslarda ishlatilgani uchun ro'yxatda qoladi`
+                    : text.removed,
             );
             setRemoving(null);
         } catch (cause) {
@@ -81,11 +126,16 @@ export const CourseFileLibrary = ({
 
     const addButton = canAdd && (
         <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Kitob qo'shish
+            <Plus className="mr-1.5 h-4 w-4" /> {text.add}
         </Button>
     );
     const addModal = canAdd && (
-        <AddCourseFileModal courseId={courseId} isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+        <AddCourseFileModal
+            courseId={courseId}
+            category={category}
+            isOpen={isAddOpen}
+            onClose={() => setIsAddOpen(false)}
+        />
     );
 
     const files = useMemo(() => {
@@ -100,7 +150,7 @@ export const CourseFileLibrary = ({
     }, [data, search]);
 
     if (isError) {
-        return <ErrorState title="Kutubxonani yuklab bo'lmadi" onRetry={() => void refetch()} />;
+        return <ErrorState title={text.loadError} onRetry={() => void refetch()} />;
     }
 
     if (isLoading) {
@@ -120,12 +170,8 @@ export const CourseFileLibrary = ({
             <>
                 <EmptyState
                     icon={<FolderOpen className="h-6 w-6" />}
-                    title="Kutubxona bo'sh"
-                    description={
-                        canAdd
-                            ? "Kursga kitob yoki qo'llanma qo'shing. Darslarga biriktirilgan materiallar ham shu yerda to'planadi."
-                            : "Darslarga material yoki uy vazifasiga ilova biriktirilgach, ular shu yerda to'planadi."
-                    }
+                    title={text.emptyTitle}
+                    description={canAdd ? text.emptyCanAdd : text.emptyReadOnly}
                     action={addButton}
                 />
                 {addModal}
@@ -216,8 +262,8 @@ export const CourseFileLibrary = ({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`${file.title} — kutubxonadan olib tashlash`}
-                                        title="Kutubxonadan olib tashlash"
+                                        aria-label={`${file.title} — ${text.removeTitle.toLowerCase()}`}
+                                        title={text.removeTitle}
                                         className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                                         onClick={() => setRemoving(file)}
                                     >
@@ -230,18 +276,18 @@ export const CourseFileLibrary = ({
                 </div>
             )}
             {addModal}
-            <RenameCourseFileModal file={editing} onClose={() => setEditing(null)} />
+            <RenameCourseFileModal category={category} file={editing} onClose={() => setEditing(null)} />
             <ConfirmDialog
                 isOpen={removing !== null}
                 onClose={() => setRemoving(null)}
                 onConfirm={() => void remove()}
                 isLoading={isRemoving}
-                title="Kutubxonadan olib tashlash"
+                title={text.removeTitle}
                 description={
                     removing && (
                         <>
-                            <b>{removing.title}</b> kurs kutubxonasidan olib tashlanadi.
-                            {removing.used_in_lessons
+                            <b>{removing.title}</b> {text.removeFrom} olib tashlanadi.
+                            {removing.used_in_lessons && category === 'library'
                                 ? " Fayl darslarda ham biriktirilgan — u yerda qoladi va ro'yxatda ko'rinishda davom etadi."
                                 : ' Faylning o‘zi fayllar kutubxonasida saqlanib qoladi.'}
                         </>
@@ -258,7 +304,16 @@ export const CourseFileLibrary = ({
  * fayl yozuvida emas — shuning uchun faylning o'zi va boshqa kurslardagi
  * nomi o'zgarmaydi.
  */
-function RenameCourseFileModal({ file, onClose }: { file: CourseLibraryFile | null; onClose: () => void }) {
+function RenameCourseFileModal({
+    category,
+    file,
+    onClose,
+}: {
+    category: ResourceCategory;
+    file: CourseLibraryFile | null;
+    onClose: () => void;
+}) {
+    const text = TEXTS[category];
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
     const [saving, setSaving] = useState(false);
@@ -296,7 +351,7 @@ function RenameCourseFileModal({ file, onClose }: { file: CourseLibraryFile | nu
     };
 
     return (
-        <Modal isOpen={file !== null} onClose={() => { if (!saving) onClose(); }} title="Kitob nomini tahrirlash">
+        <Modal isOpen={file !== null} onClose={() => { if (!saving) onClose(); }} title={text.renameTitle}>
             <form
                 className="space-y-4"
                 onSubmit={(event) => { event.preventDefault(); void submit(); }}
@@ -306,7 +361,7 @@ function RenameCourseFileModal({ file, onClose }: { file: CourseLibraryFile | nu
                     <Input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
-                        placeholder="Kitob yoki qo'llanma nomi"
+                        placeholder={text.namePlaceholder}
                         maxLength={255}
                         autoFocus
                     />
@@ -331,7 +386,18 @@ function RenameCourseFileModal({ file, onClose }: { file: CourseLibraryFile | nu
  * kutubxonadan tanlash (o'qituvchi — faqat kutubxonadan, qarang
  * `FileSourceField`). Natija — kurs darajasidagi `file` materiali.
  */
-function AddCourseFileModal({ courseId, isOpen, onClose }: { courseId: number; isOpen: boolean; onClose: () => void }) {
+function AddCourseFileModal({
+    courseId,
+    category,
+    isOpen,
+    onClose,
+}: {
+    courseId: number;
+    category: ResourceCategory;
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    const text = TEXTS[category];
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
     const [file, setFile] = useState<File | null>(null);
@@ -354,11 +420,12 @@ function AddCourseFileModal({ courseId, isOpen, onClose }: { courseId: number; i
             await resourceService.create({
                 course_id: courseId,
                 resource_type: 'file',
-                title: title.trim() || file?.name || libraryFile?.title || 'Kitob',
+                category,
+                title: title.trim() || file?.name || libraryFile?.title || text.fallbackTitle,
                 file_url: fileUrl,
             });
             await queryClient.invalidateQueries({ queryKey: ['files'] });
-            toast.success("Kutubxonaga qo'shildi");
+            toast.success(text.added);
             close();
         } catch (cause) {
             setError(apiErrorMessage(cause, 'Saqlashda xatolik'));
@@ -368,16 +435,18 @@ function AddCourseFileModal({ courseId, isOpen, onClose }: { courseId: number; i
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={close} title="Kutubxonaga kitob qo'shish">
+        <Modal isOpen={isOpen} onClose={close} title={text.addTitle}>
             <div className="space-y-4">
                 <div>
                     <label className="mb-1 block text-sm font-medium">Nomi</label>
-                    <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Kitob yoki qo'llanma nomi" />
+                    <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={text.namePlaceholder} />
                 </div>
                 <FileSourceField
                     label="Fayl"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
                     deviceHint="PDF, Word, Excel, PowerPoint, TXT yoki ZIP"
+                    // Fan hujjati faqat «Fayllar kutubxonasi»dan olinadi.
+                    allowDevice={category === 'library'}
                     onFiles={(picked) => { setFile(picked[0] ?? null); setLibraryFile(null); setError(''); }}
                     onPickLibrary={() => setIsPickerOpen(true)}
                 >
@@ -404,7 +473,7 @@ function AddCourseFileModal({ courseId, isOpen, onClose }: { courseId: number; i
                     onClose={() => setIsPickerOpen(false)}
                     multiple={false}
                     kind="document"
-                    title="Kitobni tanlash"
+                    title={text.pickerTitle}
                     onSelect={(files) => { const picked = files[0]; if (picked) { setLibraryFile(picked); setFile(null); setError(''); } }}
                 />
             </div>

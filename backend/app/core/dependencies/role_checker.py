@@ -1,13 +1,14 @@
 import logging
 
 from core.database.db_helper import db_helper
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
-from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
+from app.modules.auth.model import Permission, RolePermission, User
 from app.modules.auth.user.service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,41 @@ async def get_current_user_id(token: str | None = Depends(api_key_header)) -> in
     return await auth_service.validate_session(token)
 
 
+async def get_active_role_id(x_active_role: str | None = Header(default=None)) -> int | None:
+    """Frontenddagi «Ko'rinishni tanlang» tanlovi (`X-Active-Role: <role id>`).
+
+    Admin va o'qituvchi rollari bor foydalanuvchi o'qituvchi ko'rinishiga
+    o'tganda faqat o'z kurslari, guruhlari va talabalarini ko'rishi kerak.
+    Menyuni toraytirishning o'zi yetmaydi: ma'lumotni backend beradi.
+    """
+    if not x_active_role:
+        return None
+    try:
+        return int(x_active_role)
+    except ValueError:
+        return None
+
+
+def apply_active_role(user: User, active_role_id: int | None) -> None:
+    """`user.roles` ni faol rolga toraytiradi — shu so'rov davomida.
+
+    Shundan keyin kod bazasidagi barcha `role.name == "admin"` tekshiruvlari
+    faol ko'rinishga qarab ishlaydi. Foydalanuvchida bo'lmagan rol e'tiborga
+    olinmaydi: sarlavha huquqni faqat toraytira oladi, kengaytira olmaydi.
+
+    `set_committed_value` — bazaga yozilmasligi uchun: oddiy o'zlashtirish
+    ORM uchun o'zgarish bo'lardi va flush qolgan `user_role` qatorlarini
+    o'chirib yuborardi. Rollarning to'liq ro'yxati kerak bo'lgan joylar
+    (`/user/me`, rollarni tayinlash) foydalanuvchini `populate_existing`
+    bilan qayta o'qiydi.
+    """
+    if active_role_id is None:
+        return
+    narrowed = [role for role in user.roles if role.id == active_role_id]
+    if narrowed and len(narrowed) != len(user.roles):
+        set_committed_value(user, "roles", narrowed)
+
+
 class PermissionRequired:
     def __init__(self, permission_name: str):
         self.permission_name = permission_name
@@ -35,6 +71,7 @@ class PermissionRequired:
         self,
         user_id: int = Depends(get_current_user_id),
         session: AsyncSession = Depends(db_helper.session_getter),
+        active_role_id: int | None = Depends(get_active_role_id),
     ) -> User:
         # Загружаем пользователя с ролями один раз
         user_stmt = select(User).where(User.id == user_id).options(selectinload(User.roles))
@@ -43,6 +80,8 @@ class PermissionRequired:
 
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        apply_active_role(user, active_role_id)
 
         # Проверяем, является ли пользователь админом
         is_admin = any(role.name == "Admin" for role in user.roles)
@@ -63,15 +102,7 @@ class PermissionRequired:
             )
 
         # 2. Проверяем наличие права у пользователя
-        perm_check_stmt = (
-            select(Permission.id)
-            .join(RolePermission)
-            .join(Role)
-            .join(UserRole)
-            .where(UserRole.user_id == user_id, Permission.name == self.permission_name)
-        )
-        perm_check_result = await session.execute(perm_check_stmt)
-        has_permission = perm_check_result.scalars().first()
+        has_permission = await _roles_have_permission(session, user, self.permission_name)
 
         if not has_permission:
             raise HTTPException(
@@ -91,13 +122,20 @@ async def user_has_permission(session: AsyncSession, user: User, permission_name
     """
     if any(role.name.lower() == "admin" for role in user.roles):
         return True
+    return await _roles_have_permission(session, user, permission_name)
 
+
+async def _roles_have_permission(session: AsyncSession, user: User, permission_name: str) -> bool:
+    """Huquq `user.roles` dagi rollardan qidiriladi, `user_role` jadvalidan emas:
+    faol ko'rinish tanlanganda boshqa rollarning huquqlari hisobga olinmasligi kerak.
+    """
+    role_ids = [role.id for role in user.roles]
+    if not role_ids:
+        return False
     stmt = (
         select(Permission.id)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
-        .join(Role, Role.id == RolePermission.role_id)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == user.id, Permission.name == permission_name)
+        .where(RolePermission.role_id.in_(role_ids), Permission.name == permission_name)
         .limit(1)
     )
     result = await session.execute(stmt)
@@ -131,8 +169,9 @@ class PermissionRequiredExceptRole(PermissionRequired):
         self,
         user_id: int = Depends(get_current_user_id),
         session: AsyncSession = Depends(db_helper.session_getter),
+        active_role_id: int | None = Depends(get_active_role_id),
     ) -> User:
-        user = await super().__call__(user_id=user_id, session=session)
+        user = await super().__call__(user_id=user_id, session=session, active_role_id=active_role_id)
 
         role_names = {role.name.lower() for role in (user.roles or [])}
         if self.BLOCKED_ROLE in role_names and not (role_names & self.EXEMPT_ROLES):

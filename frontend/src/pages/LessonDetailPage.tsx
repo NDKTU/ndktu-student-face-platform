@@ -148,6 +148,16 @@ export default function LessonDetailPage() {
             {activeTab === 'info' && (
             <div className="space-y-6">
             <SectionCard
+                icon={<Paperclip className="h-[18px] w-[18px]" />}
+                tone="orange"
+                title="Asosiy materiallar"
+                description={extras.length > 0 ? `${extras.length} ta havola va hujjat` : undefined}
+                action={canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['file', 'link'])} icon={<Plus className="h-4 w-4" />} label="Material qo'shish" />}
+            >
+                {extras.length === 0 ? <EmptyState icon={<Paperclip className="h-6 w-6" />} title="Material yo'q" description="Hozircha kitob, hujjat yoki havola qo'shilmagan." className="py-8" /> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="group/item flex items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-8px_rgba(16,24,40,0.2)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{item.resource_type === 'file' ? <FileText className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}</span><a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: downloadName(item.title, item.file_url) } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium transition-colors hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all group-hover/item:translate-x-0.5 group-hover/item:text-primary" />{canManageContent && <button onClick={() => setResourceToRename({ id: item.id, title: item.title })} aria-label="Material nomini tahrirlash" title="Nomini tahrirlash" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"><Pencil className="h-4 w-4" /></button>}{canManageContent && <button onClick={() => setResourceToDelete({ id: item.id, title: item.title })} aria-label="Materialni o'chirish" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/item:opacity-100"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
+            </SectionCard>
+
+            <SectionCard
                 icon={<VideoIcon className="h-[18px] w-[18px]" />}
                 tone="blue"
                 title="Dars videosi"
@@ -163,16 +173,6 @@ export default function LessonDetailPage() {
                        aks holda buni hech kim tuzatmaydi. */
                     : video?.link_url ? <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4"><p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400"><AlertTriangle className="h-4 w-4 shrink-0" /> Havola YouTube videosiga o'xshamaydi — pleyer ochilmadi.</p><a href={video.link_url} target="_blank" rel="noreferrer" className="group/link inline-flex items-center gap-2 break-all text-sm font-medium text-primary hover:underline">{video.title || video.link_url} <ExternalLink className="h-4 w-4 shrink-0 transition-transform group-hover/link:translate-x-0.5" /></a>{canManageContent && <p className="text-xs text-muted-foreground">Videoni olib tashlab, to'g'ri YouTube havolasini qo'shing.</p>}</div>
                     : <EmptyState icon={<VideoIcon className="h-6 w-6" />} title="Video qo'shilmagan" description="Bu darsni video bo'lmasdan ham o'qish mumkin." className="py-8" />}
-            </SectionCard>
-
-            <SectionCard
-                icon={<Paperclip className="h-[18px] w-[18px]" />}
-                tone="orange"
-                title="Qo'shimcha materiallar"
-                description={extras.length > 0 ? `${extras.length} ta havola va hujjat` : undefined}
-                action={canManageContent && <CardAction variant="outline" onClick={() => setContentKinds(['file', 'link'])} icon={<Plus className="h-4 w-4" />} label="Material qo'shish" />}
-            >
-                {extras.length === 0 ? <EmptyState icon={<Paperclip className="h-6 w-6" />} title="Material yo'q" description="Hozircha kitob, hujjat yoki qo'shimcha havola qo'shilmagan." className="py-8" /> : <div className="grid gap-3 sm:grid-cols-2">{extras.map((item) => <div key={item.id} className="group/item flex items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-8px_rgba(16,24,40,0.2)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{item.resource_type === 'file' ? <FileText className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}</span><a href={item.file_url || item.link_url || '#'} {...(item.file_url ? { download: downloadName(item.title, item.file_url) } : {})} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium transition-colors hover:text-primary">{item.title}</a><ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all group-hover/item:translate-x-0.5 group-hover/item:text-primary" />{canManageContent && <button onClick={() => setResourceToRename({ id: item.id, title: item.title })} aria-label="Material nomini tahrirlash" title="Nomini tahrirlash" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"><Pencil className="h-4 w-4" /></button>}{canManageContent && <button onClick={() => setResourceToDelete({ id: item.id, title: item.title })} aria-label="Materialni o'chirish" className="shrink-0 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover/item:opacity-100"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}
             </SectionCard>
 
 

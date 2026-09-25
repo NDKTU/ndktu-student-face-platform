@@ -2,12 +2,15 @@ import api from './api';
 
 /** `zoom` — jonli dars havolasi (Meeting SDK orqali saytda ochiladi). */
 export type ResourceType = 'file' | 'link' | 'text' | 'video' | 'zoom';
+/** Kurs darajasidagi fayl bo'limi: «Kutubxona» yoki «Fan hujjatlari». */
+export type ResourceCategory = 'library' | 'document';
 
 export interface Resource {
     id: number;
     lesson_id?: number | null;
     course_id?: number | null;
     resource_type: ResourceType;
+    category?: ResourceCategory;
     title: string;
     file_url?: string | null;
     link_url?: string | null;
@@ -21,6 +24,7 @@ export interface ResourceCreateRequest {
     lesson_id?: number;
     course_id?: number;
     resource_type: ResourceType;
+    category?: ResourceCategory;
     title: string;
     file_url?: string;
     link_url?: string;
