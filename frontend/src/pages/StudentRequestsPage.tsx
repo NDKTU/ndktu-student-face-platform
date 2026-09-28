@@ -142,11 +142,6 @@ const StudentRequestsPage = () => {
                                             <RequestStatusBadge status={item.status} />
                                         </div>
                                         <p className="mt-1 truncate font-medium">{item.title}</p>
-                                        {item.category?.name && (
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                {item.category.name}
-                                            </p>
-                                        )}
                                     </div>
                                     <span className="shrink-0 text-xs text-muted-foreground">
                                         {new Date(item.created_at).toLocaleDateString()}

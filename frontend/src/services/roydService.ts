@@ -33,14 +33,19 @@ export interface RequestSummary {
     priority?: string;
     created_at: string;
     sla_deadline?: string | null;
-    category?: { id: number; name: string } | null;
+    /** Ro'yxatda faqat identifikator keladi — xizmat nomi tafsilotda. */
+    category_id?: number;
+    is_overdue?: boolean;
 }
 
 export interface RequestMessage {
     id: number;
     content: string;
     created_at: string;
-    sender?: { id: number; full_name?: string | null } | null;
+    /** ROYD yuboruvchini tekis maydonlarda beradi, ichma-ich obyektda emas. */
+    sender_name?: string | null;
+    /** `student` — talabaning o'zi, qolganlari — xodim. */
+    sender_role?: string | null;
 }
 
 export interface RequestFile {
@@ -56,10 +61,14 @@ export interface RequestHistoryEntry {
     new_status: string;
     comment?: string | null;
     created_at: string;
+    changed_by_name?: string | null;
+    changed_by_role?: string | null;
 }
 
 export interface RequestDetail extends RequestSummary {
     description: string;
+    /** Tafsilotda xizmat to'liq obyekt bo'lib keladi. */
+    category?: { id: number; name: string } | null;
     messages?: RequestMessage[];
     files?: RequestFile[];
     history?: RequestHistoryEntry[];

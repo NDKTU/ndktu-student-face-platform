@@ -228,7 +228,13 @@ const StudentRequestDetailPage = () => {
                             {(data.messages ?? []).map((message) => (
                                 <li key={message.id} className="rounded-lg border border-border p-3">
                                     <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                        <span>{message.sender?.full_name || t('Xodim')}</span>
+                                        {/* O'z xabarini «Xodim» deb ko'rsatish chalkash edi:
+                                            ROYD rolni `sender_role` da beradi. */}
+                                        <span>
+                                            {message.sender_role === 'student'
+                                                ? t('Siz')
+                                                : message.sender_name || t('Xodim')}
+                                        </span>
                                         <span>{new Date(message.created_at).toLocaleString()}</span>
                                     </div>
                                     <p className="mt-1 whitespace-pre-line text-sm">{message.content}</p>
