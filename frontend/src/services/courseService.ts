@@ -84,6 +84,10 @@ export interface CourseListFilters {
     facultyId?: number;
     kafedraId?: number;
     specialityId?: number;
+    /** Bakalavr | Magistr — yo'nalishdan olinadi. */
+    educationType?: string;
+    /** Kunduzgi | Sirtqi | Kechki | Masofaviy — guruhdan olinadi. */
+    educationForm?: string;
     /** `false` — arxiv. Yuborilmasa faqat faol kurslar. */
     isActive?: boolean;
     /** Fan, o'qituvchi, guruh yoki kurs nomi bo'yicha qidiruv — serverda. */
@@ -201,6 +205,8 @@ export const courseService = {
         if (filters.facultyId) params.faculty_id = filters.facultyId;
         if (filters.kafedraId) params.kafedra_id = filters.kafedraId;
         if (filters.specialityId) params.speciality_id = filters.specialityId;
+        if (filters.educationType) params.education_type = filters.educationType;
+        if (filters.educationForm) params.education_form = filters.educationForm;
         // Yuborilmasa server faqat faol kurslarni qaytaradi.
         if (filters.isActive === false) params.is_active = false;
         // Qidiruv va saralash ham serverda: ilgari ular ochilgan sahifaning

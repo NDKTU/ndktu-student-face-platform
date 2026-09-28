@@ -39,6 +39,7 @@ import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filte
 import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 import { subjectOption } from '@/utils/subject';
+import { EDUCATION_SHAPES, EDUCATION_TYPES } from '@/utils/education';
 
 type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -79,6 +80,13 @@ export const CoursesPage = () => {
     // Semestr — kuzgi (1) yoki bahorgi (2). Filtrlash serverda: `semester_number`
     // `CourseListRequest` da allaqachon bor, sahifada esa faqat saralash bor edi.
     const [filterSemester, setFilterSemester] = useUrlState<string>('semester', 'all');
+    // Ta'lim turi (Bakalavr/Magistr) yo'nalishdan, shakli (Kunduzgi/Sirtqi/
+    // Kechki/Masofaviy) guruhdan olinadi — kursning o'zida bunday ustun yo'q.
+    // Filtrlash serverda: sahifada atigi 15 qator, mijozda filtrlasak
+    // «Magistr» 1891 tadan ochilgan sahifadagisini ko'rib, ro'yxat bo'sh
+    // chiqardi.
+    const [filterEducationType, setFilterEducationType] = useUrlState<string>('edu_type', 'all');
+    const [filterEducationForm, setFilterEducationForm] = useUrlState<string>('edu_form', 'all');
     // Arxiv — EPOS yuklamasidan yo'qolgan kurslar. Ular o'chirilmaydi (jurnal
     // ularga bog'langan), lekin faol ro'yxatda ham turmasligi kerak.
     const [showArchived, setShowArchived] = useState(false);
@@ -99,6 +107,10 @@ export const CoursesPage = () => {
     const parsedCourseType =
         filterCourseType !== 'all' && filterCourseType ? (filterCourseType as CourseType) : undefined;
     const parsedSemester = filterSemester !== 'all' && filterSemester ? Number(filterSemester) : undefined;
+    const parsedEducationType =
+        filterEducationType !== 'all' && filterEducationType ? filterEducationType : undefined;
+    const parsedEducationForm =
+        filterEducationForm !== 'all' && filterEducationForm ? filterEducationForm : undefined;
 
     const {
         data: coursesData,
@@ -113,6 +125,8 @@ export const CoursesPage = () => {
         groupId: hideGroups ? undefined : parsedGroupId,
         courseType: parsedCourseType,
         semesterNumber: parsedSemester,
+        educationType: parsedEducationType,
+        educationForm: parsedEducationForm,
         isActive: showArchived ? false : undefined,
         search: debouncedSearch,
         sortBy: sortField,
@@ -199,6 +213,8 @@ export const CoursesPage = () => {
         + (filterTeacherId !== 'all' ? 1 : 0)
         + (filterCourseType !== 'all' ? 1 : 0)
         + (filterSemester !== 'all' ? 1 : 0)
+        + (filterEducationType !== 'all' ? 1 : 0)
+        + (filterEducationForm !== 'all' ? 1 : 0)
         + (showArchived ? 1 : 0);
 
     const clearFilters = () => {
@@ -208,6 +224,8 @@ export const CoursesPage = () => {
         setFilterTeacherId('all');
         setFilterCourseType('all');
         setFilterSemester('all');
+        setFilterEducationType('all');
+        setFilterEducationForm('all');
         setShowArchived(false);
         // Combobox tanlangan qiymatni alohida eslab qoladi — u ham tozalanadi,
         // aks holda ro'yxat bo'shab, tanlov nomi ekranda qolib ketardi.
@@ -227,6 +245,25 @@ export const CoursesPage = () => {
 
     const semesterOptions = useMemo(
         () => [{ value: 'all', label: t('Barcha semestrlar') }, ...SEMESTER_OPTIONS],
+        [t],
+    );
+
+    // Qiymat serverga o'zgarmagan holda ketadi (baza shunday yozadi),
+    // ekranda esa tarjimasi turadi — ruscha interfeysda «Kunduzgi» qolib
+    // ketmasin.
+    const educationTypeOptions = useMemo(
+        () => [
+            { value: 'all', label: t("Barcha ta'lim turlari") },
+            ...EDUCATION_TYPES.map((value) => ({ value, label: t(value) })),
+        ],
+        [t],
+    );
+
+    const educationFormOptions = useMemo(
+        () => [
+            { value: 'all', label: t("Barcha ta'lim shakllari") },
+            ...EDUCATION_SHAPES.map((value) => ({ value, label: t(value) })),
+        ],
         [t],
     );
 
@@ -398,6 +435,30 @@ export const CoursesPage = () => {
                                 }}
                                 placeholder={t("Semestr bo'yicha")}
                                 searchPlaceholder="Semestr..."
+                            />
+                        </div>
+                        <div className="w-full sm:w-[190px]">
+                            <Combobox
+                                options={educationTypeOptions}
+                                value={filterEducationType}
+                                onChange={(val) => {
+                                    setFilterEducationType(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder={t("Ta'lim turi bo'yicha")}
+                                searchPlaceholder="Bakalavr / Magistr..."
+                            />
+                        </div>
+                        <div className="w-full sm:w-[200px]">
+                            <Combobox
+                                options={educationFormOptions}
+                                value={filterEducationForm}
+                                onChange={(val) => {
+                                    setFilterEducationForm(val);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder={t("Ta'lim shakli bo'yicha")}
+                                searchPlaceholder="Kunduzgi / Sirtqi..."
                             />
                         </div>
                         <Button

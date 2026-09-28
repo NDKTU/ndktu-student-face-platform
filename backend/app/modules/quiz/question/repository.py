@@ -12,6 +12,7 @@ from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Subject
 
+from .excel_format import resolve_columns
 from .schemas import (
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
@@ -390,18 +391,33 @@ class QuestionRepository:
                 detail="Excel file must contain at least 5 columns (question, option A, option B, option C, option D)",
             )
 
+        # Ustunlarni avval nomi bo'yicha qidiramiz. Tanilmasa — eski, o'rni
+        # bo'yicha o'qish. Nomi bo'yicha o'qish eksport qilingan faylni
+        # qaytadan yuklash imkonini beradi: undagi «№», «Fan» va
+        # «Foydalanuvchi» ustunlari endi xalaqit bermaydi (excel_format.py).
+        mapping = resolve_columns(df.columns)
+
+        def cell(row, field: str, position: int):
+            index = mapping[field] if mapping is not None else position
+            if index >= len(row):
+                return ""
+            value = row.iloc[index]
+            return "" if pd.isna(value) else str(value)
+
         questions = []
         warnings = []
         for index, row in df.iterrows():
-            # If subject_id is in row, use it, else use param
-            # If image is in row, use it
+            text = cell(row, "text", 0)
+            opt_a = cell(row, "option_a", 1)
+            opt_b = cell(row, "option_b", 2)
+            opt_c = cell(row, "option_c", 3)
+            opt_d = cell(row, "option_d", 4)
 
-            # Using positional indices instead of column names
-            text = str(row.iloc[0]) if not pd.isna(row.iloc[0]) else ""
-            opt_a = str(row.iloc[1]) if not pd.isna(row.iloc[1]) else ""
-            opt_b = str(row.iloc[2]) if not pd.isna(row.iloc[2]) else ""
-            opt_c = str(row.iloc[3]) if not pd.isna(row.iloc[3]) else ""
-            opt_d = str(row.iloc[4]) if not pd.isna(row.iloc[4]) else ""
+            # Butunlay bo'sh qator — savol emas. Ilgari u bo'sh matnli savol
+            # yaratardi: shablon bo'yicha to'ldirilgan faylning oxirida
+            # bunday qatorlar qolib ketishi odatiy hol.
+            if not any(value.strip() for value in (text, opt_a, opt_b, opt_c, opt_d)):
+                continue
 
             q_subject_id = subject_id
             if "subject_id" in df.columns and not pd.isna(row["subject_id"]):
@@ -410,9 +426,18 @@ class QuestionRepository:
                 except (ValueError, TypeError):
                     pass
 
+            # To'g'ri javob ixtiyoriy ustun: usiz fayl ham yuklanadi,
+            # faqat ogohlantirish chiqadi va «a» qo'yiladi.
+            if mapping is not None:
+                raw_correct = cell(row, "correct_option", 5) if "correct_option" in mapping else ""
+            elif "correct_option" in df.columns and not pd.isna(row["correct_option"]):
+                raw_correct = str(row["correct_option"])
+            else:
+                raw_correct = ""
+
             correct_option = "a"
-            if "correct_option" in df.columns and not pd.isna(row["correct_option"]):
-                candidate = str(row["correct_option"]).strip().lower()
+            if raw_correct.strip():
+                candidate = raw_correct.strip().lower()
                 if candidate in ("a", "b", "c", "d"):
                     correct_option = candidate
                 else:
@@ -553,6 +578,76 @@ class QuestionRepository:
         ws.column_dimensions["I"].width = 18  # Foydalanuvchi
 
         # Save to buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    @staticmethod
+    def build_excel_template() -> bytes:
+        """Savollar uchun bo'sh shablon.
+
+        Ikki varaq. Birinchisi — «Savollar», faqat sarlavhalar: o'qituvchi
+        savollarini shu yerga yozadi. Ikkinchisi — «Namuna», to'ldirilgan
+        misol bilan. Misol nega alohida varaqda: import faqat birinchi
+        varaqni o'qiydi (`pd.read_excel` standart holati), shuning uchun
+        o'qituvchi namunani o'chirishni unutsa ham u bazaga tushmaydi.
+        """
+        import io
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+        from .excel_format import TEMPLATE_HEADERS
+
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        thin_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+        widths = (50, 25, 25, 25, 25, 15)
+
+        def write_headers(sheet) -> None:
+            for col_idx, header in enumerate(TEMPLATE_HEADERS, 1):
+                cell = sheet.cell(row=1, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = thin_border
+            for col_idx, width in enumerate(widths, 1):
+                sheet.column_dimensions[sheet.cell(row=1, column=col_idx).column_letter].width = width
+
+        wb = Workbook()
+        sheet = wb.active
+        sheet.title = "Savollar"
+        write_headers(sheet)
+
+        example = wb.create_sheet("Namuna")
+        write_headers(example)
+        rows = [
+            ("2 + 2 nechaga teng?", "3", "4", "5", "6", "B"),
+            ("O'zbekiston poytaxti qaysi shahar?", "Samarqand", "Buxoro", "Toshkent", "Xiva", "C"),
+        ]
+        cell_alignment = Alignment(vertical="top", wrap_text=True)
+        for row_idx, values in enumerate(rows, 2):
+            for col_idx, value in enumerate(values, 1):
+                cell = example.cell(row=row_idx, column=col_idx, value=value)
+                cell.alignment = cell_alignment
+                cell.border = thin_border
+        note_row = len(rows) + 3
+        example.cell(
+            row=note_row,
+            column=1,
+            value=(
+                "Savollaringizni «Savollar» varag'iga yozing. "
+                "«To'g'ri javob» ustuniga faqat A, B, C yoki D harfini qo'ying."
+            ),
+        ).font = Font(italic=True, color="808080")
+
         buffer = io.BytesIO()
         wb.save(buffer)
         buffer.seek(0)

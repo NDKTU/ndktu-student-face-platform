@@ -9,7 +9,15 @@
  * Tanimagan qiymat o'z holicha qaytadi: EPOS yangi shakl qo'shsa, u hech
  * bo'lmasa o'zbekcha ko'rinadi, bo'sh joy emas.
  */
-const SHAPES = ['Kunduzgi', 'Sirtqi', 'Kechki', 'Masofaviy'] as const;
+export const EDUCATION_SHAPES = ['Kunduzgi', 'Sirtqi', 'Kechki', 'Masofaviy'] as const;
+
+/**
+ * Yo'nalish darajasi — `specialities.education_type` dagi qiymatlar.
+ * Filtrda ishlatiladi, shuning uchun yozilishi baza bilan bir xil.
+ */
+export const EDUCATION_TYPES = ['Bakalavr', 'Magistr'] as const;
+
+const SHAPES = EDUCATION_SHAPES;
 
 export const educationShapeKey = (form?: string | null): string | null => {
     if (!form) return null;

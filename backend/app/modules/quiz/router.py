@@ -154,6 +154,24 @@ question_router = APIRouter(
 )
 
 
+@question_router.get("/excel_template")
+async def download_questions_excel_template(
+    _: PermissionRequired = Depends(PermissionRequired("create:question")),
+):
+    """Import uchun bo'sh shablon.
+
+    Ruxsat `create:question` — shablon yuklaydiganlarga kerak, o'qish
+    huquqining o'zi yetarli emas.
+    """
+    import io
+
+    return StreamingResponse(
+        io.BytesIO(get_question_repository.build_excel_template()),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="savollar-shablon.xlsx"'},
+    )
+
+
 @question_router.get("/download_excel")
 async def download_questions_excel(
     subject_id: int | None = Query(None),

@@ -10,7 +10,7 @@ from app.core.utils.course_access import ROLE_MAIN, can_manage, can_own, managea
 from app.core.utils.sorting import order_by_clause
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson
-from app.modules.organization_structure.model import Group, Kafedra, TeacherGroup
+from app.modules.organization_structure.model import Group, Kafedra, Speciality, TeacherGroup
 from app.modules.quiz.model import Subject
 
 from .schemas import (
@@ -450,6 +450,31 @@ class CourseRepository:
         if request.group_id:
             sub = select(CourseGroup.course_id).where(CourseGroup.group_id == request.group_id)
             filters.append(Course.id.in_(sub))
+        if request.education_type:
+            # Bakalavr/Magistr yo'nalishda turadi. Guruh orqali ham borish
+            # mumkin edi, lekin kursning o'z `speciality_id` si to'ldirilgan
+            # va guruhnikidan farq qilmaydi — bitta jadval kam.
+            filters.append(
+                select(Speciality.id)
+                .where(
+                    Speciality.id == Course.speciality_id,
+                    Speciality.education_type.ilike(request.education_type),
+                )
+                .exists()
+            )
+        if request.education_form:
+            # EPOS bir xil shaklni turlicha yozadi («Kunduzgi»/«kunduzgi»),
+            # shuning uchun registr hisobga olinmaydi — guruhlar ro'yxatidagi
+            # filtr bilan bir xil (organization_structure/group/repository.py).
+            filters.append(
+                select(CourseGroup.id)
+                .join(Group, Group.id == CourseGroup.group_id)
+                .where(
+                    CourseGroup.course_id == Course.id,
+                    Group.education_shape.ilike(f"%{request.education_form}%"),
+                )
+                .exists()
+            )
         if request.search:
             # Qidiruv kursning o'zida emas, unga bog'liq nomlarda: ekranda
             # admin aynan fan, o'qituvchi va guruh nomini ko'rib turadi.

@@ -113,6 +113,13 @@ class CourseListRequest(BaseModel):
     faculty_id: Optional[int] = None
     kafedra_id: Optional[int] = None
     speciality_id: Optional[int] = None
+    #: Bakalavr | Magistr. Kursning o'zida bunday ustun yo'q — u
+    #: yo'nalishdan olinadi (`specialities.education_type`).
+    education_type: Optional[str] = None
+    #: Kunduzgi | Sirtqi | Kechki | Masofaviy. Bu esa guruhdan
+    #: (`groups.education_shape`): bitta kursga bir nechta guruh bog'langan
+    #: bo'lishi mumkin, shuning uchun shartga mos guruhi bo'lsa — kurs chiqadi.
+    education_form: Optional[str] = None
     #: Fan, o'qituvchi, guruh yoki kurs nomi bo'yicha qidiruv. Serverda:
     #: ilgari front faqat ochilgan sahifani qidirar, ikkinchi sahifadagi kurs
     #: esa «topilmadi» bo'lib qolardi.

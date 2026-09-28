@@ -90,3 +90,9 @@ export const useDownloadQuestionsExcel = () => {
             questionService.downloadQuestionsExcel(params),
     });
 };
+
+export const useDownloadQuestionsExcelTemplate = () => {
+    return useMutation({
+        mutationFn: () => questionService.downloadQuestionsExcelTemplate(),
+    });
+};

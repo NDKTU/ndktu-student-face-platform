@@ -1,0 +1,233 @@
+"""Savollar Excel formati: eksport, import va shablon bir tilda gaplashadi.
+
+Nima uchun bu testlar bor. Ilgari eksport sarlavhalarni o'zicha yozardi
+(«№ | Savol | A variant | …»), import esa ustunlarni o'rni bo'yicha o'qirdi.
+Eksport qilingan faylni qaytadan yuklasa, savol matni o'rniga qator raqami
+tushardi, variantlar bittaga surilardi va barcha to'g'ri javoblar «a» ga
+aylanardi. Savollar yaratilaverardi — xato hech qayerda ko'rinmasdi.
+"""
+
+import io
+
+import pytest
+from openpyxl import Workbook, load_workbook
+
+from app.modules.quiz.question.excel_format import (
+    TEMPLATE_HEADERS,
+    normalize_header,
+    resolve_columns,
+)
+
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx(rows: list[list]) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    for row in rows:
+        ws.append(row)
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+async def _upload(auth_client, subject_id: int, content: bytes):
+    return await auth_client.post(
+        f"/question/upload_excel?subject_id={subject_id}",
+        files={"file": ("savollar.xlsx", content, XLSX_MIME)},
+    )
+
+
+@pytest.mark.asyncio
+async def test_exported_file_can_be_imported_back(auth_client, test_subject):
+    """Asosiy regressiya: eksport → import savollarni buzmaydi."""
+    users_resp = await auth_client.get("/user/")
+    user_id = users_resp.json()["users"][0]["id"]
+
+    created = await auth_client.post(
+        "/question/",
+        json={
+            "subject_id": test_subject.id,
+            "user_id": user_id,
+            "text": "2 + 2 nechaga teng?",
+            "option_a": "3",
+            "option_b": "4",
+            "option_c": "5",
+            "option_d": "6",
+            "correct_option": "b",
+        },
+    )
+    assert created.status_code == 201, created.json()
+
+    exported = await auth_client.get("/question/download_excel", params={"subject_id": test_subject.id})
+    assert exported.status_code == 200
+
+    response = await _upload(auth_client, test_subject.id, exported.content)
+    assert response.status_code == 201, response.json()
+
+    questions = response.json()["questions"]
+    assert len(questions) == 1
+    imported = questions[0]
+    # Ilgari bu yerda text «1» (qator raqami), option_a esa savol matni edi.
+    assert imported["text"] == "2 + 2 nechaga teng?"
+    assert [imported["option_a"], imported["option_b"], imported["option_c"], imported["option_d"]] == [
+        "3",
+        "4",
+        "5",
+        "6",
+    ]
+    # Ilgari eksportdagi «To'g'ri javob» ustuni tanilmay, hammasi «a» bo'lardi.
+    assert imported["correct_option"] == "b"
+
+
+@pytest.mark.asyncio
+async def test_legacy_positional_file_still_imports(auth_client, test_subject):
+    """Sarlavhalar tanilmasa — eski, o'rni bo'yicha o'qish ishlaydi."""
+    content = _xlsx(
+        [
+            ["Ustun1", "Ustun2", "Ustun3", "Ustun4", "Ustun5", "correct_option"],
+            ["Poytaxt qaysi?", "Samarqand", "Toshkent", "Buxoro", "Xiva", "b"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+
+    imported = response.json()["questions"][0]
+    assert imported["text"] == "Poytaxt qaysi?"
+    assert imported["option_a"] == "Samarqand"
+    assert imported["correct_option"] == "b"
+
+
+@pytest.mark.asyncio
+async def test_headers_ignore_case_and_apostrophe_shape(auth_client, test_subject):
+    """«TO'G'RI JAVOB» ham, «to'g'ri javob» ham bir xil tushuniladi.
+
+    Excel apostrofni avtomatik «'» ga almashtiradi, foydalanuvchi esa
+    qaysi belgi turganini ko'rmaydi.
+    """
+    content = _xlsx(
+        [
+            ["SAVOL", "a variant", "B Variant", "c variant", "D VARIANT", "TO’G’RI JAVOB"],
+            ["Eng katta sayyora?", "Mars", "Yupiter", "Venera", "Saturn", "B"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+
+    imported = response.json()["questions"][0]
+    assert imported["text"] == "Eng katta sayyora?"
+    assert imported["option_b"] == "Yupiter"
+    assert imported["correct_option"] == "b"
+
+
+@pytest.mark.asyncio
+async def test_blank_rows_do_not_create_questions(auth_client, test_subject):
+    """Savollar orasidagi bo'sh qatorlar savolga aylanmaydi.
+
+    Bo'sh qatorlar ataylab oxirida emas, o'rtasida: oxirgilarini Excel'ning
+    o'zi kesib tashlaydi va test hech narsani tekshirmagan bo'lardi.
+    Ilgari bunday qator `text=""` bilan savol yaratardi.
+    """
+    content = _xlsx(
+        [
+            TEMPLATE_HEADERS,
+            ["Birinchi savol", "A", "B", "C", "D", "a"],
+            [None, None, None, None, None, None],
+            ["", "", "", "", "", ""],
+            ["Oxirgi savol", "A", "B", "C", "D", "b"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+
+    questions = response.json()["questions"]
+    assert [q["text"] for q in questions] == ["Birinchi savol", "Oxirgi savol"]
+
+
+@pytest.mark.asyncio
+async def test_missing_correct_option_warns_and_defaults_to_a(auth_client, test_subject):
+    """To'g'ri javobsiz fayl yuklanadi, lekin jimgina emas."""
+    content = _xlsx(
+        [
+            TEMPLATE_HEADERS[:5],
+            ["Javobsiz savol", "A", "B", "C", "D"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+
+    body = response.json()
+    assert body["questions"][0]["correct_option"] == "a"
+    assert body["warnings"], "ogohlantirish bo'lishi kerak edi"
+
+
+@pytest.mark.asyncio
+async def test_template_has_headers_and_empty_first_sheet(auth_client):
+    response = await auth_client.get("/question/excel_template")
+    assert response.status_code == 200
+
+    wb = load_workbook(io.BytesIO(response.content))
+    sheet = wb["Savollar"]
+    assert [c.value for c in sheet[1]] == TEMPLATE_HEADERS
+    # Birinchi varaqda ma'lumot bo'lmasligi shart: import faqat shuni
+    # o'qiydi, namuna qatori bazaga tushib qolmasligi kerak.
+    assert sheet.max_row == 1
+    assert "Namuna" in wb.sheetnames
+    assert wb["Namuna"].max_row > 1
+
+
+@pytest.mark.asyncio
+async def test_template_is_importable(auth_client, test_subject):
+    """Shablonni to'ldirib yuklash ishlaydi — sarlavhalari tanildi."""
+    template = await auth_client.get("/question/excel_template")
+    wb = load_workbook(io.BytesIO(template.content))
+    sheet = wb["Savollar"]
+    sheet.append(["Shablondan savol", "A", "B", "C", "D", "c"])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+
+    response = await _upload(auth_client, test_subject.id, buffer.getvalue())
+    assert response.status_code == 201, response.json()
+
+    imported = response.json()["questions"][0]
+    assert imported["text"] == "Shablondan savol"
+    assert imported["correct_option"] == "c"
+
+
+def test_export_headers_are_all_recognized():
+    """Eksport sarlavhalarini parser taniydi — ikkisi yana ajralmasin.
+
+    Bu sof birlik testi: `download_questions_excel` dagi ro'yxat qo'lda
+    takrorlangan, chunki u funksiya ichida turadi. Agar u o'zgarsa va
+    alias qo'shilmasa, shu test yiqiladi — eksport → import yana jimgina
+    buzilishidan oldin.
+    """
+    export_headers = [
+        "№",
+        "Savol",
+        "A variant",
+        "B variant",
+        "C variant",
+        "D variant",
+        "To'g'ri javob",
+        "Fan",
+        "Foydalanuvchi",
+    ]
+    mapping = resolve_columns(export_headers)
+
+    assert mapping is not None, "eksport sarlavhalari tanilmadi"
+    assert mapping["text"] == 1
+    assert mapping["option_a"] == 2
+    assert mapping["correct_option"] == 6
+
+
+def test_unknown_headers_fall_back_to_positional():
+    assert resolve_columns(["a", "b", "c", "d", "e"]) is None
+
+
+def test_normalize_header_folds_apostrophes_and_spaces():
+    assert normalize_header("  TO’G‘RI   JAVOB ") == "to'g'ri javob"

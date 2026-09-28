@@ -64,6 +64,30 @@ export interface QuestionTeacherSummary {
     subjects: QuestionSubjectSummary[];
 }
 
+/**
+ * Blob javobini faylga saqlaydi. Nomi `Content-Disposition` dan olinadi.
+ *
+ * `headers` turi ataylab kengroq: axios u yerda `null` ham qaytarishi
+ * mumkin, shuning uchun qiymat satr ekani alohida tekshiriladi.
+ */
+function saveXlsx(response: { data: BlobPart; headers: unknown }, fallbackName: string) {
+    const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    const raw = (response.headers as Record<string, unknown> | undefined)?.['content-disposition'];
+    const match = typeof raw === 'string' ? raw.match(/filename="?(.+?)"?$/) : null;
+    link.setAttribute('download', match ? match[1] : fallbackName);
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+}
+
 export const questionService = {
     getCatalog: async (search?: string) => {
         const response = await api.get<{ teachers: QuestionTeacherSummary[] }>('/question/catalog', {
@@ -127,27 +151,18 @@ export const questionService = {
             params,
             responseType: 'blob',
         });
+        saveXlsx(response, 'savollar.xlsx');
+    },
 
-        // Trigger browser download
-        const blob = new Blob([response.data], {
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-
-        // Extract filename from Content-Disposition header or use default
-        const contentDisposition = response.headers['content-disposition'];
-        let filename = 'savollar.xlsx';
-        if (contentDisposition) {
-            const match = contentDisposition.match(/filename="?(.+?)"?$/);
-            if (match) filename = match[1];
-        }
-
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+    /**
+     * Import uchun bo'sh shablon. Serverdan olinadi, mijozda yig'ilmaydi:
+     * ustun nomlari parser bilan bitta joyda turishi kerak
+     * (`backend/.../question/excel_format.py`). Ilgari format ikki joyda
+     * mustaqil ta'riflangani uchun eksport va import bir-biriga mos
+     * kelmay qolgan edi.
+     */
+    downloadQuestionsExcelTemplate: async () => {
+        const response = await api.get('/question/excel_template', { responseType: 'blob' });
+        saveXlsx(response, 'savollar-shablon.xlsx');
     },
 };

@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { FileUp } from 'lucide-react';
+import { FileSpreadsheet, FileUp } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
-import { useUploadQuestions } from '@/hooks/useQuestions';
+import { useUploadQuestions, useDownloadQuestionsExcelTemplate } from '@/hooks/useQuestions';
+import { useTranslation } from 'react-i18next';
 import type { Subject } from '@/services/subjectService';
 import { subjectOption } from '@/utils/subject';
+
+/**
+ * Oynada ko'rsatiladigan namuna. Ustun nomlari serverdagi shablon bilan bir
+ * xil bo'lishi kerak (`question/excel_format.py::TEMPLATE_HEADERS`) — shuning
+ * uchun ularni o'zgartirganda ikkala joyni ham yangilash kerak. Import
+ * sarlavhalarni nomi bo'yicha taniydi, ya'ni tartib qat'iy emas, lekin
+ * o'qituvchi ko'radigan namuna shablonga mos turgani yaxshi.
+ */
+const EXAMPLE_HEADERS = ['Savol', 'A variant', 'B variant', 'C variant', 'D variant', "To'g'ri javob"];
+const EXAMPLE_ROW = ['2 + 2 nechaga teng?', '3', '4', '5', '6', 'B'];
 
 interface Props {
     isOpen: boolean;
@@ -37,6 +48,8 @@ export const QuestionExcelUploadModal = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [subjectId, setSubjectId] = useState<string>(defaultSubjectId ? String(defaultSubjectId) : '');
     const uploadMutation = useUploadQuestions();
+    const templateMutation = useDownloadQuestionsExcelTemplate();
+    const { t } = useTranslation();
 
     useEffect(() => {
         setSubjectId(defaultSubjectId ? String(defaultSubjectId) : '');
@@ -84,6 +97,61 @@ export const QuestionExcelUploadModal = ({
                             searchPlaceholder="Fanni qidirish..."
                         />
                     )}
+                </div>
+
+                {/* Format hech qayerda yozilmagan edi: o'qituvchi faylni qanday
+                    yig'ishni taxmin qilardi. Namuna oynada turadi, to'liq
+                    shablonni esa serverdan yuklab olsa bo'ladi. */}
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{t('Fayl qanday ko\'rinishi kerak')}</p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            isLoading={templateMutation.isPending}
+                            onClick={() =>
+                                templateMutation.mutate(undefined, {
+                                    onError: () => toast.error(t('Shablonni yuklab bo\'lmadi')),
+                                })
+                            }
+                        >
+                            <FileSpreadsheet className="h-3.5 w-3.5" />
+                            {t('Shablonni yuklab olish')}
+                        </Button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-xs">
+                            <thead>
+                                <tr>
+                                    {EXAMPLE_HEADERS.map((header) => (
+                                        <th
+                                            key={header}
+                                            className="whitespace-nowrap border border-border bg-muted px-2 py-1.5 text-left font-medium"
+                                        >
+                                            {header}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {EXAMPLE_ROW.map((value, index) => (
+                                        <td
+                                            key={EXAMPLE_HEADERS[index]}
+                                            className="whitespace-nowrap border border-border px-2 py-1.5 text-muted-foreground"
+                                        >
+                                            {value}
+                                        </td>
+                                    ))}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        {t("Birinchi qator — sarlavhalar. «To'g'ri javob» ustuniga faqat A, B, C yoki D harfi yoziladi.")}
+                    </p>
                 </div>
 
                 {/* Nativ `<input type="file">` brauzer tilida «Choose File / No
