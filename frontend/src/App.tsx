@@ -35,6 +35,8 @@ const FilesPage = lazy(() => import('@/pages/FilesPage'));
 const FileQuotasPage = lazy(() => import('@/pages/FileQuotasPage'));
 const AnnouncementsPage = lazy(() => import('@/pages/AnnouncementsPage'));
 const StudentAnnouncementsPage = lazy(() => import('@/pages/StudentAnnouncementsPage'));
+const StudentRequestsPage = lazy(() => import('@/pages/StudentRequestsPage'));
+const StudentRequestDetailPage = lazy(() => import('@/pages/StudentRequestDetailPage'));
 const TeacherAssignmentsPage = lazy(() => import('@/pages/TeacherAssignmentsPage'));
 const GroupsPage = lazy(() => import('@/pages/GroupsPage'));
 const GroupStudentsPage = lazy(() => import('@/pages/GroupStudentsPage'));
@@ -216,6 +218,29 @@ const OrganizationStructureRoute = ({ children }: { children: React.ReactElement
     </TeacherBlockedRoute>
 );
 
+/**
+ * «Arizalar» — talabaning oʻz boʻlimi.
+ *
+ * Murojaatlar ROYD tizimida yuritiladi va u talabani HEMIS raqami
+ * boʻyicha topadi. Boshqa rollarda bunday raqam yoʻq, shuning uchun
+ * bekend ham 403 qaytaradi; bu yerdagi qoʻriqchi sababni koʻrsatadi.
+ */
+const StudentRequestsRoute = ({ children }: { children: React.ReactElement }) => {
+    const { isLoading } = useAuth();
+    const { isStudent, isAdmin } = useRoleView();
+
+    if (isLoading) {
+        return <PageSpinner />;
+    }
+    // Maʼmuriyat ham kiradi, lekin nazorat rejimida: yuborish va yozish
+    // tugmalari koʻrinmaydi, chunki ROYD xizmat kaliti bilan faqat oʻqishga
+    // ruxsat beradi. Talabada esa toʻliq huquq.
+    if (!isStudent && !isAdmin) {
+        return <AccessDenied reason="Ariza faqat talaba nomidan yuboriladi" />;
+    }
+    return children;
+};
+
 const DashboardRedirect = () => {
     const { user, activeRole } = useAuth();
     // Bir nechta roli borlar uchun tanlangan ko'rinish hal qiladi.
@@ -289,6 +314,8 @@ function App() {
                                             sahifasi ham ochilib ketardi. */}
                                         <Route path="/announcements" element={<PermissionRoute permission="read:announcement"><AnnouncementsPage /></PermissionRoute>} />
                                         <Route path="/announcements/student" element={<PermissionRoute permission="announcement:feed"><StudentAnnouncementsPage /></PermissionRoute>} />
+                                        <Route path="/requests" element={<StudentRequestsRoute><StudentRequestsPage /></StudentRequestsRoute>} />
+                                        <Route path="/requests/:requestId" element={<StudentRequestsRoute><StudentRequestDetailPage /></StudentRequestsRoute>} />
                                         <Route path="/specialities" element={<OrganizationStructureRoute><PermissionRoute permission={['read:speciality', 'read:faculty']}><SpecialitiesPage /></PermissionRoute></OrganizationStructureRoute>} />
                                         <Route path="/curriculums" element={<OrganizationStructureRoute><PermissionRoute permission="read:curriculum"><CurriculumsPage /></PermissionRoute></OrganizationStructureRoute>} />
                                         <Route path="/groups" element={<PermissionRoute permission="read:group"><GroupsPage /></PermissionRoute>} />

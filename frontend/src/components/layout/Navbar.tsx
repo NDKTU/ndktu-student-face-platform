@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { NotificationBell } from '@/components/layout/NotificationBell';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { setLanguage } from '@/i18n';
@@ -131,6 +132,8 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
 
             {/* Right: Actions & User Dropdown */}
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                <NotificationBell />
+
                 {/* Language Switcher */}
                 <button
                     onClick={toggleLang}

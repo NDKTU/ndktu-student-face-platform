@@ -1,34 +1,35 @@
 import {
-    Users,
-    FolderOpen,
-    GraduationCap,
-    Shield,
-    Key,
+    // Trophy — «Reyting» uchun edi, bo'lim yashirilgan.
+    BarChart2,
+    Award,
+    BookMarked,
     BookOpen,
     Brain,
     Building2,
-    Layers,
-    UsersRound,
-    ClipboardList,
-    ClipboardCheck,
-    PlayCircle,
-    // Trophy — «Reyting» uchun edi, bo'lim yashirilgan.
-    BarChart2,
-    Library,
-    Database,
-    Megaphone,
-    RefreshCw,
-    Award,
-    BookMarked,
-    UserCog,
-    Network,
-    SlidersHorizontal,
-    ClipboardPen,
-    MessageCircleQuestion,
-    Timer,
     ChartColumnBig,
-    ListChecks,
+    ClipboardCheck,
+    ClipboardList,
+    ClipboardPen,
+    Database,
+    FileText,
+    FolderOpen,
+    GraduationCap,
     HardDrive,
+    Key,
+    Layers,
+    Library,
+    ListChecks,
+    Megaphone,
+    MessageCircleQuestion,
+    Network,
+    PlayCircle,
+    RefreshCw,
+    Shield,
+    SlidersHorizontal,
+    Timer,
+    UserCog,
+    Users,
+    UsersRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -171,7 +172,10 @@ const STUDENT_ALWAYS_VISIBLE: SidebarSection = {
 };
 
 interface StudentSidebarItem extends SidebarItem {
-    permission: string;
+    /** Bo'sh bo'lsa punkt har bir talabaga ko'rinadi: ba'zi bo'limlar
+     *  ruxsat bilan emas, rol bilan chegaralangan (masalan «Arizalar» —
+     *  u ROYD tizimiga boradi va bizda unga tegishli ruxsat yo'q). */
+    permission?: string;
     /** Qaysi bo'limga tushadi. Ko'rsatilmasa — «Baholash». */
     section?: string;
 }
@@ -286,6 +290,9 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
     { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
+    // Ruxsatsiz: arizalar ROYD'da yuritiladi, bizda unga mos ruxsat yo'q.
+    // Chegara rol bo'yicha — marshrutda ham (`StudentRequestsRoute`).
+    { name: 'Arizalar', href: '/requests', icon: FileText, tone: 'blue', section: 'Umumiy' },
 ];
 
 // Resources whose generic admin/staff destination shouldn't be surfaced to a
@@ -318,7 +325,7 @@ const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[]
     }
 
     for (const item of STUDENT_BESPOKE_ITEMS) {
-        if (!permissions.has(item.permission)) continue;
+        if (item.permission && !permissions.has(item.permission)) continue;
         (grouped[item.section ?? 'Baholash'] ??= []).push({ name: item.name, href: item.href, icon: item.icon, tone: item.tone });
     }
 
@@ -512,7 +519,19 @@ export const buildSidebar = (
     const isTeacher = roleNames.some((r) => r.toLowerCase() === 'teacher');
     const isPsixologik = roleNames.some((r) => r.toLowerCase() === 'psixologik');
     const showDashboard = isAdmin || (isTeacher && !isPsixologik);
-    const sections: SidebarSection[] = showDashboard ? [ALWAYS_VISIBLE] : [];
+    // «Arizalar» — ROYD tizimidagi murojaatlar. Maʼmuriyat uchun nazorat
+    // koʻrinishi: xizmat kaliti unga faqat oʻqishga ruxsat beradi, shuning
+    // uchun punkt bor, lekin sahifada yuborish tugmasi yoʻq. Ruxsat bilan
+    // chegaralanmagan — bizda bu boʻlimga mos ruxsat yoʻq, u boshqa tizimda.
+    const commonItems = [
+        ...ALWAYS_VISIBLE.items,
+        ...(isAdmin
+            ? [{ name: 'Arizalar', href: '/requests', icon: FileText, tone: 'blue' as const }]
+            : []),
+    ];
+    const sections: SidebarSection[] = showDashboard
+        ? [{ ...ALWAYS_VISIBLE, items: commonItems }]
+        : [];
     for (const sectionLabel of SIDEBAR_SECTION_ORDER) {
         if (sectionLabel === 'Umumiy') continue;
         const items = grouped[sectionLabel];

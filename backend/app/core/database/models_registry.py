@@ -5,6 +5,7 @@ Used by Alembic env.py and anywhere that needs all tables registered.
 
 __all__ = [
     "Announcement",
+    "Notification",
     "AppSetting",
     "AnnouncementRegistration",
     "HemisDataCredential",
@@ -53,6 +54,9 @@ from app.modules.announcement.model import (
 )
 from app.modules.app_setting.model import (
     AppSetting,
+)
+from app.modules.notification.model import (
+    Notification,
 )
 from app.modules.auth.model import (
     Permission,

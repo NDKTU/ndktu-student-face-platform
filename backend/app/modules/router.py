@@ -7,6 +7,7 @@ from .file.quota_router import router as file_quota_router
 from .file.router import router as file_router
 from .integration.router import router as integration_router
 from .logs.router import router as logs_router
+from .notification.router import router as notification_router
 from .organization_structure.router import router as organization_structure_router
 from .psychology.router import router as psychology_router
 from .quiz.router import router as quiz_router
@@ -24,3 +25,4 @@ router.include_router(file_router)
 router.include_router(integration_router)
 router.include_router(logs_router)
 router.include_router(announcement_router)
+router.include_router(notification_router)

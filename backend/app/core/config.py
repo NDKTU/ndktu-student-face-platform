@@ -171,6 +171,38 @@ class CorsConfig(BaseModel):
     origins: list[str] = []
 
 
+class RoydConfig(BaseModel):
+    """ROYD — «Yagona darcha»: talabalar murojaatlari tizimi.
+
+    Murojaatlar ROYD'da yuritiladi, bizda nusxa saqlanmaydi: talaba arizani
+    shu platformadan yuboradi va holatini shu yerda ko'radi.
+
+    Integratsiya ROYD'ning rasmiy server-to-server yo'li bilan ishlaydi
+    (OAuth2 `client_credentials`, `docs/INTEGRATION.md` §6): biz o'z
+    nomimizdan token olamiz va talaba ma'lumotlarini arizaning o'zi bilan
+    bitta so'rovda yuboramiz. Talaba ROYD'ga kirmaydi va uning paroli bizda
+    yo'q.
+
+    `webhook_secret` — ROYD yuboradigan hodisalar imzosini tekshirish uchun.
+    ROYD tomonida kamida 32 belgi talab qilinadi. Usiz imzoni tekshirib
+    bo'lmaydi, ya'ni murojaat holatini kim xohlasa soxtalashtirardi.
+    """
+
+    base_url: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    webhook_secret: str = ""
+    timeout_seconds: float = 20.0
+    #: Token muddati javobda keladi (`expires_in`), lekin biz undan shu
+    #: soniyalar oldin yangilaymiz: so'rov yo'lda turganda muddati
+    #: tugamasligi uchun.
+    token_leeway_seconds: int = 60
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.base_url and self.client_id and self.client_secret)
+
+
 class ZoomConfig(BaseModel):
     """Zoom Meeting SDK (General App).
 
@@ -233,6 +265,7 @@ class AppConfig(BaseSettings):
     redis: RedisConfig
     cors: CorsConfig = CorsConfig()
     admin: AdminConfig = AdminConfig()
+    royd: RoydConfig = RoydConfig()
     zoom: ZoomConfig = ZoomConfig()
     attendance: AttendanceConfig = AttendanceConfig()
 
