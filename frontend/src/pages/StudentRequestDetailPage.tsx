@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ArrowLeft, Download, FileCheck2, Paperclip, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Download, FileCheck2, RotateCcw } from 'lucide-react';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +13,6 @@ import {
     useDownloadRoydFile,
     useResubmitRoydRequest,
     useRoydRequest,
-    useUploadRoydFile,
 } from '@/hooks/useRoyd';
 import { useAuth } from '@/context/AuthContext';
 import { apiErrorMessage } from '@/utils/apiError';
@@ -49,9 +48,7 @@ const StudentRequestDetailPage = () => {
 
     const [resubmitComment, setResubmitComment] = useState('');
     const resubmitMutation = useResubmitRoydRequest(id ?? 0);
-    const uploadMutation = useUploadRoydFile(id ?? 0);
     const downloadMutation = useDownloadRoydFile();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const download = (fileId: number, fileName: string) =>
         downloadMutation.mutate(
@@ -176,6 +173,9 @@ const StudentRequestDetailPage = () => {
 
             <Card>
                 <CardContent className="space-y-3 p-4">
+                    {/* Faqat ko'rish: talaba fayl biriktirmaydi. Bekend
+                        endpointi joyida qoldirildi — kerak bo'lsa tugmani
+                        qaytarish bitta tahrir. */}
                     <h2 className="text-sm font-semibold">{t('Fayllar')}</h2>
                     {(data.files ?? []).length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t('Fayl biriktirilmagan')}</p>
@@ -206,44 +206,6 @@ const StudentRequestDetailPage = () => {
                         </ul>
                     )}
 
-                    {canWrite && (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                isLoading={uploadMutation.isPending}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Paperclip className="mr-2 h-4 w-4" />
-                                {t('Fayl biriktirish')}
-                            </Button>
-                            <p className="text-xs text-muted-foreground">
-                                {t('PDF, JPG, PNG, WEBP, DOC yoki DOCX. 20 MB gacha.')}
-                            </p>
-                            {/* Nativ input yashirin: brauzer tilidagi «Choose File»
-                                tarjima qilinmaydi va qolgan tugmalardan farq qiladi.
-                                `accept` ROYD qabul qiladigan turlar bo'yicha —
-                                aks holda xato faqat serverdan qaytardi. */}
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                                onChange={(e) => {
-                                    const picked = e.target.files?.[0];
-                                    e.target.value = '';
-                                    if (!picked) return;
-                                    uploadMutation.mutate(picked, {
-                                        onSuccess: () => toast.success(t('Fayl yuklandi')),
-                                        onError: (error) =>
-                                            toast.error(
-                                                apiErrorMessage(error, t('Faylni yuklab bo\u2018lmadi')),
-                                            ),
-                                    });
-                                }}
-                            />
-                        </>
-                    )}
                 </CardContent>
             </Card>
 
