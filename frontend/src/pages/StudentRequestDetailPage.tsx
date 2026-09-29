@@ -1,23 +1,17 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ArrowLeft, Paperclip, RotateCcw, Send } from 'lucide-react';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import {
-    useAddRoydMessage,
-    useResubmitRoydRequest,
-    useRoydRequest,
-    useUploadRoydFile,
-} from '@/hooks/useRoyd';
+import { useResubmitRoydRequest, useRoydRequest } from '@/hooks/useRoyd';
 import { useAuth } from '@/context/AuthContext';
 import { apiErrorMessage } from '@/utils/apiError';
-import { formatSize } from '@/utils/fileSize';
 import {
     REQUEST_STATUS_LABEL,
     RequestStatusBadge,
@@ -37,8 +31,6 @@ const StudentRequestDetailPage = () => {
     const id = requestId ? Number(requestId) : undefined;
 
     const { data, isLoading, isError, error, refetch } = useRoydRequest(id);
-    const messageMutation = useAddRoydMessage(id ?? 0);
-    const fileMutation = useUploadRoydFile(id ?? 0);
 
     // Yozish huquqi talaba yozuviga bog'liq, rolga emas — bekend ham
     // shunday tekshiradi (`students.student_id_number`).
@@ -49,29 +41,8 @@ const StudentRequestDetailPage = () => {
     // garchi TS tipida e'lon qilingan bo'lsa ham. Talaba yozuvining
     // BORLIGI yetarli: bekend ham shu yozuv bo'yicha ishlaydi.
 
-    const [draft, setDraft] = useState('');
     const [resubmitComment, setResubmitComment] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const resubmitMutation = useResubmitRoydRequest(id ?? 0);
-
-    const sendMessage = () => {
-        const content = draft.trim();
-        if (!content) return;
-        messageMutation.mutate(content, {
-            onSuccess: () => setDraft(''),
-            onError: (mutationError) =>
-                toast.error(apiErrorMessage(mutationError, t('Xabarni yuborib bo‘lmadi'))),
-        });
-    };
-
-    const uploadFile = (file: File | undefined) => {
-        if (!file) return;
-        fileMutation.mutate(file, {
-            onSuccess: () => toast.success(t('Fayl yuklandi')),
-            onError: (mutationError) =>
-                toast.error(apiErrorMessage(mutationError, t('Faylni yuklab bo‘lmadi'))),
-        });
-    };
 
     if (isLoading) {
         return (
@@ -180,91 +151,6 @@ const StudentRequestDetailPage = () => {
                 </Card>
             )}
 
-            <Card>
-                <CardContent className="space-y-3 p-4">
-                    <h2 className="text-sm font-semibold">{t('Fayllar')}</h2>
-                    {(data.files ?? []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t('Fayl biriktirilmagan')}</p>
-                    ) : (
-                        <ul className="space-y-1 text-sm">
-                            {(data.files ?? []).map((file) => (
-                                <li key={file.id} className="flex items-center justify-between gap-2">
-                                    <span className="truncate">{file.file_name}</span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                        {formatSize(file.file_size)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {canWrite && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            isLoading={fileMutation.isPending}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            <Paperclip className="mr-2 h-4 w-4" />
-                            {t('Fayl biriktirish')}
-                        </Button>
-                    )}
-                    {/* Nativ input yashirin: brauzer tilidagi «Choose File»
-                        tarjima qilinmaydi va qolgan tugmalardan farq qiladi. */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                            uploadFile(e.target.files?.[0]);
-                            e.target.value = '';
-                        }}
-                    />
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardContent className="space-y-3 p-4">
-                    <h2 className="text-sm font-semibold">{t('Yozishmalar')}</h2>
-                    {(data.messages ?? []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t('Hozircha xabar yo‘q')}</p>
-                    ) : (
-                        <ul className="space-y-3">
-                            {(data.messages ?? []).map((message) => (
-                                <li key={message.id} className="rounded-lg border border-border p-3">
-                                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                        {/* O'z xabarini «Xodim» deb ko'rsatish chalkash edi:
-                                            ROYD rolni `sender_role` da beradi. */}
-                                        <span>
-                                            {message.sender_role === 'student'
-                                                ? t('Siz')
-                                                : message.sender_name || t('Xodim')}
-                                        </span>
-                                        <span>{new Date(message.created_at).toLocaleString()}</span>
-                                    </div>
-                                    <p className="mt-1 whitespace-pre-line text-sm">{message.content}</p>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-
-                    {canWrite && <div className="flex gap-2">
-                        <textarea
-                            value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            rows={2}
-                            placeholder={t('Xabar yozish...')}
-                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
-                        <Button
-                            onClick={sendMessage}
-                            isLoading={messageMutation.isPending}
-                            disabled={!draft.trim()}
-                        >
-                            <Send className="h-4 w-4" />
-                        </Button>
-                    </div>}
-                </CardContent>
-            </Card>
         </div>
     );
 };
