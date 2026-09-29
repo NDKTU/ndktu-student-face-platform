@@ -52,7 +52,19 @@ export interface RequestFile {
     id: number;
     file_name: string;
     file_size: number;
+    mime_type?: string;
+    /** Xodimning javob fayli (tayyor hujjat), talabanikimas. */
+    is_answer?: boolean;
     created_at: string;
+}
+
+/** Xodimning rasmiy javobi: matn va unga ilova qilingan hujjatlar. */
+export interface RequestAnswer {
+    text: string;
+    description?: string | null;
+    answered_at: string;
+    answered_by_name?: string | null;
+    files?: RequestFile[];
 }
 
 export interface RequestHistoryEntry {
@@ -71,6 +83,7 @@ export interface RequestDetail extends RequestSummary {
     category?: { id: number; name: string } | null;
     messages?: RequestMessage[];
     files?: RequestFile[];
+    answer?: RequestAnswer | null;
     history?: RequestHistoryEntry[];
 }
 
@@ -124,6 +137,26 @@ export const roydService = {
             { comment },
         );
         return response.data;
+    },
+
+    /**
+     * Faylni yuklab oladi. Nom shu yerda qo'yiladi: ROYD
+     * `Content-Disposition` da fayl nomini bermaydi (faqat `attachment`),
+     * bizda esa u tafsilot javobida bor.
+     */
+    downloadFile: async (requestId: number, fileId: number, fileName: string) => {
+        const response = await api.get(
+            `/integration/royd/requests/${requestId}/files/${fileId}`,
+            { responseType: 'blob' },
+        );
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
     },
 
     uploadFile: async (id: number, file: File) => {

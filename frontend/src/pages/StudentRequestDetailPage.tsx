@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ArrowLeft, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Download, FileCheck2, Paperclip, RotateCcw } from 'lucide-react';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useResubmitRoydRequest, useRoydRequest } from '@/hooks/useRoyd';
+import {
+    useDownloadRoydFile,
+    useResubmitRoydRequest,
+    useRoydRequest,
+    useUploadRoydFile,
+} from '@/hooks/useRoyd';
 import { useAuth } from '@/context/AuthContext';
 import { apiErrorMessage } from '@/utils/apiError';
+import { formatSize } from '@/utils/fileSize';
 import {
     REQUEST_STATUS_LABEL,
     RequestStatusBadge,
@@ -43,6 +49,18 @@ const StudentRequestDetailPage = () => {
 
     const [resubmitComment, setResubmitComment] = useState('');
     const resubmitMutation = useResubmitRoydRequest(id ?? 0);
+    const uploadMutation = useUploadRoydFile(id ?? 0);
+    const downloadMutation = useDownloadRoydFile();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const download = (fileId: number, fileName: string) =>
+        downloadMutation.mutate(
+            { requestId: id ?? 0, fileId, fileName },
+            {
+                onError: (error) =>
+                    toast.error(apiErrorMessage(error, t('Faylni yuklab bo\u2018lmadi'))),
+            },
+        );
 
     if (isLoading) {
         return (
@@ -109,6 +127,123 @@ const StudentRequestDetailPage = () => {
                     )}
 
                     <p className="whitespace-pre-line text-sm">{data.description}</p>
+                </CardContent>
+            </Card>
+
+            {/* Xodimning rasmiy javobi. Aynan shu narsa uchun ariza
+                yuborilgan, shuning uchun eng tepada va alohida ajratilgan. */}
+            {data.answer && (
+                <Card className="border-emerald-500/30">
+                    <CardContent className="space-y-3 p-4">
+                        <div className="flex items-center gap-2">
+                            <FileCheck2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <h2 className="text-sm font-semibold">{t('Javob')}</h2>
+                        </div>
+                        <p className="whitespace-pre-line text-sm">{data.answer.text}</p>
+                        {data.answer.description && (
+                            <p className="whitespace-pre-line text-xs text-muted-foreground">
+                                {data.answer.description}
+                            </p>
+                        )}
+                        {(data.answer.files ?? []).length > 0 && (
+                            <ul className="space-y-1">
+                                {(data.answer.files ?? []).map((file) => (
+                                    <li key={file.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => download(file.id, file.file_name)}
+                                            className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                                <span className="truncate">{file.file_name}</span>
+                                            </span>
+                                            <span className="shrink-0 text-xs text-muted-foreground">
+                                                {formatSize(file.file_size)}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            {data.answer.answered_by_name || t('Xodim')} ·{' '}
+                            {new Date(data.answer.answered_at).toLocaleString()}
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card>
+                <CardContent className="space-y-3 p-4">
+                    <h2 className="text-sm font-semibold">{t('Fayllar')}</h2>
+                    {(data.files ?? []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t('Fayl biriktirilmagan')}</p>
+                    ) : (
+                        <ul className="space-y-1">
+                            {(data.files ?? []).map((file) => (
+                                <li key={file.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => download(file.id, file.file_name)}
+                                        className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+                                    >
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <span className="truncate">{file.file_name}</span>
+                                            {file.is_answer && (
+                                                <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                    {t('Javob')}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                            {formatSize(file.file_size)}
+                                        </span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    {canWrite && (
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                isLoading={uploadMutation.isPending}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Paperclip className="mr-2 h-4 w-4" />
+                                {t('Fayl biriktirish')}
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                                {t('PDF, JPG, PNG, WEBP, DOC yoki DOCX. 20 MB gacha.')}
+                            </p>
+                            {/* Nativ input yashirin: brauzer tilidagi «Choose File»
+                                tarjima qilinmaydi va qolgan tugmalardan farq qiladi.
+                                `accept` ROYD qabul qiladigan turlar bo'yicha —
+                                aks holda xato faqat serverdan qaytardi. */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                                onChange={(e) => {
+                                    const picked = e.target.files?.[0];
+                                    e.target.value = '';
+                                    if (!picked) return;
+                                    uploadMutation.mutate(picked, {
+                                        onSuccess: () => toast.success(t('Fayl yuklandi')),
+                                        onError: (error) =>
+                                            toast.error(
+                                                apiErrorMessage(error, t('Faylni yuklab bo\u2018lmadi')),
+                                            ),
+                                    });
+                                }}
+                            />
+                        </>
+                    )}
                 </CardContent>
             </Card>
 

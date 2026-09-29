@@ -454,3 +454,80 @@ async def test_missing_course_is_refused_before_royd(
     assert response.status_code == 409
     assert "kurs" in response.json()["detail"].lower()
     assert captured == []
+
+
+# ──────────────────────────── Fayl yuklab olish ────────────────────────
+#
+# Talabada ROYD tokeni yo'q, shuning uchun faylga to'g'ridan-to'g'ri
+# havola berib bo'lmaydi: bekend vositachi bo'ladi.
+
+
+@pytest.mark.asyncio
+async def test_download_streams_the_file(
+    async_client, async_db, test_faculty, make_group, monkeypatch
+):
+    group = await make_group("IT-41", test_faculty["id"])
+    user_id = await _make_student(async_db, "royd_dl", group["id"], number="DL-1")
+    client = await _login(async_client, user_id)
+
+    calls: list[str] = []
+
+    async def _fake_download(path: str):
+        calls.append(path)
+        return b"\x89PNG\r\n\x1a\n", "image/png", None
+
+    monkeypatch.setattr(royd_client, "download", _fake_download)
+
+    response = await client.get("/integration/royd/requests/7/files/3")
+
+    assert response.status_code == 200, response.text
+    assert calls == ["/requests/7/files/3"]
+    assert response.content.startswith(b"\x89PNG")
+    assert response.headers["content-type"].startswith("image/png")
+    # ROYD `Content-Disposition` da nom bermaydi (faqat `attachment`),
+    # shuning uchun zaxira nom qo'yiladi — bo'sh nom bilan brauzer faylni
+    # «download» deb saqlardi.
+    assert "attachment" in response.headers["content-disposition"]
+
+
+@pytest.mark.asyncio
+async def test_download_uses_royd_filename_when_given(
+    async_client, async_db, test_faculty, make_group, monkeypatch
+):
+    group = await make_group("IT-42", test_faculty["id"])
+    user_id = await _make_student(async_db, "royd_dl2", group["id"], number="DL-2")
+    client = await _login(async_client, user_id)
+
+    async def _fake_download(path: str):
+        return b"data", "application/pdf", "malumotnoma.pdf"
+
+    monkeypatch.setattr(royd_client, "download", _fake_download)
+
+    response = await client.get("/integration/royd/requests/7/files/3")
+
+    assert 'filename="malumotnoma.pdf"' in response.headers["content-disposition"]
+
+
+@pytest.mark.asyncio
+async def test_download_requires_a_profile(async_client, async_db, test_role, monkeypatch):
+    """Talaba profili ham, ma'muriyat huquqi ham bo'lmasa — 403."""
+    from app.modules.auth.model import Role, User
+
+    role = Role(name="RandomRole")
+    user = User(username="royd_nobody", password="not-used", roles=[role])
+    async_db.add_all([role, user])
+    await async_db.commit()
+    client = await _login(async_client, user.id)
+
+    called: list[str] = []
+
+    async def _fake_download(path: str):
+        called.append(path)
+        return b"", "application/pdf", None
+
+    monkeypatch.setattr(royd_client, "download", _fake_download)
+
+    response = await client.get("/integration/royd/requests/7/files/3")
+
+    assert response.status_code == 403
+    assert called == [], "ruxsatsiz so'rov ROYD'ga bormasligi kerak"

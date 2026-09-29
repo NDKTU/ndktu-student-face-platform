@@ -77,3 +77,9 @@ export const useResubmitRoydRequest = (requestId: number) => {
         },
     });
 };
+
+export const useDownloadRoydFile = () =>
+    useMutation({
+        mutationFn: ({ requestId, fileId, fileName }: { requestId: number; fileId: number; fileName: string }) =>
+            roydService.downloadFile(requestId, fileId, fileName),
+    });

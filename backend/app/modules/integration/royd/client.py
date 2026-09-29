@@ -13,8 +13,10 @@ noto'g'ri holatni ko'radi. Webhook faqat bildirishnoma yaratadi.
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any
+from urllib.parse import unquote
 
 import httpx
 from fastapi import HTTPException, status
@@ -168,6 +170,40 @@ class RoydClient:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Arizalar tizimiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",
             ) from exc
+
+    async def download(self, path: str) -> tuple[bytes, str, str | None]:
+        """Faylni xom holida oladi: (bayt, mime, fayl nomi).
+
+        `request()` javobni JSON deb o'qiydi — fayl uchun yaramaydi.
+        Talabada ROYD tokeni yo'q, shuning uchun faylni biz olib, unga
+        uzatamiz: to'g'ridan-to'g'ri havola berib bo'lmaydi.
+        """
+        config = settings.royd
+        if not config.enabled:
+            raise RoydDisabled()
+
+        token = await self._access_token()
+        for attempt in (1, 2):
+            response = await self._send(
+                "GET", path, token=token, json=None, params=None, files=None,
+                idempotency_key=None,
+            )
+            if response.status_code == 401 and attempt == 1:
+                token = await self._access_token(force_refresh=True)
+                continue
+            break
+
+        if response.status_code >= 400:
+            # Xatoni odatdagi yo'l bilan o'giramiz — matni va kodi saqlansin.
+            self._unwrap(response)
+
+        disposition = response.headers.get("content-disposition", "")
+        filename = None
+        match = re.search(r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', disposition)
+        if match:
+            filename = unquote(match.group(1))
+        media_type = response.headers.get("content-type") or "application/octet-stream"
+        return response.content, media_type, filename
 
     @staticmethod
     def _unwrap(response: httpx.Response) -> Any:

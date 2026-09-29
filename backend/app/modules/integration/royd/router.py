@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import logging
 import re
 import uuid
@@ -9,6 +10,7 @@ import uuid
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import get_current_user_id
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -258,6 +260,31 @@ async def resubmit_request(
     await _student_payload(session, user_id)
     return await royd_client.request(
         "POST", f"/requests/{request_id}/resubmit", json={"comment": data.comment}
+    )
+
+
+@router.get("/requests/{request_id}/files/{file_id}")
+async def download_file(
+    request_id: int,
+    file_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Faylni ROYD'dan olib, foydalanuvchiga uzatadi.
+
+    To'g'ridan-to'g'ri havola berib bo'lmaydi: fayl ROYD'da va uni olish
+    uchun bizning xizmat tokenimiz kerak, talabada esa u yo'q. Shuning
+    uchun bekend vositachi bo'ladi.
+    """
+    await _hemis_filter(session, user_id)
+    content, media_type, filename = await royd_client.download(
+        f"/requests/{request_id}/files/{file_id}"
+    )
+    safe_name = (filename or f"ariza-{request_id}-{file_id}").replace('"', "")
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
     )
 
 
