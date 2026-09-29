@@ -15,7 +15,7 @@ import {
     useRoydRequest,
     useUploadRoydFile,
 } from '@/hooks/useRoyd';
-import { useRoleView } from '@/hooks/useRoleView';
+import { useAuth } from '@/context/AuthContext';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatSize } from '@/utils/fileSize';
 import {
@@ -40,10 +40,14 @@ const StudentRequestDetailPage = () => {
     const messageMutation = useAddRoydMessage(id ?? 0);
     const fileMutation = useUploadRoydFile(id ?? 0);
 
-    // Ma'muriyat nazorat rejimida o'qiydi: xizmat kaliti yozishga ruxsat
-    // bermaydi, shuning uchun xabar va fayl tugmalari ko'rsatilmaydi.
-    const { isAdmin } = useRoleView();
-    const canWrite = !isAdmin;
+    // Yozish huquqi talaba yozuviga bog'liq, rolga emas — bekend ham
+    // shunday tekshiradi (`students.student_id_number`).
+    const { user } = useAuth();
+    const canWrite = Boolean(user?.student);
+    // DIQQAT: `student.student_id_number` ga qaramaymiz — `/user/me`
+    // uni qaytarmaydi (`StudentDetailResponse` da bunday maydon yo'q),
+    // garchi TS tipida e'lon qilingan bo'lsa ham. Talaba yozuvining
+    // BORLIGI yetarli: bekend ham shu yozuv bo'yicha ishlaydi.
 
     const [draft, setDraft] = useState('');
     const [resubmitComment, setResubmitComment] = useState('');

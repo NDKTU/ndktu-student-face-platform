@@ -15,7 +15,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useUrlNumberState, useUrlState } from '@/hooks/useUrlState';
-import { useRoleView } from '@/hooks/useRoleView';
+import { useAuth } from '@/context/AuthContext';
 import { useCreateRoydRequest, useRoydCatalog, useRoydRequests } from '@/hooks/useRoyd';
 import { apiErrorMessage } from '@/utils/apiError';
 import { REQUEST_STATUS_LABEL, RequestStatusBadge } from '@/components/royd/RequestStatusBadge';
@@ -26,11 +26,16 @@ const StudentRequestsPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
 
-    // Ma'muriyat nazorat rejimida: ROYD xizmat kaliti unga faqat o'qishga
-    // ruxsat beradi, shuning uchun yuborish tugmasi ko'rsatilmaydi — bosilsa
-    // server 403 qaytarardi va bu nosozlikka o'xshab ko'rinardi.
-    const { isAdmin } = useRoleView();
-    const canSubmit = !isAdmin;
+    // Yuborish huquqi ROLga emas, TALABA YOZUVIga bog'liq: bekend arizani
+    // `students.student_id_number` bo'yicha yuboradi. Bootstrap adminda
+    // `student` roli bor, lekin yozuvi yo'q — rol bo'yicha hal qilsak, unga
+    // tugma ko'rinardi va bosilganda 403 kelardi.
+    const { user } = useAuth();
+    const canSubmit = Boolean(user?.student);
+    // DIQQAT: `student.student_id_number` ga qaramaymiz — `/user/me`
+    // uni qaytarmaydi (`StudentDetailResponse` da bunday maydon yo'q),
+    // garchi TS tipida e'lon qilingan bo'lsa ham. Talaba yozuvining
+    // BORLIGI yetarli: bekend ham shu yozuv bo'yicha ishlaydi.
 
     const [page, setPage] = useUrlNumberState('page', 1);
     const [status, setStatus] = useUrlState<string>('status', 'all');
@@ -66,7 +71,7 @@ const StudentRequestsPage = () => {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={isAdmin ? t('Arizalar') : t('Arizalarim')}
+                title={canSubmit ? t('Arizalarim') : t('Arizalar')}
                 description={t('Registrator ofisiga yuborilgan murojaatlar va ularning holati')}
                 actions={
                     !isDisabled && canSubmit && (
