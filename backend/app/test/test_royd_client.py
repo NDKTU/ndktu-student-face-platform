@@ -175,7 +175,13 @@ async def test_disabled_integration_returns_503(monkeypatch):
 async def test_create_sends_student_data_and_idempotency_key(
     async_client, async_db, test_faculty, make_group, captured
 ):
+    from sqlalchemy import update
+
+    from app.modules.organization_structure.model import Group
+
     group = await make_group("IT-21", test_faculty["id"])
+    await async_db.execute(update(Group).where(Group.id == group["id"]).values(course=3))
+    await async_db.commit()
     user_id = await _make_student(async_db, "royd_create", group["id"])
     client = await _login(async_client, user_id)
 
@@ -199,6 +205,8 @@ async def test_create_sends_student_data_and_idempotency_key(
     # Kalit har doim yuboriladi: tarmoq uzilgach qayta yuborish nusxa
     # yaratmasligi kerak.
     assert call["idempotency_key"]
+    # `course` — ROYD 2026-09-29 da majburiy qildi. Bo'sh yuborsak 422.
+    assert body["course"] == 3
 
 
 @pytest.mark.asyncio
@@ -366,4 +374,83 @@ async def test_student_without_group_gets_clear_error(async_client, async_db, ca
 
     assert response.status_code == 409
     assert "fakultet" in response.json()["detail"].lower()
+    assert captured == []
+
+
+# ─────────────────────────────── Kurs ──────────────────────────────────
+#
+# `course` ROYD tomonida majburiy (1..7). Manba ikkita: guruhdagi butun son
+# (EPOS) va talabaning `level` satri (HEMIS «3-kurs» deb yozadi).
+
+
+@pytest.mark.asyncio
+async def test_course_comes_from_group(
+    async_client, async_db, test_faculty, make_group, captured
+):
+    from sqlalchemy import update
+
+    from app.modules.organization_structure.model import Group
+
+    group = await make_group("IT-31", test_faculty["id"])
+    await async_db.execute(update(Group).where(Group.id == group["id"]).values(course=4))
+    await async_db.commit()
+    user_id = await _make_student(async_db, "royd_course", group["id"], number="CRS-1")
+    client = await _login(async_client, user_id)
+
+    await client.post(
+        "/integration/royd/requests",
+        json={"category_id": 1, "title": "Sarlavha", "description": "Matn"},
+    )
+
+    assert captured[0]["json"]["course"] == 4
+
+
+@pytest.mark.asyncio
+async def test_course_falls_back_to_hemis_level(
+    async_client, async_db, test_faculty, make_group, captured
+):
+    """Guruhda kurs bo'lmasa — HEMIS «3-kurs» satridan olinadi."""
+    from sqlalchemy import update
+
+    from app.modules.auth.model import Student
+
+    group = await make_group("IT-32", test_faculty["id"])  # `course` bo'sh
+    user_id = await _make_student(async_db, "royd_level", group["id"], number="CRS-2")
+    await async_db.execute(
+        update(Student).where(Student.user_id == user_id).values(level="3-kurs")
+    )
+    await async_db.commit()
+    client = await _login(async_client, user_id)
+
+    await client.post(
+        "/integration/royd/requests",
+        json={"category_id": 1, "title": "Sarlavha", "description": "Matn"},
+    )
+
+    assert captured[0]["json"]["course"] == 3
+
+
+@pytest.mark.asyncio
+async def test_missing_course_is_refused_before_royd(
+    async_client, async_db, test_faculty, make_group, captured
+):
+    """Kurs topilmasa ROYD'ga bormaymiz: u 422 qaytarardi va talaba
+    tushunarsiz xatoni ko'rardi."""
+    from sqlalchemy import update
+
+    from app.modules.auth.model import Student
+
+    group = await make_group("IT-33", test_faculty["id"])
+    user_id = await _make_student(async_db, "royd_nocourse", group["id"], number="CRS-3")
+    await async_db.execute(update(Student).where(Student.user_id == user_id).values(level=""))
+    await async_db.commit()
+    client = await _login(async_client, user_id)
+
+    response = await client.post(
+        "/integration/royd/requests",
+        json={"category_id": 1, "title": "Sarlavha", "description": "Matn"},
+    )
+
+    assert response.status_code == 409
+    assert "kurs" in response.json()["detail"].lower()
     assert captured == []

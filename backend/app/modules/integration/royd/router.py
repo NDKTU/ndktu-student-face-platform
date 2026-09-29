@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 import uuid
 
 from core.database.db_helper import db_helper
@@ -40,6 +41,29 @@ _DELIVERY_TTL_SECONDS = 7 * 24 * 3600
 # ─────────────────────────── Talaba ma'lumotlari ───────────────────────────
 
 
+#: ROYD kursni 1..7 oralig'ida butun son sifatida kutadi.
+_COURSE_MIN, _COURSE_MAX = 1, 7
+
+
+def _course_number(group_course: int | None, level: str | None) -> int | None:
+    """Talabaning kursi.
+
+    Asosiy manba — `groups.course`: u EPOS'dan keladi va butun son.
+    Zaxira — `students.level`, unda HEMIS «3-kurs» ko'rinishida yozadi,
+    shuning uchun raqam ajratib olinadi. Ikkalasi ham bo'lmasa `None`:
+    bo'sh qiymat yuborsak ROYD 422 qaytaradi va talaba tushunarsiz
+    xatoni ko'rardi.
+    """
+    if group_course and _COURSE_MIN <= group_course <= _COURSE_MAX:
+        return group_course
+    digits = re.search(r"\d+", level or "")
+    if digits:
+        value = int(digits.group())
+        if _COURSE_MIN <= value <= _COURSE_MAX:
+            return value
+    return None
+
+
 async def _student_payload(session: AsyncSession, user_id: int) -> dict:
     """ROYD'ga yuboriladigan talaba ma'lumotlari.
 
@@ -55,7 +79,9 @@ async def _student_payload(session: AsyncSession, user_id: int) -> dict:
                 Student.student_id_number,
                 Student.full_name,
                 Student.image_path,
+                Student.level,
                 Group.name,
+                Group.course,
                 Faculty.name,
             )
             .join(Group, Group.id == Student.group_id, isouter=True)
@@ -70,7 +96,7 @@ async def _student_payload(session: AsyncSession, user_id: int) -> dict:
             detail="Ariza faqat talaba nomidan yuboriladi",
         )
 
-    hemis_id, full_name, image_path, group_name, faculty_name = row
+    hemis_id, full_name, image_path, level, group_name, group_course, faculty_name = row
     if not faculty_name or not group_name:
         # ROYD uchun ikkalasi ham majburiy. Bo'sh yuborsak 422 qaytardi va
         # talaba tushunarsiz xatoni ko'rardi.
@@ -79,11 +105,19 @@ async def _student_payload(session: AsyncSession, user_id: int) -> dict:
             detail="Profilingizda fakultet yoki guruh ko'rsatilmagan. Administratorga murojaat qiling.",
         )
 
+    course = _course_number(group_course, level)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Profilingizda kurs ko'rsatilmagan. Administratorga murojaat qiling.",
+        )
+
     payload = {
         "student_hemis_id": hemis_id,
         "full_name": full_name or hemis_id,
         "faculty": faculty_name,
         "group": group_name,
+        "course": course,
     }
     # Rasm ixtiyoriy va faqat http(s) bo'lishi kerak. Bizdagi qiymat
     # nisbiy yo'l bo'lishi mumkin (`/uploads/...`) — bunday havolani ROYD
