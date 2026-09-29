@@ -109,11 +109,24 @@ async def async_db(async_db_engine):
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def async_client(async_db):
+async def async_client(async_db, async_db_engine, monkeypatch):
     def override_get_db():
         yield async_db
 
     fastapi_app.dependency_overrides[db_helper.session_getter] = override_get_db
+
+    # `session_getter` ni almashtirish yetarli emas: so'rov ichida o'z
+    # tranzaksiyasini ochadigan kod (masalan audit jurnali) `db_helper`
+    # fabrikasini to'g'ridan-to'g'ri chaqiradi va u ASOSIY bazaga
+    # ko'rsatadi. Almashtirilmasa, testlar ishlab turgan bazaga yozib
+    # ketardi. Skriptlar va fon vazifalari bundan zarar ko'rmaydi: ular
+    # test jarayonida chaqirilmaydi.
+    monkeypatch.setattr(
+        db_helper,
+        "session_factory",
+        async_sessionmaker(bind=async_db_engine, class_=AsyncSession, expire_on_commit=False),
+    )
+
     return AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://localhost/api")
 
 

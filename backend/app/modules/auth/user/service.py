@@ -49,11 +49,25 @@ class UserService:
         # Store jti in Redis to enforce Single Active Session.
         # TTL = скользящее idle-окно; продлевается при каждом запросе в validate_session.
         try:
+            # Avvalgi sessiya bor edimi — bu yangi kirish uni tugatayotganini
+            # bildiradi. Keyin tekshirib bo'lmaydi: kalit qayta yoziladi.
+            # So'rov konteksti bu yerda yo'q, shuning uchun IP yozilmaydi —
+            # muhimi kimning sessiyasi va qachon tugatilgani.
+            had_session = bool(await redis_client.get(self._session_key(user_id)))
             await redis_client.set(
                 self._session_key(user_id),
                 jti,
                 ex=settings.jwt.session_idle_minutes * 60,
             )
+            if had_session:
+                from app.modules.audit import service as audit_service
+                from app.modules.audit.model import AuditEvent
+
+                await audit_service.record_standalone(
+                    event=AuditEvent.SESSION_EVICTED,
+                    user_id=user_id,
+                    summary="Boshqa qurilmadan kirildi — avvalgi sessiya tugatildi",
+                )
         except RedisError:
             logger.exception("Redis unavailable while creating session for user %s", user_id)
             raise HTTPException(

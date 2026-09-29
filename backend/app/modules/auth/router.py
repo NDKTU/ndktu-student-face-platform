@@ -3,6 +3,8 @@ import logging
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
+from app.modules.audit import service as audit_service
+from app.modules.audit.model import AuditEvent
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,8 +122,37 @@ user_router = APIRouter(
     response_model=UserLoginResponse,
     dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=login_rate_limit_identifier))],
 )
-async def login(data: UserLoginRequest, session: AsyncSession = Depends(db_helper.session_getter)):
-    return await auth_service.login(session=session, data=data)
+async def login(
+    data: UserLoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_getter),
+):
+    # Kirish urinishi muvaffaqiyatli ham, muvaffaqiyatsiz ham qayd etiladi:
+    # ikkinchisisiz parol tanlash urinishlari ko'rinmay qolardi. Yozuv
+    # alohida tranzaksiyada — xato bo'lsa chaqiruvchining tranzaksiyasi
+    # qaytadi, urinish esa qolishi kerak.
+    try:
+        result = await auth_service.login(session=session, data=data)
+    except Exception as exc:
+        await audit_service.record_standalone(
+            event=AuditEvent.LOGIN_FAILED,
+            username=data.username,
+            summary=f"Kirish muvaffaqiyatsiz: {data.username}",
+            meta={"reason": getattr(exc, "detail", None) or type(exc).__name__},
+            request=request,
+        )
+        raise
+
+    user = await auth_service.get_user_by_username(session, data.username)
+    await audit_service.record_standalone(
+        event=AuditEvent.LOGIN,
+        user_id=user.id if user else None,
+        username=data.username,
+        summary=f"Tizimga kirdi: {data.username}",
+        meta={"method": "local"},
+        request=request,
+    )
+    return result
 
 
 @user_router.get("/me", response_model=UserMeResponse)
@@ -157,11 +188,19 @@ async def delete_my_avatar(
 
 @user_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     current_user=Depends(PermissionRequired("user:me")),
 ):
     # Отзываем сессию на сервере: удаляем jti из Redis → все токены пользователя
     # становятся невалидными (validate_session вернёт 401).
     await auth_service.logout(current_user.id)
+    await audit_service.record_standalone(
+        event=AuditEvent.LOGOUT,
+        user_id=current_user.id,
+        username=current_user.username,
+        summary=f"Tizimdan chiqdi: {current_user.username}",
+        request=request,
+    )
 
 
 @user_router.put("/me/credentials", response_model=UserCreateResponse)
@@ -732,9 +771,35 @@ hemis_router = APIRouter(prefix="/hemis", tags=["Hemis"])
 )
 async def hemis_login(
     data: HemisLoginRequest,
+    request: Request,
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
-    return await hemis_service.hemis_login(session=session, data=data)
+    # Talabalar va o'qituvchilarning asosiy kirish yo'li. `hemis_login`
+    # ichida uchta tarmoq bor (mahalliy parol, talabalar HEMIS'i,
+    # xodimlar HEMIS'i) — ularni alohida o'rash o'rniga natija bo'yicha
+    # bir joyda qayd etamiz.
+    try:
+        result = await hemis_service.hemis_login(session=session, data=data)
+    except Exception as exc:
+        await audit_service.record_standalone(
+            event=AuditEvent.LOGIN_FAILED,
+            username=data.login,
+            summary=f"Kirish muvaffaqiyatsiz: {data.login}",
+            meta={"method": "hemis", "reason": getattr(exc, "detail", None) or type(exc).__name__},
+            request=request,
+        )
+        raise
+
+    user = await auth_service.get_user_by_username(session, data.login)
+    await audit_service.record_standalone(
+        event=AuditEvent.LOGIN,
+        user_id=user.id if user else None,
+        username=data.login,
+        summary=f"Tizimga kirdi: {data.login}",
+        meta={"method": "hemis"},
+        request=request,
+    )
+    return result
 
 
 @hemis_router.post(

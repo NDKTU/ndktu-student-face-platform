@@ -15,6 +15,7 @@ import {
     FolderOpen,
     GraduationCap,
     HardDrive,
+    History,
     Key,
     Layers,
     Library,
@@ -71,6 +72,9 @@ export const SIDEBAR_SECTION_ORDER = [
 ] as const;
 
 export const RESOURCES: Record<string, ResourceMeta> = {
+    // Jurnal — ma'muriyat ishi: `read:audit` faqat Admin'da bo'ladi
+    // (ishga tushishda route'dan topilib beriladi).
+    audit:         { label: 'Audit jurnali',    href: '/audit',       icon: History,       section: 'Tizim',        tone: 'blue' },
     user:          { label: 'Foydalanuvchilar', href: '/users',       icon: UserCog,       section: "Ma'lumotnoma", tone: 'blue' },
     teacher:       { label: "O'qituvchilar",    href: '/teachers',    icon: GraduationCap, section: "Ma'lumotnoma", tone: 'teal' },
     student:       { label: 'Talabalar',        href: '/students',    icon: Users,         section: "Ma'lumotnoma", tone: 'cyan' },
@@ -181,6 +185,7 @@ interface StudentSidebarItem extends SidebarItem {
 }
 
 export const SIDEBAR_RESOURCE_ORDER: string[] = [
+    'audit',
     // O'quv jarayoni
     'course',
     'teacher_assignment',

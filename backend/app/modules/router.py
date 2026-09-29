@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .announcement.router import router as announcement_router
+from .audit.router import router as audit_router
 from .auth.router import router as auth_router
 from .course.router import router as course_router
 from .file.quota_router import router as file_quota_router
@@ -26,3 +27,4 @@ router.include_router(integration_router)
 router.include_router(logs_router)
 router.include_router(announcement_router)
 router.include_router(notification_router)
+router.include_router(audit_router)

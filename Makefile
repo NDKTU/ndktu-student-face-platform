@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply cleanup-files cleanup-files-apply cleanup-files-cron link-answers link-answers-apply restore-dates restore-dates-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply cleanup-files cleanup-files-apply cleanup-files-cron audit-cleanup audit-cleanup-apply audit-cleanup-cron link-answers link-answers-apply restore-dates restore-dates-apply
 
 .DEFAULT_GOAL := help
 
@@ -35,6 +35,9 @@ help:
 	@echo "make cleanup-files        - Show deleted files whose bytes can be removed (dry run)"
 	@echo "make cleanup-files-apply  - Remove them from disk (dumps library tables first)"
 	@echo "make cleanup-files-cron   - Print the crontab line for a nightly cleanup"
+	@echo "make audit-cleanup        - Show how many audit rows are past retention (dry run)"
+	@echo "make audit-cleanup-apply  - Delete them (default: older than 90 days)"
+	@echo "make audit-cleanup-cron   - Print the crontab line for a nightly cleanup"
 	@echo "make link-answers         - Show answers to link to their attempts (dry run)"
 	@echo "make link-answers-apply   - Link them (dumps user_answers first)"
 	@echo "make restore-dates        - Show result dates recoverable from answers (dry run)"
@@ -164,6 +167,17 @@ cleanup-files-apply:
 cleanup-files-cron:
 	@echo "# File library cleanup — nightly at 03:30"
 	@echo "30 3 * * * $(CURDIR)/scripts/cleanup_files.sh --apply >> /dev/null 2>&1"
+
+# Audit jurnalini saqlash muddati boʻyicha tozalash
+audit-cleanup:
+	@./scripts/audit_cleanup.sh $(ARGS)
+
+audit-cleanup-apply:
+	@./scripts/audit_cleanup.sh --apply $(ARGS)
+
+audit-cleanup-cron:
+	@echo "# Audit log cleanup — nightly at 04:00"
+	@echo "0 4 * * * $(CURDIR)/scripts/audit_cleanup.sh --apply >> /dev/null 2>&1"
 
 # Javoblarni urinishlarga bogʻlash (bir martalik)
 link-answers:
