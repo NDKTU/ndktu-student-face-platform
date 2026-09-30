@@ -116,6 +116,7 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: "O'quv jarayoni", tone: 'green' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Baholash', tone: 'pink' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Baholash', tone: 'purple' },
+    psychology_stats: { label: 'Psixologiya statistikasi', href: '/psychology/stats', icon: ChartColumnBig, section: 'Baholash', tone: 'cyan' },
 
     me:            { label: 'Profil' },
     quiz_process:  { label: 'Test jarayoni' },
@@ -539,6 +540,20 @@ export const buildSidebar = (
             ? [{ name: 'Arizalar', href: '/requests', icon: FileText, tone: 'blue' as const }]
             : []),
     ];
+    // «Psixologiya statistikasi» — o'z ruxsati yo'q: bekend uni
+    // `read:psychology_results` bilan yopadi (`psychology/router.py`).
+    // Menyu esa punktni `read:<resurs>` bo'yicha qo'shadi, shuning uchun
+    // umumiy sikldan tashqarida, aniq ruxsat bo'yicha qo'shiladi.
+    if (permissions.has('read:psychology_results')) {
+        const meta = RESOURCES.psychology_stats;
+        (grouped[meta.section ?? 'Baholash'] ??= []).push({
+            name: meta.label,
+            href: meta.href!,
+            icon: meta.icon!,
+            tone: meta.tone,
+        });
+    }
+
     const sections: SidebarSection[] = showDashboard
         ? [{ ...ALWAYS_VISIBLE, items: commonItems }]
         : [];

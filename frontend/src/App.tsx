@@ -59,6 +59,7 @@ const TeacherSubjectsPage = lazy(() => import('@/pages/TeacherSubjectsPage'));
 const PsychologyPage = lazy(() => import('@/pages/PsychologyPage'));
 const PsychologyTestPage = lazy(() => import('@/pages/PsychologyTestPage'));
 const PsychologyResultsPage = lazy(() => import('@/pages/PsychologyResultsPage'));
+const PsychologyStatsPage = lazy(() => import('@/pages/PsychologyStatsPage'));
 const StudentPsychologyPage = lazy(() => import('@/pages/StudentPsychologyPage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
@@ -337,6 +338,7 @@ function App() {
                                         <Route path="/homework/:id/submissions" element={<PermissionRoute permission="update:submission"><HomeworkSubmissionsPage /></PermissionRoute>} />
                                         <Route path="/psychology" element={<PsychologyRoute><PermissionRoute permission="read:psychology"><PsychologyPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/results" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute></PsychologyRoute>} />
+                                        <Route path="/psychology/stats" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyStatsPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
