@@ -62,6 +62,8 @@ from .lesson.schemas import (
     LessonResponse,
     LessonUpdateRequest,
 )
+from .stats.repository import get_course_stats_repository
+from .stats.schemas import CourseStatsRequest, CourseStatsResponse
 from .resource.repository import get_resource_repository
 from .resource.schemas import (
     ResourceCreateRequest,
@@ -135,6 +137,20 @@ async def list_course_teacher_summaries(
         faculty_id=faculty_id,
         kafedra_id=kafedra_id,
     )
+
+
+# `/{course_id}` dan oldin turishi shart: aks holda «stats» kurs id'si deb
+# o'qilib, 422 qaytardi.
+@course_router.get("/stats", response_model=CourseStatsResponse)
+async def course_stats(
+    data: CourseStatsRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    # Alohida ruxsat: `read:course` o'qituvchi va talabada ham bor, bu esa
+    # butun universitet kesimi. Ishga tushishda faqat Admin'ga beriladi.
+    _: "User" = Depends(PermissionRequired("read:course_stats")),
+):
+    """Kurslar statistikasi: har kursda nechta mavzu, resurs va topshiriq."""
+    return await get_course_stats_repository.course_stats(session=session, request=data)
 
 
 @course_router.get("/{course_id}", response_model=CourseResponse)

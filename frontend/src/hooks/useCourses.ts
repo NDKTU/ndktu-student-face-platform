@@ -3,8 +3,19 @@ import {
     courseService,
     type CourseCreateRequest,
     type CourseListFilters,
+    type CourseStatsFilters,
     type CourseUpdateRequest,
 } from '@/services/courseService';
+
+/** Kurslar statistikasi — faqat admin (`read:course_stats`). */
+export const useCourseStats = (filters: CourseStatsFilters = {}, enabled = true) =>
+    useQuery({
+        queryKey: ['course-stats', filters],
+        queryFn: () => courseService.getStats(filters),
+        // Filtr almashganda jadval va kartochkalar bo'shab, sakrab ketmasin.
+        placeholderData: (previousData) => previousData,
+        enabled,
+    });
 
 export const useCourses = (filters: CourseListFilters = {}, enabled: boolean = true) => {
     return useQuery({

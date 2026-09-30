@@ -187,7 +187,82 @@ export interface CourseGradebook {
     students: CourseGradebookRow[];
 }
 
+/** Kurslar statistikasi (`GET /course/stats`) — bitta kurs, bitta qator. */
+export interface CourseStatsRow {
+    course_id: number;
+    /** Guruhlar bilan to'liq nom — bir xil ko'rinadigan qatorlarni ajratadi. */
+    course_name: string;
+    kafedra_name?: string | null;
+    /** Kafedraning fakulteti. */
+    faculty_name?: string | null;
+    subject_name: string;
+    curriculum_name?: string | null;
+    education_type?: string | null;
+    education_form?: string | null;
+    course_type?: string | null;
+    /** 1 — kuzgi, 2 — bahorgi. */
+    semester_number?: number | null;
+    /** O'qish semestri (4-kurs, kuzgi → 7). Guruhsiz kursda bo'sh. */
+    study_semester?: number | null;
+    topic_count: number;
+    resource_count: number;
+    homework_count: number;
+}
+
+export interface CourseStatsSummary {
+    course_count: number;
+    topic_count: number;
+    resource_count: number;
+    homework_count: number;
+    /** Mavzu, resurs va topshirig'i yo'q kurslar. */
+    empty_course_count: number;
+}
+
+export interface CourseStatsResponse {
+    total: number;
+    page: number;
+    limit: number;
+    summary: CourseStatsSummary;
+    rows: CourseStatsRow[];
+}
+
+export type CourseStatsSortField = 'kafedra' | 'subject' | 'semester' | 'topics' | 'resources' | 'homeworks';
+
+export interface CourseStatsFilters {
+    page?: number;
+    limit?: number;
+    facultyId?: number;
+    kafedraId?: number;
+    courseType?: CourseType;
+    /** O'qish semestri: 1–10. */
+    semester?: number;
+    educationType?: string;
+    educationForm?: string;
+    fill?: 'filled' | 'empty';
+    search?: string;
+    sortBy?: CourseStatsSortField;
+    order?: 'asc' | 'desc';
+}
+
 export const courseService = {
+    getStats: async (filters: CourseStatsFilters = {}) => {
+        const params: Record<string, unknown> = { page: filters.page ?? 1, limit: filters.limit ?? 20 };
+        if (filters.facultyId) params.faculty_id = filters.facultyId;
+        if (filters.kafedraId) params.kafedra_id = filters.kafedraId;
+        if (filters.courseType) params.course_type = filters.courseType;
+        if (filters.semester) params.semester = filters.semester;
+        if (filters.educationType) params.education_type = filters.educationType;
+        if (filters.educationForm) params.education_form = filters.educationForm;
+        if (filters.fill) params.fill = filters.fill;
+        if (filters.search?.trim()) params.search = filters.search.trim();
+        if (filters.sortBy) {
+            params.sort_by = filters.sortBy;
+            params.order = filters.order ?? 'asc';
+        }
+
+        const response = await api.get<CourseStatsResponse>('/course/stats', { params });
+        return response.data;
+    },
     getTeacherSummaries: async (search?: string, facultyId?: number, kafedraId?: number) => {
         const response = await api.get<{ teachers: CourseTeacherSummary[] }>('/course/teachers/summary', {
             params: { search, faculty_id: facultyId, kafedra_id: kafedraId },

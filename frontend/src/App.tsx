@@ -44,6 +44,7 @@ const GroupStudentsPage = lazy(() => import('@/pages/GroupStudentsPage'));
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'));
 const CoursesPage = lazy(() => import('@/pages/CoursesPage'));
 const CourseDetailPage = lazy(() => import('@/pages/CourseDetailPage'));
+const CourseStatsPage = lazy(() => import('@/pages/CourseStatsPage'));
 const StudentsPage = lazy(() => import('@/pages/StudentsPage'));
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'));
 const QuestionFormPage = lazy(() => import('@/pages/QuestionFormPage'));
@@ -340,6 +341,8 @@ function App() {
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
                                         <Route path="/courses" element={<PermissionRoute permission="read:course"><CoursesPage /></PermissionRoute>} />
+                                        {/* `/courses/:id` dan aniqroq — react-router uni birinchi tanlaydi. */}
+                                        <Route path="/courses/stats" element={<PermissionRoute permission="read:course_stats"><CourseStatsPage /></PermissionRoute>} />
                                         <Route path="/courses/:id" element={<PermissionRoute permission="read:course"><CourseDetailPage /></PermissionRoute>} />
                                         <Route path="/teacher-groups" element={<PermissionRoute permission="read:group"><TeacherGroupsPage /></PermissionRoute>} />
                                         <Route path="/teacher-subjects" element={<PermissionRoute permission="read:subject"><TeacherSubjectsPage /></PermissionRoute>} />

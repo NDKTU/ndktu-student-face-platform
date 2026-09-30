@@ -39,6 +39,7 @@ const PATH_LABELS: Record<string, string> = {
     '/psychology/student':  'Psixologik testlar',
     '/subjects':            'Fanlar',
     '/courses':             'Kurslar',
+    '/courses/stats':       'Kurslar statistikasi',
     '/teacher-groups':      'Mening guruhlarim',
     '/teacher-subjects':    'Mening fanlarim',
     '/questions':           'Savollar',

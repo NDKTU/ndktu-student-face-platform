@@ -7,6 +7,7 @@ import {
     Brain,
     Building2,
     ChartColumnBig,
+    ChartNoAxesCombined,
     ClipboardCheck,
     ClipboardList,
     ClipboardPen,
@@ -101,6 +102,9 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     group:         { label: 'Guruhlar',         href: '/groups',      icon: UsersRound,    section: "Ma'lumotnoma", tone: 'cyan' },
     subject:       { label: 'Fanlar',           href: '/subjects',    icon: BookMarked,    section: "Ma'lumotnoma", tone: 'green' },
     course:        { label: 'Kurslar',          href: '/courses',     icon: Library,       section: "O'quv jarayoni", tone: 'teal' },
+    // Butun universitet kesimi: `read:course_stats` ishga tushishda faqat
+    // Admin'ga beriladi (`read:course` esa o'qituvchi va talabada ham bor).
+    course_stats:  { label: 'Kurslar statistikasi', href: '/courses/stats', icon: ChartNoAxesCombined, section: "O'quv jarayoni", tone: 'purple' },
 
     quiz:          { label: 'Testlar',          href: '/quizzes',     icon: ClipboardPen,    section: 'Baholash', tone: 'blue' },
     active_quiz:   { label: 'Faol testlar',     href: '/active-quizzes', icon: Timer, section: 'Baholash', tone: 'green' },
@@ -188,6 +192,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'audit',
     // O'quv jarayoni
     'course',
+    'course_stats',
     'teacher_assignment',
     'homework',
     'lesson',
