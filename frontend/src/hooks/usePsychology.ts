@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { psychologyService, type MethodCreateRequest, type MethodUpdateRequest, type QuestionCreateRequest, type QuestionUpdateRequest, type TestSubmitRequest } from '@/services/psychologyService';
+import { psychologyService, type BreakdownBy, type StatsFilterParams, type TimelinePeriod, type MethodCreateRequest, type MethodUpdateRequest, type QuestionCreateRequest, type QuestionUpdateRequest, type TestSubmitRequest } from '@/services/psychologyService';
 
 export const useMethods = (page = 1, limit = 20) =>
     useQuery({
@@ -87,7 +87,10 @@ export const useDeleteResult = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => psychologyService.deleteResult(id),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ['psychology-my-results'] }),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['psychology-my-results'] });
+            qc.invalidateQueries({ queryKey: ['psychology-stats'] });
+        },
     });
 };
 
@@ -101,4 +104,65 @@ export const useMyResults = (params?: {
     useQuery({
         queryKey: ['psychology-my-results', params],
         queryFn: () => psychologyService.listMyResults(params),
+    });
+
+// ── Statistika ──────────────────────────────────────────────────────────────
+
+export const usePsychologyStatsOverview = (filters: StatsFilterParams) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'overview', filters],
+        queryFn: () => psychologyService.getStatsOverview(filters),
+        placeholderData: (prev) => prev,
+    });
+
+export const usePsychologyTimeline = (filters: StatsFilterParams, period: TimelinePeriod, methodId?: number) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'timeline', filters, period, methodId],
+        queryFn: () => psychologyService.getStatsTimeline({ ...filters, period, method_id: methodId }),
+        placeholderData: (prev) => prev,
+    });
+
+export const useMethodStats = (methodId: number | undefined, filters: StatsFilterParams, latestOnly: boolean) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'method', methodId, filters, latestOnly],
+        queryFn: () => psychologyService.getMethodStats(methodId!, { ...filters, latest_only: latestOnly }),
+        enabled: methodId !== undefined,
+        placeholderData: (prev) => prev,
+    });
+
+export const useMethodBreakdown = (
+    methodId: number | undefined,
+    filters: StatsFilterParams,
+    by: BreakdownBy,
+    category: string | undefined,
+    latestOnly: boolean,
+) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'breakdown', methodId, filters, by, category, latestOnly],
+        queryFn: () =>
+            psychologyService.getMethodBreakdown(methodId!, { ...filters, by, category, latest_only: latestOnly }),
+        enabled: methodId !== undefined,
+        placeholderData: (prev) => prev,
+    });
+
+export const useRiskStudents = (
+    methodId: number | undefined,
+    filters: StatsFilterParams,
+    labels: string[] | undefined,
+    category: string | undefined,
+    page: number,
+    limit: number,
+) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'risk', methodId, filters, labels, category, page, limit],
+        queryFn: () => psychologyService.getRiskStudents(methodId!, { ...filters, labels, category, page, limit }),
+        enabled: methodId !== undefined,
+        placeholderData: (prev) => prev,
+    });
+
+export const useUserPsychologyHistory = (userId: number | null, methodId?: number) =>
+    useQuery({
+        queryKey: ['psychology-stats', 'history', userId, methodId],
+        queryFn: () => psychologyService.getUserHistory(userId!, methodId),
+        enabled: userId !== null,
     });

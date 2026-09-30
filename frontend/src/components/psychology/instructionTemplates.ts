@@ -12,6 +12,8 @@ export interface InterpretationRow {
     max: number;
     label: string;
     description: string;
+    /** Bu daraja statistikada «xavf guruhi» sifatida sanaladi. */
+    risk?: boolean;
 }
 
 export interface CategoryRow {
@@ -43,6 +45,7 @@ function rowFromAny(r: Record<string, unknown>): InterpretationRow {
         max: Number(r.max ?? 0),
         label: String(r.label ?? ''),
         description: String(r.description ?? ''),
+        ...(r.risk ? { risk: true } : {}),
     };
 }
 

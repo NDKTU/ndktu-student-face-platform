@@ -118,6 +118,16 @@ function RangeRow({
                     </button>
                 </div>
             </div>
+            <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-xs text-foreground">
+                <input
+                    type="checkbox"
+                    checked={!!value.risk}
+                    onChange={e => onChange({ ...value, risk: e.target.checked || undefined })}
+                    className="h-3.5 w-3.5 accent-destructive"
+                />
+                Xavf guruhi
+                <span className="text-muted-foreground">— statistikada alohida ko'rsatiladi</span>
+            </label>
             <div className="mt-2">
                 <label className="text-xs font-medium text-muted-foreground">Izoh</label>
                 <textarea

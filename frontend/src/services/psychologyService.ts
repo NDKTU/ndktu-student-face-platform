@@ -108,6 +108,116 @@ export interface TestResultListResponse {
     results: TestResultResponse[];
 }
 
+// ── Statistika ──────────────────────────────────────────────────────────────
+
+export interface StatsFilterParams {
+    faculty_id?: number;
+    group_id?: number;
+    course?: number;
+    /** YYYY-MM-DD, Toshkent sanasi; ikkala chegara kiradi. */
+    date_from?: string;
+    date_to?: string;
+}
+
+export interface StatsOverview {
+    total_results: number;
+    results_7d: number;
+    results_30d: number;
+    total_students: number;
+    tested_students: number;
+    coverage_pct: number;
+    methods: Array<{ method_id: number; name: string; results: number; students: number }>;
+    faculties: Array<{
+        faculty_id: number;
+        name: string;
+        total_students: number;
+        tested_students: number;
+        coverage_pct: number;
+    }>;
+}
+
+export interface LevelCount {
+    label: string;
+    count: number;
+    pct: number;
+    risk: boolean;
+}
+
+export interface MethodStats {
+    method_id: number;
+    name: string;
+    scoring: 'sum' | 'category' | null;
+    total: number;
+    undetermined: number;
+    levels: LevelCount[];
+    histogram: Array<{ score: number; count: number }>;
+    avg: number | null;
+    min: number | null;
+    max: number | null;
+    categories: Array<{ name: string; avg: number | null; min: number | null; max: number | null; levels: LevelCount[] }>;
+}
+
+export type BreakdownBy = 'faculty' | 'course' | 'group';
+
+export interface MethodBreakdown {
+    by: BreakdownBy;
+    category: string | null;
+    labels: string[];
+    risk_labels: string[];
+    rows: Array<{
+        key: number;
+        name: string;
+        total: number;
+        avg: number | null;
+        levels: Record<string, number>;
+        risk_count: number;
+        risk_pct: number;
+    }>;
+}
+
+export interface RiskStudent {
+    result_id: number;
+    user_id: number;
+    username: string | null;
+    full_name: string | null;
+    student_id_number: string | null;
+    group_name: string | null;
+    faculty_name: string | null;
+    course: number | null;
+    category: string | null;
+    label: string;
+    score: number | null;
+    created_at: string;
+}
+
+export interface RiskList {
+    total: number;
+    risk_labels: string[];
+    items: RiskStudent[];
+}
+
+export type TimelinePeriod = 'day' | 'week' | 'month';
+
+export interface Timeline {
+    period: TimelinePeriod;
+    points: Array<{ bucket: string; count: number }>;
+}
+
+export interface UserHistory {
+    user_id: number;
+    full_name: string | null;
+    username: string | null;
+    items: Array<{
+        result_id: number;
+        method_id: number;
+        method_name: string;
+        created_at: string;
+        label: string | null;
+        score: number | null;
+        categories: Array<{ name: string; score: number; label: string }>;
+    }>;
+}
+
 export const psychologyService = {
     listMethods: async (page = 1, limit = 20) => {
         const response = await api.get<MethodListResponse>('/psychology/method/', { params: { page, limit } });
@@ -170,5 +280,47 @@ export const psychologyService = {
 
     deleteResult: async (resultId: number) => {
         await api.delete(`/psychology/test/results/${resultId}`);
+    },
+
+    getStatsOverview: async (params: StatsFilterParams) => {
+        const response = await api.get<StatsOverview>('/psychology/stats/overview', { params });
+        return response.data;
+    },
+
+    getStatsTimeline: async (params: StatsFilterParams & { method_id?: number; period: TimelinePeriod }) => {
+        const response = await api.get<Timeline>('/psychology/stats/timeline', { params });
+        return response.data;
+    },
+
+    getMethodStats: async (methodId: number, params: StatsFilterParams & { latest_only?: boolean }) => {
+        const response = await api.get<MethodStats>(`/psychology/stats/methods/${methodId}`, { params });
+        return response.data;
+    },
+
+    getMethodBreakdown: async (
+        methodId: number,
+        params: StatsFilterParams & { by: BreakdownBy; category?: string; latest_only?: boolean },
+    ) => {
+        const response = await api.get<MethodBreakdown>(`/psychology/stats/methods/${methodId}/breakdown`, { params });
+        return response.data;
+    },
+
+    getRiskStudents: async (
+        methodId: number,
+        params: StatsFilterParams & { labels?: string[]; category?: string; page?: number; limit?: number },
+    ) => {
+        const response = await api.get<RiskList>(`/psychology/stats/methods/${methodId}/risk`, {
+            params,
+            // FastAPI ro'yxatni `labels=a&labels=b` ko'rinishida kutadi.
+            paramsSerializer: { indexes: null },
+        });
+        return response.data;
+    },
+
+    getUserHistory: async (userId: number, methodId?: number) => {
+        const response = await api.get<UserHistory>(`/psychology/stats/users/${userId}/history`, {
+            params: { method_id: methodId },
+        });
+        return response.data;
     },
 };

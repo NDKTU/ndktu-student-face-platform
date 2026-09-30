@@ -4,25 +4,35 @@ import logging
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import User
 
+from . import stats
 from .schemas import (
+    BREAKDOWN_BY,
+    TIMELINE_PERIOD,
+    MethodBreakdownResponse,
     MethodCreateRequest,
     MethodListRequest,
     MethodListResponse,
     MethodResponse,
+    MethodStatsResponse,
     MethodUpdateRequest,
     QuestionCreateRequest,
     QuestionResponse,
     QuestionUpdateRequest,
+    RiskListResponse,
+    StatsFilter,
+    StatsOverviewResponse,
     TestResultListRequest,
     TestResultListResponse,
     TestResultResponse,
     TestSubmitRequest,
+    TimelineResponse,
+    UserHistoryResponse,
 )
 from .service import get_psychology_service
 
@@ -197,3 +207,81 @@ async def get_result(
     _: User = Depends(PermissionRequired("read:psychology_results")),
 ):
     return await get_psychology_service.get_result(session=session, result_id=result_id)
+
+
+# ─── Statistics ──────────────────────────────────────────────────────────────
+# Natijalar ro'yxati bilan bir xil ruxsat: statistika o'sha ma'lumotning yig'indisi.
+
+_read_results = PermissionRequired("read:psychology_results")
+
+
+@router.get("/stats/overview", response_model=StatsOverviewResponse)
+async def stats_overview(
+    f: StatsFilter = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.overview(session=session, f=f)
+
+
+@router.get("/stats/timeline", response_model=TimelineResponse)
+async def stats_timeline(
+    f: StatsFilter = Depends(),
+    method_id: int | None = None,
+    period: TIMELINE_PERIOD = "day",
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.timeline(session=session, f=f, method_id=method_id, period=period)
+
+
+@router.get("/stats/methods/{method_id}", response_model=MethodStatsResponse)
+async def stats_method(
+    method_id: int,
+    f: StatsFilter = Depends(),
+    latest_only: bool = True,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.method_stats(session=session, method_id=method_id, f=f, latest_only=latest_only)
+
+
+@router.get("/stats/methods/{method_id}/breakdown", response_model=MethodBreakdownResponse)
+async def stats_method_breakdown(
+    method_id: int,
+    f: StatsFilter = Depends(),
+    by: BREAKDOWN_BY = "faculty",
+    category: str | None = None,
+    latest_only: bool = True,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.method_breakdown(
+        session=session, method_id=method_id, by=by, category=category, f=f, latest_only=latest_only
+    )
+
+
+@router.get("/stats/methods/{method_id}/risk", response_model=RiskListResponse)
+async def stats_method_risk(
+    method_id: int,
+    f: StatsFilter = Depends(),
+    labels: list[str] | None = Query(default=None),
+    category: str | None = None,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=5000),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.risk_students(
+        session=session, method_id=method_id, f=f, labels=labels, category=category, page=page, limit=limit
+    )
+
+
+@router.get("/stats/users/{user_id}/history", response_model=UserHistoryResponse)
+async def stats_user_history(
+    user_id: int,
+    method_id: int | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(_read_results),
+):
+    return await stats.user_history(session=session, user_id=user_id, method_id=method_id)
