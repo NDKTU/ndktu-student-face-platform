@@ -64,6 +64,17 @@ const PsychologyStatsPage = () => {
         ],
         [facultiesData],
     );
+    // Metodlar ro'yxati obzor javobidan olinadi: u allaqachon
+    // yuklangan, alohida so'rov ortiqcha bo'lardi.
+    const methodOptions = useMemo(
+        () =>
+            (overview.data?.methods ?? []).map((m) => ({
+                value: String(m.method_id),
+                label: `${m.name} (${m.results})`,
+            })),
+        [overview.data],
+    );
+
     const courseOptions = useMemo(
         () => [
             { value: 'all', label: 'Barcha kurslar' },
@@ -114,6 +125,23 @@ const PsychologyStatsPage = () => {
                             onChange={setFacultyId}
                             placeholder="Barcha fakultetlar"
                             searchPlaceholder="Fakultet..."
+                        />
+                    </div>
+                    <div className="w-full sm:w-[260px]">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                            Metod
+                        </label>
+                        <Combobox
+                            options={methodOptions}
+                            value={selectedMethodId ? String(selectedMethodId) : ''}
+                            onChange={(value) => {
+                                setMethodId(Number(value));
+                                // Kategoriya avvalgi metodnikidan qolib
+                                // ketmasin.
+                                setCategory('');
+                            }}
+                            placeholder={overview.isLoading ? 'Yuklanmoqda...' : 'Metodni tanlang'}
+                            searchPlaceholder="Metod nomi..."
                         />
                     </div>
                     <div className="w-[150px]">
