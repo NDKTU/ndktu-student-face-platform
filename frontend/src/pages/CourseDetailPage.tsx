@@ -7,7 +7,6 @@ import {
     ChevronRight,
     ClipboardCheck,
     FileStack,
-    FolderOpen,
     Clock3,
     Info,
     ListChecks,
@@ -133,11 +132,10 @@ export default function CourseDetailPage() {
         ...(canReadAttendance
             ? [{ id: 'attendance' as const, label: 'Davomat jurnali', icon: <ClipboardCheck className="h-4 w-4" /> }]
             : []),
-        // Kutubxona darslar bilan bir huquqda: u kursning materiali va
-        // kursni ko'ra oladigan har kimga (talabaga ham) ochiq.
-        ...(canReadLessons
-            ? [{ id: 'library' as const, label: 'Kutubxona', icon: <FolderOpen className="h-4 w-4" /> }]
-            : []),
+        // «Kurs kutubxonasi» interfeysdan olib tashlandi. Bekend
+        // endpointlari va `CourseFileLibrary` komponenti o'z joyida —
+        // faqat ko'rinish yopildi, shuning uchun qaytarish oson
+        // (git tarixida: CourseDetailPage, 'library' vkladkasi).
         // Fan hujjatlari (o'quv dastur, sillabus) — kutubxona bilan bir huquqda.
         ...(canReadLessons
             ? [{ id: 'documents' as const, label: 'Fan hujjatlari', icon: <FileStack className="h-4 w-4" /> }]
@@ -347,22 +345,6 @@ export default function CourseDetailPage() {
                     </h2>
                     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
                         <CourseGradebook courseId={course.id} />
-                    </div>
-                </section>
-            )}
-
-            {activeTab === 'library' && canReadLessons && (
-                <section className="space-y-3">
-                    <h2 className="px-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Kurs kutubxonasi
-                    </h2>
-                    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
-                        <CourseFileLibrary
-                            courseId={course.id}
-                            canAdd={canAddLibraryFiles}
-                            canEdit={canEditLibraryFiles}
-                            canRemove={canRemoveLibraryFiles}
-                        />
                     </div>
                 </section>
             )}
