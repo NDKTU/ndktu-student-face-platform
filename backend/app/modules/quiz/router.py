@@ -54,7 +54,7 @@ from .result.schemas import (
 )
 from .subject.repository import get_subject_repository
 from .subject.schemas import (
-#    SubjectCreateRequest,
+    SubjectCreateRequest,
     SubjectCreateResponse,
     SubjectListRequest,
     SubjectListResponse,
@@ -90,6 +90,26 @@ subject_router = APIRouter(
 # ):
 #     result = await get_subject_repository.create_subject(session=session, data=data)
 #     return result
+
+
+@subject_router.post(
+    "/service",
+    response_model=SubjectCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+)
+async def create_service_subject(
+    data: SubjectCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("create:subject")),
+):
+    """Test uchun fan yaratadi.
+
+    Yuqoridagi umumiy `POST /subject/` yopiqligicha qoladi: fanlar EPOS
+    koʻzgusi. Bu yoʻl faqat xizmat fanini yaratadi — u hisob-kitobga
+    kirmaydi va spravochniklarda koʻrinmaydi.
+    """
+    return await get_subject_repository.create_service_subject(session=session, data=data)
 
 
 @subject_router.get("/{subject_id}", response_model=SubjectCreateResponse)

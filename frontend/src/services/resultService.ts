@@ -14,7 +14,11 @@ export interface Result {
     created_at: string;
     user?: User;
     quiz?: Quiz;
-    subject?: { id: number; name: string };
+    /**
+     * `is_countable: false` — xizmat fani: natija ko'rinadi, lekin
+     * reyting va statistikaga kirmaydi (chip bilan belgilanadi).
+     */
+    subject?: { id: number; name: string; is_countable?: boolean };
     group?: { id: number; name: string };
     student_id?: string;
     student_name?: string;

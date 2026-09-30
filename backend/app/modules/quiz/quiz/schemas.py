@@ -22,6 +22,9 @@ class QuizCreateRequest(BaseModel):
     lecturer_id: Optional[int] = None
     user_id: Optional[int] = None
     group_id: Optional[int] = None
+    #: Bir testni bir nechta guruhga biriktirish. Berilmasa, `group_id`
+    #: ishlatiladi — eski mijozlar buzilmasin.
+    group_ids: Optional[list[int]] = None
     subject_id: Optional[int] = None
     # Dars sahifasidan tuzilgan test shu darsga biriktiriladi. Berilsa,
     # guruh/fan/lektor bo'sh qolsa — darsdan olinadi.
@@ -71,6 +74,9 @@ class QuizCreateResponse(BaseModel):
     lecturer_id: Optional[int]
     created_by_user_id: Optional[int] = None
     group_id: Optional[int]
+    #: Testga biriktirilgan barcha guruhlar. `group_id` — ulardan biri,
+    #: eski mijozlar uchun qoldirilgan.
+    group_ids: list[int] = []
     subject_id: Optional[int]
     lesson_id: Optional[int] = None
 

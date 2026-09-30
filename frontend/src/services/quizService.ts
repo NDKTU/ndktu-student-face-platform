@@ -25,6 +25,11 @@ export interface Quiz {
     /** @deprecated `lecturer_id` bilan bir xil qiymat, eski klientlar uchun qoldirilgan. */
     user_id?: number;
     group_id?: number;
+    /**
+     * Testga biriktirilgan barcha guruhlar. `group_id` — ulardan biri:
+     * bitta guruhga hisoblangan eski kod uchun qoldirilgan.
+     */
+    group_ids?: number[];
     subject_id?: number;
     /**
      * Fan va guruh nomlari serverdan keladi (`QuizCreateResponse`).
@@ -53,6 +58,11 @@ export interface QuizCreateRequest {
     /** Ma'ruzachi. Tashkilotchi tanlaydi; savollar shu o'qituvchining bankidan olinadi. */
     lecturer_id?: number | null;
     group_id?: number | null;
+    /**
+     * Bir testni bir nechta guruhga biriktirish. Berilsa, `group_id`
+     * serverda roʻyxatning birinchi guruhiga tenglashtiriladi.
+     */
+    group_ids?: number[] | null;
     subject_id?: number | null;
     /** Berilsa, guruh/fan/ma'ruzachi darsdan to'ldiriladi. */
     lesson_id?: number | null;

@@ -12,6 +12,11 @@ export interface Subject {
     curriculum?: { id: number; name: string } | null;
     /** «kuzgi» / «bahorgi» — bitta reja ichidagi takrorlarni ajratadi. */
     semester?: string | null;
+    /**
+     * Hisob-kitobga kiradimi. `false` — test uchun platformada tuzilgan
+     * xizmat fani: reyting va panellarda umuman hisoblanmaydi.
+     */
+    is_countable?: boolean;
     created_at: string;
     updated_at: string;
     // Признаки зеркала EduPlan: если источник задан, запись не редактируется.
@@ -48,6 +53,7 @@ export interface TeacherAssignedSubjectsResponse {
 }
 
 export interface SubjectListParams {
+
     sort_by?: 'id' | 'name' | 'created_at';
     order?: 'asc' | 'desc';
 }
@@ -60,8 +66,15 @@ export const subjectService = {
         search = '',
         teacher_id?: number,
         sort?: SubjectListParams,
+        /**
+         * Xizmat fanlari standart roʻyxatdan tashqarida: kurs, yuklama va
+         * spravochniklarda ular koʻrinmasligi kerak. Faqat testlar va
+         * savollar sahifasi ularni soʻraydi.
+         */
+        includeService = false,
     ) => {
         const params: any = { page, limit };
+        if (includeService) params.include_service = true;
         // if (includeHidden) params.include_hidden = true;
         if (search) params.name = search;
         if (teacher_id) params.teacher_id = teacher_id;
@@ -83,6 +96,16 @@ export const subjectService = {
 
     getSubjectById: async (id: number): Promise<Subject> => {
         const response = await api.get<Subject>(`/subject/${id}`);
+        return response.data;
+    },
+
+    /**
+     * Xizmat fani — faqat test uchun. Umumiy `POST /subject/` yopiq
+     * (fanlar EPOS koʻzgusi), bu esa alohida endpoint: har doim
+     * `is_countable=false` qoʻyadi.
+     */
+    createServiceSubject: async (data: { name: string }): Promise<Subject> => {
+        const response = await api.post<Subject>('/subject/service', data);
         return response.data;
     },
 

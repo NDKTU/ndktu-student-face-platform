@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.lesson_scope import visible_to_group
+from app.core.utils.countable import countable_results
 from app.modules.auth.model import Student, User
 from app.modules.course.model import (
     Course,
@@ -211,7 +212,11 @@ async def build_student_dashboard(session: AsyncSession, user: User) -> StudentD
         )
 
     # ── Testlar ────────────────────────────────────────────────────────────
-    completed = and_(Result.user_id == user.id, Result.status == "completed")
+    # Xizmat fani talabaning oʻrtacha bahosiga ham kirmaydi
+    # (core/utils/countable.py).
+    completed = and_(
+        Result.user_id == user.id, Result.status == "completed", countable_results()
+    )
     rows = await session.execute(select(Result.grade, func.count(Result.id)).where(completed).group_by(Result.grade))
     grade_sum = 0
     graded = 0

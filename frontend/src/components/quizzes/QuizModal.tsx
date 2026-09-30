@@ -10,7 +10,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
-import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
+import { useServiceSubjects, useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest, QuizType } from '@/services/quizService';
@@ -85,7 +85,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     const proctoringMode = watch('proctoring_mode');
     const selectedLecturerId = watch('lecturer_id');
     const selectedSubjectId = watch('subject_id');
-    const selectedGroupId = watch('group_id');
+    const selectedGroupIds = watch('group_ids');
     const selectedSemester = watch('semester_number');
     // Ochiq test guruhga biriktirilmaydi — tegishli maydonlar yashiriladi.
     const isPublicQuiz = watch('quiz_type') === 'PUBLIC_FREE';
@@ -95,6 +95,9 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
+    // Xizmat fanlari hech kimga biriktirilmaydi (`teacher_subjects` da yo'q),
+    // shuning uchun ular ro'yxatga alohida qo'shiladi.
+    const { data: serviceSubjects } = useServiceSubjects(hasPermission('read:subject'));
     const { data: searchTeachersData } = useTeachers(1, 100, debouncedTeacherSearch, hasPermission('read:teacher'));
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(
         effectiveUserId ? parseInt(effectiveUserId) : undefined
@@ -114,6 +117,18 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             label: st.subject.name,
             hint: subjectHint(st.subject) || undefined,
         }));
+        // Xizmat fani — platformada test uchun tuzilgan fan. U hisob-kitobga
+        // kirmaydi va o'qituvchiga biriktirilmaydi, shuning uchun biriktirilgan
+        // fanlar ro'yxatiga qo'shib qo'yiladi: aks holda uni tanlab bo'lmasdi.
+        for (const subject of serviceSubjects ?? []) {
+            if (!options.some(o => o.value === subject.id.toString())) {
+                options.push({
+                    value: subject.id.toString(),
+                    label: subject.name,
+                    hint: 'Xizmat fani — hisob-kitobga kirmaydi',
+                });
+            }
+        }
         if (quiz?.subject_id && !options.some(o => o.value === quiz.subject_id!.toString())) {
             const current = (allSubjectsData?.subjects ?? []).find(s => s.id === quiz.subject_id);
             if (current) {
@@ -125,19 +140,37 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             }
         }
         return options;
-    }, [assignedSubjectsData, quiz, allSubjectsData]);
+    }, [assignedSubjectsData, quiz, allSubjectsData, serviceSubjects]);
+
+    // Tanlangan fan xizmat fanimi. Shundan ikki narsa kelib chiqadi: guruhlar
+    // o'qituvchining biriktirilganlari bilan cheklanmaydi (bir martalik sinov
+    // istalgan guruhda o'tkaziladi) va oynada ogohlantirish ko'rsatiladi.
+    const isServiceSubject = useMemo(
+        () => (serviceSubjects ?? []).some(subject => subject.id.toString() === selectedSubjectId),
+        [serviceSubjects, selectedSubjectId],
+    );
 
     const groupOptions = useMemo(() => {
+        // Xizmat fanida guruh o'qituvchining yuklamasidan kelib chiqmaydi:
+        // kirish sinovi yoki bir martalik nazorat istalgan guruhlarda
+        // o'tkaziladi, shuning uchun to'liq ro'yxat.
+        if (isServiceSubject) {
+            return (allGroupsData?.groups ?? []).map(g => ({ id: g.id, name: g.name }));
+        }
         const options = (assignedGroupsData?.group_teachers ?? []).map(gt => ({
-            value: gt.group_id.toString(),
-            label: gt.group.name,
+            id: gt.group_id,
+            name: gt.group.name,
         }));
-        if (quiz?.group_id && !options.some(o => o.value === quiz.group_id!.toString())) {
-            const name = (allGroupsData?.groups ?? []).find(g => g.id === quiz.group_id)?.name;
-            if (name) options.push({ value: quiz.group_id.toString(), label: name });
+        // Tahrirlashda testning joriy guruhlari ro'yxatda bo'lmasa qo'shiladi,
+        // aks holda saqlashda ular jimgina uzilib qolardi.
+        for (const gid of quiz?.group_ids ?? (quiz?.group_id ? [quiz.group_id] : [])) {
+            if (!options.some(o => o.id === gid)) {
+                const name = (allGroupsData?.groups ?? []).find(g => g.id === gid)?.name;
+                if (name) options.push({ id: gid, name });
+            }
         }
         return options;
-    }, [assignedGroupsData, quiz, allGroupsData]);
+    }, [assignedGroupsData, quiz, allGroupsData, isServiceSubject]);
 
     const teacherOptions = (searchTeachersData?.teachers || teachers).map(t => ({
         value: (t.user_id ?? '').toString(),
@@ -146,7 +179,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const hasLecturer = Boolean(effectiveUserId);
     const noSubjects = hasLecturer && !isFetchingSubjects && subjectOptions.length === 0;
-    const noGroups = hasLecturer && !isFetchingGroups && groupOptions.length === 0;
+    const noGroups = hasLecturer && !isFetchingGroups && !isServiceSubject && groupOptions.length === 0;
 
     useEffect(() => {
         if (!isOpen) return;
@@ -156,7 +189,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 duration: quiz.duration.toString(),
                 pin: quiz.pin,
                 lecturer_id: quiz.lecturer_id ? quiz.lecturer_id.toString() : '',
-                group_id: quiz.group_id ? quiz.group_id.toString() : '',
+                group_ids: quiz.group_ids?.length ? quiz.group_ids : quiz.group_id ? [quiz.group_id] : [],
                 subject_id: quiz.subject_id ? quiz.subject_id.toString() : '',
                 semester_number: semesterFromTitle(quiz.title),
                 quiz_type: quiz.quiz_type ?? 'LESSON_QUIZ',
@@ -169,7 +202,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 duration: '30',
                 pin: Math.random().toString().slice(2, 6),
                 lecturer_id: isTeacher && user?.id ? user.id.toString() : '',
-                group_id: '',
+                group_ids: [],
                 subject_id: '',
                 semester_number: '',
                 quiz_type: 'LESSON_QUIZ',
@@ -177,12 +210,16 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 proctoring_mode: 'standard',
             });
         }
-    }, [quiz, reset, isOpen, isTeacher, user]);
+    // `user` EMAS, `user?.id`: AuthContext har 60 soniyada `/user/me` ni
+    // qayta so'raydi va yangi obyekt qo'yadi. Butun obyektga bog'lansa,
+    // shu paytda ochiq turgan forma o'zi-o'zidan tozalanardi — tanlangan
+    // ma'ruzachi, fan, guruhlar yo'qolib, PIN qaytadan yaratilardi.
+    }, [quiz, reset, isOpen, isTeacher, user?.id]);
 
     useEffect(() => {
         if (isOpen && !quiz && !isTeacher) {
             setValue('subject_id', '');
-            setValue('group_id', '');
+            setValue('group_ids', []);
         }
     }, [selectedLecturerId, isOpen, quiz, isTeacher]);
 
@@ -199,12 +236,14 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     // Sarlavhani server yig'adi; bu yerda faqat qanday chiqishini ko'rsatamiz.
     // Tahrirlashda sana test yaratilgan kun bo'lib qoladi — serverdagi kabi.
+    // Sarlavhaga birinchi guruh kiradi — serverda ham shunday
+    // (`quizzes.group_id` ro'yxatning birinchi guruhi bo'lib qoladi).
     const previewTitle = useMemo(() => buildQuizTitle(
         subjectOptions.find(o => o.value === selectedSubjectId)?.label,
-        groupOptions.find(o => o.value === selectedGroupId)?.label,
+        groupOptions.find(o => o.id === selectedGroupIds?.[0])?.name,
         selectedSemester ? parseInt(selectedSemester, 10) : undefined,
         quiz ? new Date(quiz.created_at) : new Date(),
-    ), [subjectOptions, selectedSubjectId, groupOptions, selectedGroupId, selectedSemester, quiz]);
+    ), [subjectOptions, selectedSubjectId, groupOptions, selectedGroupIds, selectedSemester, quiz]);
 
     /**
      * 409 от бэкенда несёт осмысленное сообщение (не хватает вопросов, смена
@@ -232,7 +271,10 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             pin: data.pin,
             lecturer_id: resolvedLecturerId,
             // Ochiq testda guruh yo'q: uni tashqi ishtirokchi yechadi.
-            group_id: data.group_id ? parseInt(data.group_id, 10) : null,
+            // `group_id` — ro'yxatning birinchi guruhi: unga eski kod va
+            // natijalar tayanadi, server ham shu tartibni saqlaydi.
+            group_id: data.group_ids[0] ?? null,
+            group_ids: data.group_ids,
             subject_id: parseInt(data.subject_id, 10),
             semester_number: data.semester_number ? parseInt(data.semester_number, 10) : null,
             quiz_type: data.quiz_type,
@@ -288,7 +330,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                                     onChange={(val) => {
                                         field.onChange(val);
                                         setValue('subject_id', '');
-                                        setValue('group_id', '');
+                                        setValue('group_ids', []);
                                     }}
                                     placeholder="Ma'ruzachini tanlang"
                                     searchPlaceholder="Qidirish..."
@@ -334,30 +376,59 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                             {notEnough && ` — so'ralgan ${requested} tadan kam, faol test yaratilmaydi`}
                         </p>
                     )}
+                    {isServiceSubject && (
+                        <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                            Xizmat fani: natija reyting, panel va statistikaga kirmaydi.
+                            Guruhlar ro'yxati o'qituvchining yuklamasi bilan cheklanmaydi.
+                        </p>
+                    )}
                 </div>
 
                 {!isPublicQuiz && <div className="space-y-2">
-                    <label className="text-sm font-medium">Guruh</label>
+                    <label className="text-sm font-medium">Guruhlar</label>
                     <Controller
-                        name="group_id"
+                        name="group_ids"
                         control={control}
                         render={({ field }) => (
-                            <Combobox
-                                options={groupOptions}
-                                value={field.value}
-                                onChange={field.onChange}
-                                placeholder={hasLecturer ? 'Guruhni tanlang' : "Avval ma'ruzachini tanlang"}
-                                searchPlaceholder="Qidirish..."
-                                disabled={!hasLecturer || noGroups}
-                            />
+                            <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto p-3 border rounded-md bg-muted/20">
+                                {groupOptions.map(group => (
+                                    <div key={group.id} className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            id={`quiz-group-${group.id}`}
+                                            checked={field.value.includes(group.id)}
+                                            onChange={() => {
+                                                field.onChange(
+                                                    field.value.includes(group.id)
+                                                        ? field.value.filter((id: number) => id !== group.id)
+                                                        : [...field.value, group.id]
+                                                );
+                                            }}
+                                            className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                                        />
+                                        <label
+                                            htmlFor={`quiz-group-${group.id}`}
+                                            className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis"
+                                        >
+                                            {group.name}
+                                        </label>
+                                    </div>
+                                ))}
+                                {!hasLecturer && (
+                                    <span className="text-sm text-muted-foreground">Avval ma'ruzachini tanlang.</span>
+                                )}
+                                {noGroups && (
+                                    <span className="text-sm text-destructive">
+                                        O'qituvchiga guruh biriktirilmagan. "O'qituvchilar" bo'limida guruh biriktiring.
+                                    </span>
+                                )}
+                            </div>
                         )}
                     />
-                    {noGroups && (
-                        <p className="text-sm text-destructive">
-                            O'qituvchiga guruh biriktirilmagan. "O'qituvchilar" bo'limida guruh biriktiring.
-                        </p>
-                    )}
-                    {errors.group_id && <p className="text-sm text-destructive">{errors.group_id.message}</p>}
+                    {errors.group_ids && <p className="text-sm text-destructive">{errors.group_ids.message}</p>}
+                    <p className="text-xs text-muted-foreground">
+                        Bir test bir nechta guruhga biriktiriladi. Saqlashda ro'yxat to'liq almashtiriladi.
+                    </p>
                 </div>}
 
                 {isPublicQuiz && (

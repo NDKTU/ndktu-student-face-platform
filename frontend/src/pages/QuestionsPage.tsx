@@ -95,7 +95,9 @@ export const QuestionsPage = () => {
         refetch: refetchQuestions,
     } = useQuestions(currentPage, pageSize, debouncedSearch, parsedSubjectId, effectiveOwnerUserId);
 
-    const { data: subjectsData } = useSubjects(1, 500);
+    // Xizmat fani ham kerak: savollar aynan unga yuklanadi, aks holda
+    // test uchun tuzilgan fanni bu sahifada tanlab bo'lmasdi.
+    const { data: subjectsData } = useSubjects(1, 500, '', undefined, true, undefined, true);
     const { data: teachersData } = useTeachers(1, 500, undefined, !isTeacher && hasPermission('read:teacher'));
 
     const deleteQuestionMutation = useDeleteQuestion();

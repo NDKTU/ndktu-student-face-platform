@@ -20,6 +20,10 @@ class ResultQuizInfo(BaseModel):
 class ResultSubjectInfo(BaseModel):
     id: int
     name: str
+    #: Xizmat fani natijasi roʻyxatda KOʻRINADI (oʻqituvchi natijani
+    #: koʻrmasa, testdan maʼno yoʻq), lekin belgisi bilan: u reyting va
+    #: statistikaga kirmaydi. Belgi shu maydondan chiziladi.
+    is_countable: bool = True
     model_config = ConfigDict(from_attributes=True)
 
 

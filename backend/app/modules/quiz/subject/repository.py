@@ -22,6 +22,35 @@ logger = logging.getLogger(__name__)
 
 
 class SubjectRepository:
+    async def create_service_subject(
+        self, session: AsyncSession, data: SubjectCreateRequest
+    ) -> Subject:
+        """Test uchun xizmat fani.
+
+        Oddiy fan yaratish 2026-09-11 da yopilgan: fanlar EPOS koʻzgusi.
+        Bu yoʻl oʻsha qarorni bekor qilmaydi — u faqat
+        `is_countable=False` boʻlgan, hisob-kitobga kirmaydigan va
+        spravochniklarda koʻrinmaydigan fan yaratadi.
+
+        `external_source` boʻsh qoldiriladi: bu qoʻlda kiritilgan satr,
+        va `uq_subjects_kafedra_id_name` indeksi aynan shunday satrlar
+        uchun nomni yakka qiladi.
+        """
+        existing = (
+            await session.execute(select(Subject).where(Subject.name == data.name))
+        ).scalar_one_or_none()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"«{data.name}» nomli fan allaqachon bor",
+            )
+
+        subject = Subject(name=data.name, is_countable=False)
+        session.add(subject)
+        await session.commit()
+        await session.refresh(subject)
+        return subject
+
     async def create_subject(self, session: AsyncSession, data: SubjectCreateRequest) -> Subject:
         stmt_check = select(Subject).where(Subject.name == data.name)
         result_check = await session.execute(stmt_check)
@@ -61,6 +90,11 @@ class SubjectRepository:
         self, session: AsyncSession, request: SubjectListRequest, current_user: User
     ) -> SubjectListResponse:
         stmt = select(Subject)
+        # Xizmat fanlari standart holda chiqmaydi: ular faqat test va
+        # savollar uchun. Aks holda ular kurs tuzish, yuklama va
+        # spravochniklarda paydo boʻlib, tasodifan tanlanardi.
+        if not request.include_service:
+            stmt = stmt.where(Subject.is_countable.is_(True))
         # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
         # stmt = apply_visibility(stmt, Subject, current_user, request.include_hidden)
 
@@ -107,6 +141,10 @@ class SubjectRepository:
         subjects = result.scalars().all()
 
         count_stmt = select(func.count()).select_from(Subject)
+        # Sanoq ham filtrga boʻysunadi: aks holda «jami 3065» deb yozilib,
+        # roʻyxatda 3064 qator chiqardi va oxirgi sahifa boʻsh boʻlardi.
+        if not request.include_service:
+            count_stmt = count_stmt.where(Subject.is_countable.is_(True))
         # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
         # count_stmt = apply_visibility(count_stmt, Subject, current_user, request.include_hidden)
 

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from core.config import settings
 from fastapi import HTTPException, status
-from sqlalchemy import asc, case, desc, func, or_, select
+from sqlalchemy import asc, case, delete, desc, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +13,7 @@ from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.file.storage import public_url, store_upload
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
+from app.modules.quiz.model import Question, Quiz, QuizGroup, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
     QuizAnalyticsResponse,
@@ -315,6 +315,13 @@ class QuizRepository:
             if available < data.question_number:
                 raise self._not_enough_questions(available, data.question_number)
 
+        # Guruhlar roʻyxati sarlavhadan OLDIN normallashtiriladi: sarlavha
+        # `group_id` boʻyicha yigʻiladi va faqat `group_ids` yuborilgan
+        # boʻlsa, testda guruh nomi boʻlmay qolardi.
+        group_ids = sorted({*(data.group_ids or []), *([data.group_id] if data.group_id else [])})
+        if group_ids:
+            data.group_id = group_ids[0]
+
         title = data.title or await self.build_title(
             session,
             subject_id=data.subject_id,
@@ -338,6 +345,12 @@ class QuizRepository:
         )
         session.add(new_quiz)
 
+        # `quizzes.group_id` yuqorida allaqachon roʻyxatning birinchi
+        # guruhiga tenglashtirilgan — unga kodning koʻp joyi va natijalar
+        # tayanadi. Bu yerda faqat bogʻlanishlar yoziladi.
+        for gid in group_ids:
+            session.add(QuizGroup(quiz=new_quiz, group_id=gid))
+
         if data.lecturer_id and data.subject_id:
             result_questions = await session.execute(self._lecturer_questions_stmt(data.lecturer_id, data.subject_id))
             for question in result_questions.scalars().all():
@@ -357,6 +370,7 @@ class QuizRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
+        self._attach_group_ids(new_quiz)
         return new_quiz
 
     async def get_quiz(self, session: AsyncSession, quiz_id: int) -> Quiz:
@@ -386,6 +400,40 @@ class QuizRepository:
         for quiz in quizzes:
             quiz.subject_name = quiz.subject.name if quiz.subject else None
             quiz.group_name = quiz.group.name if quiz.group else None
+            QuizRepository._attach_group_ids(quiz)
+
+    @staticmethod
+    def _attach_group_ids(quiz: Quiz) -> None:
+        """Javobga guruhlar roʻyxatini yozadi.
+
+        `_attach_names` dan alohida: yaratish va tahrirlashda `quiz.subject`
+        yuklanmagan boʻladi va unga murojaat async sessiyada MissingGreenlet
+        berardi, guruhlar esa (`lazy="selectin"`) doim qoʻlda.
+        """
+        ids = [qg.group_id for qg in (quiz.quiz_groups or [])]
+        quiz.group_ids = ids or ([quiz.group_id] if quiz.group_id else [])
+
+    @staticmethod
+    def _in_group(*group_ids: int):
+        """«Test shu guruh(lar)ga tegishli» sharti.
+
+        Test bir nechta guruhga biriktirilishi mumkin (`quiz_groups`), lekin
+        `quizzes.group_id` ham qoldirilgan. Faqat ustunga qaralsa, ikkinchi
+        guruh talabasi testni RO'YXATDA KO'RMAY qolardi — garchi PIN bilan
+        kira olsa ham. Shuning uchun har ikkisi tekshiriladi.
+
+        `EXISTS`, `JOIN` emas: qo'shilish bitta testni har bir guruh uchun
+        takrorlab, `total` ni ham buzardi.
+        """
+        ids = [gid for gid in group_ids if gid is not None]
+        if not ids:
+            return false()
+        linked = (
+            select(QuizGroup.id)
+            .where(QuizGroup.quiz_id == Quiz.id, QuizGroup.group_id.in_(ids))
+            .exists()
+        )
+        return or_(Quiz.group_id.in_(ids), linked)
 
     async def list_quizzes(
         self, session: AsyncSession, request: QuizListRequest, current_user: User
@@ -410,7 +458,7 @@ class QuizRepository:
             student_result = await session.execute(student_stmt)
             student_group_id = student_result.scalar_one_or_none()
             if student_group_id:
-                stmt = stmt.where(Quiz.group_id == student_group_id)
+                stmt = stmt.where(self._in_group(student_group_id))
             else:
                 stmt = stmt.where(Quiz.id == -1)  # no group → no quizzes
 
@@ -440,7 +488,7 @@ class QuizRepository:
             # связка не появляется.
             conditions = [Quiz.lecturer_id == current_user.id]
             if allowed_group_ids:
-                conditions.append(Quiz.group_id.in_(allowed_group_ids))
+                conditions.append(self._in_group(*allowed_group_ids))
             if allowed_subject_ids:
                 conditions.append(Quiz.subject_id.in_(allowed_subject_ids))
 
@@ -457,7 +505,7 @@ class QuizRepository:
             stmt = stmt.where(Quiz.created_by_user_id == request.created_by_user_id)
 
         if request.group_id:
-            stmt = stmt.where(Quiz.group_id == request.group_id)
+            stmt = stmt.where(self._in_group(request.group_id))
 
         if request.subject_id:
             stmt = stmt.where(Quiz.subject_id == request.subject_id)
@@ -494,7 +542,7 @@ class QuizRepository:
 
         if is_student:
             if student_group_id:
-                count_stmt = count_stmt.where(Quiz.group_id == student_group_id)
+                count_stmt = count_stmt.where(self._in_group(student_group_id))
             else:
                 count_stmt = count_stmt.where(Quiz.id == -1)
         elif is_teacher and teacher_filter is not None:
@@ -507,7 +555,7 @@ class QuizRepository:
         if request.created_by_user_id:
             count_stmt = count_stmt.where(Quiz.created_by_user_id == request.created_by_user_id)
         if request.group_id:
-            count_stmt = count_stmt.where(Quiz.group_id == request.group_id)
+            count_stmt = count_stmt.where(self._in_group(request.group_id))
         if request.subject_id:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
         if request.lesson_id:
@@ -575,6 +623,14 @@ class QuizRepository:
             if linked < data.question_number:
                 raise self._not_enough_questions(linked, data.question_number)
 
+        # Sarlavha `group_id` boʻyicha yigʻiladi, shuning uchun guruhlar
+        # roʻyxati undan oldin normallashtiriladi (yaratishda ham shunday).
+        new_group_ids: list[int] | None = None
+        if data.group_ids is not None:
+            new_group_ids = sorted({*data.group_ids, *([data.group_id] if data.group_id else [])})
+            if new_group_ids:
+                data.group_id = new_group_ids[0]
+
         quiz.title = data.title or await self.build_title(
             session,
             subject_id=data.subject_id,
@@ -590,6 +646,14 @@ class QuizRepository:
         quiz.quiz_type = data.quiz_type.value
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
+
+        # Guruhlar roʻyxati aniq berilgandagina qayta yoziladi: umumiy
+        # tahrirlash oynasi `group_ids` ni yubormaydi va test guruhlaridan
+        # uzilib qolmasligi kerak.
+        if new_group_ids is not None:
+            await session.execute(delete(QuizGroup).where(QuizGroup.quiz_id == quiz.id))
+            for gid in new_group_ids:
+                session.add(QuizGroup(quiz_id=quiz.id, group_id=gid))
         # Darsga bog'lanish faqat aniq berilganda o'zgaradi: umumiy tahrirlash
         # oynasida `lesson_id` yuborilmaydi va test darsdan uzilib qolmasligi kerak.
         if data.lesson_id is not None:
@@ -597,6 +661,7 @@ class QuizRepository:
 
         await session.commit()
         await session.refresh(quiz)
+        self._attach_group_ids(quiz)
         return quiz
 
     async def delete_quiz(self, session: AsyncSession, quiz_id: int, force: bool = False) -> None:

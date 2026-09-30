@@ -27,6 +27,8 @@ class SubjectCurriculumInfo(BaseModel):
 class SubjectCreateResponse(ExternalRefFields):
     id: int
     name: str
+    #: `False` — test uchun tuzilgan xizmat fani, hisob-kitobga kirmaydi.
+    is_countable: bool = True
     #: O'quv reja — bir xil nomli fanlarni aynan shu ajratadi. EPMOS bitta
     #: fanni har bir reja uchun alohida yozuv qilib beradi («Akademik yozuv»
     #: to'rt marta), kafedra esa to'rtoviniki ham bitta. Qo'lda kiritilgan
@@ -44,6 +46,9 @@ class SubjectCreateResponse(ExternalRefFields):
 
 
 class SubjectListRequest(BaseModel):
+    #: Xizmat fanlarini ham koʻrsatish. Faqat test va savollar
+    #: sahifalari uchun — qolgan joylarda ular kerak emas.
+    include_service: bool = False
     # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
     # Faqat adminda ishlaydi: boshqa rol yuborsa ham yashirilgan
     # yozuv koʻrinmaydi. Usiz admin oʻzi yashirganini qayta topa olmaydi.
