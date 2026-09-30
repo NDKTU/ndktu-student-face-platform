@@ -99,11 +99,25 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     // shuning uchun ular ro'yxatga alohida qo'shiladi.
     const { data: serviceSubjects } = useServiceSubjects(hasPermission('read:subject'));
     const { data: searchTeachersData } = useTeachers(1, 100, debouncedTeacherSearch, hasPermission('read:teacher'));
+    // Tanlangan fan xizmat fanimi. Shundan uch narsa kelib chiqadi: guruhlar
+    // o'qituvchining biriktirilganlari bilan cheklanmaydi (bir martalik sinov
+    // istalgan guruhda o'tkaziladi), ma'ruzachi testni tuzgan odam bo'ladi va
+    // oynada ogohlantirish ko'rsatiladi.
+    const isServiceSubject = useMemo(
+        () => (serviceSubjects ?? []).some(subject => subject.id.toString() === selectedSubjectId),
+        [serviceSubjects, selectedSubjectId],
+    );
+
+    // Xizmat fanida biriktirilgan fan/guruh ro'yxati ishlatilmaydi, so'ralmaydi
+    // ham: ma'ruzachi — admin, unda `teachers` yozuvi yo'q va ikkala so'rov ham
+    // 404 qaytarib, konsolni ko'karitirardi.
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(
-        effectiveUserId ? parseInt(effectiveUserId) : undefined
+        effectiveUserId ? parseInt(effectiveUserId) : undefined,
+        !isServiceSubject,
     );
     const { data: assignedGroupsData, isFetching: isFetchingGroups } = useTeacherAssignedGroups(
-        effectiveUserId ? parseInt(effectiveUserId) : undefined
+        effectiveUserId ? parseInt(effectiveUserId) : undefined,
+        !isServiceSubject,
     );
 
     // Fan va guruh ro'yxati doim tanlangan ma'ruzachiga biriktirilganidan yig'iladi
@@ -142,14 +156,6 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         return options;
     }, [assignedSubjectsData, quiz, allSubjectsData, serviceSubjects]);
 
-    // Tanlangan fan xizmat fanimi. Shundan ikki narsa kelib chiqadi: guruhlar
-    // o'qituvchining biriktirilganlari bilan cheklanmaydi (bir martalik sinov
-    // istalgan guruhda o'tkaziladi) va oynada ogohlantirish ko'rsatiladi.
-    const isServiceSubject = useMemo(
-        () => (serviceSubjects ?? []).some(subject => subject.id.toString() === selectedSubjectId),
-        [serviceSubjects, selectedSubjectId],
-    );
-
     const groupOptions = useMemo(() => {
         // Xizmat fanida guruh o'qituvchining yuklamasidan kelib chiqmaydi:
         // kirish sinovi yoki bir martalik nazorat istalgan guruhlarda
@@ -172,12 +178,28 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         return options;
     }, [assignedGroupsData, quiz, allGroupsData, isServiceSubject]);
 
-    const teacherOptions = (searchTeachersData?.teachers || teachers).map(t => ({
-        value: (t.user_id ?? '').toString(),
-        label: t.full_name ?? '',
-    }));
+    const teacherOptions = useMemo(() => {
+        const options = (searchTeachersData?.teachers || teachers).map(t => ({
+            value: (t.user_id ?? '').toString(),
+            label: t.full_name ?? '',
+        }));
+        // Xizmat testida ma'ruzachi — testni tuzgan odamning o'zi, va u
+        // odatda admin: `teachers` ro'yxatida bunday yozuv yo'q, shuning
+        // uchun maydon tanlangan qiymatni ko'rsata olmasdi.
+        if (user?.id && !options.some(o => o.value === user.id.toString())) {
+            options.push({
+                value: user.id.toString(),
+                label: `${user.teacher?.full_name || user.username} (siz)`,
+            });
+        }
+        return options;
+    }, [searchTeachersData, teachers, user]);
 
     const hasLecturer = Boolean(effectiveUserId);
+    // Xizmat fani hech kimga biriktirilmaydi, shuning uchun uni ma'ruzachi
+    // tanlanmasdan oldin ham ko'rsatamiz: aks holda admin avval bironta
+    // o'qituvchini tanlashga majbur bo'lardi — testga esa uning aloqasi yo'q.
+    const hasServiceSubjects = (serviceSubjects ?? []).length > 0;
     const noSubjects = hasLecturer && !isFetchingSubjects && subjectOptions.length === 0;
     const noGroups = hasLecturer && !isFetchingGroups && !isServiceSubject && groupOptions.length === 0;
 
@@ -217,11 +239,26 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     }, [quiz, reset, isOpen, isTeacher, user?.id]);
 
     useEffect(() => {
+        // Xizmat fanida ma'ruzachi fandan KEYIN qo'yiladi (pastdagi effekt),
+        // shuning uchun bu yerda tozalash fanni darhol o'chirib yuborardi.
+        if (isServiceSubject) return;
         if (isOpen && !quiz && !isTeacher) {
             setValue('subject_id', '');
             setValue('group_ids', []);
         }
-    }, [selectedLecturerId, isOpen, quiz, isTeacher]);
+    }, [selectedLecturerId, isOpen, quiz, isTeacher, isServiceSubject]);
+
+    // Xizmat testini kim tuzsa, ma'ruzachi ham o'sha bo'ladi — ko'pincha admin.
+    // Savollar aynan `Question.user_id == lecturer_id` bo'yicha yig'iladi, ya'ni
+    // begona o'qituvchi tanlansa test bo'sh chiqardi (bekend ham `lecturer_id`
+    // bo'sh kelganda shunday qo'yadi). Aniq tanlangan qiymat almashtirilmaydi:
+    // savollarni boshqa odam yuklagan bo'lishi mumkin.
+    useEffect(() => {
+        if (!isOpen || quiz) return;
+        if (isServiceSubject && !selectedLecturerId && user?.id) {
+            setValue('lecturer_id', user.id.toString());
+        }
+    }, [isServiceSubject, selectedLecturerId, isOpen, quiz, user?.id, setValue]);
 
     // Сколько вопросов в банке выбранного лектора по выбранному предмету. Без этого
     // организатор не знает, загрузил ли лектор вопросы, и узнал бы об этом только
@@ -358,9 +395,13 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                                 options={subjectOptions}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder={hasLecturer ? 'Fanni tanlang' : "Avval ma'ruzachini tanlang"}
+                                placeholder={
+                                    hasLecturer || hasServiceSubjects
+                                        ? 'Fanni tanlang'
+                                        : "Avval ma'ruzachini tanlang"
+                                }
                                 searchPlaceholder="Qidirish..."
-                                disabled={!hasLecturer || noSubjects}
+                                disabled={(!hasLecturer && !hasServiceSubjects) || noSubjects}
                             />
                         )}
                     />
@@ -380,6 +421,8 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                             Xizmat fani: natija reyting, panel va statistikaga kirmaydi.
                             Guruhlar ro'yxati o'qituvchining yuklamasi bilan cheklanmaydi.
+                            Ma'ruzachi — testni tuzgan odam: savollar uning bankidan
+                            yig'iladi.
                         </p>
                     )}
                 </div>

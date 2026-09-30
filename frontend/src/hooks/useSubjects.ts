@@ -49,11 +49,11 @@ export const useCreateServiceSubject = () => {
     });
 };
 
-export const useTeacherAssignedSubjects = (userId?: number) => {
+export const useTeacherAssignedSubjects = (userId?: number, enabled: boolean = true) => {
     return useQuery({
         queryKey: ['teacherAssignedSubjects', userId],
         queryFn: () => subjectService.getAssignedSubjects(userId!),
-        enabled: !!userId,
+        enabled: !!userId && enabled,
     });
 };
 

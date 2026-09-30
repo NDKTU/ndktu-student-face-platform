@@ -420,3 +420,100 @@ async def test_multi_group_quiz_is_visible_in_list(
     # Javobda barcha guruhlar boʻlishi kerak — tahrirlash oynasi shuni oʻqiydi.
     row = next(q for q in body["quizzes"] if q["id"] == quiz_id)
     assert sorted(row["group_ids"]) == sorted([first["id"], second["id"]])
+
+
+# ───────────── Xizmat testida maʼruzachi — tuzuvchining oʻzi ─────────────
+
+
+@pytest.mark.asyncio
+async def test_service_quiz_lecturer_defaults_to_creator(
+    auth_client, async_db, make_group, test_faculty, test_user
+):
+    """Maʼruzachi koʻrsatilmasa, xizmat testi tuzuvchiga yoziladi.
+
+    Xizmat fani hech kimga biriktirilmaydi va savollarni odatda uni
+    tuzgan odam yuklaydi. Maʼruzachisiz test savolsiz qolardi: ular
+    aynan `Question.user_id == lecturer_id` boʻyicha yigʻiladi.
+    """
+    group = await make_group("SVC-LECT", test_faculty["id"])
+    service = Subject(name="Maʼruzachisiz xizmat fani", is_countable=False)
+    async_db.add(service)
+    await async_db.commit()
+    await async_db.refresh(service)
+
+    response = await auth_client.post(
+        "/quiz/",
+        json={
+            "question_number": 1,
+            "duration": 30,
+            "pin": "2323",
+            "subject_id": service.id,
+            "group_ids": [group["id"]],
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["lecturer_id"] == test_user["id"]
+
+
+@pytest.mark.asyncio
+async def test_service_quiz_keeps_explicit_lecturer(
+    auth_client, async_db, make_group, make_teacher, test_faculty, test_kafedra
+):
+    """Aniq koʻrsatilgan maʼruzachi almashtirilmaydi.
+
+    Savollarni boshqa odam yuklagan boʻlishi mumkin — admin uni ataylab
+    tanlaydi va bu tanlov saqlanishi kerak.
+    """
+    group = await make_group("SVC-LECT2", test_faculty["id"])
+    teacher = await make_teacher("svc_lecturer", test_kafedra["id"])
+    service = Subject(name="Boshqa maʼruzachili xizmat fani", is_countable=False)
+    async_db.add(service)
+    await async_db.commit()
+    await async_db.refresh(service)
+
+    response = await auth_client.post(
+        "/quiz/",
+        json={
+            "question_number": 1,
+            "duration": 30,
+            "pin": "2424",
+            "user_id": teacher["user_id"],
+            "subject_id": service.id,
+            "group_ids": [group["id"]],
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["lecturer_id"] == teacher["user_id"]
+
+
+@pytest.mark.asyncio
+async def test_normal_subject_has_no_lecturer_fallback(
+    auth_client, async_db, make_group, make_subject, test_faculty
+):
+    """Oddiy fanda bunday almashtirish YOʻQ.
+
+    Aks holda tashkilotchi maʼruzachini koʻrsatishni unutganda, test
+    jimgina uning nomiga yozilib, savollari oʻqituvchi bankidan emas,
+    tashkilotchinikidan (yaʼni boʻsh) yigʻilardi.
+    """
+    group = await make_group("NORM-LECT", test_faculty["id"])
+    subject = await make_subject("Oddiy fan — maʼruzachisiz")
+
+    response = await auth_client.post(
+        "/quiz/",
+        json={
+            "question_number": 1,
+            "duration": 30,
+            "pin": "2525",
+            "subject_id": subject.id,
+            "group_ids": [group["id"]],
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["lecturer_id"] is None

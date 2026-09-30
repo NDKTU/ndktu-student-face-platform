@@ -113,11 +113,11 @@ export const useTeacher = (id: number) => {
 //     });
 // };
 
-export const useTeacherAssignedGroups = (userId?: number) => {
+export const useTeacherAssignedGroups = (userId?: number, enabled: boolean = true) => {
     return useQuery({
         queryKey: ['teacherAssignedGroups', userId],
         queryFn: () => teacherService.getAssignedGroups(userId!),
-        enabled: !!userId,
+        enabled: !!userId && enabled,
     });
 };
 

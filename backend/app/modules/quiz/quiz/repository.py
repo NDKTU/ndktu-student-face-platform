@@ -296,8 +296,36 @@ class QuizRepository:
             data.user_id = lecturer_user_id
         return data
 
+    async def _fill_service_lecturer(
+        self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int
+    ) -> QuizCreateRequest:
+        """Xizmat fanida maʼruzachi — testni tuzgan odamning oʻzi.
+
+        Xizmat fani hech kimga biriktirilmaydi va savollarni odatda uni
+        tuzgan odam (admin) yuklaydi. Maʼruzachini majburiy tanlatish
+        maʼnosiz boʻlardi: tanlangan oʻqituvchining bankida bu fan
+        boʻyicha savol yoʻq va test boʻsh chiqardi.
+
+        Faqat maʼruzachi KOʻRSATILMAGANDA ishlaydi: admin savollarni
+        boshqa odam yuklagan boʻlsa, uni ataylab tanlashi mumkin.
+        """
+        if data.lecturer_id is not None or data.subject_id is None:
+            return data
+        is_service = (
+            await session.execute(
+                select(Subject.id).where(
+                    Subject.id == data.subject_id, Subject.is_countable.is_(False)
+                )
+            )
+        ).scalar_one_or_none()
+        if is_service is not None:
+            data.lecturer_id = created_by_user_id
+            data.user_id = created_by_user_id
+        return data
+
     async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int) -> Quiz:
         data = await self._fill_from_lesson(session, data)
+        data = await self._fill_service_lecturer(session, data, created_by_user_id)
 
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
