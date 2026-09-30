@@ -61,17 +61,6 @@ class Subject(Base, IdIntPk, TimestampMixin, ExternalRefMixin, HideableMixin):
     #: nomli ikki yozuvni ham koʻpincha aynan semestr ajratadi.
     semester: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
-    #: Hisob-kitobga kiradimi. `False` — test uchun tuzilgan xizmat fani:
-    #: uning natijalari reyting, panel va statistikaga qoʻshilmaydi.
-    #:
-    #: Nega `HideableMixin` dagi `is_hidden` emas. U 2026-09-11 dan
-    #: ataylab oʻchirilgan va maʼnosi boshqa — «admin yashirdi». Ikki
-    #: maʼnoni bitta ustunga yuklash oʻsha mixin izohida ogohlantirilgan
-    #: chalkashlikka olib borardi.
-    is_countable: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="true"
-    )
-
     curriculum: Mapped["Curriculum | None"] = relationship("Curriculum", lazy="selectin")
 
     teacher_subjects: Mapped[list["TeacherSubject"]] = relationship(
@@ -242,13 +231,6 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         cascade="all, delete-orphan",
     )
 
-    quiz_groups: Mapped[list["QuizGroup"]] = relationship(
-        "QuizGroup",
-        back_populates="quiz",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-
     results: Mapped[list["Result"]] = relationship(
         "Result",
         back_populates="quiz",
@@ -270,32 +252,6 @@ class Quiz(Base, IdIntPk, TimestampMixin):
             "title": self.title,
             "questions": [qq.question.to_dict() for qq in self.quiz_questions],
         }
-
-
-class QuizGroup(Base, IdIntPk, TimestampMixin):
-    """Test biriktirilgan guruhlar.
-
-    Ilgari test bitta guruhga bogʻlanardi (`quizzes.group_id`). Bir
-    testni bir necha guruhga oʻtkazish uchun har safar nusxa yaratish
-    kerak boʻlardi — natijalar ham boʻlinib ketardi.
-
-    `quizzes.group_id` olib tashlanmadi: unga mavjud testlar va kodning
-    koʻp joyi tayanadi. U birinchi guruhni saqlab qoladi, haqiqat
-    manbai esa shu jadval.
-    """
-
-    __tablename__ = "quiz_groups"
-    __table_args__ = (UniqueConstraint("quiz_id", "group_id", name="uq_quiz_group"),)
-
-    quiz_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    group_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-
-    quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="quiz_groups")
-    group: Mapped["Group"] = relationship("Group")
 
 
 class QuizQuestion(Base, IdIntPk, TimestampMixin):

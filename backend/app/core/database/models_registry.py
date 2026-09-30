@@ -7,7 +7,6 @@ __all__ = [
     "Announcement",
     "AuditLog",
     "Notification",
-    "QuizGroup",
     "AppSetting",
     "AnnouncementRegistration",
     "HemisDataCredential",
@@ -113,7 +112,6 @@ from app.modules.psychology.model import (
 from app.modules.quiz.model import (
     Question,
     Quiz,
-    QuizGroup,
     QuizQuestion,
     Result,
     Subject,

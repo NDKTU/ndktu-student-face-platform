@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, /* useMutation, */ /* useQueryClient */ } from '@tanstack/react-query';
 import { subjectService, type SubjectListParams } from '@/services/subjectService';
 
 export const useSubjects = (
@@ -10,50 +10,20 @@ export const useSubjects = (
     // Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
     // includeHidden = false,
     sort?: SubjectListParams,
-    /** Xizmat fanlarini ham qoʻshish — testlar va savollar sahifasi uchun. */
-    includeService = false,
 ) => {
     return useQuery({
-        queryKey: ['subjects', page, limit, search, teacher_id, sort, includeService],
-        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id, sort, includeService),
+        queryKey: ['subjects', page, limit, search, teacher_id, sort],
+        queryFn: () => subjectService.getSubjects(page, limit, search, teacher_id, sort),
         placeholderData: (previousData) => previousData,
         enabled,
     });
 };
 
-/**
- * Faqat xizmat fanlari.
- *
- * Nega alohida: test oynasida fan roʻyxati oʻqituvchiga BIRIKTIRILGAN
- * fanlardan yigʻiladi (`teacher_subjects`). Xizmat fani hech kimga
- * biriktirilmaydi — u bir martalik test uchun tuziladi, shuning uchun
- * roʻyxatga shu yerdan qoʻshiladi.
- */
-export const useServiceSubjects = (enabled: boolean = true) => {
-    return useQuery({
-        queryKey: ['serviceSubjects'],
-        queryFn: () => subjectService.getSubjects(1, 200, '', undefined, undefined, true),
-        select: (data) => data.subjects.filter((subject) => subject.is_countable === false),
-        enabled,
-    });
-};
-
-export const useCreateServiceSubject = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: { name: string }) => subjectService.createServiceSubject(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['subjects'] });
-            queryClient.invalidateQueries({ queryKey: ['serviceSubjects'] });
-        },
-    });
-};
-
-export const useTeacherAssignedSubjects = (userId?: number, enabled: boolean = true) => {
+export const useTeacherAssignedSubjects = (userId?: number) => {
     return useQuery({
         queryKey: ['teacherAssignedSubjects', userId],
         queryFn: () => subjectService.getAssignedSubjects(userId!),
-        enabled: !!userId && enabled,
+        enabled: !!userId,
     });
 };
 

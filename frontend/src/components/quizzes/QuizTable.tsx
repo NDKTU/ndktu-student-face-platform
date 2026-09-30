@@ -46,11 +46,6 @@ interface QuizTableProps {
     isRepeatPending: boolean;
     getSubjectName: (id?: number) => string;
     getGroupName: (id?: number) => string;
-    /**
-     * Fan xizmat fanimi (hisob-kitobga kirmaydi). Berilmasa chip
-     * ko'rsatilmaydi — faol testlar sahifasi bu ma'lumotni yuklamaydi.
-     */
-    isServiceSubject?: (id?: number) => boolean;
     onToggleStatus?: (quiz: Quiz) => void;
     onEdit?: (quiz: Quiz) => void;
     onDelete?: (quiz: Quiz) => void;
@@ -66,21 +61,6 @@ interface QuizTableProps {
  * variant='list' даёт таблицу как на «Natijalar»: на мобильных DataTable сам
  * переключается на карточки.
  */
-/**
- * Test guruhlari bitta satrda.
- *
- * `quiz.group_id` — ro'yxatning birinchi guruhi; unga qarab chizilsa,
- * ko'p guruhli test bitta guruhga tegishli bo'lib ko'rinardi. Ikkitadan
- * ortiq bo'lsa qolgani «+N» ga yig'iladi: satr bo'yiga sig'ishi kerak.
- */
-const groupsLabel = (quiz: Quiz, getGroupName: (id?: number) => string): string => {
-    const ids = quiz.group_ids?.length ? quiz.group_ids : quiz.group_id ? [quiz.group_id] : [];
-    const names = ids.map((id) => getGroupName(id)).filter((name) => name && name !== '-');
-    if (names.length === 0) return '-';
-    if (names.length <= 2) return names.join(', ');
-    return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
-};
-
 export const QuizTable = ({
     quizzes,
     isLoading,
@@ -93,7 +73,6 @@ export const QuizTable = ({
     isRepeatPending,
     getSubjectName,
     getGroupName,
-    isServiceSubject,
     onToggleStatus,
     onEdit,
     onDelete,
@@ -243,15 +222,10 @@ export const QuizTable = ({
                             )}
                         </div>
                         <p className="truncate text-xs capitalize text-muted-foreground">
-                            {[getSubjectName(quiz.subject_id), groupsLabel(quiz, getGroupName)]
+                            {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
                                 .filter((value) => value && value !== '-')
                                 .join(' · ') || '—'}
                         </p>
-                        {isServiceSubject?.(quiz.subject_id) && (
-                            <span className="mt-1 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                                {t('Xizmat fani')}
-                            </span>
-                        )}
                     </div>
                 ),
             },
@@ -333,7 +307,7 @@ export const QuizTable = ({
                                     )}
                                 </div>
                                 <p className="truncate text-xs capitalize text-muted-foreground">
-                                    {[getSubjectName(quiz.subject_id), groupsLabel(quiz, getGroupName)]
+                                    {[getSubjectName(quiz.subject_id), getGroupName(quiz.group_id)]
                                         .filter((value) => value && value !== '-')
                                         .join(' · ') || '—'}
                                 </p>
@@ -368,7 +342,7 @@ export const QuizTable = ({
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {quizzes.map((quiz) => {
                 const subjectName = getSubjectName(quiz.subject_id);
-                const groupName = groupsLabel(quiz, getGroupName);
+                const groupName = getGroupName(quiz.group_id);
                 const subtitle = [subjectName, groupName].filter((v) => v && v !== '-').join(' · ');
                 return (
                     <div

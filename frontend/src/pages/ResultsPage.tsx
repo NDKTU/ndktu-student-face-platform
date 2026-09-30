@@ -28,7 +28,6 @@ import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
 import { formatDate, formatDateTime } from '@/utils/date';
 import { subjectOption } from '@/utils/subject';
-import { ServiceSubjectBadge } from '@/components/common/ServiceSubjectBadge';
 import { useTranslation } from 'react-i18next';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
@@ -80,7 +79,6 @@ const ResultCard = ({ result, onClick }: ResultCardProps) => {
                     <div className="flex items-center gap-1.5 mt-1.5">
                         <BookOpen className="h-3 w-3 text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground truncate">{result.subject?.name || '—'}</span>
-                        <ServiceSubjectBadge subject={result.subject} />
                     </div>
                 </div>
 
@@ -240,7 +238,7 @@ const ResultsPage = () => {
     const { data: facultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
     const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, canFilterByKafedra);
     const { data: groupsData }   = useGroups(1, 1000, '', undefined, undefined, isAdminOrTeacher);
-    const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher, undefined, true);
+    const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher);
     const { data: quizzesData }  = useQuizzes({ page: 1, limit: 1000 }, isAdminOrTeacher);
 
     const groups        = groupsData?.groups || [];
@@ -336,18 +334,7 @@ const ResultsPage = () => {
             ),
         },
         { key: 'group', header: t('Guruh'), hideBelow: 'md', className: 'text-sm', cell: (result) => result.group?.name || '—' },
-        {
-            key: 'subject',
-            header: t('Fan'),
-            hideBelow: 'lg',
-            className: 'text-sm',
-            cell: (result) => (
-                <span className="flex flex-wrap items-center gap-1.5">
-                    <span>{result.subject?.name || '—'}</span>
-                    <ServiceSubjectBadge subject={result.subject} />
-                </span>
-            ),
-        },
+        { key: 'subject', header: t('Fan'), hideBelow: 'lg', className: 'text-sm', cell: (result) => result.subject?.name || '—' },
         {
             key: 'quiz',
             header: t('Test'),

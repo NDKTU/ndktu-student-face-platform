@@ -16,7 +16,6 @@ from app.modules.auth.user.repository import get_user_repository
 from app.modules.auth.user.schemas import UserCreateRequest
 from app.modules.course.model import Course, CourseGroup, CourseTeacher
 from app.modules.organization_structure.model import Faculty, Group, Kafedra, TeacherGroup
-from app.core.utils.countable import countable_results
 from app.modules.quiz.model import Result, Subject
 
 from .schemas import (
@@ -832,11 +831,7 @@ class TeacherRepository:
             .outerjoin(Kafedra, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(Faculty, Kafedra.faculty_id == Faculty.id)
             .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
-            .outerjoin(
-                Result,
-                # Xizmat fani reytingga kirmaydi (core/utils/countable.py).
-                (Result.group_id == TeacherGroup.group_id) & countable_results(),
-            )
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
         )
 
         if faculty_id is not None:
@@ -938,11 +933,7 @@ class TeacherRepository:
             .outerjoin(Kafedra, Kafedra.faculty_id == Faculty.id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
-            .outerjoin(
-                Result,
-                # Xizmat fani reytingga kirmaydi (core/utils/countable.py).
-                (Result.group_id == TeacherGroup.group_id) & countable_results(),
-            )
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
             .group_by(Faculty.id, Faculty.name)
             .order_by(desc("rank_score"))
         )
@@ -1004,11 +995,7 @@ class TeacherRepository:
             .outerjoin(Faculty, Faculty.id == Kafedra.faculty_id)
             .outerjoin(Teacher, Teacher.kafedra_id == Kafedra.id)
             .outerjoin(TeacherGroup, TeacherGroup.teacher_id == Teacher.id)
-            .outerjoin(
-                Result,
-                # Xizmat fani reytingga kirmaydi (core/utils/countable.py).
-                (Result.group_id == TeacherGroup.group_id) & countable_results(),
-            )
+            .outerjoin(Result, Result.group_id == TeacherGroup.group_id)
             .group_by(Kafedra.id, Kafedra.name, Kafedra.faculty_id, Faculty.name)
             .order_by(desc("rank_score"))
         )

@@ -71,11 +71,7 @@ const QuestionFormPage = () => {
     // serverda (`useSubjects` uni `name=` ga o'giradi), sahifa hajmi kichik.
     const [subjectQuery, setSubjectQuery] = useState('');
     const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
-    // Oxirgi `true` — xizmat fanlari ham ro'yxatda: savol aynan ularga
-    // yuklanadi (test uchun tuzilgan fan).
-    const { data: subjectsData } = useSubjects(
-        1, FILTER_PAGE_SIZE, debouncedSubjectQuery, undefined, true, undefined, true,
-    );
+    const { data: subjectsData } = useSubjects(1, FILTER_PAGE_SIZE, debouncedSubjectQuery);
     // Tanlangan fan qidiruv natijasida bo'lmasligi mumkin — u holda Combobox
     // nom o'rniga placeholder ko'rsatardi va saqlashda maydon bo'sh deb
     // hisoblanardi. Shuning uchun tanlov alohida eslab qolinadi.

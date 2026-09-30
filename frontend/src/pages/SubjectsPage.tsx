@@ -6,7 +6,7 @@ import type { Subject } from '@/services/subjectService';
 import { Button } from '@/components/ui/Button';
 // import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
 import {
-    Plus,
+    // Plus,
     // Pencil,
     // Trash2,
     ArrowRight,
@@ -17,9 +17,6 @@ import {
     XCircle,
 } from 'lucide-react';
 import { ExternalSourceBadge, InactiveBadge, /* isExternal */ } from '@/components/common/ExternalSourceBadge';
-import { ServiceSubjectBadge } from '@/components/common/ServiceSubjectBadge';
-import { ServiceSubjectModal } from '@/components/subjects/ServiceSubjectModal';
-import { PermissionGate } from '@/components/auth/PermissionGate';
 // import { /* Modal */ } from '@/components/ui/Modal';
 // import { /* Input */ } from '@/components/ui/Input';
 // import { /* useForm */ } from 'react-hook-form';
@@ -54,9 +51,6 @@ type SortOrder = 'asc' | 'desc';
 export const SubjectsPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    // Xizmat fani — test uchun platformada tuzilgan fan. Umumiy fan
-    // yaratish yopiq (EPMOS ko'zgusi), bu esa alohida yo'l.
-    const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [isModalOpen, setIsModalOpen] = useState(false);
     // Yashirilganlarni koʻrsatish — faqat adminda maʼnoga ega.
@@ -99,9 +93,7 @@ export const SubjectsPage = () => {
     } = useSubjects(currentPage, pageSize, debouncedSearch, undefined, true, {
         sort_by: sortField,
         order: sortOrder,
-    // Xizmat fanlari shu yerda ko'rinadi: aks holda yaratilgan fan
-    // ro'yxatda paydo bo'lmasdi va yo'qolgandek tuyulardi.
-    }, true);
+    });
 
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const deleteSubjectMutation = useDeleteSubject();
@@ -250,19 +242,23 @@ export const SubjectsPage = () => {
                 /* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                 extraFilters={<ShowHiddenSwitch value={showHidden} onChange={setShowHidden} />}
                 */
+                /* EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
                 actions={
                     <PermissionGate permission="create:subject">
                         <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() => setIsServiceModalOpen(true)}
+                            onClick={() => {
+                                setSelectedSubject(null);
+                                setIsModalOpen(true);
+                            }}
                             className="h-9 gap-1.5 font-semibold shadow-sm"
                         >
                             <Plus className="h-4 w-4" />
-                            <span>{t('Xizmat fani')}</span>
+                            <span>{t("Qo'shish")}</span>
                         </Button>
                     </PermissionGate>
                 }
+                */
             />
 
             {/* Content */}
@@ -356,7 +352,6 @@ export const SubjectsPage = () => {
                                                 </p>
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                                     <ExternalSourceBadge row={subject} />
-                                                    <ServiceSubjectBadge subject={subject} />
                                                     <InactiveBadge row={subject} />
                                                     {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                                     <HiddenBadge row={subject} />
@@ -415,7 +410,6 @@ export const SubjectsPage = () => {
                             subtitle={
                                 <span className="flex flex-wrap items-center gap-1.5">
                                     <ExternalSourceBadge row={subject} />
-                                    <ServiceSubjectBadge subject={subject} />
                                     <InactiveBadge row={subject} />
                                     {/* Yashirish funksiyasi 2026-09-11 da kommentga olindi (VisibilityControls.tsx ga qarang).
                                     <HiddenBadge row={subject} />
@@ -442,12 +436,6 @@ export const SubjectsPage = () => {
                 totalItems={totalCount}
                 pageSize={pageSize}
                 onPageSizeChange={setPageSize}
-            />
-
-            <ServiceSubjectModal
-                isOpen={isServiceModalOpen}
-                onClose={() => setIsServiceModalOpen(false)}
-                onSuccess={() => refetch()}
             />
 
             {/* Modal */}

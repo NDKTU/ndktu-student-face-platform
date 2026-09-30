@@ -99,14 +99,9 @@ class QuizProcessRepository:
             if student.image_path:
                 student_image_url = student.image_path
 
-            # Test bir nechta guruhga biriktirilishi mumkin (`quiz_groups`).
-            # `quizzes.group_id` moslik uchun qoldirilgan: yangi jadval
-            # boʻsh boʻlsa (eski test), oʻsha ustunga qaytamiz.
-            allowed_groups = {qg.group_id for qg in (quiz.quiz_groups or [])}
-            if not allowed_groups and quiz.group_id is not None:
-                allowed_groups = {quiz.group_id}
-            if allowed_groups and student.group_id not in allowed_groups:
-                raise errors.quiz_not_for_your_group()
+            if quiz.group_id is not None:
+                if student.group_id != quiz.group_id:
+                    raise errors.quiz_not_for_your_group()
 
         # Prepare questions with shuffled options — only ever serve active questions;
         # a question can be soft-deleted after being linked to this quiz without a

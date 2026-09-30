@@ -26,7 +26,6 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.schemas import TASHKENT_TZ
 from app.core.utils.course_access import manageable_course_ids
 from app.core.utils.group_scope import teacher_group_ids
-from app.core.utils.countable import countable_results
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import (
     Course,
@@ -277,13 +276,7 @@ async def build_teacher_dashboard(session: AsyncSession, user: User) -> TeacherD
     own_results = (
         select(Result)
         .join(Quiz, Quiz.id == Result.quiz_id)
-        .where(
-            Quiz.lecturer_id == user.id,
-            Result.status == "completed",
-            # Xizmat fani oʻrtacha bahoni buzmasin
-            # (core/utils/countable.py).
-            countable_results(),
-        )
+        .where(Quiz.lecturer_id == user.id, Result.status == "completed")
         .subquery()
     )
     grades = TeacherDashboardGrades()

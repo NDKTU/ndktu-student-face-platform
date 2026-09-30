@@ -99,11 +99,7 @@ const QuizzesPage = () => {
     //    bo'lmaydi: qatorlarda «-» chiqib qolardi.
     //  * `subjectOptionsData` — filtr ro'yxati uchun. Fanlar 2978 ta,
     //    hammasi yuklanmaydi; qidiruv serverga uzatiladi.
-    // Oxirgi `true` — xizmat fanlari ham: ular aynan bu sahifada test
-    // uchun ishlatiladi, shuning uchun nomi va filtri kerak.
-    const { data: allSubjectsData } = useSubjects(
-        1, 1000, '', undefined, hasPermission('read:subject'), undefined, true,
-    );
+    const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
     const [subjectQuery, setSubjectQuery] = useState('');
     const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
     const { data: subjectOptionsData } = useSubjects(
@@ -112,8 +108,6 @@ const QuizzesPage = () => {
         debouncedSubjectQuery,
         undefined,
         hasPermission('read:subject'),
-        undefined,
-        true,
     );
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
@@ -261,15 +255,6 @@ const QuizzesPage = () => {
     }, [allGroups, quizzes]);
 
     const getSubjectName = (id?: number) => (id ? subjectNameById.get(id) : undefined) || '-';
-
-    // Xizmat fani — hisob-kitobga kirmaydigan fan. Ro'yxatda chip bilan
-    // belgilanadi: aks holda o'qituvchi reyting nega o'zgarmaganini
-    // tushunmasdi.
-    const serviceSubjectIds = useMemo(
-        () => new Set(allSubjects.filter((s: Subject) => s.is_countable === false).map((s: Subject) => s.id)),
-        [allSubjects],
-    );
-    const isServiceSubject = (id?: number) => (id ? serviceSubjectIds.has(id) : false);
     const getGroupName = (id?: number) => (id ? groupNameById.get(id) : undefined) || '-';
 
     const clearFilters = () => {
@@ -358,7 +343,6 @@ const QuizzesPage = () => {
                 isRepeatPending={repeatQuizMutation.isPending}
                 getSubjectName={getSubjectName}
                 getGroupName={getGroupName}
-                isServiceSubject={isServiceSubject}
                 onToggleStatus={handleToggleStatus}
                 onEdit={handleEditQuiz}
                 onDelete={handleDeleteClick}
