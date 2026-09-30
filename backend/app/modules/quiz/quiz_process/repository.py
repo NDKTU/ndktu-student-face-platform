@@ -10,7 +10,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.security import create_face_ws_token
+from app.core.utils.lesson_scope import covers_group
 from app.modules.auth.model import Student, User
+from app.modules.course.model import Lesson
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
 from . import errors
@@ -101,6 +103,15 @@ class QuizProcessRepository:
 
             if quiz.group_id is not None:
                 if student.group_id != quiz.group_id:
+                    raise errors.quiz_not_for_your_group()
+            elif quiz.lesson_id is not None:
+                # Guruhsiz test darsdan tuzilgan: dars butun kursniki
+                # boʻlsa, testda ham guruh boʻlmaydi. Bu «hammaga ochiq»
+                # degani emas — u kursning guruhlariga tegishli. Shartsiz
+                # qoldirilsa, PIN bilgan istalgan talaba begona kursning
+                # testini ishlab, natijasi oʻsha guruh jurnaliga tushardi.
+                lesson = await session.get(Lesson, quiz.lesson_id)
+                if lesson is not None and not await covers_group(session, lesson, student.group_id):
                     raise errors.quiz_not_for_your_group()
 
         # Prepare questions with shuffled options — only ever serve active questions;

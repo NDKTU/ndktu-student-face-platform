@@ -3,13 +3,14 @@ from datetime import datetime, timezone
 
 from core.config import settings
 from fastapi import HTTPException, status
-from sqlalchemy import asc, case, desc, func, or_, select
+from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.enums import QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.core.utils.lesson_scope import visible_to_group
 from app.modules.course.model import Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.file.storage import public_url, store_upload
@@ -387,6 +388,31 @@ class QuizRepository:
             quiz.subject_name = quiz.subject.name if quiz.subject else None
             quiz.group_name = quiz.group.name if quiz.group else None
 
+    @staticmethod
+    def _visible_to_student(group_id: int):
+        """Talabaga koʻrinadigan testlar sharti.
+
+        Ikkita yoʻl bor. Oddiysi — testda aynan shu guruh koʻrsatilgan.
+        Ikkinchisi darsdan keladi: dars butun kursniki boʻlishi mumkin
+        (`lessons.group_id` boʻsh — «kursning barcha guruhlari»), unda
+        guruh yoʻq, demak undan tuzilgan testga ham guruh yozilmaydi.
+        Faqat ustunga qaralganda bunday test hech kimga koʻrinmasdi:
+        oʻqituvchi uni tuzardi, faol qilardi, talaba esa «Test ishlash»
+        sahifasida boʻshliq koʻrardi.
+
+        Guruhsiz test «hammaga ochiq» degani emas — u oʻsha darsning
+        kursiga kirgan guruhlarniki. Shart darslar bilan bir xil joydan
+        olinadi (`lesson_scope.visible_to_group`), aks holda dars va uning
+        testi har xil guruhlarga koʻrinib ketardi.
+        """
+        return or_(
+            Quiz.group_id == group_id,
+            and_(
+                Quiz.group_id.is_(None),
+                Quiz.lesson_id.in_(select(Lesson.id).where(visible_to_group(group_id))),
+            ),
+        )
+
     async def list_quizzes(
         self, session: AsyncSession, request: QuizListRequest, current_user: User
     ) -> QuizListResponse:
@@ -410,7 +436,7 @@ class QuizRepository:
             student_result = await session.execute(student_stmt)
             student_group_id = student_result.scalar_one_or_none()
             if student_group_id:
-                stmt = stmt.where(Quiz.group_id == student_group_id)
+                stmt = stmt.where(self._visible_to_student(student_group_id))
             else:
                 stmt = stmt.where(Quiz.id == -1)  # no group → no quizzes
 
@@ -494,7 +520,7 @@ class QuizRepository:
 
         if is_student:
             if student_group_id:
-                count_stmt = count_stmt.where(Quiz.group_id == student_group_id)
+                count_stmt = count_stmt.where(self._visible_to_student(student_group_id))
             else:
                 count_stmt = count_stmt.where(Quiz.id == -1)
         elif is_teacher and teacher_filter is not None:
