@@ -33,6 +33,11 @@ interface Props {
     lockSubject?: boolean;
     /** Fan nomi ma'lum bo'lsa (dars javobidan) — ro'yxatdan izlanmaydi. */
     subjectName?: string;
+    /**
+     * Dars sahifasidan kelingan boʻlsa — yuklangan savollar oʻsha darsga
+     * biriktiriladi. Dars testi aynan shu savollardan yigʻiladi.
+     */
+    lessonId?: number;
 }
 
 export const QuestionExcelUploadModal = ({
@@ -43,6 +48,7 @@ export const QuestionExcelUploadModal = ({
     defaultSubjectId,
     lockSubject = false,
     subjectName,
+    lessonId,
 }: Props) => {
     const [file, setFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,7 +67,7 @@ export const QuestionExcelUploadModal = ({
 
     const handleUpload = () => {
         if (!file || !subjectId) return;
-        uploadMutation.mutate({ file, subject_id: parseInt(subjectId, 10) }, {
+        uploadMutation.mutate({ file, subject_id: parseInt(subjectId, 10), lesson_id: lessonId }, {
             onSuccess: (data: { questions?: unknown[]; warnings?: string[] }) => {
                 const imported = data?.questions?.length ?? 0;
                 toast.success(imported ? `${imported} ta savol import qilindi` : 'Savollar import qilindi');

@@ -31,15 +31,28 @@ interface QuizFiltersProps {
     onUserChange: (id: number | undefined) => void;
     filterIsActive?: boolean | undefined;
     onIsActiveChange?: (val: boolean | undefined) => void;
-    /** Darsi o'chirilgan dars testlari — boshqa filtrlarga tushmaydi. */
-    filterWithoutLesson?: boolean | undefined;
-    onWithoutLessonChange?: (val: boolean | undefined) => void;
+    /**
+     * Darsga bogʻlanish: `hidden` — dars testlarisiz (standart, ular kurs
+     * ichida koʻrinadi), `all` — hammasi, `lesson` — faqat dars testlari,
+     * `orphan` — darsi oʻchirilganlari (ular boshqa filtrlarga tushmaydi).
+     */
+    lessonScope?: LessonScope;
+    onLessonScopeChange?: (val: LessonScope) => void;
     sortDir: 'desc' | 'asc';
     onSortDirChange: (dir: 'desc' | 'asc') => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     hideStatusFilter?: boolean;
 }
+
+export type LessonScope = 'hidden' | 'all' | 'lesson' | 'orphan';
+
+const LESSON_SCOPE_LABELS: Record<LessonScope, string> = {
+    hidden: 'Dars testlarisiz',
+    all: 'Barchasi',
+    lesson: 'Faqat dars testlari',
+    orphan: "Darsi o'chirilgan",
+};
 
 const selectClassName =
     'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -61,8 +74,8 @@ export const QuizFilters = ({
     onUserChange,
     filterIsActive,
     onIsActiveChange,
-    filterWithoutLesson,
-    onWithoutLessonChange,
+    lessonScope = 'hidden',
+    onLessonScopeChange,
     sortDir,
     onSortDirChange,
     hasActiveFilters,
@@ -142,16 +155,17 @@ export const QuizFilters = ({
                             </select>
                         </div>
                     )}
-                    {onWithoutLessonChange && (
-                        <div className="flex w-full flex-col gap-2 sm:w-[170px]">
+                    {onLessonScopeChange && (
+                        <div className="flex w-full flex-col gap-2 sm:w-[190px]">
                             <label className="text-sm font-medium">{t('Darsga bog\'liqlik')}</label>
                             <select
                                 className={selectClassName}
-                                value={filterWithoutLesson ? 'orphan' : 'all'}
-                                onChange={(e) => onWithoutLessonChange(e.target.value === 'orphan' ? true : undefined)}
+                                value={lessonScope}
+                                onChange={(e) => onLessonScopeChange(e.target.value as LessonScope)}
                             >
-                                <option value="all">{t('Barchasi')}</option>
-                                <option value="orphan">{t("Darsi o'chirilgan")}</option>
+                                {(Object.keys(LESSON_SCOPE_LABELS) as LessonScope[]).map((value) => (
+                                    <option key={value} value={value}>{t(LESSON_SCOPE_LABELS[value])}</option>
+                                ))}
                             </select>
                         </div>
                     )}

@@ -1,13 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { questionService, type QuestionCreateRequest } from '@/services/questionService';
 
-export const useQuestions = (page = 1, limit = 10, text?: string, subject_id?: number, user_id?: number) => {
+export const useQuestions = (
+    page = 1,
+    limit = 10,
+    text?: string,
+    subject_id?: number,
+    user_id?: number,
+    /** Dars sahifasi aynan shu darsning savollarini soʻraydi. */
+    lesson_id?: number,
+) => {
     return useQuery({
-        queryKey: ['questions', page, limit, text, subject_id, user_id],
-        queryFn: () => questionService.getQuestions(page, limit, text, subject_id, user_id),
+        queryKey: ['questions', page, limit, text, subject_id, user_id, lesson_id],
+        queryFn: () => questionService.getQuestions(page, limit, text, subject_id, user_id, lesson_id),
         placeholderData: (previousData) => previousData,
     });
 };
+
+/** Darsga biriktirilgan savollar — kurs ichidagi roʻyxat uchun. */
+export const useLessonQuestions = (lessonId?: number) =>
+    useQuery({
+        queryKey: ['questions', 'lesson', lessonId],
+        queryFn: () => questionService.getQuestions(1, 200, undefined, undefined, undefined, lessonId),
+        enabled: !!lessonId,
+    });
 
 export const useQuestionCatalog = (search?: string) => useQuery({
     queryKey: ['question-catalog', search],
@@ -59,7 +75,8 @@ export const useDeleteQuestion = () => {
 export const useUploadQuestions = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ file, subject_id }: { file: File; subject_id: number }) => questionService.uploadQuestions(file, subject_id),
+        mutationFn: ({ file, subject_id, lesson_id }: { file: File; subject_id: number; lesson_id?: number }) =>
+            questionService.uploadQuestions(file, subject_id, lesson_id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });

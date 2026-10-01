@@ -125,6 +125,14 @@ export interface QuizListParams {
     lesson_id?: number;
     /** Darsi o'chirilgan dars testlari: bor, lekin filtrlarda topilmaydi. */
     without_lesson?: boolean;
+    /**
+     * Darsga bogʻlanish boʻyicha filtr: `false` — faqat darssiz testlar,
+     * `true` — faqat dars testlari. Berilmasa — hammasi.
+     *
+     * «Testlar» sahifasi `false` yuboradi: dars testlari kurs ichida
+     * koʻrinadi. Talaba yoʻli (`/quiz/active`) buni yubormaydi.
+     */
+    has_lesson?: boolean;
     faculty_id?: number;
     quiz_type?: QuizType;
     sort_dir?: string;

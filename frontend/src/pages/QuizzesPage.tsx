@@ -17,7 +17,7 @@ import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
-import { QuizFilters } from '@/components/quizzes/QuizFilters';
+import { QuizFilters, type LessonScope } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
@@ -65,9 +65,11 @@ const QuizzesPage = () => {
     const [filterGroupId, setFilterGroupId] = useUrlOptionalNumberState('group');
     const [filterUserId, setFilterUserId] = useUrlOptionalNumberState('teacher');
     const [filterIsActive, setFilterIsActive] = useUrlOptionalBoolState('active');
-    // Darsi o'chirilgan testlar guruhsiz qoladi va boshqa filtrlarning
-    // hech biriga tushmaydi — ularni ataylab so'rash kerak.
-    const [filterWithoutLesson, setFilterWithoutLesson] = useUrlOptionalBoolState('orphan');
+    // Dars testlari standart holda bu ro'yxatda KO'RINMAYDI: ular kurs
+    // ichida, o'z darsida turadi va umumiy ro'yxatni to'ldiradi. Kerak
+    // bo'lsa — shu tanlagich orqali. «Darsi o'chirilgan» ham shu yerda:
+    // bunday testlar guruhsiz qoladi va boshqa filtrlarga tushmaydi.
+    const [lessonScope, setLessonScope] = useUrlState<LessonScope>('lesson_scope', 'hidden');
     const [sortDir, setSortDir] = useUrlState<'desc' | 'asc'>('order', 'desc');
 
     useEffect(() => {
@@ -83,7 +85,8 @@ const QuizzesPage = () => {
         limit: pageSize,
         title: debouncedSearch || undefined,
         is_active: filterIsActive,
-        without_lesson: filterWithoutLesson || undefined,
+        without_lesson: lessonScope === 'orphan' || undefined,
+        has_lesson: lessonScope === 'hidden' ? false : lessonScope === 'lesson' ? true : undefined,
         user_id: filterUserId,
         group_id: filterGroupId,
         subject_id: filterSubjectId,
@@ -263,7 +266,7 @@ const QuizzesPage = () => {
         setFilterGroupId(undefined);
         setFilterUserId(undefined);
         setFilterIsActive(undefined);
-        setFilterWithoutLesson(undefined);
+        setLessonScope('hidden');
         setSearchTerm('');
         setSortDir('desc');
         setCurrentPage(1);
@@ -275,7 +278,7 @@ const QuizzesPage = () => {
         filterGroupId !== undefined ||
         filterUserId !== undefined ||
         filterIsActive !== undefined ||
-        filterWithoutLesson !== undefined ||
+        lessonScope !== 'hidden' ||
         searchTerm !== '' ||
         sortDir !== 'desc';
 
@@ -322,8 +325,8 @@ const QuizzesPage = () => {
                 onUserChange={setFilterUserId}
                 filterIsActive={filterIsActive}
                 onIsActiveChange={setFilterIsActive}
-                filterWithoutLesson={filterWithoutLesson}
-                onWithoutLessonChange={(val) => { setFilterWithoutLesson(val); setCurrentPage(1); }}
+                lessonScope={lessonScope}
+                onLessonScopeChange={(val) => { setLessonScope(val); setCurrentPage(1); }}
                 sortDir={sortDir}
                 onSortDirChange={setSortDir}
                 hasActiveFilters={hasActiveFilters}
@@ -343,6 +346,7 @@ const QuizzesPage = () => {
                 isRepeatPending={repeatQuizMutation.isPending}
                 getSubjectName={getSubjectName}
                 getGroupName={getGroupName}
+                lessonQuizzesHidden={lessonScope === 'hidden'}
                 onToggleStatus={handleToggleStatus}
                 onEdit={handleEditQuiz}
                 onDelete={handleDeleteClick}

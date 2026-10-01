@@ -315,12 +315,17 @@ async def upload_question_image(
 )
 async def upload_questions_excel(
     subject_id: int,
+    lesson_id: int | None = None,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: PermissionRequired = Depends(PermissionRequired("create:question")),
 ):
     result = await get_question_repository.upload_questions_excel(
-        session=session, file=file, subject_id=subject_id, user_id=current_user.id
+        session=session,
+        file=file,
+        subject_id=subject_id,
+        user_id=current_user.id,
+        lesson_id=lesson_id,
     )
     return result
 

@@ -352,6 +352,9 @@ const QuestionFormPage = () => {
         const payload: QuestionCreateRequest = {
             subject_id: parseInt(data.subject_id, 10),
             user_id: user.id,
+            // Dars sahifasidan kelingan boʻlsa, savol oʻsha darsniki boʻladi.
+            // Tahrirlashda yuborilmaydi: bekend eski versiyadan koʻchiradi.
+            lesson_id: !isEditMode && lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined,
             text: data.text,
             question_type: questionKind,
             option_a: data.option_a,

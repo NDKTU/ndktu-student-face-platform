@@ -84,6 +84,17 @@ class Question(Base, IdIntPk, TimestampMixin):
     subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
+    #: Savol qaysi darsga qoʻshilgan. Boʻsh — fan bankidagi umumiy savol
+    #: (shu ustun paydo boʻlishidan oldingi hamma savol aynan shunday).
+    #:
+    #: Dars testi aynan shu bogʻlanish boʻyicha yigʻiladi: oʻqituvchi dars
+    #: sahifasida savol qoʻshadi va oʻsha darsning testi faqat shulardan
+    #: tuziladi. `SET NULL`, `CASCADE` emas: dars oʻchirilsa ham savol
+    #: bankda qolishi kerak — unga natijalar va eski testlar tayanadi.
+    lesson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Savol turi (QuestionType). Ustun satr sifatida saqlanadi — Postgres enum
     # tipi emas. Diqqat: hozircha faqat "QUIZ" haqiqatan ishlaydi, qolgan
     # turlar uchun option_a..option_d / correct_option shakli mos kelmaydi.

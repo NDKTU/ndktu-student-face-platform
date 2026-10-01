@@ -104,6 +104,9 @@ PAYLOAD_SCHEMA = {
 class QuestionCreateRequest(BaseModel):
     subject_id: int
     user_id: int
+    #: Qaysi darsga qoʻshilyapti. Dars sahifasidan kelganda toʻldiriladi va
+    #: oʻsha darsning testi aynan shu savollardan yigʻiladi.
+    lesson_id: Optional[int] = None
     text: str
     # `QUIZ` dan boshqa turlarda variantlar `payload` da, shuning uchun bu
     # ustunlar majburiy emas — ular faqat eski tur uchun.
@@ -168,6 +171,8 @@ class QuestionCreateResponse(BaseModel):
     correct_option: CorrectOption
     question_type: QuestionType
     payload: Optional[dict] = None
+    #: Boʻsh — fan bankidagi umumiy savol.
+    lesson_id: Optional[int] = None
     version: int
     is_latest: bool
     is_active: bool
@@ -194,6 +199,8 @@ class QuestionListRequest(BaseModel):
     text: Optional[str] = None
     subject_id: Optional[int] = None
     user_id: Optional[int] = None
+    #: Dars sahifasi aynan shu darsning savollarini soʻraydi.
+    lesson_id: Optional[int] = None
 
     page: int = 1
 

@@ -14,6 +14,8 @@ import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePane
 import { LessonGradebook } from '@/components/courses/LessonGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
+import { useLessonQuestions } from '@/hooks/useQuestions';
+import { sanitizeHtml } from '@/utils/sanitize';
 import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
 import { LessonHomeworkCard } from '@/components/homework/LessonHomeworkCard';
@@ -74,6 +76,12 @@ export default function LessonDetailPage() {
         Boolean(lessonId) && canSeeQuizzes,
     );
     const deleteQuiz = useDeleteQuiz();
+    // Dars savollari. Test aynan shulardan yigʻiladi, shuning uchun
+    // oʻqituvchi ularni shu yerda, dars ichida koʻrishi kerak: avval
+    // ular faqat umumiy «Savollar» bankida koʻrinardi.
+    const lessonQuestionsQuery = useLessonQuestions(
+        canSeeQuizzes && lessonId ? lessonId : undefined,
+    );
 
     if (lessonQuery.isLoading) return <div className="space-y-6"><Skeleton className="h-10 w-2/3" /><Skeleton className="aspect-video w-full rounded-2xl" /></div>;
     if (lessonQuery.isError) return <ErrorState onRetry={() => lessonQuery.refetch()} />;
@@ -99,6 +107,7 @@ export default function LessonDetailPage() {
     const canManageQuiz = hasPermission('create:quiz');
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
+    const lessonQuestions = lessonQuestionsQuery.data?.questions ?? [];
     // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,
     // ro'yxat esa tanlanmagan holat uchun zaxira.
     const lessonSubjectId = lesson.teacher_subject?.subject_id;
@@ -227,7 +236,11 @@ export default function LessonDetailPage() {
                 icon={<ListChecks className="h-[18px] w-[18px]" />}
                 tone="blue"
                 title="Testlar va savollar"
-                description={quizzes.length > 0 ? `${quizzes.length} ta test` : 'Avval savol qo\'shing, keyin ulardan test tuzing'}
+                description={
+                    lessonQuestions.length > 0 || quizzes.length > 0
+                        ? `${lessonQuestions.length} ta savol · ${quizzes.length} ta test`
+                        : 'Avval savol qo\'shing, keyin ulardan test tuzing'
+                }
                 action={
                     <div className="flex flex-wrap gap-2">
                         {canAddQuestion && (
@@ -260,8 +273,46 @@ export default function LessonDetailPage() {
                     </div>
                 }
             >
-                {/* Savollar ma'ruzachining bankidan yig'iladi, shuning uchun avval
-                    savol qo'shish, keyin test tuzish tabiiy tartib. */}
+                {/* Test aynan shu darsning savollaridan yig'iladi, shuning uchun
+                    avval savol qo'shish, keyin test tuzish tabiiy tartib. */}
+                {lessonQuestions.length > 0 && (
+                    <div className="mb-5 space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Savollar
+                        </p>
+                        <ol className="space-y-1.5">
+                            {lessonQuestions.map((question, index) => (
+                                <li
+                                    key={question.id}
+                                    className="group/q flex items-start gap-3 rounded-xl border border-border/60 px-3.5 py-2.5"
+                                >
+                                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
+                                        {index + 1}
+                                    </span>
+                                    <div
+                                        className="min-w-0 flex-1 text-sm leading-snug [&_p]:m-0"
+                                        // Savol matni HTML ko'rinishida saqlanadi (jodit).
+                                        // Tozalash majburiy: muallif o'qituvchi, ro'yxatni
+                                        // esa admin ham ochadi.
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text || '') }}
+                                    />
+                                    {canAddQuestion && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Savolni tahrirlash"
+                                            className="shrink-0 opacity-60 transition-opacity group-hover/q:opacity-100"
+                                            onClick={() => navigate(`/questions/${question.id}/edit?return_to=/lessons/${lesson.id}`)}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                )}
+
                 {quizzes.length === 0 ? (
                     <EmptyState icon={<ListChecks className="h-6 w-6" />} title="Test tuzilmagan" description="Bu dars uchun hali test yaratilmagan." className="py-8" />
                 ) : (
@@ -311,6 +362,7 @@ export default function LessonDetailPage() {
                 defaultSubjectId={lessonSubjectId}
                 subjectName={lessonSubjectName}
                 lockSubject
+                lessonId={lesson.id}
             />
             <AssignmentFormModal isOpen={homeworkOpen} onClose={() => setHomeworkOpen(false)} courseId={lesson.course_id} lessonId={lesson.id} editing={editingHomework} />
             <ConfirmDialog

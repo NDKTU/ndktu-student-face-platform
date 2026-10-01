@@ -110,6 +110,14 @@ class QuizListRequest(BaseModel):
     # NULL), lekin guruhsiz qolgani uchun deyarli hech qaysi filtrga tushmaydi:
     # bor, lekin topib bo'lmaydi. Shu bayroq ularni ataylab ko'rsatadi.
     without_lesson: Optional[bool] = None
+    #: Darsga bogʻlanish boʻyicha filtr: `False` — faqat darssiz testlar,
+    #: `True` — faqat dars testlari, `None` — hammasi.
+    #:
+    #: Standart qiymat ataylab `None`: filtrni mijoz soʻraydi. «Testlar»
+    #: sahifasi dars testlarini yashirish uchun `False` yuboradi, talaba
+    #: yoʻli (`/quiz/active`) esa hech narsa yubormaydi — aks holda dars
+    #: testi talabaga yana koʻrinmay qolardi.
+    has_lesson: Optional[bool] = None
     faculty_id: Optional[int] = None
     is_active: Optional[bool] = None
     proctoring_mode: Optional[ProctoringMode] = None

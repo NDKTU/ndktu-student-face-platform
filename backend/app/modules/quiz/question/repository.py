@@ -133,6 +133,7 @@ class QuestionRepository:
         new_question = Question(
             subject_id=data.subject_id,
             user_id=author_id,
+            lesson_id=data.lesson_id,
             text=data.text,
             option_a=data.option_a,
             option_b=data.option_b,
@@ -215,6 +216,9 @@ class QuestionRepository:
         if request.user_id:
             stmt = stmt.where(Question.user_id == request.user_id)
 
+        if request.lesson_id:
+            stmt = stmt.where(Question.lesson_id == request.lesson_id)
+
         stmt = stmt.order_by(desc(Question.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
@@ -232,6 +236,8 @@ class QuestionRepository:
             count_stmt = count_stmt.where(Question.subject_id == request.subject_id)
         if request.user_id:
             count_stmt = count_stmt.where(Question.user_id == request.user_id)
+        if request.lesson_id:
+            count_stmt = count_stmt.where(Question.lesson_id == request.lesson_id)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -275,6 +281,11 @@ class QuestionRepository:
         new_question = Question(
             subject_id=data.subject_id,
             user_id=data.user_id,
+            # Tahrirlash yangi VERSIYA yaratadi. Dars bogʻlanishi
+            # koʻchirilmasa, tahrirlangan savol oʻz darsidan tushib
+            # qolardi — va dars testi uni boshqa olmasdi. Mijoz aniq
+            # qiymat yuborsa, oʻsha ustun boʻladi.
+            lesson_id=data.lesson_id if data.lesson_id is not None else question.lesson_id,
             text=data.text,
             option_a=data.option_a,
             option_b=data.option_b,
@@ -375,7 +386,7 @@ class QuestionRepository:
         return public_url(stored.blob.stored_path)
 
     async def upload_questions_excel(
-        self, session: AsyncSession, file, subject_id: int, user_id: int
+        self, session: AsyncSession, file, subject_id: int, user_id: int, lesson_id: int | None = None
     ) -> list[Question]:
         import io
 
@@ -448,6 +459,9 @@ class QuestionRepository:
             question = Question(
                 subject_id=q_subject_id,
                 user_id=user_id,
+                # Dars sahifasidan yuklanganda savollar oʻsha darsniki
+                # boʻladi: dars testi aynan shu bogʻlanish boʻyicha yigʻiladi.
+                lesson_id=lesson_id,
                 text=text,
                 option_a=opt_a,
                 option_b=opt_b,

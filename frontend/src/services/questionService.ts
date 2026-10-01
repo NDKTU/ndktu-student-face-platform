@@ -23,6 +23,11 @@ export type QuestionType = 'QUIZ' | 'TRUE_FALSE' | 'MULTI_SELECT' | 'TYPE_ANSWER
 export interface QuestionCreateRequest {
     subject_id: number;
     user_id: number;
+    /**
+     * Savol qaysi darsga qoʻshilyapti. Dars sahifasidan kelganda
+     * toʻldiriladi — oʻsha darsning testi aynan shu savollardan yigʻiladi.
+     */
+    lesson_id?: number;
     text: string;
     /** Standart tur — to'rt variant, bitta to'g'ri javob. */
     question_type?: QuestionType;
@@ -95,9 +100,11 @@ export const questionService = {
         });
         return response.data.teachers;
     },
-    getQuestions: async (page = 1, limit = 10, text?: string, subject_id?: number, user_id?: number) => {
+    getQuestions: async (
+        page = 1, limit = 10, text?: string, subject_id?: number, user_id?: number, lesson_id?: number,
+    ) => {
         const response = await api.get<QuestionListResponse>('/question/', {
-            params: { page, limit, text, subject_id, user_id },
+            params: { page, limit, text, subject_id, user_id, lesson_id },
         });
         return response.data;
     },
@@ -121,11 +128,13 @@ export const questionService = {
         await api.delete(`/question/${id}`);
     },
 
-    uploadQuestions: async (file: File, subject_id: number) => {
+    uploadQuestions: async (file: File, subject_id: number, lesson_id?: number) => {
         const formData = new FormData();
         formData.append('file', file);
         const response = await api.post('/question/upload_excel', formData, {
-            params: { subject_id },
+            // `lesson_id` dars sahifasidan keladi: yuklangan savollar oʻsha
+            // darsniki boʻladi va dars testi aynan shulardan yigʻiladi.
+            params: { subject_id, lesson_id },
         });
         return response.data;
     },

@@ -195,12 +195,29 @@ class QuizRepository:
             questions=question_items,
         )
 
-    def _lecturer_questions_stmt(self, lecturer_id: int, subject_id: int):
+    def _lecturer_questions_stmt(self, lecturer_id: int, subject_id: int, lesson_id: int | None = None):
         """Банк вопросов лектора по предмету — активные, последней версии.
 
         Банк персональный: тест собирается из вопросов того лектора, который
         читает лекции группе, а не из всех вопросов предмета.
+
+        `lesson_id` berilsa — faqat oʻsha darsning savollari. Dars sahifasida
+        oʻqituvchi savolni mavzuga qoʻshadi va oʻsha mavzuning testini kutadi;
+        butun fan banki olinsa, bitta mavzu testiga semestrning hamma savoli
+        tushib ketardi.
+
+        Dars boʻyicha olinganda muallif va fan boʻyicha filtr QOʻYILMAYDI.
+        Savol darsga biriktirilgan boʻlsa, uni kim kiritgani muhim emas:
+        amalda savollarni koʻpincha admin yoki yordamchi yuklaydi, maʼruzachi
+        esa boshqa hisob boʻladi — bank muallif boʻyicha kesilsa, test boʻsh
+        chiqardi.
         """
+        if lesson_id is not None:
+            return select(Question).where(
+                Question.lesson_id == lesson_id,
+                Question.is_active.is_(True),
+                Question.is_latest.is_(True),
+            )
         return select(Question).where(
             Question.user_id == lecturer_id,
             Question.subject_id == subject_id,
@@ -208,8 +225,12 @@ class QuizRepository:
             Question.is_latest.is_(True),
         )
 
-    async def count_available_questions(self, session: AsyncSession, lecturer_id: int, subject_id: int) -> int:
-        stmt = select(func.count()).select_from(self._lecturer_questions_stmt(lecturer_id, subject_id).subquery())
+    async def count_available_questions(
+        self, session: AsyncSession, lecturer_id: int, subject_id: int, lesson_id: int | None = None
+    ) -> int:
+        stmt = select(func.count()).select_from(
+            self._lecturer_questions_stmt(lecturer_id, subject_id, lesson_id).subquery()
+        )
         return (await session.execute(stmt)).scalar() or 0
 
     def _not_enough_questions(self, available: int, requested: int) -> HTTPException:
@@ -312,6 +333,7 @@ class QuizRepository:
                 session=session,
                 lecturer_id=data.lecturer_id,
                 subject_id=data.subject_id,
+                lesson_id=data.lesson_id,
             )
             if available < data.question_number:
                 raise self._not_enough_questions(available, data.question_number)
@@ -340,7 +362,10 @@ class QuizRepository:
         session.add(new_quiz)
 
         if data.lecturer_id and data.subject_id:
-            result_questions = await session.execute(self._lecturer_questions_stmt(data.lecturer_id, data.subject_id))
+            # Dars testi faqat oʻsha darsning savollaridan yigʻiladi.
+            result_questions = await session.execute(
+                self._lecturer_questions_stmt(data.lecturer_id, data.subject_id, data.lesson_id)
+            )
             for question in result_questions.scalars().all():
                 session.add(QuizQuestion(quiz=new_quiz, question=question))
 
@@ -496,6 +521,11 @@ class QuizRepository:
             # testlari darsga umuman biriktirilmaydi, ular «egasiz» emas.
             stmt = stmt.where(Quiz.lesson_id.is_(None), Quiz.quiz_type == QuizType.LESSON_QUIZ.value)
 
+        if request.has_lesson is not None:
+            stmt = stmt.where(
+                Quiz.lesson_id.isnot(None) if request.has_lesson else Quiz.lesson_id.is_(None)
+            )
+
         if request.faculty_id:
             stmt = stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
 
@@ -540,6 +570,10 @@ class QuizRepository:
             count_stmt = count_stmt.where(Quiz.lesson_id == request.lesson_id)
         if request.without_lesson:
             count_stmt = count_stmt.where(Quiz.lesson_id.is_(None), Quiz.quiz_type == QuizType.LESSON_QUIZ.value)
+        if request.has_lesson is not None:
+            count_stmt = count_stmt.where(
+                Quiz.lesson_id.isnot(None) if request.has_lesson else Quiz.lesson_id.is_(None)
+            )
         if request.faculty_id:
             count_stmt = count_stmt.join(Group, Group.id == Quiz.group_id).where(Group.faculty_id == request.faculty_id)
         if request.is_active is not None:
