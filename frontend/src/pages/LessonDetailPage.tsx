@@ -73,6 +73,10 @@ export default function LessonDetailPage() {
     // Talabada `read:quiz` yo'q — so'rov yuborilsa 403 qaytadi va konsol
     // xatolarga to'ladi. Huquq bo'lmasa, blok umuman ko'rsatilmaydi.
     const canSeeQuizzes = hasPermission('read:quiz');
+    // Savollar alohida huquq bilan: savolda to'g'ri javob ham bor va u
+    // talabaga ko'rinmasligi kerak. `read:quiz` bilan birlashtirilsa,
+    // kelajakda testlar talabaga ochilgan kuni savollar ham ochilardi.
+    const canSeeQuestions = hasPermission('read:question');
     const quizzesQuery = useQuizzes(
         lessonId ? { lesson_id: lessonId, limit: 20 } : {},
         Boolean(lessonId) && canSeeQuizzes,
@@ -126,7 +130,7 @@ export default function LessonDetailPage() {
     // oʻqituvchi ularni shu yerda, dars ichida koʻrishi kerak: avval
     // ular faqat umumiy «Savollar» bankida koʻrinardi.
     const lessonQuestionsQuery = useLessonQuestions(
-        canSeeQuizzes && lessonId ? lessonId : undefined,
+        canSeeQuestions && lessonId ? lessonId : undefined,
     );
 
     if (lessonQuery.isLoading) return <div className="space-y-6"><Skeleton className="h-10 w-2/3" /><Skeleton className="aspect-video w-full rounded-2xl" /></div>;
@@ -278,65 +282,31 @@ export default function LessonDetailPage() {
                 )}
             </SectionCard>
 
+            {/* Testlar va savollar ataylab IKKI karta. Ilgari ular bitta
+                kartada edi va savollar ro'yxati tepada turardi: o'qituvchi
+                savol qo'shgani sayin testlar pastga suriladi va ularni
+                ko'rish uchun butun bankni aylantirish kerak bo'lardi.
+                Testlar birinchi — ular kundalik ishda tez-tez kerak
+                bo'ladi (yoqish, PIN aytish, holatni ko'rish). */}
             {canSeeQuizzes && <SectionCard
                 icon={<ListChecks className="h-[18px] w-[18px]" />}
                 tone="blue"
-                title="Testlar va savollar"
+                title="Testlar"
                 description={
-                    lessonQuestions.length > 0 || quizzes.length > 0
-                        ? `${lessonQuestions.length} ta savol · ${quizzes.length} ta test`
-                        : 'Avval savol qo\'shing, keyin ulardan test tuzing'
+                    quizzes.length > 0
+                        ? `${quizzes.length} ta test`
+                        : 'Dars savollaridan test tuziladi'
                 }
                 action={
-                    <div className="flex flex-wrap gap-2">
-                        {canAddQuestion && (
-                            <>
-                                <CardAction
-                                    variant="outline"
-                                    // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
-                                    // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
-                                    onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
-                                    icon={<FileQuestion className="h-4 w-4" />}
-                                    label="Savol qo'shish"
-                                />
-                                <CardAction
-                                    variant="outline"
-                                    onClick={() => setExcelOpen(true)}
-                                    disabled={!lessonSubjectId}
-                                    title={lessonSubjectId ? undefined : 'Darsning fani aniqlanmadi'}
-                                    icon={<Upload className="h-4 w-4" />}
-                                    label="Excel'dan yuklash"
-                                />
-                            </>
-                        )}
-                        {canManageQuiz && (
-                            <CardAction
-                                onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}
-                                icon={<Plus className="h-4 w-4" />}
-                                label="Test yaratish"
-                            />
-                        )}
-                    </div>
+                    canManageQuiz && (
+                        <CardAction
+                            onClick={() => { setEditingQuiz(null); setQuizOpen(true); }}
+                            icon={<Plus className="h-4 w-4" />}
+                            label="Test yaratish"
+                        />
+                    )
                 }
             >
-                {/* Test aynan shu darsning savollaridan yig'iladi, shuning uchun
-                    avval savol qo'shish, keyin test tuzish tabiiy tartib. */}
-                {lessonQuestions.length > 0 && (
-                    <div className="mb-5 space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Savollar
-                        </p>
-                        {/* Savol bosilganda variantlari ochiladi: ro'yxat
-                            qisqa qoladi, lekin tekshirish uchun sahifani
-                            tark etish shart emas. */}
-                        <QuestionAccordionList
-                            questions={lessonQuestions}
-                            canManage={canAddQuestion}
-                            returnTo={`/lessons/${lesson.id}`}
-                        />
-                    </div>
-                )}
-
                 {quizzes.length === 0 ? (
                     <EmptyState icon={<ListChecks className="h-6 w-6" />} title="Test tuzilmagan" description="Bu dars uchun hali test yaratilmagan." className="py-8" />
                 ) : (
@@ -379,6 +349,54 @@ export default function LessonDetailPage() {
                             </div>
                         ))}
                     </div>
+                )}
+            </SectionCard>}
+
+            {canSeeQuestions && <SectionCard
+                icon={<FileQuestion className="h-[18px] w-[18px]" />}
+                tone="purple"
+                title="Savollar"
+                description={
+                    lessonQuestions.length > 0
+                        ? `${lessonQuestions.length} ta savol · test aynan shulardan yig'iladi`
+                        : 'Test shu darsning savollaridan yig\'iladi'
+                }
+                action={
+                    canAddQuestion && (
+                        <div className="flex flex-wrap gap-2">
+                            <CardAction
+                                variant="outline"
+                                // Fanni `lesson_id` bo'yicha savol formasi o'zi aniqlaydi —
+                                // dars javobi kechikkan bo'lsa ham havola to'g'ri qoladi.
+                                onClick={() => navigate(`/questions/create?lesson_id=${lesson.id}&return_to=/lessons/${lesson.id}`)}
+                                icon={<FileQuestion className="h-4 w-4" />}
+                                label="Savol qo'shish"
+                            />
+                            <CardAction
+                                variant="outline"
+                                onClick={() => setExcelOpen(true)}
+                                disabled={!lessonSubjectId}
+                                title={lessonSubjectId ? undefined : 'Darsning fani aniqlanmadi'}
+                                icon={<Upload className="h-4 w-4" />}
+                                label="Excel'dan yuklash"
+                            />
+                        </div>
+                    )
+                }
+            >
+                {lessonQuestions.length === 0 ? (
+                    <EmptyState
+                        icon={<FileQuestion className="h-6 w-6" />}
+                        title="Savol qo'shilmagan"
+                        description="Savol qo'shing yoki Excel'dan yuklang — test shu savollardan tuziladi."
+                        className="py-8"
+                    />
+                ) : (
+                    <QuestionAccordionList
+                        questions={lessonQuestions}
+                        canManage={canAddQuestion}
+                        returnTo={`/lessons/${lesson.id}`}
+                    />
                 )}
             </SectionCard>}
             </div>
