@@ -116,6 +116,9 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: "O'quv jarayoni", tone: 'green' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Baholash', tone: 'pink' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Baholash', tone: 'purple' },
+    // Umumiy test — fan va guruhsiz, hamma ishlaydigan test (`general_test` moduli).
+    general_test:  { label: 'Umumiy testlar',   href: '/general-tests', icon: ClipboardCheck, section: 'Baholash', tone: 'green' },
+    general_test_result: { label: 'Umumiy test natijalari', href: '/general-tests/results', icon: ChartColumnBig, section: 'Baholash', tone: 'orange' },
     psychology_stats: { label: 'Psixologiya statistikasi', href: '/psychology/stats', icon: ChartColumnBig, section: 'Baholash', tone: 'cyan' },
 
     me:            { label: 'Profil' },
@@ -206,6 +209,8 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'result',
     'psychology',
     'psychology_results',
+    'general_test',
+    'general_test_result',
 
     // Ma'lumotnoma
     'user',
@@ -261,6 +266,14 @@ export const SIDEBAR_GROUPS: SidebarGroupSpec[] = [
         tone: 'pink',
     },
     {
+        name: 'Umumiy testlar',
+        icon: ClipboardCheck,
+        section: 'Baholash',
+        resources: ['general_test', 'general_test_result'],
+        href: '/general-tests',
+        tone: 'green',
+    },
+    {
         name: 'Foydalanuvchilar',
         icon: UserCog,
         section: "Ma'lumotnoma",
@@ -291,6 +304,8 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
     quiz: "Testlar ro'yxati",
     psychology: 'Metodikalar',
     psychology_results: 'Natijalar',
+    general_test: "Testlar ro'yxati",
+    general_test_result: 'Natijalar',
     user: 'Barcha foydalanuvchilar',
 };
 
@@ -300,6 +315,7 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
+    { name: 'Umumiy testlar', href: '/general-tests/take', icon: ClipboardCheck, tone: 'teal', permission: 'general_test:take' },
     { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
     // Ruxsatsiz: arizalar ROYD'da yuritiladi, bizda unga mos ruxsat yo'q.
     // Chegara rol bo'yicha — marshrutda ham (`StudentRequestsRoute`).
@@ -369,6 +385,8 @@ const STAFF_BESPOKE_ITEMS: {
     section: string;
     /** Shu nomli yig'iluvchi guruh ichiga tushadi. */
     group?: string;
+    /** Guruh ichidagi nomi — guruh nomini takrorlamaslik uchun. */
+    groupedName?: string;
 }[] = [
     {
         name: 'HEMIS sinxronizatsiyasi',
@@ -378,6 +396,19 @@ const STAFF_BESPOKE_ITEMS: {
         permission: 'hemis_admin_sync',
         section: 'Tizim',
         group: 'Sozlamalar',
+    },
+    // Umumiy testni ishlash — har bir xodim uchun (`general_test:take`
+    // barcha rollarda). Adminda boshqaruv guruhi ichiga tushadi, boshqalarda
+    // «Baholash» da alohida punkt bo'lib chiqadi.
+    {
+        name: 'Umumiy testlar',
+        groupedName: 'Testni ishlash',
+        href: '/general-tests/take',
+        icon: PlayCircle,
+        tone: 'teal',
+        permission: 'general_test:take',
+        section: 'Baholash',
+        group: 'Umumiy testlar',
     },
 ];
 
@@ -493,8 +524,9 @@ export const buildSidebar = (
 
     for (const item of STAFF_BESPOKE_ITEMS) {
         if (!permissions.has(item.permission)) continue;
-        const entry = { name: item.name, href: item.href, icon: item.icon, tone: item.tone };
         const children = item.group ? groupChildren.get(item.group) : undefined;
+        const name = children ? (item.groupedName ?? item.name) : item.name;
+        const entry = { name, href: item.href, icon: item.icon, tone: item.tone };
         if (children) children.push(entry);
         else pushTo(item.section, entry);
     }

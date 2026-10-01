@@ -61,6 +61,11 @@ const PsychologyTestPage = lazy(() => import('@/pages/PsychologyTestPage'));
 const PsychologyResultsPage = lazy(() => import('@/pages/PsychologyResultsPage'));
 const PsychologyStatsPage = lazy(() => import('@/pages/PsychologyStatsPage'));
 const StudentPsychologyPage = lazy(() => import('@/pages/StudentPsychologyPage'));
+const GeneralTestsPage = lazy(() => import('@/pages/GeneralTestsPage'));
+const GeneralTestDetailPage = lazy(() => import('@/pages/GeneralTestDetailPage'));
+const GeneralTestResultsPage = lazy(() => import('@/pages/GeneralTestResultsPage'));
+const GeneralTestTakeListPage = lazy(() => import('@/pages/GeneralTestTakeListPage'));
+const GeneralTestTakePage = lazy(() => import('@/pages/GeneralTestTakePage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
 const PublicQuizPage = lazy(() => import('@/pages/PublicQuizPage'));
@@ -286,6 +291,7 @@ function App() {
                                     {/* Фокус-режим: прохождение тестов без сайдбара */}
                                     <Route element={<FocusLayout />}>
                                         <Route path="/psychology/test/:methodId" element={<PermissionRoute permission="read:psychology"><PsychologyTestPage /></PermissionRoute>} />
+                                        <Route path="/general-tests/attempt/:attemptId" element={<PermissionRoute permission="general_test:take"><GeneralTestTakePage /></PermissionRoute>} />
                                     </Route>
 
                                     <Route element={<MainLayout />}>
@@ -340,6 +346,14 @@ function App() {
                                         <Route path="/psychology/results" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyResultsPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/stats" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyStatsPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
+
+                                        {/* Umumiy test: boshqaruv va natijalar — admin; ishlash — hamma
+                                            (`general_test:take` barcha rollarda). `/take` va `/results`
+                                            `/:id` dan oldin turadi. */}
+                                        <Route path="/general-tests" element={<PermissionRoute permission="read:general_test"><GeneralTestsPage /></PermissionRoute>} />
+                                        <Route path="/general-tests/take" element={<PermissionRoute permission="general_test:take"><GeneralTestTakeListPage /></PermissionRoute>} />
+                                        <Route path="/general-tests/results" element={<PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute>} />
+                                        <Route path="/general-tests/:id" element={<PermissionRoute permission="read:general_test"><GeneralTestDetailPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
                                         <Route path="/courses" element={<PermissionRoute permission="read:course"><CoursesPage /></PermissionRoute>} />

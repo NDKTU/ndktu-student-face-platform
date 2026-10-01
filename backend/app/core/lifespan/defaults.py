@@ -36,6 +36,8 @@ TEACHER_PERMISSIONS = (
     "delete:question",
     "delete:quiz",
     "delete:resource",
+    # Umumiy test — har bir foydalanuvchi uchun (`general_test/router.py`).
+    "general_test:take",
     "mark:attendance",
     "read:active_quiz",
     "read:announcement",
@@ -72,6 +74,7 @@ STUDENT_PERMISSIONS = (
     "announcement:register",
     "attendance:me",
     "create:submission",
+    "general_test:take",
     "read:active_quiz",
     "read:course",
     "read:homework",

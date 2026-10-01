@@ -50,6 +50,9 @@ const PATH_LABELS: Record<string, string> = {
     '/homework':            'Uy vazifalari',
     '/results':             'Natijalar',
     '/results/answers':     'Javoblar tahlili',
+    '/general-tests':         'Umumiy testlar',
+    '/general-tests/take':    'Umumiy testlar',
+    '/general-tests/results': 'Umumiy test natijalari',
     // Nomlar `constants/resources.ts` dagi menyu yozuvlari bilan bir xil:
     // bo'lim menyuda bir nom, sarlavhada boshqasi bo'lsa, odam adashadi.
     '/files':                 'Fayl kutubxonasi',
@@ -65,6 +68,7 @@ const DYNAMIC_LABELS: Array<[RegExp, string]> = [
     [/^\/lessons\/[^/]+$/, 'Dars tafsilotlari'],
     [/^\/homework\/[^/]+\/submissions$/, 'Ishlarni tekshirish'],
     [/^\/psychology\/test\/[^/]+$/, 'Psixologik test'],
+    [/^\/general-tests\/[^/]+$/, 'Umumiy test'],
 ];
 
 const getPageLabel = (pathname: string) => {

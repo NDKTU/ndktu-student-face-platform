@@ -36,6 +36,7 @@ __all__ = [
     "UserAnswers",
     "TeacherGroup",
     "PsychologyMethod",
+    "GeneralTest",
     "Lesson",
     "Homework",
     "HomeworkSubmission",
@@ -96,6 +97,9 @@ from app.modules.file.model import (
     FileQuotaChange,
     FileUsage,
     StoredFile,
+)
+from app.modules.general_test.model import (
+    GeneralTest,
 )
 from app.modules.integration.eduplan.model import (
     EduPlanCredential,

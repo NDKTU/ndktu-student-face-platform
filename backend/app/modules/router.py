@@ -6,6 +6,7 @@ from .auth.router import router as auth_router
 from .course.router import router as course_router
 from .file.quota_router import router as file_quota_router
 from .file.router import router as file_router
+from .general_test.router import router as general_test_router
 from .integration.router import router as integration_router
 from .logs.router import router as logs_router
 from .notification.router import router as notification_router
@@ -19,6 +20,7 @@ router.include_router(auth_router)
 router.include_router(organization_structure_router)
 router.include_router(quiz_router)
 router.include_router(psychology_router)
+router.include_router(general_test_router)
 router.include_router(course_router)
 # Kvota routeri fayl routeridan oldin: `/file/quota` `/file/{file_id}` ga tushmasligi uchun.
 router.include_router(file_quota_router)
