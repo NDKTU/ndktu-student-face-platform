@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BarChart3, Clock3, ExternalLink, UsersRound } from 'lucide-react';
 import { useQuiz, useQuizAnalytics } from '@/hooks/useQuizzes';
 import { useResults } from '@/hooks/useResults';
@@ -23,6 +23,19 @@ const formatDuration = (seconds?: number | null) => {
 const QuizDetailPage = () => {
     const navigate = useNavigate();
     const quizId = Number(useParams().id);
+    // Bu sahifaga ikki yo'ldan kelishadi: umumiy «Testlar» ro'yxatidan va
+    // dars sahifasidagi «Natijalar» tugmasidan. «Orqaga» har doim
+    // ro'yxatga qaytarsa, dars sahifasidan kelgan o'qituvchi butunlay
+    // boshqa joyga tushib qolardi — va darsni qaytadan qidirardi.
+    //
+    // Manzil `return_to` da keladi (savollar sahifasidagi kabi). Faqat
+    // ichki yo'l qabul qilinadi: tashqi havola bo'lsa, tugma
+    // foydalanuvchini saytdan olib chiqib ketardi.
+    const [searchParams] = useSearchParams();
+    const requestedBack = searchParams.get('return_to');
+    const backTo = requestedBack && requestedBack.startsWith('/') && !requestedBack.startsWith('//')
+        ? requestedBack
+        : '/quizzes';
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const quiz = useQuiz(quizId);
@@ -46,7 +59,7 @@ const QuizDetailPage = () => {
             <HierarchyHeader
                 title={quiz.data.title}
                 description={`PIN: ${quiz.data.pin} · ${quiz.data.question_number} savol · ${quiz.data.duration} daqiqa`}
-                onBack={() => navigate('/quizzes')}
+                onBack={() => navigate(backTo)}
                 actions={
                     <Button variant="outline" onClick={() => navigate('/results')}>
                         Eski Results sahifasi <ExternalLink className="ml-2 h-4 w-4" />

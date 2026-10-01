@@ -377,7 +377,7 @@ export default function LessonDetailPage() {
                                         variant="outline"
                                         size="sm"
                                         className="shrink-0 gap-1.5"
-                                        onClick={() => navigate(`/quizzes/${quiz.id}`)}
+                                        onClick={() => navigate(`/quizzes/${quiz.id}?return_to=/lessons/${lesson.id}`)}
                                     >
                                         <BarChart3 className="h-4 w-4" />
                                         <span>Natijalar</span>
