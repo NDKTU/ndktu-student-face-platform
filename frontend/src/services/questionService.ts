@@ -14,6 +14,13 @@ export interface Question {
     correct_option?: string; // Optional as not explicitly requested, but likely needed
     question_type?: QuestionType;
     payload?: Record<string, unknown> | null;
+    /** Qaysi darsga biriktirilgan. Bo'sh — fan bankidagi umumiy savol. */
+    lesson_id?: number | null;
+    /**
+     * Savol biror testga olinganmi. Olingan bo'lsa o'chirib bo'lmaydi:
+     * test tarkibi va talabalarning javoblari unga tayanadi.
+     */
+    in_quiz?: boolean;
     created_at?: string;
     updated_at?: string;
 }

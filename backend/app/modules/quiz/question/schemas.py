@@ -173,6 +173,9 @@ class QuestionCreateResponse(BaseModel):
     payload: Optional[dict] = None
     #: Boʻsh — fan bankidagi umumiy savol.
     lesson_id: Optional[int] = None
+    #: Savol biror testga olinganmi. Olingan boʻlsa uni oʻchirib
+    #: boʻlmaydi: test tarkibi va talabalarning javoblari unga tayanadi.
+    in_quiz: bool = False
     version: int
     is_latest: bool
     is_active: bool

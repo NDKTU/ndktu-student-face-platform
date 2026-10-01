@@ -10,7 +10,7 @@ from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import Teacher, User
 from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
-from app.modules.quiz.model import Question, Subject
+from app.modules.quiz.model import Question, QuizQuestion, Subject
 
 from .excel_format import parse_correct_option, resolve_columns
 from .schemas import (
@@ -225,6 +225,25 @@ class QuestionRepository:
         result = await session.execute(stmt)
         questions = result.scalars().all()
 
+        # Qaysi savollar testga olingan — bitta so'rovda. Front shu
+        # bo'yicha «o'chirish» tugmasini yopadi, aks holda o'qituvchi
+        # tugmani bosib, 409 xatosini ko'rardi.
+        used_ids: set[int] = set()
+        if questions:
+            used_ids = set(
+                (
+                    await session.execute(
+                        select(QuizQuestion.question_id).where(
+                            QuizQuestion.question_id.in_([q.id for q in questions])
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        for question in questions:
+            question.in_quiz = question.id in used_ids
+
         count_stmt = (
             select(func.count()).select_from(Question).where(Question.is_latest.is_(True), Question.is_active.is_(True))
         )
@@ -305,8 +324,6 @@ class QuestionRepository:
         try:
             await session.flush()
 
-            from app.modules.quiz.model import QuizQuestion
-
             await session.execute(
                 QuizQuestion.__table__.update()
                 .where(QuizQuestion.question_id == question.id)
@@ -340,8 +357,21 @@ class QuestionRepository:
                 detail="Access denied: you can only delete your own questions",
             )
 
+        # Testga olingan savol o'chirilmaydi. Soft delete bo'lsa ham, savol
+        # testdan tushib qolardi: `start_quiz` faqat `is_active` savollarni
+        # beradi, ya'ni tayyor test jimgina qisqarardi — va allaqachon
+        # ishlagan talabalar bilan keyingilari boshqa testni yechardi.
+        used = await session.scalar(
+            select(QuizQuestion.id).where(QuizQuestion.question_id == question.id).limit(1)
+        )
+        if used is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bu savol testga olingan — avval uni testdan chiqaring",
+            )
+
         # Soft delete: the row stays (it may already be referenced by
-        # quiz_questions/user_answers) — it's just excluded from future selection.
+        # user_answers) — it's just excluded from future selection.
         question.is_active = False
         await session.commit()
 

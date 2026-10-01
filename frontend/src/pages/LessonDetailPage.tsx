@@ -15,11 +15,13 @@ import { LessonGradebook } from '@/components/courses/LessonGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useLessonQuestions } from '@/hooks/useQuestions';
-import { sanitizeHtml } from '@/utils/sanitize';
-import { useQuizzes, useDeleteQuiz } from '@/hooks/useQuizzes';
-import { QUIZ_TYPE_LABELS, type Quiz } from '@/services/quizService';
+import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
+import { useQuizzes, useDeleteQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
+import { QUIZ_TYPE_LABELS, type Quiz, type QuizCreateRequest } from '@/services/quizService';
 import { LessonHomeworkCard } from '@/components/homework/LessonHomeworkCard';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
 import { CardAction } from '@/components/ui/CardAction';
 import { formatDate } from '@/utils/date';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -76,6 +78,50 @@ export default function LessonDetailPage() {
         Boolean(lessonId) && canSeeQuizzes,
     );
     const deleteQuiz = useDeleteQuiz();
+    const updateQuiz = useUpdateQuiz();
+    // Testni shu yerdan yoqish/o'chirish. Ilgari holat faqat YOZUV edi:
+    // test tuzgan o'qituvchi uni faollashtirish uchun «Testlar» sahifasini
+    // qidirib topishi kerak bo'lardi — dars sahifasida esa testi tayyor
+    // bo'lib, lekin o'chiq turardi.
+    const [togglingQuizId, setTogglingQuizId] = useState<number | null>(null);
+
+    const toggleQuizActive = (quiz: Quiz) => {
+        setTogglingQuizId(quiz.id);
+        const payload: QuizCreateRequest = {
+            title: quiz.title,
+            question_number: quiz.question_number,
+            duration: quiz.duration,
+            pin: quiz.pin,
+            lecturer_id: quiz.lecturer_id ?? null,
+            group_id: quiz.group_id ?? null,
+            subject_id: quiz.subject_id ?? null,
+            is_active: !quiz.is_active,
+            proctoring_mode: quiz.proctoring_mode,
+        };
+        updateQuiz.mutate(
+            { id: quiz.id, data: payload },
+            {
+                onSettled: () => setTogglingQuizId(null),
+                onSuccess: () =>
+                    toast.success(
+                        payload.is_active ? 'Test faollashtirildi' : "Test faol emas holatga o'tkazildi",
+                    ),
+                onError: (error: unknown) => {
+                    // Savoli yetmagan testni yoqishni bekend 409 bilan rad
+                    // etadi va sababini aytadi — aynan shuni ko'rsatamiz,
+                    // aks holda nega ishlamagani tushunarsiz qolardi.
+                    const response = (
+                        error as { response?: { status?: number; data?: { detail?: { message?: string } } } }
+                    )?.response;
+                    if (response?.status === 409 && response.data?.detail?.message) {
+                        toast.error(response.data.detail.message);
+                        return;
+                    }
+                    toast.error('Test holatini yangilashda xatolik yuz berdi');
+                },
+            },
+        );
+    };
     // Dars savollari. Test aynan shulardan yigʻiladi, shuning uchun
     // oʻqituvchi ularni shu yerda, dars ichida koʻrishi kerak: avval
     // ular faqat umumiy «Savollar» bankida koʻrinardi.
@@ -280,36 +326,14 @@ export default function LessonDetailPage() {
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Savollar
                         </p>
-                        <ol className="space-y-1.5">
-                            {lessonQuestions.map((question, index) => (
-                                <li
-                                    key={question.id}
-                                    className="group/q flex items-start gap-3 rounded-xl border border-border/60 px-3.5 py-2.5"
-                                >
-                                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
-                                        {index + 1}
-                                    </span>
-                                    <div
-                                        className="min-w-0 flex-1 text-sm leading-snug [&_p]:m-0"
-                                        // Savol matni HTML ko'rinishida saqlanadi (jodit).
-                                        // Tozalash majburiy: muallif o'qituvchi, ro'yxatni
-                                        // esa admin ham ochadi.
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text || '') }}
-                                    />
-                                    {canAddQuestion && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label="Savolni tahrirlash"
-                                            className="shrink-0 opacity-60 transition-opacity group-hover/q:opacity-100"
-                                            onClick={() => navigate(`/questions/${question.id}/edit?return_to=/lessons/${lesson.id}`)}
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </li>
-                            ))}
-                        </ol>
+                        {/* Savol bosilganda variantlari ochiladi: ro'yxat
+                            qisqa qoladi, lekin tekshirish uchun sahifani
+                            tark etish shart emas. */}
+                        <QuestionAccordionList
+                            questions={lessonQuestions}
+                            canManage={canAddQuestion}
+                            returnTo={`/lessons/${lesson.id}`}
+                        />
                     </div>
                 )}
 
@@ -328,10 +352,24 @@ export default function LessonDetailPage() {
                                         {QUIZ_TYPE_LABELS[quiz.quiz_type ?? 'LESSON_QUIZ']} · {quiz.question_number} savol · {quiz.duration} daqiqa · PIN: {quiz.pin}
                                     </p>
                                 </div>
-                                <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${quiz.is_active ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400' : 'bg-muted text-muted-foreground ring-border'}`}>
-                                    <span className={`h-1.5 w-1.5 rounded-full ${quiz.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
-                                    {quiz.is_active ? 'Faol' : 'Faol emas'}
-                                </span>
+                                {canManageQuiz ? (
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <Switch
+                                            checked={quiz.is_active}
+                                            onCheckedChange={() => toggleQuizActive(quiz)}
+                                            disabled={togglingQuizId === quiz.id || updateQuiz.isPending}
+                                            aria-label={quiz.is_active ? "Testni o'chirish" : 'Testni faollashtirish'}
+                                        />
+                                        <span className={quiz.is_active ? 'text-xs font-semibold text-emerald-600 dark:text-emerald-400' : 'text-xs text-muted-foreground'}>
+                                            {quiz.is_active ? 'Faol' : 'Faol emas'}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${quiz.is_active ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400' : 'bg-muted text-muted-foreground ring-border'}`}>
+                                        <span className={`h-1.5 w-1.5 rounded-full ${quiz.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
+                                        {quiz.is_active ? 'Faol' : 'Faol emas'}
+                                    </span>
+                                )}
                                 {canManageQuiz && (
                                     <div className="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover/item:opacity-100">
                                         <Button variant="ghost" size="icon" aria-label="Testni tahrirlash" onClick={() => { setEditingQuiz(quiz); setQuizOpen(true); }}><Pencil className="h-4 w-4" /></Button>

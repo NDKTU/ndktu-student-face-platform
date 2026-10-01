@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useLessonQuestions } from '@/hooks/useQuestions';
+import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
 import {
     useCreateIndependentTopic,
     useDeleteIndependentTopic,
@@ -16,7 +17,6 @@ import {
 } from '@/hooks/useIndependentTopics';
 import type { IndependentTopic } from '@/services/independentTopicService';
 import type { Lesson } from '@/services/lessonService';
-import { sanitizeHtml } from '@/utils/sanitize';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate } from '@/utils/date';
 import { IndependentTopicModal } from './IndependentTopicModal';
@@ -39,7 +39,7 @@ interface Props {
  * savollar dars ochilganda keladi — foydalanuvchi aynan shu darsni
  * so'ragan paytda.
  */
-const LessonQuestions = ({ lessonId }: { lessonId: number }) => {
+const LessonQuestions = ({ lessonId, canManage }: { lessonId: number; canManage: boolean }) => {
     const { data, isLoading, isError } = useLessonQuestions(lessonId);
     const questions = data?.questions ?? [];
 
@@ -69,20 +69,17 @@ const LessonQuestions = ({ lessonId }: { lessonId: number }) => {
     }
 
     return (
-        <ol className="space-y-1.5 px-4 pb-4">
-            {questions.map((question, index) => (
-                <li key={question.id} className="flex items-start gap-3 rounded-xl border border-border/60 px-3.5 py-2.5">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
-                        {index + 1}
-                    </span>
-                    <div
-                        className="min-w-0 flex-1 text-sm leading-snug [&_p]:m-0"
-                        // Savol matni HTML (jodit) — boshqa joylardagi kabi tozalanadi.
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text || '') }}
-                    />
-                </li>
-            ))}
-        </ol>
+        <div className="px-4 pb-4">
+            {/* Dars sahifasidagi bilan bitta komponent: savol bosilganda
+                variantlari ochiladi, ishlatilmagan savolni o'chirish
+                mumkin. Ikki joyda ikki xil ro'yxat bo'lsa, ular vaqt
+                o'tib bir-biridan uzoqlashardi. */}
+            <QuestionAccordionList
+                questions={questions}
+                canManage={canManage}
+                returnTo={`/lessons/${lessonId}`}
+            />
+        </div>
     );
 };
 
@@ -175,7 +172,7 @@ export const CourseAssignments = ({
                                                 Darsga o'tish
                                             </span>
                                         </button>
-                                        {isOpen && <LessonQuestions lessonId={lesson.id} />}
+                                        {isOpen && <LessonQuestions lessonId={lesson.id} canManage={canManageTopics} />}
                                     </li>
                                 );
                             })}
