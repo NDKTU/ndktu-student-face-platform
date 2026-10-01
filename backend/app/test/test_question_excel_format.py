@@ -15,6 +15,7 @@ from openpyxl import Workbook, load_workbook
 from app.modules.quiz.question.excel_format import (
     TEMPLATE_HEADERS,
     normalize_header,
+    parse_correct_option,
     resolve_columns,
 )
 
@@ -70,14 +71,16 @@ async def test_exported_file_can_be_imported_back(auth_client, test_subject):
     imported = questions[0]
     # Ilgari bu yerda text «1» (qator raqami), option_a esa savol matni edi.
     assert imported["text"] == "2 + 2 nechaga teng?"
-    assert [imported["option_a"], imported["option_b"], imported["option_c"], imported["option_d"]] == [
-        "3",
-        "4",
-        "5",
-        "6",
-    ]
-    # Ilgari eksportdagi «To'g'ri javob» ustuni tanilmay, hammasi «a» bo'lardi.
-    assert imported["correct_option"] == "b"
+
+    # Endi to'g'ri javob ustuni yo'q: eksport javobni «A variant» ga olib
+    # chiqadi, import esa A ni to'g'ri deb oladi. Shuning uchun HARF emas,
+    # javob MATNI tekshiriladi — ma'no aynan shunda saqlanadi.
+    assert imported["correct_option"] == "a"
+    assert imported["option_a"] == "4", "to'g'ri javob («4») A ustunida qolishi kerak"
+    # Qolgan variantlar yo'qolmaydi, faqat tartibi siljiydi.
+    assert sorted(
+        [imported["option_a"], imported["option_b"], imported["option_c"], imported["option_d"]]
+    ) == ["3", "4", "5", "6"]
 
 
 @pytest.mark.asyncio
@@ -148,12 +151,17 @@ async def test_blank_rows_do_not_create_questions(auth_client, test_subject):
 
 
 @pytest.mark.asyncio
-async def test_missing_correct_option_warns_and_defaults_to_a(auth_client, test_subject):
-    """To'g'ri javobsiz fayl yuklanadi, lekin jimgina emas."""
+async def test_new_template_marks_first_option_as_correct(auth_client, test_subject):
+    """Yangi shablonda ustun yo'q: A — to'g'ri javob, ogohlantirishsiz.
+
+    Ilgari bu holat «xato» deb ogohlantirilardi. Endi bu QOIDA, shuning
+    uchun ogohlantirish ham yo'q — aks holda har bir qator uchun keraksiz
+    ogohlantirish chiqib, haqiqiy muammolar ular orasida ko'rinmasdi.
+    """
     content = _xlsx(
         [
-            TEMPLATE_HEADERS[:5],
-            ["Javobsiz savol", "A", "B", "C", "D"],
+            list(TEMPLATE_HEADERS),
+            ["Javob A da", "To'g'ri", "Noto'g'ri 1", "Noto'g'ri 2", "Noto'g'ri 3"],
         ]
     )
 
@@ -162,7 +170,47 @@ async def test_missing_correct_option_warns_and_defaults_to_a(auth_client, test_
 
     body = response.json()
     assert body["questions"][0]["correct_option"] == "a"
-    assert body["warnings"], "ogohlantirish bo'lishi kerak edi"
+    assert body["questions"][0]["option_a"] == "To'g'ri"
+    assert not body["warnings"], "qoida bo'yicha ishlagan faylga ogohlantirish kerak emas"
+
+
+@pytest.mark.asyncio
+async def test_legacy_file_with_correct_column_is_respected(auth_client, test_subject):
+    """Eski fayldagi «To'g'ri javob» ustuni e'tiborsiz qolmaydi.
+
+    O'qituvchilarda ilgari yuklab olingan fayllar bor va ularda haqiqiy
+    «b»/«c»/«d» turadi. Agar ustun shunchaki tashlab yuborilsa, o'z
+    bankini qayta yuklagan o'qituvchining BARCHA javoblari «a» bo'lib
+    qolardi — bu jimgina ma'lumot buzilishi.
+    """
+    content = _xlsx(
+        [
+            ["Savol", "A variant", "B variant", "C variant", "D variant", "To'g'ri javob"],
+            ["Poytaxt qaysi?", "Samarqand", "Toshkent", "Buxoro", "Xiva", "B"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+    assert response.json()["questions"][0]["correct_option"] == "b"
+
+
+@pytest.mark.asyncio
+async def test_cyrillic_letter_in_legacy_file_is_understood(auth_client, test_subject):
+    """Kirillcha «В» lotinchadan farq qilmaydi, lekin boshqa belgi.
+
+    Ilgari bunday qiymat tanilmay, javob jimgina «a» bo'lardi.
+    """
+    content = _xlsx(
+        [
+            ["Savol", "A variant", "B variant", "C variant", "D variant", "To'g'ri javob"],
+            ["Kirillcha javob", "Bir", "Ikki", "Uch", "To'rt", "В"],
+        ]
+    )
+
+    response = await _upload(auth_client, test_subject.id, content)
+    assert response.status_code == 201, response.json()
+    assert response.json()["questions"][0]["correct_option"] == "b"
 
 
 @pytest.mark.asyncio
@@ -172,7 +220,13 @@ async def test_template_has_headers_and_empty_first_sheet(auth_client):
 
     wb = load_workbook(io.BytesIO(response.content))
     sheet = wb["Savollar"]
-    assert [c.value for c in sheet[1]] == TEMPLATE_HEADERS
+    headers = [c.value for c in sheet[1]]
+    assert len(headers) == 5, "«To'g'ri javob» ustuni shablondan olib tashlangan"
+    # A ustuni sarlavhasida qoida yozilgan: o'qituvchi «Namuna» varag'ini
+    # ochmasligi mumkin.
+    assert headers[1].startswith(TEMPLATE_HEADERS[1])
+    assert "to'g'ri javob" in headers[1].lower()
+    assert headers[0] == TEMPLATE_HEADERS[0]
     # Birinchi varaqda ma'lumot bo'lmasligi shart: import faqat shuni
     # o'qiydi, namuna qatori bazaga tushib qolmasligi kerak.
     assert sheet.max_row == 1
@@ -186,7 +240,7 @@ async def test_template_is_importable(auth_client, test_subject):
     template = await auth_client.get("/question/excel_template")
     wb = load_workbook(io.BytesIO(template.content))
     sheet = wb["Savollar"]
-    sheet.append(["Shablondan savol", "A", "B", "C", "D", "c"])
+    sheet.append(["Shablondan savol", "To'g'ri", "Xato 1", "Xato 2", "Xato 3"])
     buffer = io.BytesIO()
     wb.save(buffer)
 
@@ -195,7 +249,8 @@ async def test_template_is_importable(auth_client, test_subject):
 
     imported = response.json()["questions"][0]
     assert imported["text"] == "Shablondan savol"
-    assert imported["correct_option"] == "c"
+    assert imported["correct_option"] == "a"
+    assert imported["option_a"] == "To'g'ri"
 
 
 def test_export_headers_are_all_recognized():
@@ -209,11 +264,10 @@ def test_export_headers_are_all_recognized():
     export_headers = [
         "№",
         "Savol",
-        "A variant",
+        "A variant (to'g'ri javob)",
         "B variant",
         "C variant",
         "D variant",
-        "To'g'ri javob",
         "Fan",
         "Foydalanuvchi",
     ]
@@ -221,8 +275,11 @@ def test_export_headers_are_all_recognized():
 
     assert mapping is not None, "eksport sarlavhalari tanilmadi"
     assert mapping["text"] == 1
+    # Qavs ichidagi izoh sarlavhani buzmasligi kerak: aks holda fayl
+    # ustun O'RNI bo'yicha o'qilib, birinchi ustundagi «№» savol matni
+    # bo'lib tushardi.
     assert mapping["option_a"] == 2
-    assert mapping["correct_option"] == 6
+    assert mapping["option_d"] == 5
 
 
 def test_unknown_headers_fall_back_to_positional():
@@ -231,3 +288,23 @@ def test_unknown_headers_fall_back_to_positional():
 
 def test_normalize_header_folds_apostrophes_and_spaces():
     assert normalize_header("  TO’G‘RI   JAVOB ") == "to'g'ri javob"
+
+
+def test_parse_correct_option_understands_common_mistakes():
+    """Eski fayllardagi yozuv shakllari — bitta joyda tekshiriladi."""
+    assert parse_correct_option("B") == "b"
+    assert parse_correct_option("  c  ") == "c"
+    assert parse_correct_option("D)") == "d"
+    assert parse_correct_option("2") == "b"
+    # Kirillcha harflar lotinchadan ko'z bilan farq qilmaydi.
+    assert parse_correct_option("В") == "b"
+    assert parse_correct_option("С") == "c"
+    assert parse_correct_option("B variant") == "b"
+    assert parse_correct_option("variant b") == "b"
+    # Tanib bo'lmaydigan qiymat — `None`, chaqiruvchi «a» qo'yadi.
+    assert parse_correct_option("") is None
+    assert parse_correct_option(None) is None
+    # Matnning birinchi harfi bo'yicha taxmin qilinmaydi.
+    assert parse_correct_option("bilmadim") is None
+    # Ikki xil harf ko'rsatilgan — taxmin qilmaymiz.
+    assert parse_correct_option("a yoki b") is None

@@ -15,9 +15,11 @@ import { subjectOption } from '@/utils/subject';
  * uchun ularni o'zgartirganda ikkala joyni ham yangilash kerak. Import
  * sarlavhalarni nomi bo'yicha taniydi, ya'ni tartib qat'iy emas, lekin
  * o'qituvchi ko'radigan namuna shablonga mos turgani yaxshi.
+ *
+ * «To'g'ri javob» ustuni yo'q: to'g'ri javob — har doim A varianti.
  */
-const EXAMPLE_HEADERS = ['Savol', 'A variant', 'B variant', 'C variant', 'D variant', "To'g'ri javob"];
-const EXAMPLE_ROW = ['2 + 2 nechaga teng?', '3', '4', '5', '6', 'B'];
+const EXAMPLE_HEADERS = ["Savol", "A variant (to'g'ri javob)", 'B variant', 'C variant', 'D variant'];
+const EXAMPLE_ROW = ['2 + 2 nechaga teng?', '4', '3', '5', '6'];
 
 interface Props {
     isOpen: boolean;
@@ -156,7 +158,12 @@ export const QuestionExcelUploadModal = ({
                         </table>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {t("Birinchi qator — sarlavhalar. «To'g'ri javob» ustuniga faqat A, B, C yoki D harfi yoziladi.")}
+                        {t("Birinchi qator — sarlavhalar. To'g'ri javobni «A variant» ustuniga yozing — alohida «To'g'ri javob» ustuni kerak emas.")}
+                    </p>
+                    {/* Eng ko'p beriladigan savolga oldindan javob: «talaba
+                        har doim birinchisini tanlab qo'ymaydimi?» */}
+                    <p className="text-xs text-muted-foreground">
+                        {t('Talabaga variantlar har safar aralashtirib ko\u2018rsatiladi, shuning uchun to\u2018g\u2018ri javob birinchi turgani bilinmaydi.')}
                     </p>
                 </div>
 

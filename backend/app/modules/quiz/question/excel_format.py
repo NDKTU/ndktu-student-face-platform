@@ -10,8 +10,21 @@ eksport ham, shablon ham shu modulga qaraydi.
 
 from __future__ import annotations
 
+import re
+
 #: Maydonlar tartibi — shablon ustunlari aynan shunday joylashadi.
-FIELDS = ("text", "option_a", "option_b", "option_c", "option_d", "correct_option")
+#:
+#: «To'g'ri javob» ustuni YO'Q: to'g'ri javob — har doim A varianti.
+#: Sabab oddiy — o'qituvchilar bu ustunda juda ko'p xato qilardi: «А»
+#: ni kirillcha yozish (lotincha bilan bir xil ko'rinadi), «B)», «2»,
+#: «variant b» — bularning hammasi tanilmay, jimgina «a» ga aylanardi.
+#: Yaʼni ustun xatoni OLDINI OLMAY, uni yashirardi.
+#:
+#: Talaba uchun bu hech narsani o'zgartirmaydi: variantlar har bir
+#: urinishda aralashtirib ko'rsatiladi (`quiz_process/option_order.py`),
+#: shuning uchun «to'g'ri javob doim birinchi» degan qoida ekranda
+#: ko'rinmaydi.
+FIELDS = ("text", "option_a", "option_b", "option_c", "option_d")
 
 #: Shablon va eksport yozadigan sarlavhalar.
 HEADERS = {
@@ -49,12 +62,21 @@ ALIASES: dict[str, tuple[str, ...]] = {
 #: foydalanuvchi esa qaysi biri turganini ko'rmaydi.
 _APOSTROPHES = "’‘ʼʻ´`"
 
+#: Sarlavhadagi qavs ichidagi izoh — «A variant (to'g'ri javob)».
+_BRACKETS = re.compile(r"\([^)]*\)")
+
 
 def normalize_header(value: object) -> str:
     """Sarlavhani taqqoslashga yaroqli ko'rinishga soladi."""
     text = str(value if value is not None else "").strip().lower()
     for char in _APOSTROPHES:
         text = text.replace(char, "'")
+    # Qavs ichidagi izoh tashlab yuboriladi: shablon va eksport
+    # sarlavhasi «A variant (to'g'ri javob)» ko'rinishida yoziladi —
+    # qoida o'qituvchining ko'z oldida tursin. Qavs qolsa, sarlavha
+    # taniklmay, fayl ustun O'RNI bo'yicha o'qilardi; eksportda esa
+    # birinchi ustun «№», ya'ni hamma ma'lumot bir ustunga siljirdi.
+    text = _BRACKETS.sub(" ", text)
     # Ichki ortiqcha bo'shliqlar: «A  variant» ham «A variant» bo'lsin.
     return " ".join(text.split())
 
@@ -65,9 +87,49 @@ _BY_ALIAS: dict[str, str] = {
 }
 
 #: Sarlavhalar tanildi deb hisoblash uchun kamida shular topilishi kerak.
-#: `correct_option` majburiy emas — usiz ham fayl yuklanadi, parser
-#: ogohlantirish beradi va «a» ni qo'yadi (eski xatti-harakat).
 REQUIRED_FIELDS = ("text", "option_a", "option_b", "option_c", "option_d")
+
+#: To'g'ri javob harflari — eski fayllarni o'qish uchun.
+LETTERS = ("a", "b", "c", "d")
+
+#: Kirillcha ko'rinishlar: «А», «В», «С» lotinchadan farq qilmaydi, lekin
+#: boshqa belgi. O'qituvchi buni ko'rmaydi, Excel esa o'zgartirmaydi.
+_CYRILLIC_LETTERS = {"а": "a", "в": "b", "б": "b", "с": "c", "ц": "c", "д": "d"}
+
+
+def parse_correct_option(raw: object) -> str | None:
+    """Eski fayldagi «To'g'ri javob» qiymatini harfga o'giradi.
+
+    `None` — qiymat yo'q yoki tanib bo'lmadi; chaqiruvchi «a» ni qo'yadi.
+
+    Yangi shablonda bunday ustun yo'q, lekin ilgari yuklab olingan
+    fayllar (eksport ham, shablon ham) unda haqiqiy «b»/«c»/«d» ni
+    saqlaydi. Agar ular e'tiborsiz qoldirilsa, o'qituvchi o'z bankini
+    qayta yuklagan zahoti BARCHA javoblari «a» bo'lib qolardi.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip().lower()
+    if not text:
+        return None
+
+    def letter_of(token: str) -> str | None:
+        token = token.strip(".)(-:,; ")
+        if token in LETTERS:
+            return token
+        if token in _CYRILLIC_LETTERS:
+            return _CYRILLIC_LETTERS[token]
+        if token in ("1", "2", "3", "4"):
+            return LETTERS[int(token) - 1]
+        return None
+
+    # «B», «b)», «2», «B variant», «variant b» — hammasi uchraydi.
+    # Shuning uchun bitta belgidan iborat bo'laklar qidiriladi, matnning
+    # BIRINCHI HARFI emas: aks holda «bilmadim» ham «b» bo'lib ketardi.
+    found = {letter for token in text.split() if (letter := letter_of(token)) is not None}
+    if len(found) == 1:
+        return found.pop()
+    return None
 
 
 def resolve_columns(columns) -> dict[str, int] | None:

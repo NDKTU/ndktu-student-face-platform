@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.organization_structure.model import Group
-from app.modules.quiz.question.excel_format import resolve_columns
+from app.modules.quiz.question.excel_format import parse_correct_option, resolve_columns
 
 from .model import GeneralTest, GeneralTestAnswer, GeneralTestAttempt, GeneralTestQuestion
 from .schemas import (
@@ -254,12 +254,11 @@ class GeneralTestRepository:
                 warnings.append(f"{line}-qator: savol yoki variantlardan biri bo'sh — o'tkazib yuborildi")
                 continue
 
-            raw_correct = cell(row, "correct_option", 5).lower()
-            if raw_correct in LETTERS:
-                correct = raw_correct
-            else:
-                correct = "a"
-                warnings.append(f"{line}-qator: to'g'ri javob ko'rsatilmagan yoki noto'g'ri, 'A' qo'yildi")
+            # To'g'ri javob — A varianti (shablonda alohida ustun yo'q).
+            # Ustun faqat eski fayllarda bo'ladi va o'sha yerda hisobga
+            # olinadi: aks holda ilgari tayyorlangan fayl qayta
+            # yuklanganda barcha javoblar «a» ga ko'chib ketardi.
+            correct = parse_correct_option(cell(row, "correct_option", 5)) or "a"
 
             text_, a, b, c, d = values
             questions.append(

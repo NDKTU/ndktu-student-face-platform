@@ -12,7 +12,7 @@ from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Subject
 
-from .excel_format import resolve_columns
+from .excel_format import parse_correct_option, resolve_columns
 from .schemas import (
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
@@ -437,8 +437,13 @@ class QuestionRepository:
                 except (ValueError, TypeError):
                     pass
 
-            # To'g'ri javob ixtiyoriy ustun: usiz fayl ham yuklanadi,
-            # faqat ogohlantirish chiqadi va «a» qo'yiladi.
+            # To'g'ri javob — A varianti. Shablonda bunday ustun yo'q va
+            # ogohlantirish ham berilmaydi: bu endi qoida, xato emas.
+            #
+            # Ustun faqat ESKI fayllar uchun o'qiladi. Ilgari yuklab
+            # olingan eksport va shablonlarda haqiqiy «b»/«c»/«d» turadi;
+            # ularni e'tiborsiz qoldirsak, o'qituvchi o'z bankini qayta
+            # yuklagan zahoti barcha javoblari «a» bo'lib qolardi.
             if mapping is not None:
                 raw_correct = cell(row, "correct_option", 5) if "correct_option" in mapping else ""
             elif "correct_option" in df.columns and not pd.isna(row["correct_option"]):
@@ -446,15 +451,7 @@ class QuestionRepository:
             else:
                 raw_correct = ""
 
-            correct_option = "a"
-            if raw_correct.strip():
-                candidate = raw_correct.strip().lower()
-                if candidate in ("a", "b", "c", "d"):
-                    correct_option = candidate
-                else:
-                    warnings.append(f"Qator {index + 2}: to'g'ri javob noto'g'ri ko'rsatilgan, 'A' ishlatildi")
-            else:
-                warnings.append(f"Qator {index + 2}: to'g'ri javob ko'rsatilmagan, 'A' ishlatildi")
+            correct_option = parse_correct_option(raw_correct) or "a"
 
             question = Question(
                 subject_id=q_subject_id,
@@ -540,14 +537,21 @@ class QuestionRepository:
             bottom=Side(style="thin"),
         )
 
+        # «To'g'ri javob» ustuni yo'q — uning o'rniga variantlar shunday
+        # joylashtiriladiki, TO'G'RI JAVOB HAR DOIM «A variant» da bo'ladi
+        # (import ham shunday o'qiydi).
+        #
+        # Bu shunchaki qulaylik emas, balki ma'lumotni saqlash sharti:
+        # o'qituvchilar bankni yuklab olib, tahrirlab, qaytadan yuklaydi.
+        # Agar eksport javobni boshqa ustunda qoldirsa, shu aylanishda
+        # barcha to'g'ri javoblar «a» ga ko'chib, bank jimgina buzilardi.
         headers = [
             "№",
             "Savol",
-            "A variant",
+            "A variant (to'g'ri javob)",
             "B variant",
             "C variant",
             "D variant",
-            "To'g'ri javob",
             "Fan",
             "Foydalanuvchi",
         ]
@@ -564,14 +568,23 @@ class QuestionRepository:
             subject_name = q.subject.name if q.subject else "-"
             username = q.user.username if q.user else "-"
 
-            values = [
-                row_idx - 1,
-                strip_html(q.text),
+            options = [
                 strip_html(q.option_a),
                 strip_html(q.option_b),
                 strip_html(q.option_c),
                 strip_html(q.option_d),
-                q.correct_option.upper(),
+            ]
+            # To'g'ri javobni birinchi o'ringa olib chiqamiz, qolganlarining
+            # tartibi saqlanadi.
+            correct_index = {"a": 0, "b": 1, "c": 2, "d": 3}.get((q.correct_option or "a").lower(), 0)
+            ordered = [options[correct_index]] + [
+                option for index, option in enumerate(options) if index != correct_index
+            ]
+
+            values = [
+                row_idx - 1,
+                strip_html(q.text),
+                *ordered,
                 subject_name,
                 username,
             ]
@@ -587,9 +600,8 @@ class QuestionRepository:
         ws.column_dimensions["D"].width = 25  # B
         ws.column_dimensions["E"].width = 25  # C
         ws.column_dimensions["F"].width = 25  # D
-        ws.column_dimensions["G"].width = 15  # To'g'ri javob
-        ws.column_dimensions["H"].width = 20  # Fan
-        ws.column_dimensions["I"].width = 18  # Foydalanuvchi
+        ws.column_dimensions["G"].width = 20  # Fan
+        ws.column_dimensions["H"].width = 18  # Foydalanuvchi
 
         # Save to buffer
         buffer = io.BytesIO()
@@ -612,7 +624,7 @@ class QuestionRepository:
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-        from .excel_format import TEMPLATE_HEADERS
+        from .excel_format import HEADERS, TEMPLATE_HEADERS
 
         header_font = Font(bold=True, color="FFFFFF", size=11)
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
@@ -623,10 +635,16 @@ class QuestionRepository:
             top=Side(style="thin"),
             bottom=Side(style="thin"),
         )
-        widths = (50, 25, 25, 25, 25, 15)
+        widths = (50, 25, 25, 25, 25)
+
+        # A ustuni sarlavhasida qoida yozilgan: o'qituvchi «Namuna»
+        # varag'ini ochmasligi ham mumkin, shuning uchun qoida ikkala
+        # varaqning sarlavhasida ham turadi.
+        headers = list(TEMPLATE_HEADERS)
+        headers[1] = f"{HEADERS['option_a']} (to'g'ri javob)"
 
         def write_headers(sheet) -> None:
-            for col_idx, header in enumerate(TEMPLATE_HEADERS, 1):
+            for col_idx, header in enumerate(headers, 1):
                 cell = sheet.cell(row=1, column=col_idx, value=header)
                 cell.font = header_font
                 cell.fill = header_fill
@@ -642,9 +660,10 @@ class QuestionRepository:
 
         example = wb.create_sheet("Namuna")
         write_headers(example)
+        # Namunada to'g'ri javob — har doim A ustunida.
         rows = [
-            ("2 + 2 nechaga teng?", "3", "4", "5", "6", "B"),
-            ("O'zbekiston poytaxti qaysi shahar?", "Samarqand", "Buxoro", "Toshkent", "Xiva", "C"),
+            ("2 + 2 nechaga teng?", "4", "3", "5", "6"),
+            ("O'zbekiston poytaxti qaysi shahar?", "Toshkent", "Samarqand", "Buxoro", "Xiva"),
         ]
         cell_alignment = Alignment(vertical="top", wrap_text=True)
         for row_idx, values in enumerate(rows, 2):
@@ -653,14 +672,15 @@ class QuestionRepository:
                 cell.alignment = cell_alignment
                 cell.border = thin_border
         note_row = len(rows) + 3
-        example.cell(
-            row=note_row,
-            column=1,
-            value=(
-                "Savollaringizni «Savollar» varag'iga yozing. "
-                "«To'g'ri javob» ustuniga faqat A, B, C yoki D harfini qo'ying."
-            ),
-        ).font = Font(italic=True, color="808080")
+        for offset, line in enumerate((
+            "Savollaringizni «Savollar» varag'iga yozing.",
+            "TO'G'RI JAVOBNI «A variant» ustuniga yozing — qolgan uchtasi noto'g'ri javoblar.",
+            "Alohida «To'g'ri javob» ustuni kerak emas: talabaga variantlar har safar "
+            "aralashtirib ko'rsatiladi, shuning uchun to'g'ri javob birinchi turgani bilinmaydi.",
+        )):
+            example.cell(row=note_row + offset, column=1, value=line).font = Font(
+                italic=True, color="808080"
+            )
 
         buffer = io.BytesIO()
         wb.save(buffer)
