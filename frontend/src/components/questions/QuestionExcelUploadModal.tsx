@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { FileSpreadsheet, FileUp } from 'lucide-react';
+import { CheckCircle2, FileSpreadsheet, FileUp, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
@@ -8,6 +8,7 @@ import { useUploadQuestions, useDownloadQuestionsExcelTemplate } from '@/hooks/u
 import { useTranslation } from 'react-i18next';
 import type { Subject } from '@/services/subjectService';
 import { subjectOption } from '@/utils/subject';
+import { formatSize } from '@/utils/fileSize';
 
 /**
  * Oynada ko'rsatiladigan namuna. Ustun nomlari serverdagi shablon bilan bir
@@ -171,19 +172,71 @@ export const QuestionExcelUploadModal = ({
                     file chosen» deb yozadi: u tarjima qilinmaydi va qolgan
                     tugmalardan boshqacha ko'rinadi. Shuning uchun input
                     yashirin, ko'rinadigan qismi — o'z tugmamiz. */}
-                <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-10 transition-colors hover:border-primary/40 hover:bg-primary/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    <FileUp className="mb-4 h-10 w-10 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">
-                        {file ? file.name : 'Excel fayl tanlash'}
-                    </span>
-                    <span className="mt-1 text-xs text-muted-foreground">
-                        {file ? "Boshqa fayl tanlash uchun bosing" : '.xlsx yoki .xls'}
-                    </span>
-                </button>
+                {/* Fayl tanlangani YAQQOL ko'rinishi kerak. Ilgari faqat
+                    matn o'zgarardi — ramka, rang va belgi o'sha-o'sha
+                    qolardi, va o'qituvchi fayl biriktirilmagan deb
+                    o'ylardi. Endi tanlangan holat boshqa rangda, boshqa
+                    belgi bilan va hajmi ko'rsatilgan holda chiziladi. */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className={
+                            file
+                                ? 'flex w-full flex-col items-center justify-center rounded-lg border-2 border-emerald-500/60 bg-emerald-500/[0.07] p-10 transition-colors hover:bg-emerald-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                                : 'flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-10 transition-colors hover:border-primary/40 hover:bg-primary/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                        }
+                    >
+                        {file ? (
+                            <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15">
+                                <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+                            </span>
+                        ) : (
+                            <FileUp className="mb-4 h-10 w-10 text-muted-foreground" />
+                        )}
+
+                        {file ? (
+                            <>
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                                    {t('Fayl tanlandi')}
+                                </span>
+                                <span className="mt-1.5 max-w-full truncate px-6 text-sm font-medium text-foreground">
+                                    {file.name}
+                                </span>
+                                <span className="mt-1 text-xs text-muted-foreground">
+                                    {formatSize(file.size)} · {t('boshqa fayl tanlash uchun bosing')}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <span className="text-sm font-medium text-foreground">
+                                    {t('Excel fayl tanlash')}
+                                </span>
+                                <span className="mt-1 text-xs text-muted-foreground">.xlsx yoki .xls</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Tugma ichida tugma bo'lmaydi, shuning uchun o'chirish
+                        tugmasi ustiga qo'yiladi. */}
+                    {file && (
+                        <button
+                            type="button"
+                            aria-label={t('Faylni olib tashlash')}
+                            title={t('Faylni olib tashlash')}
+                            onClick={() => {
+                                setFile(null);
+                                // Bitta faylni ikki marta tanlashga ham yo'l
+                                // ochiq qolsin: `change` qiymat o'zgarmasa
+                                // umuman ishlamaydi.
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -191,6 +244,15 @@ export const QuestionExcelUploadModal = ({
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                     className="hidden"
                 />
+
+                {/* «Yuklash» nega bosilmayotganini aytib turamiz. Fayl
+                    tanlangan, tugma esa o'chiq — sababi ko'rinmasa,
+                    o'qituvchi fayl yuklanmadi deb o'ylaydi. */}
+                {file && !subjectId && (
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                        {t('Yuklash uchun yuqoridan fanni tanlang.')}
+                    </p>
+                )}
 
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={onClose}>Bekor qilish</Button>
