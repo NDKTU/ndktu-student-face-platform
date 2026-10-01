@@ -12,6 +12,13 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .course.repository import get_course_repository
+from .independent_topic.repository import get_independent_topic_repository
+from .independent_topic.schemas import (
+    IndependentTopicCreateRequest,
+    IndependentTopicListResponse,
+    IndependentTopicResponse,
+    IndependentTopicUpdateRequest,
+)
 from .course.schemas import (
     CourseCreateRequest,
     CourseListRequest,
@@ -774,6 +781,65 @@ async def delete_course_message(
 # ============================================================================
 #  AGGREGATE ROUTER
 # ============================================================================
+# ─────────────────────── Mustaqil ish mavzulari ───────────────────────
+#
+# Koʻrish — kursni koʻra oladigan hamma (roʻyxat aynan talaba uchun).
+# Oʻzgartirish — dars ruxsatlari bilan: mavzular ham oʻquv rejasining
+# qismi va ular oʻqituvchida allaqachon bor.
+
+
+@course_router.get("/{course_id}/independent-topics", response_model=IndependentTopicListResponse)
+async def list_independent_topics(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("read:lesson")),
+):
+    """Fan boʻyicha mustaqil ish mavzulari — sillabusdagi tartibda."""
+    return await get_independent_topic_repository.list_topics(
+        session=session, course_id=course_id, current_user=current_user
+    )
+
+
+@course_router.post(
+    "/{course_id}/independent-topics",
+    response_model=IndependentTopicResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=user_identifier))],
+)
+async def create_independent_topic(
+    course_id: int,
+    data: IndependentTopicCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("create:lesson")),
+):
+    return await get_independent_topic_repository.create_topic(
+        session=session, course_id=course_id, data=data, current_user=current_user
+    )
+
+
+@course_router.put("/independent-topics/{topic_id}", response_model=IndependentTopicResponse)
+async def update_independent_topic(
+    topic_id: int,
+    data: IndependentTopicUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:lesson")),
+):
+    return await get_independent_topic_repository.update_topic(
+        session=session, topic_id=topic_id, data=data, current_user=current_user
+    )
+
+
+@course_router.delete("/independent-topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_independent_topic(
+    topic_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("delete:lesson")),
+):
+    await get_independent_topic_repository.delete_topic(
+        session=session, topic_id=topic_id, current_user=current_user
+    )
+
+
 router = APIRouter()
 router.include_router(course_router)
 router.include_router(lesson_router)

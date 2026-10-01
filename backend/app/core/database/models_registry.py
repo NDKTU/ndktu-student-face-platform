@@ -6,6 +6,7 @@ Used by Alembic env.py and anywhere that needs all tables registered.
 __all__ = [
     "Announcement",
     "AuditLog",
+    "IndependentTopic",
     "Notification",
     "AppSetting",
     "AnnouncementRegistration",
@@ -83,6 +84,7 @@ from app.modules.course.model import (
     CourseTeacher,
     Homework,
     HomeworkSubmission,
+    IndependentTopic,
     Lesson,
     LessonAttendance,
     LessonFaceCheck,

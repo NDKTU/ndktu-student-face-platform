@@ -6,6 +6,7 @@ import {
     BookOpen,
     ChevronRight,
     ClipboardCheck,
+    ClipboardList,
     FileStack,
     Clock3,
     Info,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useCourse } from '@/hooks/useCourses';
 import { useDeleteLesson, useLessons } from '@/hooks/useLessons';
+import { CourseAssignments } from '@/components/courses/CourseAssignments';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -41,7 +43,7 @@ import { courseTypeLabel } from '@/services/courseTypes';
 import { initialsOf } from '@/lib/avatarTiles';
 import './CourseDetailPage.css';
 
-type CourseTab = 'lessons' | 'grades' | 'gradebook' | 'attendance' | 'library' | 'documents' | 'chat';
+type CourseTab = 'lessons' | 'assignments' | 'grades' | 'gradebook' | 'attendance' | 'library' | 'documents' | 'chat';
 
 export default function CourseDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -122,6 +124,13 @@ export default function CourseDetailPage() {
     const tabs: TabDef<CourseTab>[] = [
         ...(canReadLessons
             ? [{ id: 'lessons' as const, label: 'Darslar', icon: <BookOpen className="h-4 w-4" /> }]
+            : []),
+        // «Fan topshiriqlari»: darslar bo'yicha savollar va mustaqil ish
+        // mavzulari. Savollar bloki ichkarida `read:question` bilan
+        // yopiladi (savolda to'g'ri javob bor — talabaga ko'rsatib
+        // bo'lmaydi), mavzular esa hammaga ko'rinadi.
+        ...(canReadLessons
+            ? [{ id: 'assignments' as const, label: 'Fan topshiriqlari', icon: <ClipboardList className="h-4 w-4" /> }]
             : []),
         ...(isStudent
             ? [{ id: 'grades' as const, label: 'Baholarim', icon: <Award className="h-4 w-4" /> }]
@@ -319,6 +328,16 @@ export default function CourseDetailPage() {
                             )}
                         </section>
                     )}
+
+            {activeTab === 'assignments' && canReadLessons && (
+                <CourseAssignments
+                    courseId={course.id}
+                    lessons={lessons}
+                    isLoadingLessons={lessonsQuery.isLoading}
+                    canSeeQuestions={hasPermission('read:question')}
+                    canManageTopics={canCreateLessons}
+                />
+            )}
 
             {activeTab === 'attendance' && canReadAttendance && (
                 <section className="space-y-3">

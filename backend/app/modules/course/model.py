@@ -457,3 +457,38 @@ class CourseMessage(Base, IdIntPk, TimestampMixin):
 
     def __str__(self):
         return f"CourseMessage {self.id} course={self.course_id}"
+
+
+class IndependentTopic(Base, IdIntPk, TimestampMixin):
+    """Mustaqil ish mavzusi — fan boʻyicha talaba oʻzi oʻrganadigan mavzu.
+
+    Nega uy vazifasi emas. `Homework` — muddat, topshirish va baho bilan
+    ishlaydigan vazifa; mustaqil ish mavzulari esa sillabusning roʻyxati:
+    oʻqituvchi semestr boshida eʼlon qiladi, talaba koʻradi va unga
+    tayyorlanadi. Topshirish kerak boʻlsa, oʻsha mavzuga alohida uy
+    vazifasi beriladi — bu roʻyxat uni almashtirmaydi.
+
+    Tartib `position` boʻyicha: mavzular sillabusdagi ketma-ketlikda
+    turadi, yaratilgan vaqt boʻyicha emas.
+    """
+
+    __tablename__ = "course_independent_topics"
+    __table_args__ = (Index("ix_course_independent_topics_course_position", "course_id", "position"),)
+
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: Kim qoʻshgani. Foydalanuvchi oʻchirilsa mavzu qolaveradi — u kursniki.
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Roʻyxatdagi tartib raqami.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0", default=0)
+
+    course: Mapped["Course"] = relationship("Course")
+
+    def __str__(self):
+        return f"IndependentTopic {self.id} course={self.course_id}"
