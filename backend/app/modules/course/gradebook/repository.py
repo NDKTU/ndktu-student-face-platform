@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.course_access import can_manage as can_manage_course
 from app.core.utils.lesson_access import ensure_can_manage_lesson
-from app.core.utils.lesson_scope import visible_to_group
+from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import Group
@@ -102,14 +102,9 @@ class GradebookRepository:
         return cells
 
     async def _lesson_group_ids(self, session: AsyncSession, lesson: Lesson) -> list[int]:
-        # Davomat jurnalidagi qoida bilan bir xil: guruhi yo'q dars — kursning
-        # barcha guruhlariniki.
-        if lesson.group_id is not None:
-            return [lesson.group_id]
-        rows = await session.execute(
-            select(CourseGroup.group_id).where(CourseGroup.course_id == lesson.course_id)
-        )
-        return [row[0] for row in rows]
+        # Qoida bitta joyda: `core/utils/lesson_scope.py`. Guruhi yo'q dars —
+        # kursning barcha guruhlariniki (davomat ham shunday hisoblaydi).
+        return await lesson_group_ids(session, lesson)
 
     async def lesson_gradebook(
         self, session: AsyncSession, lesson_id: int, current_user: User

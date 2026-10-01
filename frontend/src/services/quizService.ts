@@ -156,6 +156,15 @@ export const quizService = {
         return response.data;
     },
 
+    /**
+     * Dars testlarining yakuni — bitta so'rovda. Har bir test uchun
+     * `/analytics` chaqirilsa, o'nlab so'rov bo'lardi.
+     */
+    getLessonQuizSummary: async (lessonId: number): Promise<LessonQuizSummaryResponse> => {
+        const response = await api.get<LessonQuizSummaryResponse>(`/quiz/lesson/${lessonId}/summary`);
+        return response.data;
+    },
+
     getActiveQuizzes: async (page = 1, limit = 10, title?: string, user_id?: number, group_id?: number, subject_id?: number, sort_dir?: string) => {
         const response = await api.get<QuizListResponse>('/quiz/active', {
             params: { page, limit, title, user_id, group_id, subject_id, sort_dir },
@@ -201,3 +210,18 @@ export const quizService = {
         return response.data;
     },
 };
+
+/** Dars testining qisqa yakuni — dars sahifasidagi qator uchun. */
+export interface LessonQuizSummaryItem {
+    quiz_id: number;
+    /** Testni yakunlagan talabalar soni. */
+    submitted_count: number;
+    /** Test guruhlaridagi talabalar soni — maxraj. */
+    total_students: number;
+    average_grade?: number | null;
+}
+
+export interface LessonQuizSummaryResponse {
+    lesson_id: number;
+    items: LessonQuizSummaryItem[];
+}

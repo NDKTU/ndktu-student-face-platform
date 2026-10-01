@@ -27,6 +27,7 @@ from .question.schemas import (
 from .public_quiz.router import router as public_quiz_router
 from .quiz.repository import get_quiz_repository
 from .quiz.schemas import (
+    LessonQuizSummaryResponse,
     AvailableQuestionsResponse,
     QuizAnalyticsResponse,
     QuizCatalogResponse,
@@ -405,6 +406,20 @@ async def get_quiz(
     _: PermissionRequired = Depends(PermissionRequired("read:quiz")),
 ):
     return await get_quiz_repository.get_quiz(session=session, quiz_id=quiz_id)
+
+
+@quiz_router.get("/lesson/{lesson_id}/summary", response_model=LessonQuizSummaryResponse)
+async def lesson_quiz_summary(
+    lesson_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:result")),
+):
+    """Dars testlarining qisqa yakuni: nechta topshirdi va o'rtacha baho.
+
+    Yo'l `/{quiz_id}` dan OLDIN e'lon qilingan: aks holda «lesson» test
+    identifikatori deb o'qilardi.
+    """
+    return await get_quiz_repository.lesson_quiz_summary(session=session, lesson_id=lesson_id)
 
 
 @quiz_router.get("/{quiz_id}/analytics", response_model=QuizAnalyticsResponse)

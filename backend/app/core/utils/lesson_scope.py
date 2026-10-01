@@ -53,3 +53,19 @@ async def covers_group(session: AsyncSession, lesson: Lesson, group_id: int | No
         )
     )
     return found is not None
+
+
+async def lesson_group_ids(session: AsyncSession, lesson: Lesson) -> list[int]:
+    """Dars qaysi guruhlarga tegishli — roʻyxat koʻrinishida.
+
+    `visible_to_group` filtr uchun, bu esa aniq roʻyxat kerak boʻlgan
+    joylar uchun: davomat, baholash jurnali, test natijalari. Qoida bitta
+    joyda turishi kerak — aks holda jurnal bir guruhni, natijalar sanogʻi
+    esa boshqasini hisoblashi mumkin edi.
+    """
+    if lesson.group_id is not None:
+        return [lesson.group_id]
+    rows = await session.execute(
+        select(CourseGroup.group_id).where(CourseGroup.course_id == lesson.course_id)
+    )
+    return [row[0] for row in rows]

@@ -10,13 +10,15 @@ from sqlalchemy.orm import selectinload
 from app.core.enums import QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
-from app.core.utils.lesson_scope import visible_to_group
+from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
 from app.modules.course.model import Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
+    LessonQuizSummaryItem,
+    LessonQuizSummaryResponse,
     QuizAnalyticsResponse,
     QuizCatalogFaculty,
     QuizCatalogResponse,
@@ -437,6 +439,75 @@ class QuizRepository:
                 Quiz.lesson_id.in_(select(Lesson.id).where(visible_to_group(group_id))),
             ),
         )
+
+    async def lesson_quiz_summary(self, session: AsyncSession, lesson_id: int) -> LessonQuizSummaryResponse:
+        """Dars testlarining qisqa yakuni — bitta so'rovda.
+
+        Nega alohida: dars sahifasida har bir test uchun `/analytics` ni
+        chaqirish o'nlab so'rov degani edi. Bu yerda esa barcha testlar
+        uchun bitta agregatsiya.
+
+        Maxraj — testning GURUHLARIDAGI talabalar soni, topshirganlar emas:
+        o'qituvchiga «24 tadan 12 tasi topshirdi» kerak, «12 ta topshirdi»
+        esa kim qolganini ko'rsatmaydi. Guruh darsnikidek aniqlanadi
+        (`lesson_scope.lesson_group_ids`): guruhsiz dars — kursning barcha
+        guruhlari.
+        """
+        lesson = await session.get(Lesson, lesson_id)
+        if lesson is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
+
+        quizzes = (
+            (await session.execute(select(Quiz.id, Quiz.group_id).where(Quiz.lesson_id == lesson_id)))
+            .all()
+        )
+        if not quizzes:
+            return LessonQuizSummaryResponse(lesson_id=lesson_id, items=[])
+
+        quiz_ids = [row.id for row in quizzes]
+        stats = {
+            row.quiz_id: row
+            for row in (
+                await session.execute(
+                    select(
+                        Result.quiz_id,
+                        func.count(func.distinct(Result.user_id)).label("submitted"),
+                        func.avg(Result.grade).label("average"),
+                    )
+                    .where(Result.quiz_id.in_(quiz_ids), Result.status == "completed")
+                    .group_by(Result.quiz_id)
+                )
+            ).all()
+        }
+
+        # Guruhdagi talabalar soni: test o'z guruhini ko'rsatsa — o'sha,
+        # ko'rsatmasa (dars butun kursniki) — darsning guruhlari.
+        default_group_ids = await lesson_group_ids(session, lesson)
+        counts: dict[tuple[int, ...], int] = {}
+
+        async def students_in(group_ids: list[int]) -> int:
+            key = tuple(sorted(group_ids))
+            if key not in counts:
+                counts[key] = (
+                    await session.scalar(
+                        select(func.count()).select_from(Student).where(Student.group_id.in_(group_ids or [0]))
+                    )
+                ) or 0
+            return counts[key]
+
+        items: list[LessonQuizSummaryItem] = []
+        for row in quizzes:
+            group_ids = [row.group_id] if row.group_id is not None else default_group_ids
+            stat = stats.get(row.id)
+            items.append(
+                LessonQuizSummaryItem(
+                    quiz_id=row.id,
+                    submitted_count=int(stat.submitted) if stat else 0,
+                    total_students=await students_in(group_ids),
+                    average_grade=round(float(stat.average), 2) if stat and stat.average is not None else None,
+                )
+            )
+        return LessonQuizSummaryResponse(lesson_id=lesson_id, items=items)
 
     async def list_quizzes(
         self, session: AsyncSession, request: QuizListRequest, current_user: User

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
@@ -16,7 +16,7 @@ import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useLessonQuestions } from '@/hooks/useQuestions';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
-import { useQuizzes, useDeleteQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
+import { useQuizzes, useDeleteQuiz, useLessonQuizSummary, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz, type QuizCreateRequest } from '@/services/quizService';
 import { LessonHomeworkCard } from '@/components/homework/LessonHomeworkCard';
 import { toast } from 'sonner';
@@ -77,12 +77,22 @@ export default function LessonDetailPage() {
     // talabaga ko'rinmasligi kerak. `read:quiz` bilan birlashtirilsa,
     // kelajakda testlar talabaga ochilgan kuni savollar ham ochilardi.
     const canSeeQuestions = hasPermission('read:question');
+    // Natijalar sahifasi (`/quizzes/:id`) shu huquq ostida — tugmani ham
+    // o'shanga bog'laymiz, aks holda u bosilganda 403 beradigan sahifaga
+    // olib borardi.
+    const canSeeResults = hasPermission('read:result');
     const quizzesQuery = useQuizzes(
         lessonId ? { lesson_id: lessonId, limit: 20 } : {},
         Boolean(lessonId) && canSeeQuizzes,
     );
     const deleteQuiz = useDeleteQuiz();
     const updateQuiz = useUpdateQuiz();
+    // Test yakunlari: nechta talaba topshirdi va o'rtacha baho. O'qituvchi
+    // natijani darhol ko'rishi kerak — ilgari buning uchun umumiy
+    // «Testlar» bo'limidan kerakli testni qidirish kerak edi.
+    const quizSummaryQuery = useLessonQuizSummary(
+        canSeeQuizzes && lessonId ? lessonId : undefined,
+    );
     // Testni shu yerdan yoqish/o'chirish. Ilgari holat faqat YOZUV edi:
     // test tuzgan o'qituvchi uni faollashtirish uchun «Testlar» sahifasini
     // qidirib topishi kerak bo'lardi — dars sahifasida esa testi tayyor
@@ -157,6 +167,9 @@ export default function LessonDetailPage() {
     const canManageQuiz = hasPermission('create:quiz');
     const canAddQuestion = hasPermission('create:question');
     const quizzes = quizzesQuery.data?.quizzes ?? [];
+    const quizSummary = new Map(
+        (quizSummaryQuery.data?.items ?? []).map((item) => [item.quiz_id, item]),
+    );
     const lessonQuestions = lessonQuestionsQuery.data?.questions ?? [];
     // Excel oynasi fan nomini ko'rsatishi uchun — dars javobida nom bor,
     // ro'yxat esa tanlanmagan holat uchun zaxira.
@@ -321,6 +334,25 @@ export default function LessonDetailPage() {
                                     <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                                         {QUIZ_TYPE_LABELS[quiz.quiz_type ?? 'LESSON_QUIZ']} · {quiz.question_number} savol · {quiz.duration} daqiqa · PIN: {quiz.pin}
                                     </p>
+                                    {/* Yakun: nechta topshirdi va o'rtacha baho.
+                                        Maxraj — test guruhlaridagi talabalar soni,
+                                        shuning uchun kim qolgani ham ko'rinadi. */}
+                                    {(() => {
+                                        const summary = quizSummary.get(quiz.id);
+                                        if (!summary) return null;
+                                        return (
+                                            <p className="mt-1 text-xs tabular-nums">
+                                                <span className={summary.submitted_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}>
+                                                    {summary.submitted_count}/{summary.total_students} topshirdi
+                                                </span>
+                                                {summary.average_grade != null && (
+                                                    <span className="text-muted-foreground">
+                                                        {' '}· o'rtacha {summary.average_grade}
+                                                    </span>
+                                                )}
+                                            </p>
+                                        );
+                                    })()}
                                 </div>
                                 {canManageQuiz ? (
                                     <div className="flex shrink-0 items-center gap-2">
@@ -339,6 +371,17 @@ export default function LessonDetailPage() {
                                         <span className={`h-1.5 w-1.5 rounded-full ${quiz.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
                                         {quiz.is_active ? 'Faol' : 'Faol emas'}
                                     </span>
+                                )}
+                                {canSeeResults && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="shrink-0 gap-1.5"
+                                        onClick={() => navigate(`/quizzes/${quiz.id}`)}
+                                    >
+                                        <BarChart3 className="h-4 w-4" />
+                                        <span>Natijalar</span>
+                                    </Button>
                                 )}
                                 {canManageQuiz && (
                                     <div className="flex shrink-0 gap-1 opacity-60 transition-opacity group-hover/item:opacity-100">

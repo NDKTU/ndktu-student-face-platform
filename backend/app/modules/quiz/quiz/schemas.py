@@ -191,3 +191,19 @@ class QuizAnalyticsResponse(BaseModel):
     maximum_grade: Optional[int] = None
     average_duration_seconds: Optional[float] = None
     questions: list[QuizQuestionAnalytics]
+
+
+class LessonQuizSummaryItem(BaseModel):
+    """Bitta testning qisqa yakuni — dars sahifasidagi qator uchun."""
+
+    quiz_id: int
+    #: Testni yakunlagan talabalar soni (noyob).
+    submitted_count: int
+    #: Test tegishli guruhlardagi talabalar soni — maxraj.
+    total_students: int
+    average_grade: Optional[float] = None
+
+
+class LessonQuizSummaryResponse(BaseModel):
+    lesson_id: int
+    items: list[LessonQuizSummaryItem]

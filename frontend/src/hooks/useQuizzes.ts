@@ -95,3 +95,11 @@ export const useRepeatQuiz = () => {
         },
     });
 };
+
+/** Dars testlarining yakuni: nechta topshirdi, o'rtacha baho. */
+export const useLessonQuizSummary = (lessonId?: number, enabled: boolean = true) =>
+    useQuery({
+        queryKey: ['lesson-quiz-summary', lessonId],
+        queryFn: () => quizService.getLessonQuizSummary(lessonId!),
+        enabled: !!lessonId && enabled,
+    });
