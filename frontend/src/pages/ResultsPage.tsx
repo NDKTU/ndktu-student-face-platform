@@ -28,6 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
 import { formatDate, formatDateTime } from '@/utils/date';
 import { subjectOption } from '@/utils/subject';
+import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 import { useTranslation } from 'react-i18next';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
@@ -326,7 +327,11 @@ const ResultsPage = () => {
             header: t('Talaba'),
             cell: (result) => (
                 <div>
-                    <div className="font-medium text-sm">{result.student_name || result.user?.username || '—'}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-sm">{result.student_name || result.user?.username || '—'}</span>
+                        {/* Ko'chirish dalili — bosilganda surat ochiladi. */}
+                        <CheatingEvidence result={result} />
+                    </div>
                     {result.student_id && (
                         <div className="text-xs font-mono text-muted-foreground">{result.student_id}</div>
                     )}

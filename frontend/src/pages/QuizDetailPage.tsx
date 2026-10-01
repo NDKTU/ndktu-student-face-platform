@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { sanitizeHtml } from '@/utils/sanitize';
+import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 
 const formatDuration = (seconds?: number | null) => {
     if (seconds === null || seconds === undefined) return '—';
@@ -99,7 +100,12 @@ const QuizDetailPage = () => {
                             <TableBody>
                                 {resultItems.map((result) => (
                                     <TableRow key={result.id}>
-                                        <TableCell className="font-medium">{result.student_name || result.user?.username || `#${result.user_id}`}</TableCell>
+                                        <TableCell className="font-medium">
+                                            <span className="flex flex-wrap items-center gap-2">
+                                                <span>{result.student_name || result.user?.username || `#${result.user_id}`}</span>
+                                                <CheatingEvidence result={result} />
+                                            </span>
+                                        </TableCell>
                                         <TableCell>{result.correct_answers}/{result.correct_answers + result.wrong_answers}</TableCell>
                                         <TableCell><span className="badge badge-primary">{result.grade}</span></TableCell>
                                         <TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => navigate(`/results/answers?result_id=${result.id}&user_id=${result.user_id}&quiz_id=${quizId}`)}>Ko'rish</Button></TableCell>

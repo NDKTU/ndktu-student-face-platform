@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useUserAnswers } from '@/hooks/useUserAnswers';
+import { useResult } from '@/hooks/useResults';
+import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { Pagination } from '@/components/ui/Pagination';
@@ -43,6 +45,10 @@ const UserAnswersPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
 
+    // Natijaning o'zi — ko'chirish dalili uchun. Javoblar ro'yxatida bu
+    // ma'lumot yo'q, dalil esa aynan natijaga tegishli.
+    const resultQuery = useResult(resultId ?? 0);
+
     const { data, isLoading, isError, refetch } = useUserAnswers({
         page: currentPage,
         limit: pageSize,
@@ -82,6 +88,11 @@ const UserAnswersPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Ko'chirish dalili — javoblardan OLDIN: baho shu belgidan
+                kelib chiqib qayta ko'rib chiqilishi mumkin, demak u
+                birinchi ko'rinishi kerak. */}
+            {resultQuery.data && <CheatingEvidence result={resultQuery.data} variant="block" />}
 
             {/* Content */}
             {isLoading ? (
