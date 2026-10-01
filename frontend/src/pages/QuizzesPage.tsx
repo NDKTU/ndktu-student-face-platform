@@ -30,7 +30,7 @@ import { subjectOption } from '@/utils/subject';
 const QuizzesPage = () => {
     const { t } = useTranslation();
     const { hasPermission } = useAuth();
-    const { isTeacher } = useRoleView();
+    const { isAdmin, isTeacher } = useRoleView();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -69,7 +69,19 @@ const QuizzesPage = () => {
     // ichida, o'z darsida turadi va umumiy ro'yxatni to'ldiradi. Kerak
     // bo'lsa — shu tanlagich orqali. «Darsi o'chirilgan» ham shu yerda:
     // bunday testlar guruhsiz qoladi va boshqa filtrlarga tushmaydi.
-    const [lessonScope, setLessonScope] = useUrlState<LessonScope>('lesson_scope', 'hidden');
+    // Standart qiymat ROLGA qarab.
+    //
+    // O'qituvchiga dars testlari bu ro'yxatda kerak emas: ular o'z darsida
+    // turadi va umumiy ro'yxatni to'ldirib, oddiy testlarni ko'rsatmay
+    // qo'yardi. Ma'muriyatga esa aksincha — unga universitet bo'yicha
+    // to'liq manzara kerak, va yashirilgan testlarni qidirib o'tirish
+    // vaqt yo'qotish bo'lardi.
+    //
+    // Filtr ikkalasida ham joyida: bu faqat boshlang'ich qiymat.
+    // `useUrlState` qiymatni har renderda URL'dan o'qiydi, shuning uchun
+    // rol kechroq yuklansa ham to'g'ri qiymatga o'tadi.
+    const defaultLessonScope: LessonScope = isAdmin ? 'all' : 'hidden';
+    const [lessonScope, setLessonScope] = useUrlState<LessonScope>('lesson_scope', defaultLessonScope);
     const [sortDir, setSortDir] = useUrlState<'desc' | 'asc'>('order', 'desc');
 
     useEffect(() => {
@@ -266,7 +278,7 @@ const QuizzesPage = () => {
         setFilterGroupId(undefined);
         setFilterUserId(undefined);
         setFilterIsActive(undefined);
-        setLessonScope('hidden');
+        setLessonScope(defaultLessonScope);
         setSearchTerm('');
         setSortDir('desc');
         setCurrentPage(1);
@@ -278,7 +290,7 @@ const QuizzesPage = () => {
         filterGroupId !== undefined ||
         filterUserId !== undefined ||
         filterIsActive !== undefined ||
-        lessonScope !== 'hidden' ||
+        lessonScope !== defaultLessonScope ||
         searchTerm !== '' ||
         sortDir !== 'desc';
 
