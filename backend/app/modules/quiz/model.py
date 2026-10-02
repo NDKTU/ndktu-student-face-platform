@@ -95,6 +95,16 @@ class Question(Base, IdIntPk, TimestampMixin):
         ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    #: Kurs savollari banki: savol shu kursning «Test savollari» boʻlimida,
+    #: ``control_type`` nazorati ostida turadi. Dars savollaridan farqi —
+    #: hech qaysi darsga tegishli emas. `SET NULL`: kurs oʻchsa ham savolga
+    #: natijalar tayanishi mumkin.
+    course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: ControlType: ON1, ON2, JN1, JN2, YN, OTHER. Faqat ``course_id`` bilan.
+    control_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     # Savol turi (QuestionType). Ustun satr sifatida saqlanadi — Postgres enum
     # tipi emas. Diqqat: hozircha faqat "QUIZ" haqiqatan ishlaydi, qolgan
     # turlar uchun option_a..option_d / correct_option shakli mos kelmaydi.

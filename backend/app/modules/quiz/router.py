@@ -11,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Yashirish funksiyasi kommentga olindi (2026-09-11) — quyidagi importlar endi kerak emas.
 # from app.core.schemas import VisibilityRequest
 # from app.core.utils.visibility import set_hidden
+from app.core.enums import ControlType
 from app.modules.auth.model import User
 
 from .model import Result
 from .question.repository import get_question_repository
 from .question.schemas import (
+    ControlQuestionCountsResponse,
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
     QuestionCreateRequest,
@@ -229,6 +231,18 @@ async def get_question_catalog(
     return await get_question_repository.get_catalog(session=session, current_user=current_user, search=search)
 
 
+@question_router.get("/control_counts", response_model=ControlQuestionCountsResponse)
+async def get_control_question_counts(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:question")),
+):
+    """Kursning «Test savollari»: har bir nazorat turida nechta savol."""
+    return await get_question_repository.control_counts(
+        session=session, course_id=course_id, current_user=current_user
+    )
+
+
 @question_router.get("/{question_id}", response_model=QuestionCreateResponse)
 async def get_question(
     question_id: int,
@@ -317,6 +331,8 @@ async def upload_question_image(
 async def upload_questions_excel(
     subject_id: int,
     lesson_id: int | None = None,
+    course_id: int | None = None,
+    control_type: ControlType | None = None,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: PermissionRequired = Depends(PermissionRequired("create:question")),
@@ -327,6 +343,9 @@ async def upload_questions_excel(
         subject_id=subject_id,
         user_id=current_user.id,
         lesson_id=lesson_id,
+        course_id=course_id,
+        control_type=control_type,
+        current_user=current_user,
     )
     return result
 

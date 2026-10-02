@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { useUploadQuestions, useDownloadQuestionsExcelTemplate } from '@/hooks/useQuestions';
 import { useTranslation } from 'react-i18next';
+import type { ControlType } from '@/services/questionService';
 import type { Subject } from '@/services/subjectService';
 import { subjectOption } from '@/utils/subject';
 import { formatSize } from '@/utils/fileSize';
@@ -41,6 +42,10 @@ interface Props {
      * biriktiriladi. Dars testi aynan shu savollardan yigʻiladi.
      */
     lessonId?: number;
+    /** Kursning «Test savollari»dan: savollar shu nazoratga yuklanadi. */
+    control?: { course_id: number; control_type: ControlType };
+    /** Oyna sarlavhasi ostidagi izoh — savollar qayerga tushishi. */
+    targetHint?: string;
 }
 
 export const QuestionExcelUploadModal = ({
@@ -52,6 +57,8 @@ export const QuestionExcelUploadModal = ({
     lockSubject = false,
     subjectName,
     lessonId,
+    control,
+    targetHint,
 }: Props) => {
     const [file, setFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +77,7 @@ export const QuestionExcelUploadModal = ({
 
     const handleUpload = () => {
         if (!file || !subjectId) return;
-        uploadMutation.mutate({ file, subject_id: parseInt(subjectId, 10), lesson_id: lessonId }, {
+        uploadMutation.mutate({ file, subject_id: parseInt(subjectId, 10), lesson_id: lessonId, control }, {
             onSuccess: (data: { questions?: unknown[]; warnings?: string[] }) => {
                 const imported = data?.questions?.length ?? 0;
                 toast.success(imported ? `${imported} ta savol import qilindi` : 'Savollar import qilindi');
@@ -106,6 +113,7 @@ export const QuestionExcelUploadModal = ({
                             searchPlaceholder="Fanni qidirish..."
                         />
                     )}
+                    {targetHint && <p className="text-xs text-muted-foreground">{targetHint}</p>}
                 </div>
 
                 {/* Format hech qayerda yozilmagan edi: o'qituvchi faylni qanday

@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from app.core.enums import QuestionType
+from app.core.enums import ControlType, QuestionType
 from app.core.schemas import TashkentDatetime
 
 CorrectOption = Literal["a", "b", "c", "d"]
@@ -110,6 +110,10 @@ class QuestionCreateRequest(BaseModel):
     #: Oraliq nazoratga alohida qoʻshilayotgan savol: hech qaysi darsga
     #: tegishli emas va faqat shu testga bogʻlanadi.
     quiz_id: Optional[int] = None
+    #: Kursning «Test savollari» boʻlimidan: savol shu kursniki boʻladi va
+    #: ``control_type`` nazorati ostida turadi. Ikkalasi birga keladi.
+    course_id: Optional[int] = None
+    control_type: Optional[ControlType] = None
     text: str
     # `QUIZ` dan boshqa turlarda variantlar `payload` da, shuning uchun bu
     # ustunlar majburiy emas — ular faqat eski tur uchun.
@@ -127,6 +131,17 @@ class QuestionCreateRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
         return v.strip()
+
+    @model_validator(mode="after")
+    def check_control_pair(self):
+        # Kursisiz nazorat turi ham, nazoratsiz kurs savoli ham maʼnosiz:
+        # birinchisi hech qayerda koʻrinmaydi, ikkinchisi hech qaysi
+        # roʻyxatga tushmaydi.
+        if (self.course_id is None) != (self.control_type is None):
+            raise ValueError("Kurs va nazorat turi birga berilishi kerak")
+        if self.course_id is not None and (self.lesson_id is not None or self.quiz_id is not None):
+            raise ValueError("Kurs savoli darsga yoki testga bogʻlanmaydi")
+        return self
 
     @model_validator(mode="after")
     def check_type_shape(self):
@@ -176,6 +191,9 @@ class QuestionCreateResponse(BaseModel):
     payload: Optional[dict] = None
     #: Boʻsh — fan bankidagi umumiy savol.
     lesson_id: Optional[int] = None
+    #: Kursning «Test savollari» boʻlimidagi savol.
+    course_id: Optional[int] = None
+    control_type: Optional[ControlType] = None
     #: Savol biror testga olinganmi. Olingan boʻlsa uni oʻchirib
     #: boʻlmaydi: test tarkibi va talabalarning javoblari unga tayanadi.
     in_quiz: bool = False
@@ -209,6 +227,9 @@ class QuestionListRequest(BaseModel):
     lesson_id: Optional[int] = None
     #: Oraliq nazoratga alohida qoʻshilgan savollar (darsdan kelmaganlari).
     midterm_quiz_id: Optional[int] = None
+    #: Kursning «Test savollari» — nazorat turi boʻyicha.
+    course_id: Optional[int] = None
+    control_type: Optional[ControlType] = None
 
     page: int = 1
 
@@ -226,6 +247,12 @@ class QuestionListResponse(BaseModel):
     page: int
     limit: int
     questions: list[QuestionCreateResponse]
+
+
+class ControlQuestionCountsResponse(BaseModel):
+    """Kurs savollari soni nazorat turi boʻyicha. Savoli yoʻq tur — 0."""
+
+    counts: dict[ControlType, int]
 
 
 class QuestionSubjectSummary(BaseModel):

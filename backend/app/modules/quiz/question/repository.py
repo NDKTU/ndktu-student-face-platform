@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.enums import QuizType
+from app.core.enums import ControlType, QuizType
 from app.core.utils.course_access import can_manage
 from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import Teacher, User
@@ -18,6 +18,7 @@ from app.modules.quiz.quiz.repository import get_quiz_repository
 
 from .excel_format import parse_correct_option, resolve_columns
 from .schemas import (
+    ControlQuestionCountsResponse,
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
     QuestionCreateRequest,
@@ -132,10 +133,17 @@ class QuestionRepository:
         author_id = data.user_id if is_admin and data.user_id else current_user.id
 
         midterm = await self._midterm_for_new_question(session, data, current_user)
+        if data.course_id is not None:
+            course = await self._course_for_control_questions(session, data.course_id, current_user)
+            if course.subject_id != data.subject_id:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Savol fani kurs faniga mos emas",
+                )
 
-        # Oraliq nazoratga qoʻshilayotgan savolni kurs huquqi hal qiladi:
-        # assistentga fan biriktirilmagan boʻlishi mumkin.
-        if not is_admin and midterm is None:
+        # Oraliq nazoratga yoki kursga qoʻshilayotgan savolni kurs huquqi
+        # hal qiladi: assistentga fan biriktirilmagan boʻlishi mumkin.
+        if not is_admin and midterm is None and data.course_id is None:
             # Oʻz fanidan tashqariga savol qoʻshib boʻlmaydi. Biriktirmasi
             # umuman yoʻq oʻqituvchini bloklamaymiz — EduPlan sinxronizatsiyasi
             # kechikkan boʻlishi mumkin, bu esa ishlashni butunlay toʻxtatardi.
@@ -150,6 +158,8 @@ class QuestionRepository:
             subject_id=data.subject_id,
             user_id=author_id,
             lesson_id=None if midterm else data.lesson_id,
+            course_id=data.course_id,
+            control_type=data.control_type.value if data.control_type else None,
             text=data.text,
             option_a=data.option_a,
             option_b=data.option_b,
@@ -200,6 +210,40 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
         return quiz
 
+    async def _course_for_control_questions(
+        self, session: AsyncSession, course_id: int, current_user: User
+    ) -> Course:
+        """Kursning «Test savollari» bilan ishlash huquqi — kursni boshqaruvchilar."""
+        course = await session.get(Course, course_id)
+        if course is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kurs topilmadi")
+        if not await can_manage(session, course, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+        return course
+
+    async def control_counts(
+        self, session: AsyncSession, course_id: int, current_user: User
+    ) -> ControlQuestionCountsResponse:
+        """Kurs savollari soni nazorat turlari boʻyicha — tablar yonidagi raqamlar."""
+        await self._course_for_control_questions(session, course_id, current_user)
+        rows = (
+            await session.execute(
+                select(Question.control_type, func.count(Question.id))
+                .where(
+                    Question.course_id == course_id,
+                    Question.control_type.is_not(None),
+                    Question.is_latest.is_(True),
+                    Question.is_active.is_(True),
+                )
+                .group_by(Question.control_type)
+            )
+        ).all()
+        counts = {kind: 0 for kind in ControlType}
+        for kind, count in rows:
+            if kind in ControlType._value2member_map_:
+                counts[ControlType(kind)] = count
+        return ControlQuestionCountsResponse(counts=counts)
+
     async def get_question(self, session: AsyncSession, question_id: int, current_user: User) -> Question:
         stmt = (
             select(Question)
@@ -244,7 +288,14 @@ class QuestionRepository:
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
 
         subject_ids: list[int] = []
-        if not is_admin and is_teacher:
+        # Kurs savollarini kurs huquqi hal qiladi: assistent asosiy
+        # oʻqituvchi yozgan savollarni ham koʻrishi kerak, fan esa unga
+        # biriktirilmagan boʻlishi mumkin.
+        course_scoped = False
+        if request.course_id:
+            await self._course_for_control_questions(session, request.course_id, current_user)
+            course_scoped = True
+        if not is_admin and is_teacher and not course_scoped:
             # Oʻqituvchi biriktirilgan fanlarining savollarini koʻradi —
             # ilgari faqat oʻzi yozganini koʻrardi va oʻz fanining bazasi
             # unga boʻsh koʻrinardi.
@@ -265,6 +316,12 @@ class QuestionRepository:
 
         if request.midterm_quiz_id:
             stmt = stmt.where(self._midterm_extra_filter(request.midterm_quiz_id))
+
+        if request.course_id:
+            stmt = stmt.where(Question.course_id == request.course_id)
+
+        if request.control_type:
+            stmt = stmt.where(Question.control_type == request.control_type.value)
 
         stmt = stmt.order_by(desc(Question.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
@@ -294,7 +351,7 @@ class QuestionRepository:
         count_stmt = (
             select(func.count()).select_from(Question).where(Question.is_latest.is_(True), Question.is_active.is_(True))
         )
-        if not is_admin and is_teacher:
+        if not is_admin and is_teacher and not course_scoped:
             count_stmt = count_stmt.where(self._visible_questions_filter(current_user, subject_ids))
         if request.text:
             count_stmt = count_stmt.where(Question.text.ilike(f"%{request.text}%"))
@@ -306,6 +363,10 @@ class QuestionRepository:
             count_stmt = count_stmt.where(Question.lesson_id == request.lesson_id)
         if request.midterm_quiz_id:
             count_stmt = count_stmt.where(self._midterm_extra_filter(request.midterm_quiz_id))
+        if request.course_id:
+            count_stmt = count_stmt.where(Question.course_id == request.course_id)
+        if request.control_type:
+            count_stmt = count_stmt.where(Question.control_type == request.control_type.value)
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -354,6 +415,9 @@ class QuestionRepository:
             # qolardi — va dars testi uni boshqa olmasdi. Mijoz aniq
             # qiymat yuborsa, oʻsha ustun boʻladi.
             lesson_id=data.lesson_id if data.lesson_id is not None else question.lesson_id,
+            # Kurs savoli ham oʻz boʻlimida qolishi kerak — xuddi shu sabab.
+            course_id=data.course_id if data.course_id is not None else question.course_id,
+            control_type=data.control_type.value if data.control_type else question.control_type,
             text=data.text,
             option_a=data.option_a,
             option_b=data.option_b,
@@ -465,11 +529,30 @@ class QuestionRepository:
         return public_url(stored.blob.stored_path)
 
     async def upload_questions_excel(
-        self, session: AsyncSession, file, subject_id: int, user_id: int, lesson_id: int | None = None
+        self,
+        session: AsyncSession,
+        file,
+        subject_id: int,
+        user_id: int,
+        lesson_id: int | None = None,
+        course_id: int | None = None,
+        control_type: ControlType | None = None,
+        current_user: User | None = None,
     ) -> list[Question]:
         import io
 
         import pandas as pd
+
+        if (course_id is None) != (control_type is None):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Kurs va nazorat turi birga berilishi kerak",
+            )
+        if course_id is not None:
+            course = await self._course_for_control_questions(session, course_id, current_user)
+            # Fan kursdan olinadi: savollar boshqa fan bankiga tushib qolmasin.
+            subject_id = course.subject_id
+            lesson_id = None
 
         contents = await file.read()
         df = pd.read_excel(io.BytesIO(contents))
@@ -510,7 +593,7 @@ class QuestionRepository:
                 continue
 
             q_subject_id = subject_id
-            if "subject_id" in df.columns and not pd.isna(row["subject_id"]):
+            if course_id is None and "subject_id" in df.columns and not pd.isna(row["subject_id"]):
                 try:
                     q_subject_id = int(row["subject_id"])
                 except (ValueError, TypeError):
@@ -538,6 +621,8 @@ class QuestionRepository:
                 # Dars sahifasidan yuklanganda savollar oʻsha darsniki
                 # boʻladi: dars testi aynan shu bogʻlanish boʻyicha yigʻiladi.
                 lesson_id=lesson_id,
+                course_id=course_id,
+                control_type=control_type.value if control_type else None,
                 text=text,
                 option_a=opt_a,
                 option_b=opt_b,

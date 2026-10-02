@@ -22,6 +22,22 @@ class QuestionType(str, enum.Enum):
     PUZZLE = "PUZZLE"
 
 
+class ControlType(str, enum.Enum):
+    """Kurs savollari qaysi nazorat uchun yozilgan.
+
+    Oʻqituvchi savollarni oldindan nazorat turlari boʻyicha toʻplaydi:
+    ON — oraliq, JN — joriy, YN — yakuniy nazorat. Roʻyxatdan tashqari
+    nazoratlar ``OTHER`` ga tushadi.
+    """
+
+    ON1 = "ON1"
+    ON2 = "ON2"
+    JN1 = "JN1"
+    JN2 = "JN2"
+    YN = "YN"
+    OTHER = "OTHER"
+
+
 class QuizType(str, enum.Enum):
     LESSON_QUIZ = "LESSON_QUIZ"
     #: Oraliq nazorat — kurs testi, savollari tanlangan darslardan va

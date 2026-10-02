@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { questionService, type QuestionCreateRequest } from '@/services/questionService';
+import { questionService, type ControlType, type QuestionCreateRequest } from '@/services/questionService';
 
 export const useQuestions = (
     page = 1,
@@ -31,6 +31,20 @@ export const useMidtermExtraQuestions = (quizId?: number) =>
         queryKey: ['questions', 'midterm', quizId],
         queryFn: () => questionService.getQuestions(1, 200, undefined, undefined, undefined, undefined, quizId),
         enabled: !!quizId,
+    });
+
+/** Kursning «Test savollari» — tanlangan nazorat turi. */
+export const useControlQuestions = (courseId: number, controlType: ControlType) =>
+    useQuery({
+        queryKey: ['questions', 'control', courseId, controlType],
+        queryFn: () => questionService.getControlQuestions(courseId, controlType),
+    });
+
+/** Nazorat turlari yonidagi savollar soni. */
+export const useControlQuestionCounts = (courseId: number) =>
+    useQuery({
+        queryKey: ['questions', 'control-counts', courseId],
+        queryFn: () => questionService.getControlCounts(courseId),
     });
 
 export const useQuestionCatalog = (search?: string) => useQuery({
@@ -86,8 +100,14 @@ export const useDeleteQuestion = () => {
 export const useUploadQuestions = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ file, subject_id, lesson_id }: { file: File; subject_id: number; lesson_id?: number }) =>
-            questionService.uploadQuestions(file, subject_id, lesson_id),
+        mutationFn: ({
+            file, subject_id, lesson_id, control,
+        }: {
+            file: File;
+            subject_id: number;
+            lesson_id?: number;
+            control?: { course_id: number; control_type: ControlType };
+        }) => questionService.uploadQuestions(file, subject_id, lesson_id, control),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });

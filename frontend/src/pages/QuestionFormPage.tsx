@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
-import type { QuestionCreateRequest } from '@/services/questionService';
+import { CONTROL_TYPES, type ControlType, type QuestionCreateRequest } from '@/services/questionService';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
@@ -16,6 +16,7 @@ import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQu
 import { useSubjects } from '@/hooks/useSubjects';
 import { useLesson } from '@/hooks/useLessons';
 import { useQuiz } from '@/hooks/useQuizzes';
+import { useCourse } from '@/hooks/useCourses';
 import { Combobox } from '@/components/ui/Combobox';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
@@ -66,6 +67,10 @@ const QuestionFormPage = () => {
     // testniki bo'ladi — tanlanmaydi.
     const quizIdParam = searchParams.get('quiz_id');
     const returnTo = searchParams.get('return_to');
+    // Kursning «Test savollari»dan: savol shu kursning tanlangan nazoratiga
+    // qo'shiladi, fan esa kursniki — tanlanmaydi.
+    const courseIdParam = searchParams.get('course_id');
+    const controlInfo = CONTROL_TYPES.find((item) => item.value === searchParams.get('control_type'));
     const { user } = useAuth();
     const isEditMode = !!id;
     const questionId = id ? parseInt(id, 10) : 0;
@@ -85,6 +90,8 @@ const QuestionFormPage = () => {
     const lessonSubjectId = lessonData?.teacher_subject?.subject_id;
     const midtermId = !isEditMode && quizIdParam ? Number.parseInt(quizIdParam, 10) : 0;
     const { data: midterm } = useQuiz(midtermId);
+    const controlCourseId = !isEditMode && controlInfo && courseIdParam ? Number.parseInt(courseIdParam, 10) : 0;
+    const { data: controlCourse } = useCourse(controlCourseId || undefined);
     const { data: question, isLoading: isQuestionLoading } = useQuestion(questionId);
 
     const createMutation = useCreateQuestion();
@@ -243,6 +250,8 @@ const QuestionFormPage = () => {
             // Tahrirlashda yuborilmaydi: bekend eski versiyadan koʻchiradi.
             lesson_id: !isEditMode && lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined,
             quiz_id: midtermId || undefined,
+            course_id: controlCourseId || undefined,
+            control_type: controlCourseId ? (controlInfo?.value as ControlType) : undefined,
             text: data.text,
             question_type: questionKind,
             option_a: data.option_a,
@@ -458,7 +467,18 @@ const QuestionFormPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-foreground">Fan</label>
-                                {midtermId ? (
+                                {controlCourseId ? (
+                                    <>
+                                        {/* Kurs fani — tanlanmaydi. */}
+                                        <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">
+                                            {controlCourse?.subject?.name ?? (presetSubjectId ? `#${presetSubjectId}` : '…')}
+                                        </p>
+                                        <input type="hidden" {...register('subject_id')} />
+                                        <p className="text-xs text-muted-foreground">
+                                            Savol «{controlInfo?.title}» savollariga qo'shiladi.
+                                        </p>
+                                    </>
+                                ) : midtermId ? (
                                     <>
                                         {/* Oraliq nazorat fani — kursdan, tanlanmaydi. */}
                                         <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">

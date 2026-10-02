@@ -334,6 +334,8 @@ export default function CourseDetailPage() {
             {activeTab === 'assignments' && canReadLessons && (
                 <CourseAssignments
                     courseId={course.id}
+                    subjectId={course.subject_id}
+                    subjectName={course.subject?.name}
                     lessons={lessons}
                     groups={course.groups ?? []}
                     // Oraliq nazorat — test va savol ruxsatlari kerak: savolda

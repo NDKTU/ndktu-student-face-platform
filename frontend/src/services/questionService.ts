@@ -16,6 +16,9 @@ export interface Question {
     payload?: Record<string, unknown> | null;
     /** Qaysi darsga biriktirilgan. Bo'sh — fan bankidagi umumiy savol. */
     lesson_id?: number | null;
+    /** Kursning «Test savollari» boʻlimidagi savol. */
+    course_id?: number | null;
+    control_type?: ControlType | null;
     /**
      * Savol biror testga olinganmi. Olingan bo'lsa o'chirib bo'lmaydi:
      * test tarkibi va talabalarning javoblari unga tayanadi.
@@ -27,6 +30,18 @@ export interface Question {
 
 export type QuestionType = 'QUIZ' | 'TRUE_FALSE' | 'MULTI_SELECT' | 'TYPE_ANSWER' | 'PUZZLE';
 
+/** Kurs savollari qaysi nazorat uchun: oraliq, joriy, yakuniy yoki boshqa. */
+export type ControlType = 'ON1' | 'ON2' | 'JN1' | 'JN2' | 'YN' | 'OTHER';
+
+export const CONTROL_TYPES: { value: ControlType; label: string; title: string }[] = [
+    { value: 'ON1', label: 'ON1', title: '1-oraliq nazorat' },
+    { value: 'ON2', label: 'ON2', title: '2-oraliq nazorat' },
+    { value: 'JN1', label: 'JN1', title: '1-joriy nazorat' },
+    { value: 'JN2', label: 'JN2', title: '2-joriy nazorat' },
+    { value: 'YN', label: 'YN', title: 'Yakuniy nazorat' },
+    { value: 'OTHER', label: 'Boshqa nazoratlar', title: 'Boshqa nazoratlar' },
+];
+
 export interface QuestionCreateRequest {
     subject_id: number;
     user_id: number;
@@ -37,6 +52,9 @@ export interface QuestionCreateRequest {
     lesson_id?: number;
     /** Oraliq nazoratga alohida qoʻshilayotgan savol — faqat shu testniki. */
     quiz_id?: number;
+    /** Kursning «Test savollari»: savol shu kursning shu nazoratiga qoʻshiladi. */
+    course_id?: number;
+    control_type?: ControlType;
     text: string;
     /** Standart tur — to'rt variant, bitta to'g'ri javob. */
     question_type?: QuestionType;
@@ -119,6 +137,21 @@ export const questionService = {
         return response.data;
     },
 
+    /** Kursning «Test savollari» — bitta nazorat turi. */
+    getControlQuestions: async (courseId: number, controlType: ControlType) => {
+        const response = await api.get<QuestionListResponse>('/question/', {
+            params: { page: 1, limit: 500, course_id: courseId, control_type: controlType },
+        });
+        return response.data;
+    },
+
+    getControlCounts: async (courseId: number) => {
+        const response = await api.get<{ counts: Record<ControlType, number> }>('/question/control_counts', {
+            params: { course_id: courseId },
+        });
+        return response.data.counts;
+    },
+
     getQuestionById: async (id: number): Promise<Question> => {
         const response = await api.get<Question>(`/question/${id}`);
         return response.data;
@@ -138,13 +171,17 @@ export const questionService = {
         await api.delete(`/question/${id}`);
     },
 
-    uploadQuestions: async (file: File, subject_id: number, lesson_id?: number) => {
+    uploadQuestions: async (
+        file: File, subject_id: number, lesson_id?: number,
+        control?: { course_id: number; control_type: ControlType },
+    ) => {
         const formData = new FormData();
         formData.append('file', file);
         const response = await api.post('/question/upload_excel', formData, {
             // `lesson_id` dars sahifasidan keladi: yuklangan savollar oʻsha
             // darsniki boʻladi va dars testi aynan shulardan yigʻiladi.
-            params: { subject_id, lesson_id },
+            // `control` — kursning «Test savollari» boʻlimidan.
+            params: { subject_id, lesson_id, ...control },
         });
         return response.data;
     },

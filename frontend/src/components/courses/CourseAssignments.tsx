@@ -5,6 +5,8 @@ import {
     ChevronDown,
     ChevronRight,
     ClipboardCheck,
+    FileQuestion,
+    FileSpreadsheet,
     ListChecks,
     Paperclip,
     Pencil,
@@ -12,7 +14,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
 import { CardAction } from '@/components/ui/CardAction';
@@ -21,9 +23,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Switch } from '@/components/ui/Switch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useMidtermExtraQuestions } from '@/hooks/useQuestions';
+import { useControlQuestionCounts, useControlQuestions, useMidtermExtraQuestions } from '@/hooks/useQuestions';
 import { useDeleteQuiz, useQuizzes, useRemoveMidtermQuestion, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
+import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import {
     useCreateIndependentTopic,
     useDeleteIndependentTopic,
@@ -33,7 +36,7 @@ import {
 import type { CourseGroupInfo } from '@/services/courseService';
 import type { IndependentTopic } from '@/services/independentTopicService';
 import type { Lesson } from '@/services/lessonService';
-import type { Question } from '@/services/questionService';
+import { CONTROL_TYPES, type ControlType, type Question } from '@/services/questionService';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { IndependentTopicModal } from './IndependentTopicModal';
@@ -41,6 +44,9 @@ import { MidtermQuizModal } from './MidtermQuizModal';
 
 interface Props {
     courseId: number;
+    /** Kurs fani — «Test savollari» shu fanga yoziladi. */
+    subjectId: number;
+    subjectName?: string;
     lessons: Lesson[];
     groups: CourseGroupInfo[];
     /** Oraliq nazorat bloki — test va savollarni boshqara oladiganlarga. */
@@ -411,7 +417,138 @@ const MidtermQuizzes = ({
 };
 
 /**
- * «Fan topshiriqlari» — oraliq nazorat va mustaqil ish mavzulari.
+ * «Test savollari» — kursning savollar banki nazorat turlari bo'yicha.
+ *
+ * O'qituvchi savollarni oldindan ON1, ON2, JN1, JN2, YN va boshqa
+ * nazoratlarga ajratib to'playdi. Ular hech qaysi darsga tegishli emas,
+ * shuning uchun dars sahifasida emas, shu yerda turadi.
+ */
+const ControlQuestions = ({
+    courseId,
+    subjectId,
+    subjectName,
+}: {
+    courseId: number;
+    subjectId: number;
+    subjectName?: string;
+}) => {
+    const navigate = useNavigate();
+    // Savol formasidan qaytganda o'sha nazorat ochiq turishi kerak —
+    // `return_to` unga `control=` ni qo'shib yuboradi.
+    const [searchParams] = useSearchParams();
+    const [active, setActive] = useState<ControlType>(() => {
+        const fromUrl = searchParams.get('control');
+        return CONTROL_TYPES.some((item) => item.value === fromUrl) ? (fromUrl as ControlType) : 'ON1';
+    });
+    const [excelOpen, setExcelOpen] = useState(false);
+    const countsQuery = useControlQuestionCounts(courseId);
+    const questionsQuery = useControlQuestions(courseId, active);
+    const counts = countsQuery.data;
+    const total = counts ? Object.values(counts).reduce((sum, value) => sum + value, 0) : 0;
+    const activeInfo = CONTROL_TYPES.find((item) => item.value === active)!;
+    const questions = questionsQuery.data?.questions ?? [];
+    const returnTo = `/courses/${courseId}?tab=assignments&control=${active}`;
+
+    return (
+        <SectionCard
+            icon={<FileQuestion className="h-[18px] w-[18px]" />}
+            tone="purple"
+            title="Test savollari"
+            description={
+                total > 0
+                    ? `${total} ta savol · nazoratlar bo'yicha`
+                    : "Savollarni ON1, ON2, JN1, JN2, YN va boshqa nazoratlar bo'yicha qo'shing"
+            }
+            action={
+                <div className="flex shrink-0 gap-2">
+                    <CardAction
+                        variant="outline"
+                        onClick={() => setExcelOpen(true)}
+                        icon={<FileSpreadsheet className="h-4 w-4" />}
+                        label="Excel'dan yuklash"
+                    />
+                    <CardAction
+                        onClick={() =>
+                            navigate(
+                                `/questions/create?course_id=${courseId}&subject_id=${subjectId}`
+                                + `&control_type=${active}&return_to=${encodeURIComponent(returnTo)}`,
+                            )
+                        }
+                        icon={<Plus className="h-4 w-4" />}
+                        label="Savol qo'shish"
+                    />
+                </div>
+            }
+        >
+            <div role="tablist" aria-label="Nazorat turi" className="flex flex-wrap gap-2">
+                {CONTROL_TYPES.map((item) => {
+                    const selected = item.value === active;
+                    const count = counts?.[item.value] ?? 0;
+                    return (
+                        <button
+                            key={item.value}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            title={item.title}
+                            onClick={() => setActive(item.value)}
+                            className={
+                                'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors '
+                                + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring '
+                                + (selected
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'border-border/60 bg-background text-foreground hover:border-primary/40 hover:text-primary')
+                            }
+                        >
+                            {item.label}
+                            <span
+                                className={
+                                    'min-w-[1.25rem] rounded-md px-1.5 text-center text-[11px] font-semibold tabular-nums '
+                                    + (selected ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground')
+                                }
+                            >
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {questionsQuery.isLoading ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-4/5 rounded-lg" />
+                </div>
+            ) : questionsQuery.isError ? (
+                <p className="text-sm text-destructive">Savollarni yuklab bo'lmadi.</p>
+            ) : questions.length === 0 ? (
+                <EmptyState
+                    icon={<FileQuestion className="h-6 w-6" />}
+                    title={`${activeInfo.title} savollari yo'q`}
+                    description="Savolni qo'lda qo'shing yoki Excel'dan yuklang."
+                    className="py-8"
+                />
+            ) : (
+                <QuestionAccordionList questions={questions} canManage returnTo={returnTo} />
+            )}
+
+            <QuestionExcelUploadModal
+                isOpen={excelOpen}
+                onClose={() => setExcelOpen(false)}
+                subjects={[]}
+                defaultSubjectId={subjectId}
+                subjectName={subjectName}
+                lockSubject
+                control={{ course_id: courseId, control_type: active }}
+                targetHint={`Savollar «${activeInfo.title}» bo'limiga yuklanadi.`}
+            />
+        </SectionCard>
+    );
+};
+
+/**
+ * «Fan topshiriqlari» — oraliq nazorat, mustaqil ish mavzulari va
+ * nazoratlar bo'yicha test savollari.
  *
  * Ilgari bu yerda darslar bo'yicha savollar ro'yxati turardi. U dars
  * sahifasini takrorlardi; savollar dars sahifasida qo'shiladi va
@@ -419,6 +556,8 @@ const MidtermQuizzes = ({
  */
 export const CourseAssignments = ({
     courseId,
+    subjectId,
+    subjectName,
     lessons,
     groups,
     canManageQuizzes,
@@ -541,6 +680,10 @@ export const CourseAssignments = ({
                     </ol>
                 )}
             </SectionCard>
+
+            {canManageQuizzes && (
+                <ControlQuestions courseId={courseId} subjectId={subjectId} subjectName={subjectName} />
+            )}
 
             <IndependentTopicModal
                 isOpen={topicModalOpen}
