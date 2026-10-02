@@ -230,3 +230,58 @@ async def test_results_are_limited_to_own_tests(two_teachers, async_db):
     results = await client.get("/general-test/results", params={"limit": 50})
     assert results.status_code == 200, results.text
     assert results.json()["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_foreign_result_cannot_be_deleted(two_teachers, async_db):
+    """Begona testning urinishini oʻchirib boʻlmaydi.
+
+    `delete:general_test_result` ruxsati qoʻlda ham berilishi mumkin
+    (serverda oʻqituvchida u allaqachon bor edi), shuning uchun cheklov
+    ruxsatga emas, egalikka tayanadi.
+    """
+    from app.modules.general_test.model import GeneralTestAttempt
+
+    client = two_teachers["client"]
+    _as(client, two_teachers["token_first"])
+    subject_id = (
+        await client.post("/general-test/subject", json={"name": "Urinish fani"})
+    ).json()["id"]
+    async_db.add(
+        GeneralTestQuestion(
+            subject_id=subject_id, text="S", option_a="a", option_b="b",
+            option_c="c", option_d="d", correct_option="a", order=1,
+        )
+    )
+    await async_db.commit()
+    test_id = (
+        await client.post(
+            "/general-test/", json={"subject_id": subject_id, "duration": 10, "attempt_limit": 1}
+        )
+    ).json()["id"]
+
+    attempt = GeneralTestAttempt(
+        test_id=test_id, user_id=two_teachers["second"]["id"], status="completed", score=1,
+    )
+    async_db.add(attempt)
+    await async_db.commit()
+    await async_db.refresh(attempt)
+    attempt_id = attempt.id  # `expire_all` dan keyin obyektga tegib boʻlmaydi
+    async_db.expire_all()
+
+    # Ikkinchi oʻqituvchiga `delete:general_test_result` ni ataylab beramiz —
+    # ruxsat boʻlsa ham begona natija tegilmasligi kerak.
+    from app.modules.auth.model import Permission, Role, RolePermission
+    from sqlalchemy import select as sa_select
+
+    role = (await async_db.execute(sa_select(Role).where(Role.name == "teacher_b"))).scalar_one()
+    permission = Permission(name="delete:general_test_result")
+    async_db.add(permission)
+    await async_db.flush()
+    async_db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+    await async_db.commit()
+
+    _as(client, two_teachers["token_second"])
+    response = await client.delete(f"/general-test/results/{attempt_id}")
+
+    assert response.status_code == 403, response.text

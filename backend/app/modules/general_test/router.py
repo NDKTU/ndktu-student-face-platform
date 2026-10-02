@@ -163,9 +163,9 @@ async def export_results(
 async def delete_result(
     attempt_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("delete:general_test_result")),
+    user: "User" = Depends(PermissionRequired("delete:general_test_result")),
 ):
-    await repo.delete_result(session=session, attempt_id=attempt_id)
+    await repo.delete_result(session=session, attempt_id=attempt_id, user=user)
 
 
 # ─── Fanlar ──────────────────────────────────────────────────────────────────

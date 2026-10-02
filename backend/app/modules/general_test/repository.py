@@ -1331,11 +1331,19 @@ class GeneralTestRepository:
         wb.save(buffer)
         return buffer.getvalue()
 
-    async def delete_result(self, session: AsyncSession, attempt_id: int) -> None:
-        """Удаление попытки возвращает пользователю одну попытку."""
+    async def delete_result(self, session: AsyncSession, attempt_id: int, user: User) -> None:
+        """Удаление попытки возвращает пользователю одну попытку.
+
+        Oʻz testining natijasigina oʻchiriladi. `delete:general_test_result`
+        ruxsati qoʻlda ham berilishi mumkin (serverda oʻqituvchida u
+        allaqachon bor edi), shuning uchun cheklov ruxsatga emas, egalikka
+        tayanadi: aks holda begona testning urinishini oʻchirib boʻlardi va
+        uni qaytarib boʻlmasdi.
+        """
         attempt = await session.get(GeneralTestAttempt, attempt_id)
         if attempt is None:
             raise _not_found("Natija")
+        await self._get_test(session, attempt.test_id, user)
         await session.delete(attempt)
         await session.commit()
 
