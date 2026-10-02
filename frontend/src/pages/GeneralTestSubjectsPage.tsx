@@ -81,16 +81,20 @@ export default function GeneralTestSubjectsPage() {
             headClassName: 'w-24',
             cell: (s) => (
                 <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                    <PermissionGate permission="update:general_test_subject">
-                        <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => setForm({ open: true, editing: s })}>
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                    </PermissionGate>
-                    <PermissionGate permission="delete:general_test_subject">
-                        <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(s)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </PermissionGate>
+                    {s.can_manage && (
+                        <>
+                            <PermissionGate permission="update:general_test_subject">
+                                <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => setForm({ open: true, editing: s })}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </PermissionGate>
+                            <PermissionGate permission="delete:general_test_subject">
+                                <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(s)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </PermissionGate>
+                        </>
+                    )}
                 </div>
             ),
         },

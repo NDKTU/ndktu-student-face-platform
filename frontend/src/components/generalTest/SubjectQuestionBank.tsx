@@ -20,8 +20,11 @@ const LETTERS: OptionLetter[] = ['a', 'b', 'c', 'd'];
 /**
  * Fanning savollar banki: qo'lda qo'shish, Excel'dan yuklash, tahrirlash.
  * Fanning har bir testi shu bankdan tasodifiy savol oladi.
+ *
+ * `canManage=false` — fanga biriktirilgan foydalanuvchi: savol qo'sha oladi,
+ * lekin tahrirlay va o'chira olmaydi.
  */
-export function SubjectQuestionBank({ subjectId }: { subjectId: number }) {
+export function SubjectQuestionBank({ subjectId, canManage }: { subjectId: number; canManage: boolean }) {
     const { data: questions, isLoading, isError, refetch } = useSubjectQuestions(subjectId);
     const navigate = useNavigate();
     const deleteQuestion = useDeleteSubjectQuestion(subjectId);
@@ -109,16 +112,18 @@ export function SubjectQuestionBank({ subjectId }: { subjectId: number }) {
                                         <span className="shrink-0">{index + 1}.</span>
                                         <RichText value={q.text} className="min-w-0 flex-1" />
                                     </div>
-                                    <PermissionGate permission="update:general_test_subject">
-                                        <div className="flex shrink-0 gap-1">
-                                            <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => navigate(`/elementar-tests/subjects/${subjectId}/questions/${q.id}/edit`)}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(q)}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                        </div>
-                                    </PermissionGate>
+                                    {canManage && (
+                                        <PermissionGate permission="update:general_test_subject">
+                                            <div className="flex shrink-0 gap-1">
+                                                <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => navigate(`/elementar-tests/subjects/${subjectId}/questions/${q.id}/edit`)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(q)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </PermissionGate>
+                                    )}
                                 </div>
                                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                                     {LETTERS.map((letter) => {

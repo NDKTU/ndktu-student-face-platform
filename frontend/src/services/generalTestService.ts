@@ -25,6 +25,8 @@ export interface GeneralTestSubject extends SubjectRef {
     /** Fan savollar bankidagi savollar. */
     question_count: number;
     created_at: string;
+    /** Ega yoki admin. `false` — fanga biriktirilgan: faqat savol qo'shadi. */
+    can_manage: boolean;
 }
 
 export interface SubjectListResponse {

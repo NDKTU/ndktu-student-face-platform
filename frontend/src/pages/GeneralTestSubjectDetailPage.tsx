@@ -41,13 +41,20 @@ export default function GeneralTestSubjectDetailPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const debounced = useDebouncedValue(search);
-    const users = useSubjectUsers(subjectId, {
-        search: debounced || undefined,
-        kind: kind || undefined,
-        page,
-        limit: pageSize,
-    });
-    const { data: tests } = useGeneralTests(1, 200, '', subjectId);
+    // Biriktirilgan (ega bo'lmagan) foydalanuvchi faqat bankka savol qo'shadi:
+    // testlar va biriktirishlar unga ochilmaydi, so'rov ham yuborilmaydi.
+    const canManage = subject?.can_manage ?? false;
+    const users = useSubjectUsers(
+        subjectId,
+        {
+            search: debounced || undefined,
+            kind: kind || undefined,
+            page,
+            limit: pageSize,
+        },
+        canManage,
+    );
+    const { data: tests } = useGeneralTests(1, 200, '', subjectId, canManage);
 
     const saveSubject = useSaveGeneralTestSubject();
     const removeUser = useRemoveSubjectUser(subjectId);
@@ -113,27 +120,31 @@ export default function GeneralTestSubjectDetailPage() {
                 title={subject.name}
                 description={subject.description ?? undefined}
                 actions={
-                    <PermissionGate permission="update:general_test_subject">
-                        <Button variant="outline" onClick={() => setEditing(true)}>
-                            <Pencil className="h-4 w-4" /> Tahrirlash
-                        </Button>
-                    </PermissionGate>
+                    canManage && (
+                        <PermissionGate permission="update:general_test_subject">
+                            <Button variant="outline" onClick={() => setEditing(true)}>
+                                <Pencil className="h-4 w-4" /> Tahrirlash
+                            </Button>
+                        </PermissionGate>
+                    )
                 }
             />
 
-            <TabBar
-                tabs={[
-                    { id: 'questions', label: `Savollar banki (${subject.question_count})` },
-                    { id: 'tests', label: `Testlar (${subject.test_count})` },
-                    { id: 'users', label: `Foydalanuvchilar (${subject.user_count})` },
-                ]}
-                active={tab}
-                onChange={setTab}
-            />
+            {canManage && (
+                <TabBar
+                    tabs={[
+                        { id: 'questions', label: `Savollar banki (${subject.question_count})` },
+                        { id: 'tests', label: `Testlar (${subject.test_count})` },
+                        { id: 'users', label: `Foydalanuvchilar (${subject.user_count})` },
+                    ]}
+                    active={tab}
+                    onChange={setTab}
+                />
+            )}
 
-            {tab === 'questions' && <SubjectQuestionBank subjectId={subject.id} />}
+            {(tab === 'questions' || !canManage) && <SubjectQuestionBank subjectId={subject.id} canManage={canManage} />}
 
-            {tab === 'users' && (
+            {canManage && tab === 'users' && (
                 <Card>
                     <CardContent className="space-y-4 pt-6">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -202,7 +213,7 @@ export default function GeneralTestSubjectDetailPage() {
                 </Card>
             )}
 
-            {tab === 'tests' && (
+            {canManage && tab === 'tests' && (
                 <Card>
                     <CardContent className="space-y-4 pt-6">
                         <div className="flex flex-wrap items-center justify-between gap-2">

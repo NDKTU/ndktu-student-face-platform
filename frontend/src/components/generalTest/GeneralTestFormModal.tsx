@@ -21,7 +21,8 @@ interface Props {
 export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSubmit, isPending }: Props) {
     const { data: subjects } = useGeneralTestSubjects(1, 500);
     const subjectOptions = useMemo(
-        () => (subjects?.subjects ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+        // Biriktirilgan fanga test tuzib bo'lmaydi — u yerda faqat savol qo'shiladi.
+        () => (subjects?.subjects ?? []).filter((s) => s.can_manage).map((s) => ({ value: String(s.id), label: s.name })),
         [subjects],
     );
     const [subjectId, setSubjectId] = useState(String(editing?.subject.id ?? defaultSubjectId ?? ''));

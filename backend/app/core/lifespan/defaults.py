@@ -39,7 +39,8 @@ TEACHER_PERMISSIONS = (
     # Elementar test. Oʻqituvchi oʻz testini tuzadi, unga savol yuklaydi va
     # natijalarini koʻradi. Egalik repozitoriyda tekshiriladi
     # (`general_test/repository.py`): admin boʻlmagan foydalanuvchi faqat
-    # `created_by_user_id` oʻziniki boʻlgan fan va testlarni koʻradi.
+    # `created_by_user_id` oʻziniki boʻlgan fan va testlarni koʻradi; fanga
+    # biriktirilgan boʻlsa — oʻsha fanni ham koʻradi va unga faqat savol qoʻshadi.
     #
     # `delete:general_test_result` ataylab yoʻq: bu boshqa odamlarning
     # urinishlari va ularni qaytarib boʻlmaydi — oʻchirish ma'muriyatda

@@ -22,10 +22,11 @@ const KEYS = {
     candidates: (id: number) => ['general-test-subject-candidates', id] as const,
 };
 
-export const useGeneralTests = (page = 1, limit = 20, search = '', subjectId?: number) =>
+export const useGeneralTests = (page = 1, limit = 20, search = '', subjectId?: number, enabled = true) =>
     useQuery({
         queryKey: [...KEYS.list, page, limit, search, subjectId ?? null],
         queryFn: () => generalTestService.list(page, limit, search, subjectId),
+        enabled,
         placeholderData: (prev) => prev,
     });
 
@@ -80,10 +81,11 @@ export const useDeleteGeneralTestSubject = () => {
     });
 };
 
-export const useSubjectUsers = (id: number, filter: UserFilter & { page: number; limit: number }) =>
+export const useSubjectUsers = (id: number, filter: UserFilter & { page: number; limit: number }, enabled = true) =>
     useQuery({
         queryKey: [...KEYS.subjectUsers(id), filter],
         queryFn: () => generalTestService.subjectUsers(id, filter),
+        enabled,
         placeholderData: (prev) => prev,
     });
 

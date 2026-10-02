@@ -173,6 +173,11 @@ class GeneralTestRepository:
     # edi. Shuning uchun avval egalik, keyin ruxsat.
     #
     # Admin hammasini koʻradi: unga umumiy nazorat kerak.
+    #
+    # Fanga biriktirilgan foydalanuvchi (`general_test_subject_users`) fanni
+    # koʻradi va bankiga faqat savol qoʻshadi (qoʻlda yoki Excel'dan). Fanni
+    # tahrirlash, oʻchirish, biriktirishlar, test tuzish, savolni tahrirlash
+    # va oʻchirish — egasida: begona savolni buzib qoʻyish mumkin boʻlmasin.
 
     @staticmethod
     def _is_admin(user: User) -> bool:
@@ -189,17 +194,30 @@ class GeneralTestRepository:
             return
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
+    def _can_manage(self, subject: GeneralTestSubject, user: User) -> bool:
+        return self._is_admin(user) or subject.created_by_user_id == user.id
+
+    @staticmethod
+    async def _is_member(session: AsyncSession, subject_id: int, user_id: int) -> bool:
+        stmt = select(GeneralTestSubjectUser.id).where(
+            GeneralTestSubjectUser.subject_id == subject_id, GeneralTestSubjectUser.user_id == user_id
+        )
+        return (await session.execute(stmt.limit(1))).scalar_one_or_none() is not None
+
     # ── Fan ──────────────────────────────────────────────────────────────────
 
     async def _get_subject(
-        self, session: AsyncSession, subject_id: int, user: User | None = None
+        self, session: AsyncSession, subject_id: int, user: User | None = None, *, member: bool = False
     ) -> GeneralTestSubject:
+        """`member=True` — fanga biriktirilganga ham ruxsat (koʻrish, savol qoʻshish)."""
         subject = await session.get(GeneralTestSubject, subject_id)
         if subject is None:
             raise _not_found("Fan")
-        if user is not None:
-            self._ensure_owner(subject, user, "Bu fan sizniki emas")
-        return subject
+        if user is None or self._can_manage(subject, user):
+            return subject
+        if member and await self._is_member(session, subject_id, user.id):
+            return subject
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu fan sizniki emas")
 
     async def _ensure_unique_name(self, session: AsyncSession, name: str, exclude_id: int | None = None) -> None:
         stmt = select(GeneralTestSubject.id).where(func.lower(GeneralTestSubject.name) == name.lower())
@@ -243,10 +261,10 @@ class GeneralTestRepository:
         )
         return users, tests, questions
 
-    @staticmethod
-    def _subject_row(subject: GeneralTestSubject, counts) -> SubjectSummary:
+    def _subject_row(self, subject: GeneralTestSubject, counts, user: User) -> SubjectSummary:
         users, tests, questions = counts
         return SubjectSummary(
+            can_manage=self._can_manage(subject, user),
             id=subject.id,
             name=subject.name,
             description=subject.description,
@@ -256,13 +274,20 @@ class GeneralTestRepository:
             question_count=questions.get(subject.id, 0),
         )
 
-    async def _subject_summary(self, session: AsyncSession, subject: GeneralTestSubject) -> SubjectSummary:
-        return self._subject_row(subject, await self._subject_counts(session, [subject.id]))
+    async def _subject_summary(
+        self, session: AsyncSession, subject: GeneralTestSubject, user: User
+    ) -> SubjectSummary:
+        return self._subject_row(subject, await self._subject_counts(session, [subject.id]), user)
 
     async def list_subjects(
         self, session: AsyncSession, page: int, limit: int, search: str | None, user: User
     ) -> SubjectListResponse:
-        stmt = self._own_only(select(GeneralTestSubject), GeneralTestSubject, user)
+        stmt = select(GeneralTestSubject)
+        if not self._is_admin(user):
+            assigned = select(GeneralTestSubjectUser.subject_id).where(GeneralTestSubjectUser.user_id == user.id)
+            stmt = stmt.where(
+                or_(GeneralTestSubject.created_by_user_id == user.id, GeneralTestSubject.id.in_(assigned))
+            )
         if search and search.strip():
             stmt = stmt.where(GeneralTestSubject.name.ilike(f"%{search.strip()}%"))
         total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
@@ -282,11 +307,12 @@ class GeneralTestRepository:
             total=total,
             page=page,
             limit=limit,
-            subjects=[self._subject_row(s, counts) for s in subjects],
+            subjects=[self._subject_row(s, counts, user) for s in subjects],
         )
 
     async def get_subject(self, session: AsyncSession, subject_id: int, user: User) -> SubjectSummary:
-        return await self._subject_summary(session, await self._get_subject(session, subject_id, user))
+        subject = await self._get_subject(session, subject_id, user, member=True)
+        return await self._subject_summary(session, subject, user)
 
     async def create_subject(self, session: AsyncSession, data: SubjectCreateRequest, user: User) -> SubjectSummary:
         await self._ensure_unique_name(session, data.name)
@@ -298,7 +324,7 @@ class GeneralTestRepository:
         session.add(subject)
         await session.commit()
         await session.refresh(subject)
-        return await self._subject_summary(session, subject)
+        return await self._subject_summary(session, subject, user)
 
     async def update_subject(
         self, session: AsyncSession, subject_id: int, data: SubjectUpdateRequest, user: User
@@ -320,7 +346,7 @@ class GeneralTestRepository:
                 await self._retitle(session, test_id)
         await session.commit()
         await session.refresh(subject)
-        return await self._subject_summary(session, subject)
+        return await self._subject_summary(session, subject, user)
 
     async def delete_subject(self, session: AsyncSession, subject_id: int, user: User) -> None:
         subject = await self._get_subject(session, subject_id, user)
@@ -776,7 +802,7 @@ class GeneralTestRepository:
     async def list_subject_questions(
         self, session: AsyncSession, subject_id: int, user: User
     ) -> SubjectQuestionListResponse:
-        await self._get_subject(session, subject_id, user)
+        await self._get_subject(session, subject_id, user, member=True)
         questions = (
             (
                 await session.execute(
@@ -793,7 +819,7 @@ class GeneralTestRepository:
     async def create_question(
         self, session: AsyncSession, subject_id: int, data: QuestionCreateRequest, user: User
     ) -> GeneralTestQuestion:
-        await self._get_subject(session, subject_id, user)
+        await self._get_subject(session, subject_id, user, member=True)
         payload = data.model_dump()
         if payload["order"] is None:
             payload["order"] = await self._next_order(session, subject_id)
@@ -841,7 +867,7 @@ class GeneralTestRepository:
         """
         import pandas as pd
 
-        await self._get_subject(session, subject_id, user)
+        await self._get_subject(session, subject_id, user, member=True)
         try:
             df = pd.read_excel(io.BytesIO(await file.read()))
         except Exception:

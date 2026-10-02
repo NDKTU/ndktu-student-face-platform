@@ -285,3 +285,84 @@ async def test_foreign_result_cannot_be_deleted(two_teachers, async_db):
     response = await client.delete(f"/general-test/results/{attempt_id}")
 
     assert response.status_code == 403, response.text
+
+
+async def _assign(async_db, subject_id: int, user_id: int) -> None:
+    from app.modules.general_test.model import GeneralTestSubjectUser
+
+    async_db.add(GeneralTestSubjectUser(subject_id=subject_id, user_id=user_id))
+    await async_db.commit()
+
+
+QUESTION = {
+    "text": "Biriktirilgan savoli",
+    "option_a": "a",
+    "option_b": "b",
+    "option_c": "c",
+    "option_d": "d",
+    "correct_option": "a",
+}
+
+
+@pytest.mark.asyncio
+async def test_assigned_teacher_sees_subject_and_adds_questions(two_teachers, async_db):
+    """Fanga biriktirilgan oʻqituvchi fanni koʻradi va unga savol qoʻshadi."""
+    client = two_teachers["client"]
+    _as(client, two_teachers["token_first"])
+    subject_id = (
+        await client.post("/general-test/subject", json={"name": "Umumiy fan"})
+    ).json()["id"]
+    await _assign(async_db, subject_id, two_teachers["second"]["id"])
+
+    _as(client, two_teachers["token_second"])
+    listing = await client.get("/general-test/subject", params={"limit": 50})
+    assert listing.status_code == 200, listing.text
+    assert [(s["name"], s["can_manage"]) for s in listing.json()["subjects"]] == [("Umumiy fan", False)]
+
+    detail = await client.get(f"/general-test/subject/{subject_id}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["can_manage"] is False
+
+    added = await client.post(f"/general-test/subject/{subject_id}/question", json=QUESTION)
+    assert added.status_code in (200, 201), added.text
+    bank = await client.get(f"/general-test/subject/{subject_id}/questions")
+    assert bank.status_code == 200, bank.text
+    assert [q["text"] for q in bank.json()["questions"]] == ["Biriktirilgan savoli"]
+
+    # Ega uchun hammasi oʻz holicha.
+    _as(client, two_teachers["token_first"])
+    own = await client.get(f"/general-test/subject/{subject_id}")
+    assert own.json()["can_manage"] is True
+
+
+@pytest.mark.asyncio
+async def test_assigned_teacher_cannot_manage_subject(two_teachers, async_db):
+    """Biriktirilgan oʻqituvchi faqat savol qoʻshadi: qolgani egasida."""
+    client = two_teachers["client"]
+    _as(client, two_teachers["token_first"])
+    subject_id = (
+        await client.post("/general-test/subject", json={"name": "Egali fan"})
+    ).json()["id"]
+    question_id = (
+        await client.post(f"/general-test/subject/{subject_id}/question", json=QUESTION)
+    ).json()["id"]
+    await _assign(async_db, subject_id, two_teachers["second"]["id"])
+
+    _as(client, two_teachers["token_second"])
+    assert (
+        await client.put(f"/general-test/subject/{subject_id}", json={"name": "Boshqa nom"})
+    ).status_code == 403
+    assert (await client.delete(f"/general-test/subject/{subject_id}")).status_code == 403
+    assert (await client.get(f"/general-test/subject/{subject_id}/users")).status_code == 403
+    assert (
+        await client.post(f"/general-test/subject/{subject_id}/users", json={"user_ids": [1]})
+    ).status_code == 403
+    assert (
+        await client.put(f"/general-test/question/{question_id}", json={"text": "Buzildi"})
+    ).status_code == 403
+    assert (await client.delete(f"/general-test/question/{question_id}")).status_code == 403
+    assert (
+        await client.post(
+            "/general-test/", json={"subject_id": subject_id, "duration": 10, "attempt_limit": 1}
+        )
+    ).status_code == 403
