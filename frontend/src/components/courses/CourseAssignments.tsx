@@ -6,6 +6,7 @@ import {
     ChevronRight,
     ClipboardCheck,
     ListChecks,
+    Paperclip,
     Pencil,
     Plus,
     Trash2,
@@ -14,10 +15,12 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
+import { CardAction } from '@/components/ui/CardAction';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Switch } from '@/components/ui/Switch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { useMidtermExtraQuestions } from '@/hooks/useQuestions';
 import { useDeleteQuiz, useQuizzes, useRemoveMidtermQuestion, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
@@ -214,36 +217,30 @@ const MidtermQuizzes = ({
     };
 
     return (
-        <section className="rounded-2xl border border-border bg-card">
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
-                <div className="flex items-center gap-2.5">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                        <ClipboardCheck className="h-[18px] w-[18px]" />
-                    </span>
-                    <div>
-                        <h2 className="text-sm font-semibold">Oraliq nazorat</h2>
-                        <p className="text-xs text-muted-foreground">
-                            Savollar tanlangan darslardan va testga alohida qo'shilganlaridan yig'iladi
-                        </p>
-                    </div>
-                </div>
-                <Button
-                    size="sm"
+        <SectionCard
+            icon={<ClipboardCheck className="h-[18px] w-[18px]" />}
+            tone="blue"
+            title="Oraliq nazorat"
+            description={
+                quizzes.length > 0
+                    ? `${quizzes.length} ta test`
+                    : "Savollar tanlangan darslardan va testga alohida qo'shilganlaridan yig'iladi"
+            }
+            action={
+                <CardAction
                     onClick={() => { setEditing(null); setModalOpen(true); }}
-                    className="h-9 gap-1.5"
-                >
-                    <Plus className="h-4 w-4" />
-                    <span>Oraliq nazorat</span>
-                </Button>
-            </header>
-
+                    icon={<Plus className="h-4 w-4" />}
+                    label="Oraliq nazorat"
+                />
+            }
+        >
             {quizzesQuery.isLoading ? (
-                <div className="space-y-2 p-4">
+                <div className="space-y-2">
                     <Skeleton className="h-16 w-full rounded-xl" />
                     <Skeleton className="h-16 w-full rounded-xl" />
                 </div>
             ) : quizzesQuery.isError ? (
-                <p className="p-4 text-sm text-destructive">Testlarni yuklab bo'lmadi.</p>
+                <p className="text-sm text-destructive">Testlarni yuklab bo'lmadi.</p>
             ) : quizzes.length === 0 ? (
                 <EmptyState
                     icon={<ClipboardCheck className="h-6 w-6" />}
@@ -252,15 +249,18 @@ const MidtermQuizzes = ({
                     className="py-8"
                 />
             ) : (
-                <ul className="divide-y divide-border/60">
+                <ul className="space-y-3">
                     {quizzes.map((quiz) => {
                         const isOpen = openId === quiz.id;
                         const sourceLessons = (quiz.lesson_ids ?? [])
                             .map((id) => lessonById.get(id))
                             .filter((lesson): lesson is Lesson => Boolean(lesson));
                         return (
-                            <li key={quiz.id} className="group/item">
-                                <div className="flex flex-wrap items-start gap-3 px-4 py-3">
+                            <li
+                                key={quiz.id}
+                                className="group/item overflow-hidden rounded-xl border border-border/60 transition-colors duration-200 hover:border-primary/40"
+                            >
+                                <div className="flex flex-wrap items-start gap-3 p-3.5">
                                     <button
                                         type="button"
                                         onClick={() => setOpenId(isOpen ? null : quiz.id)}
@@ -406,7 +406,7 @@ const MidtermQuizzes = ({
                 isLoading={deleteQuiz.isPending}
                 variant="danger"
             />
-        </section>
+        </SectionCard>
     );
 };
 
@@ -446,33 +446,27 @@ export const CourseAssignments = ({
                 />
             )}
 
-            <section className="rounded-2xl border border-border bg-card">
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
-                    <div className="flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                            <ListChecks className="h-[18px] w-[18px]" />
-                        </span>
-                        <div>
-                            <h2 className="text-sm font-semibold">Mustaqil ishlar mavzulari</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Talaba mustaqil o'rganadigan mavzular ro'yxati
-                            </p>
-                        </div>
-                    </div>
-                    {canManageTopics && (
-                        <Button
-                            size="sm"
+            <SectionCard
+                icon={<ListChecks className="h-[18px] w-[18px]" />}
+                tone="orange"
+                title="Mustaqil ishlar mavzulari"
+                description={
+                    topics.length > 0
+                        ? `${topics.length} ta mavzu`
+                        : "Talaba mustaqil o'rganadigan mavzular ro'yxati"
+                }
+                action={
+                    canManageTopics && (
+                        <CardAction
                             onClick={() => { setEditingTopic(null); setTopicModalOpen(true); }}
-                            className="h-9 gap-1.5"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span>Mavzu qo'shish</span>
-                        </Button>
-                    )}
-                </header>
-
+                            icon={<Plus className="h-4 w-4" />}
+                            label="Mavzu qo'shish"
+                        />
+                    )
+                }
+            >
                 {topicsQuery.isLoading ? (
-                    <div className="space-y-2 p-4">
+                    <div className="space-y-2">
                         <Skeleton className="h-12 w-full rounded-xl" />
                         <Skeleton className="h-12 w-full rounded-xl" />
                     </div>
@@ -488,9 +482,12 @@ export const CourseAssignments = ({
                         className="py-8"
                     />
                 ) : (
-                    <ol className="divide-y divide-border/60">
+                    <ol className="space-y-3">
                         {topics.map((topic, index) => (
-                            <li key={topic.id} className="group/t flex items-start gap-3 px-4 py-3">
+                            <li
+                                key={topic.id}
+                                className="group/t flex items-start gap-3 rounded-xl border border-border/60 p-3.5 transition-colors duration-200 hover:border-primary/40"
+                            >
                                 <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
                                     {index + 1}
                                 </span>
@@ -500,6 +497,22 @@ export const CourseAssignments = ({
                                         <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">
                                             {topic.description}
                                         </p>
+                                    )}
+                                    {(topic.attachments?.length ?? 0) > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {topic.attachments!.map((file) => (
+                                                <a
+                                                    key={file.url}
+                                                    href={file.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-xs hover:border-primary/40 hover:text-primary"
+                                                >
+                                                    <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                                                    <span className="truncate">{file.name}</span>
+                                                </a>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                                 {canManageTopics && (
@@ -527,7 +540,7 @@ export const CourseAssignments = ({
                         ))}
                     </ol>
                 )}
-            </section>
+            </SectionCard>
 
             <IndependentTopicModal
                 isOpen={topicModalOpen}

@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import TashkentDatetime
+from app.modules.course.homework.schemas import SubmissionFile
 
 TITLE_MAX_LENGTH = 255
 
@@ -12,6 +13,8 @@ class IndependentTopicCreateRequest(BaseModel):
     description: Optional[str] = None
     #: Roʻyxatdagi tartib. Berilmasa — oxiriga qoʻshiladi.
     position: Optional[int] = None
+    #: Mavzu materiallari — kutubxonadan tanlangan yoki yuklangan fayllar.
+    attachments: list[SubmissionFile] = []
 
     @field_validator("title")
     @classmethod
@@ -42,6 +45,7 @@ class IndependentTopicResponse(BaseModel):
     title: str
     description: Optional[str] = None
     position: int
+    attachments: list[SubmissionFile] = []
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 

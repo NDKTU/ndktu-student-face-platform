@@ -13,6 +13,7 @@ import {
     type OptionLetter,
 } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
+import { RichText } from '@/components/questions/RichText';
 import { cn } from '@/lib/utils';
 
 const formatTime = (seconds: number) => {
@@ -183,7 +184,7 @@ export default function GeneralTestTakePage() {
                     <p className="mb-1 text-xs font-medium text-muted-foreground">
                         {current + 1}-savol
                     </p>
-                    <p className="whitespace-pre-wrap text-base font-medium text-foreground">{question.text}</p>
+                    <RichText value={question.text} className="text-base font-medium text-foreground" />
                     <div className="mt-4 space-y-2">
                         {question.options.map((option, index) => {
                             const selected = answers[question.id] === option.key;
@@ -207,7 +208,7 @@ export default function GeneralTestTakePage() {
                                     >
                                         {'ABCD'[index]}
                                     </span>
-                                    <span className="whitespace-pre-wrap">{option.text}</span>
+                                    <RichText value={option.text} className="min-w-0 flex-1" />
                                 </button>
                             );
                         })}

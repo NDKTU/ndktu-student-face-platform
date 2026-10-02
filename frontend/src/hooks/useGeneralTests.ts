@@ -18,6 +18,7 @@ const KEYS = {
     subjects: ['general-test-subjects'] as const,
     subject: (id: number) => ['general-test-subject', id] as const,
     subjectUsers: (id: number) => ['general-test-subject-users', id] as const,
+    subjectQuestions: (id: number) => ['general-test-subject-questions', id] as const,
     candidates: (id: number) => ['general-test-subject-candidates', id] as const,
 };
 
@@ -188,6 +189,15 @@ export const useAddGeneralTestGroups = (testId: number) => {
     });
 };
 
+export const useSetGeneralTestGroupActive = (testId: number) => {
+    const invalidate = useInvalidateTests();
+    return useMutation({
+        mutationFn: ({ groupId, isActive }: { groupId: number; isActive: boolean }) =>
+            generalTestService.setGroupActive(testId, groupId, isActive),
+        onSuccess: () => invalidate(testId),
+    });
+};
+
 export const useRemoveGeneralTestGroup = (testId: number) => {
     const invalidate = useInvalidateTests();
     return useMutation({
@@ -196,28 +206,51 @@ export const useRemoveGeneralTestGroup = (testId: number) => {
     });
 };
 
-export const useSaveGeneralTestQuestion = (testId: number) => {
-    const invalidate = useInvalidateTests();
+// ── Fan savollar banki ──────────────────────────────────────────────────────
+
+export const useSubjectQuestions = (subjectId: number) =>
+    useQuery({
+        queryKey: KEYS.subjectQuestions(subjectId),
+        queryFn: () => generalTestService.subjectQuestions(subjectId),
+    });
+
+/**
+ * Bank o'zgarganda: savollar ro'yxati, fan kartochkasidagi son va testlardagi
+ * «Savollar» (ular fan bankidan sanaladi).
+ */
+const useInvalidateBank = (subjectId: number) => {
+    const qc = useQueryClient();
+    return () => {
+        qc.invalidateQueries({ queryKey: KEYS.subjectQuestions(subjectId) });
+        qc.invalidateQueries({ queryKey: KEYS.subject(subjectId) });
+        qc.invalidateQueries({ queryKey: KEYS.subjects });
+        qc.invalidateQueries({ queryKey: KEYS.list });
+        qc.invalidateQueries({ queryKey: ['general-test'] });
+    };
+};
+
+export const useSaveSubjectQuestion = (subjectId: number) => {
+    const invalidate = useInvalidateBank(subjectId);
     return useMutation({
         mutationFn: ({ id, data }: { id?: number; data: QuestionPayload }) =>
-            id ? generalTestService.updateQuestion(id, data) : generalTestService.createQuestion(testId, data),
-        onSuccess: () => invalidate(testId),
+            id ? generalTestService.updateQuestion(id, data) : generalTestService.createQuestion(subjectId, data),
+        onSuccess: invalidate,
     });
 };
 
-export const useDeleteGeneralTestQuestion = (testId: number) => {
-    const invalidate = useInvalidateTests();
+export const useDeleteSubjectQuestion = (subjectId: number) => {
+    const invalidate = useInvalidateBank(subjectId);
     return useMutation({
         mutationFn: (id: number) => generalTestService.removeQuestion(id),
-        onSuccess: () => invalidate(testId),
+        onSuccess: invalidate,
     });
 };
 
-export const useUploadGeneralTestExcel = (testId: number) => {
-    const invalidate = useInvalidateTests();
+export const useUploadSubjectExcel = (subjectId: number) => {
+    const invalidate = useInvalidateBank(subjectId);
     return useMutation({
-        mutationFn: (file: File) => generalTestService.uploadExcel(testId, file),
-        onSuccess: () => invalidate(testId),
+        mutationFn: (file: File) => generalTestService.uploadExcel(subjectId, file),
+        onSuccess: invalidate,
     });
 };
 

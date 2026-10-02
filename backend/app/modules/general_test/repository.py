@@ -48,6 +48,7 @@ from .schemas import (
     ResultRow,
     SubjectCreateRequest,
     SubjectListResponse,
+    SubjectQuestionListResponse,
     SubjectSummary,
     SubjectUpdateRequest,
     SubjectUserListResponse,
@@ -56,7 +57,9 @@ from .schemas import (
     SubjectUsersAddResponse,
     TakeOption,
     TakeQuestion,
+    TestGroup,
     TestGroupsAddRequest,
+    TestGroupUpdateRequest,
     UploadResponse,
     UserFilter,
     UserListRequest,
@@ -121,9 +124,15 @@ def _visible_to(user_id: int):
         )
         .exists()
     )
+    # Yashirilgan guruh (`is_active = false`) hisobga olinmaydi: test unga
+    # biriktirilgan bo'lib qoladi, lekin talabalari uni ko'rmaydi.
     by_group = (
         select(GeneralTestGroup.id)
-        .where(GeneralTestGroup.test_id == GeneralTest.id, GeneralTestGroup.group_id.in_(own_groups))
+        .where(
+            GeneralTestGroup.test_id == GeneralTest.id,
+            GeneralTestGroup.group_id.in_(own_groups),
+            GeneralTestGroup.is_active.is_(True),
+        )
         .exists()
     )
     return or_(by_subject, by_group)
@@ -171,10 +180,10 @@ class GeneralTestRepository:
 
     async def _subject_counts(
         self, session: AsyncSession, subject_ids: list[int]
-    ) -> tuple[dict[int, int], dict[int, int]]:
-        """Har bir fanga biriktirilgan foydalanuvchilar va testlar soni."""
+    ) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
+        """Har bir fanga biriktirilgan foydalanuvchilar, testlar va bankdagi savollar soni."""
         if not subject_ids:
-            return {}, {}
+            return {}, {}, {}
         users = dict(
             (
                 await session.execute(
@@ -193,10 +202,20 @@ class GeneralTestRepository:
                 )
             ).all()
         )
-        return users, tests
+        questions = dict(
+            (
+                await session.execute(
+                    select(GeneralTestQuestion.subject_id, func.count())
+                    .where(GeneralTestQuestion.subject_id.in_(subject_ids))
+                    .group_by(GeneralTestQuestion.subject_id)
+                )
+            ).all()
+        )
+        return users, tests, questions
 
-    async def _subject_summary(self, session: AsyncSession, subject: GeneralTestSubject) -> SubjectSummary:
-        users, tests = await self._subject_counts(session, [subject.id])
+    @staticmethod
+    def _subject_row(subject: GeneralTestSubject, counts) -> SubjectSummary:
+        users, tests, questions = counts
         return SubjectSummary(
             id=subject.id,
             name=subject.name,
@@ -204,7 +223,11 @@ class GeneralTestRepository:
             created_at=subject.created_at,
             user_count=users.get(subject.id, 0),
             test_count=tests.get(subject.id, 0),
+            question_count=questions.get(subject.id, 0),
         )
+
+    async def _subject_summary(self, session: AsyncSession, subject: GeneralTestSubject) -> SubjectSummary:
+        return self._subject_row(subject, await self._subject_counts(session, [subject.id]))
 
     async def list_subjects(
         self, session: AsyncSession, page: int, limit: int, search: str | None
@@ -224,22 +247,12 @@ class GeneralTestRepository:
             .scalars()
             .all()
         )
-        users, tests = await self._subject_counts(session, [s.id for s in subjects])
+        counts = await self._subject_counts(session, [s.id for s in subjects])
         return SubjectListResponse(
             total=total,
             page=page,
             limit=limit,
-            subjects=[
-                SubjectSummary(
-                    id=s.id,
-                    name=s.name,
-                    description=s.description,
-                    created_at=s.created_at,
-                    user_count=users.get(s.id, 0),
-                    test_count=tests.get(s.id, 0),
-                )
-                for s in subjects
-            ],
+            subjects=[self._subject_row(s, counts) for s in subjects],
         )
 
     async def get_subject(self, session: AsyncSession, subject_id: int) -> SubjectSummary:
@@ -489,6 +502,20 @@ class GeneralTestRepository:
         await session.commit()
         return await self.get_test(session, test_id)
 
+    async def set_test_group_active(
+        self, session: AsyncSession, test_id: int, group_id: int, data: TestGroupUpdateRequest
+    ) -> GeneralTestDetail:
+        """Guruh uchun testni yoqadi yoki yashiradi — biriktirmani o'chirmasdan."""
+        result = await session.execute(
+            update(GeneralTestGroup)
+            .where(GeneralTestGroup.test_id == test_id, GeneralTestGroup.group_id == group_id)
+            .values(is_active=data.is_active)
+        )
+        if not result.rowcount:
+            raise _not_found("Biriktirilgan guruh")
+        await session.commit()
+        return await self.get_test(session, test_id)
+
     async def remove_test_group(self, session: AsyncSession, test_id: int, group_id: int) -> GeneralTestDetail:
         result = await session.execute(
             delete(GeneralTestGroup).where(GeneralTestGroup.test_id == test_id, GeneralTestGroup.group_id == group_id)
@@ -528,10 +555,8 @@ class GeneralTestRepository:
             .execution_options(synchronize_session="fetch")
         )
 
-    async def _get_test(self, session: AsyncSession, test_id: int, with_questions: bool = False) -> GeneralTest:
+    async def _get_test(self, session: AsyncSession, test_id: int) -> GeneralTest:
         stmt = select(GeneralTest).options(selectinload(GeneralTest.subject)).where(GeneralTest.id == test_id)
-        if with_questions:
-            stmt = stmt.options(selectinload(GeneralTest.questions))
         test = (await session.execute(stmt)).scalar_one_or_none()
         if test is None:
             raise _not_found()
@@ -540,15 +565,16 @@ class GeneralTestRepository:
     async def _counts(
         self, session: AsyncSession, test_ids: list[int]
     ) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
-        """Число вопросов, завершённых попыток и назначенных групп по каждому тесту."""
+        """Вопросы в банке fan'а, завершённые попытки и назначенные группы по каждому тесту."""
         if not test_ids:
             return {}, {}, {}
         questions = dict(
             (
                 await session.execute(
-                    select(GeneralTestQuestion.test_id, func.count())
-                    .where(GeneralTestQuestion.test_id.in_(test_ids))
-                    .group_by(GeneralTestQuestion.test_id)
+                    select(GeneralTest.id, func.count(GeneralTestQuestion.id))
+                    .join(GeneralTestQuestion, GeneralTestQuestion.subject_id == GeneralTest.subject_id)
+                    .where(GeneralTest.id.in_(test_ids))
+                    .group_by(GeneralTest.id)
                 )
             ).all()
         )
@@ -613,7 +639,7 @@ class GeneralTestRepository:
         )
 
     async def get_test(self, session: AsyncSession, test_id: int) -> GeneralTestDetail:
-        test = await self._get_test(session, test_id, with_questions=True)
+        test = await self._get_test(session, test_id)
         summary = await self._summary(session, test)
         groups = await self._group_options(
             session,
@@ -621,7 +647,19 @@ class GeneralTestRepository:
                 GeneralTestGroup.test_id == test_id
             ),
         )
-        return GeneralTestDetail(**summary.model_dump(), questions=test.questions, groups=groups)
+        active = dict(
+            (
+                await session.execute(
+                    select(GeneralTestGroup.group_id, GeneralTestGroup.is_active).where(
+                        GeneralTestGroup.test_id == test_id
+                    )
+                )
+            ).all()
+        )
+        return GeneralTestDetail(
+            **summary.model_dump(),
+            groups=[TestGroup(**group.model_dump(), is_active=active.get(group.id, True)) for group in groups],
+        )
 
     async def create_test(
         self, session: AsyncSession, data: GeneralTestCreateRequest, user: User
@@ -674,22 +712,37 @@ class GeneralTestRepository:
 
     # ── Вопросы ──────────────────────────────────────────────────────────────
 
-    async def _next_order(self, session: AsyncSession, test_id: int) -> int:
+    async def _next_order(self, session: AsyncSession, subject_id: int) -> int:
         current = (
             await session.execute(
-                select(func.max(GeneralTestQuestion.order)).where(GeneralTestQuestion.test_id == test_id)
+                select(func.max(GeneralTestQuestion.order)).where(GeneralTestQuestion.subject_id == subject_id)
             )
         ).scalar_one_or_none()
         return (current or 0) + 1
 
+    async def list_subject_questions(self, session: AsyncSession, subject_id: int) -> SubjectQuestionListResponse:
+        await self._get_subject(session, subject_id)
+        questions = (
+            (
+                await session.execute(
+                    select(GeneralTestQuestion)
+                    .where(GeneralTestQuestion.subject_id == subject_id)
+                    .order_by(GeneralTestQuestion.order, GeneralTestQuestion.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return SubjectQuestionListResponse(questions=questions)
+
     async def create_question(
-        self, session: AsyncSession, test_id: int, data: QuestionCreateRequest
+        self, session: AsyncSession, subject_id: int, data: QuestionCreateRequest
     ) -> GeneralTestQuestion:
-        await self._get_test(session, test_id)
+        await self._get_subject(session, subject_id)
         payload = data.model_dump()
         if payload["order"] is None:
-            payload["order"] = await self._next_order(session, test_id)
-        question = GeneralTestQuestion(test_id=test_id, **payload)
+            payload["order"] = await self._next_order(session, subject_id)
+        question = GeneralTestQuestion(subject_id=subject_id, **payload)
         session.add(question)
         await session.commit()
         await session.refresh(question)
@@ -717,7 +770,9 @@ class GeneralTestRepository:
         await session.delete(question)
         await session.commit()
 
-    async def upload_questions_excel(self, session: AsyncSession, test_id: int, file: UploadFile) -> UploadResponse:
+    async def upload_questions_excel(
+        self, session: AsyncSession, subject_id: int, file: UploadFile
+    ) -> UploadResponse:
         """Вопросы из Excel — формат тот же, что у банка вопросов.
 
         Колонки ищутся по заголовкам (`quiz/question/excel_format.py`), так что
@@ -725,7 +780,7 @@ class GeneralTestRepository:
         """
         import pandas as pd
 
-        await self._get_test(session, test_id)
+        await self._get_subject(session, subject_id)
         try:
             df = pd.read_excel(io.BytesIO(await file.read()))
         except Exception:
@@ -747,7 +802,7 @@ class GeneralTestRepository:
             value = row.iloc[index]
             return "" if pd.isna(value) else str(value).strip()
 
-        order = await self._next_order(session, test_id)
+        order = await self._next_order(session, subject_id)
         questions: list[GeneralTestQuestion] = []
         warnings: list[str] = []
         for index, row in df.iterrows():
@@ -768,7 +823,7 @@ class GeneralTestRepository:
             text_, a, b, c, d = values
             questions.append(
                 GeneralTestQuestion(
-                    test_id=test_id,
+                    subject_id=subject_id,
                     text=text_,
                     option_a=a,
                     option_b=b,
@@ -813,7 +868,7 @@ class GeneralTestRepository:
             answer.is_correct = question is not None and answer.selected_option == question.correct_option
             correct += answer.is_correct
 
-        # Вопрос, удалённый из теста во время попытки, в знаменатель не идёт.
+        # Вопрос, удалённый из банка во время попытки, в знаменатель не идёт.
         total = len(questions)
         attempt.total_questions = total
         attempt.correct_answers = correct
@@ -933,7 +988,7 @@ class GeneralTestRepository:
         # выполняется строго по очереди.
         await session.execute(text("SELECT pg_advisory_xact_lock(:a, :b)"), {"a": 7301 + test_id, "b": user.id})
 
-        test = await self._get_test(session, test_id, with_questions=True)
+        test = await self._get_test(session, test_id)
         visible = (
             await session.execute(select(GeneralTest.id).where(GeneralTest.id == test_id, _visible_to(user.id)))
         ).scalar_one_or_none()
@@ -967,12 +1022,18 @@ class GeneralTestRepository:
             await session.commit()
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinishlar soni tugagan")
 
-        if not test.questions:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda savollar yo'q")
+        # Savollar fanning bankidan — shu fanning barcha testlari uchun bitta.
+        pool = (
+            (await session.execute(select(GeneralTestQuestion.id).where(GeneralTestQuestion.subject_id == test.subject_id)))
+            .scalars()
+            .all()
+        )
+        if not pool:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu fanda savollar yo'q")
 
         layout = []
-        for question in random.sample(test.questions, _per_attempt(test, len(test.questions))):
-            layout.append({"q": question.id, "o": "".join(random.sample(LETTERS, len(LETTERS)))})
+        for question_id in random.sample(pool, _per_attempt(test, len(pool))):
+            layout.append({"q": question_id, "o": "".join(random.sample(LETTERS, len(LETTERS)))})
 
         attempt = GeneralTestAttempt(
             test_id=test.id,

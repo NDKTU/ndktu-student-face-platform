@@ -487,6 +487,11 @@ class IndependentTopic(Base, IdIntPk, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Roʻyxatdagi tartib raqami.
     position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0", default=0)
+    #: Mavzuga biriktirilgan materiallar (kutubxonadan yoki yuklangan) —
+    #: uy vazifasidagi kabi `{name, url, size, type}` roʻyxati.
+    attachments: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
 
     course: Mapped["Course"] = relationship("Course")
 

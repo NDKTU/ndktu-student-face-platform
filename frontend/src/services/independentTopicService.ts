@@ -1,4 +1,5 @@
 import api from './api';
+import type { SubmissionFile } from './assignmentService';
 
 /**
  * Mustaqil ish mavzusi — fan boʻyicha talaba oʻzi oʻrganadigan mavzu.
@@ -13,6 +14,8 @@ export interface IndependentTopic {
     description?: string | null;
     /** Roʻyxatdagi tartib raqami. */
     position: number;
+    /** Mavzu materiallari — kutubxonadan tanlangan yoki yuklangan fayllar. */
+    attachments?: SubmissionFile[];
     created_at: string;
     updated_at: string;
 }
@@ -26,6 +29,7 @@ export interface IndependentTopicRequest {
     title: string;
     description?: string | null;
     position?: number | null;
+    attachments?: SubmissionFile[];
 }
 
 export const independentTopicService = {

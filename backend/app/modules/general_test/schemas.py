@@ -45,6 +45,8 @@ class SubjectSummary(SubjectRef):
     description: str | None
     user_count: int = 0
     test_count: int = 0
+    #: Fan savollar bankidagi savollar.
+    question_count: int = 0
     created_at: TashkentDatetime
 
 
@@ -166,7 +168,7 @@ class GeneralTestSummary(BaseModel):
     attempt_limit: int
     question_number: int | None
     is_active: bool
-    #: Testdagi barcha savollar (urinishga beriladigani — `question_number`).
+    #: Fan bankidagi barcha savollar (urinishga beriladigani — `question_number`).
     question_count: int = 0
     attempt_count: int = 0
     group_count: int = 0
@@ -207,7 +209,7 @@ class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    test_id: int
+    subject_id: int
     text: str
     option_a: str
     option_b: str
@@ -217,13 +219,26 @@ class QuestionResponse(BaseModel):
     order: int
 
 
+class SubjectQuestionListResponse(BaseModel):
+    questions: list[QuestionResponse]
+
+
+class TestGroup(GroupOption):
+    """Testga biriktirilgan guruh — yoqilgan yoki yashirilganligi bilan."""
+
+    is_active: bool = True
+
+
 class GeneralTestDetail(GeneralTestSummary):
-    questions: list[QuestionResponse] = []
-    groups: list[GroupOption] = []
+    groups: list[TestGroup] = []
 
 
 class TestGroupsAddRequest(BaseModel):
     group_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class TestGroupUpdateRequest(BaseModel):
+    is_active: bool
 
 
 class UploadResponse(BaseModel):

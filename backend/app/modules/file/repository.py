@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import User
-from app.modules.course.model import Homework, Lesson, Resource
+from app.modules.course.model import Homework, IndependentTopic, Lesson, Resource
 from app.modules.quiz.model import Question
 from app.modules.file.model import FileBlob, FileFolder, FileUsage, StoredFile
 from app.modules.file.schemas import (
@@ -496,6 +496,9 @@ class FileRepository:
             elif usage.entity_type == "homework":
                 homework = await session.get(Homework, usage.entity_id)
                 label = homework.title if homework else None
+            elif usage.entity_type == "independent_topic":
+                topic = await session.get(IndependentTopic, usage.entity_id)
+                label = f"Mustaqil ish: {topic.title}" if topic else None
             elif usage.entity_type == "question":
                 question = await session.scalar(
                     select(Question)

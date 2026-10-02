@@ -1,22 +1,9 @@
-import { useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import {
-    ArrowLeft,
-    BookMarked,
-    Download,
-    FileSpreadsheet,
-    MessageCircleQuestion,
-    Pencil,
-    Plus,
-    Trash2,
-    UsersRound,
-    X,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookMarked, MessageCircleQuestion, Pencil, Plus, UsersRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -24,42 +11,29 @@ import { Switch } from '@/components/ui/Switch';
 import { PermissionGate, usePermission } from '@/components/auth/PermissionGate';
 import { GeneralTestFormModal } from '@/components/generalTest/GeneralTestFormModal';
 import { GroupPickerModal } from '@/components/generalTest/GroupPickerModal';
-import { QuestionFormModal } from '@/components/generalTest/QuestionFormModal';
 import { questionsLabel } from '@/components/generalTest/labels';
 import {
-    useDeleteGeneralTestQuestion,
     useGeneralTest,
     useRemoveGeneralTestGroup,
-    useSaveGeneralTestQuestion,
+    useSetGeneralTestGroupActive,
     useUpdateGeneralTest,
-    useUploadGeneralTestExcel,
 } from '@/hooks/useGeneralTests';
-import { generalTestService, type GeneralTestQuestion, type OptionLetter } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
-import { cn } from '@/lib/utils';
-
-const LETTERS: OptionLetter[] = ['a', 'b', 'c', 'd'];
 
 export default function GeneralTestDetailPage() {
+    const navigate = useNavigate();
     const testId = Number(useParams().id);
     const { data: test, isLoading, isError, refetch } = useGeneralTest(Number.isFinite(testId) ? testId : null);
     const canEdit = usePermission('update:general_test');
 
     const updateTest = useUpdateGeneralTest();
-    const saveQuestion = useSaveGeneralTestQuestion(testId);
-    const deleteQuestion = useDeleteGeneralTestQuestion(testId);
-    const upload = useUploadGeneralTestExcel(testId);
     const removeGroup = useRemoveGeneralTestGroup(testId);
+    const setGroupActive = useSetGeneralTestGroupActive(testId);
+    // Qaysi guruh tugmasi hozir saqlanyapti — faqat o'sha qator band bo'ladi.
+    const [togglingGroupId, setTogglingGroupId] = useState<number | null>(null);
 
     const [editTest, setEditTest] = useState(false);
     const [pickingGroups, setPickingGroups] = useState(false);
-    const [questionForm, setQuestionForm] = useState<{ open: boolean; editing: GeneralTestQuestion | null }>({
-        open: false,
-        editing: null,
-    });
-    const [deleting, setDeleting] = useState<GeneralTestQuestion | null>(null);
-    const [warnings, setWarnings] = useState<string[]>([]);
-    const fileInput = useRef<HTMLInputElement>(null);
 
     if (isLoading) {
         return (
@@ -72,8 +46,8 @@ export default function GeneralTestDetailPage() {
     if (isError || !test) return <ErrorState onRetry={() => refetch()} />;
 
     const toggleActive = (value: boolean) => {
-        if (value && test.questions.length === 0) {
-            toast.error("Avval savollarni qo'shing");
+        if (value && test.question_count === 0) {
+            toast.error("Avval fanning savollar bankiga savol qo'shing");
             return;
         }
         updateTest.mutate(
@@ -85,24 +59,26 @@ export default function GeneralTestDetailPage() {
         );
     };
 
+    const toggleGroup = (groupId: number, name: string, isActive: boolean) => {
+        setTogglingGroupId(groupId);
+        setGroupActive.mutate(
+            { groupId, isActive },
+            {
+                onSettled: () => setTogglingGroupId(null),
+                onSuccess: () =>
+                    toast.success(isActive ? `${name} guruhi uchun test yoqildi` : `${name} guruhidan test yashirildi`),
+                onError: (e) => toast.error(apiErrorMessage(e, 'Xatolik yuz berdi')),
+            },
+        );
+    };
+
+    const hiddenGroups = test.groups.filter((g) => !g.is_active).length;
+
     const unassignGroup = (groupId: number, name: string) =>
         removeGroup.mutate(groupId, {
             onSuccess: () => toast.success(`${name} guruhi testdan olib tashlandi`),
             onError: (e) => toast.error(apiErrorMessage(e, 'Xatolik yuz berdi')),
         });
-
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file) return;
-        upload.mutate(file, {
-            onSuccess: (res) => {
-                setWarnings(res.warnings);
-                toast.success(`${res.created} ta savol qo'shildi`);
-            },
-            onError: (err) => toast.error(apiErrorMessage(err, 'Faylni yuklashda xatolik')),
-        });
-    };
 
     return (
         <div className="space-y-6">
@@ -145,7 +121,7 @@ export default function GeneralTestDetailPage() {
                         <p className="text-sm text-muted-foreground">
                             {test.is_active
                                 ? "Fanga biriktirilgan foydalanuvchilar va quyidagi guruhlar talabalari «Elementar testlar» bo'limida ko'radi va ishlay oladi"
-                                : "Hech kimga ko'rinmaydi. Savollarni tayyorlab, keyin yoqing"}
+                                : "Hech kimga ko'rinmaydi. Fanning savollar bankini tayyorlab, keyin yoqing"}
                         </p>
                     </div>
                     <Switch checked={test.is_active} onCheckedChange={toggleActive} disabled={!canEdit || updateTest.isPending} />
@@ -156,9 +132,17 @@ export default function GeneralTestDetailPage() {
                 <CardContent className="space-y-4 pt-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <h2 className="text-base font-semibold text-foreground">Guruhlar ({test.groups.length})</h2>
+                            <h2 className="text-base font-semibold text-foreground">
+                                Guruhlar ({test.groups.length})
+                                {hiddenGroups > 0 && (
+                                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                        · {hiddenGroups} tasidan yashirilgan
+                                    </span>
+                                )}
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                                Guruh talabalari bu testni fanga biriktirilmagan bo'lsa ham ko'radi
+                                Yoqilgan guruh talabalari testni fanga biriktirilmagan bo'lsa ham ko'radi.
+                                O'chirilgan guruh biriktirilgan bo'lib qoladi, lekin testni ko'rmaydi
                             </p>
                         </div>
                         <PermissionGate permission="update:general_test">
@@ -172,124 +156,75 @@ export default function GeneralTestDetailPage() {
                             <UsersRound className="h-4 w-4" /> Guruh biriktirilmagan
                         </p>
                     ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {test.groups.map((g) => (
-                                <span
-                                    key={g.id}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 py-1 pl-3 pr-1 text-sm"
-                                    title={[g.faculty_name, g.course ? `${g.course}-kurs` : null].filter(Boolean).join(' · ')}
-                                >
-                                    <span className="font-medium text-foreground">{g.name}</span>
-                                    <span className="text-xs text-muted-foreground">{g.student_count}</span>
-                                    {canEdit && (
-                                        <button
-                                            type="button"
-                                            aria-label={`${g.name} guruhini olib tashlash`}
-                                            className="rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                                            disabled={removeGroup.isPending}
-                                            onClick={() => unassignGroup(g.id, g.name)}
+                        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                            {test.groups.map((g) => {
+                                const meta = [g.faculty_name, g.course ? `${g.course}-kurs` : null, `${g.student_count} talaba`]
+                                    .filter(Boolean)
+                                    .join(' · ');
+                                return (
+                                    <li
+                                        key={g.id}
+                                        className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${
+                                            g.is_active ? 'border-border bg-muted/30' : 'border-dashed border-border bg-transparent'
+                                        }`}
+                                    >
+                                        <div className={`min-w-0 flex-1 ${g.is_active ? '' : 'opacity-60'}`}>
+                                            <p className="truncate text-sm font-medium text-foreground">{g.name}</p>
+                                            <p className="truncate text-xs text-muted-foreground">{meta}</p>
+                                        </div>
+                                        <span
+                                            className={`shrink-0 text-xs ${
+                                                g.is_active
+                                                    ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+                                                    : 'text-muted-foreground'
+                                            }`}
                                         >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    )}
-                                </span>
-                            ))}
-                        </div>
+                                            {g.is_active ? "Ko'rinadi" : 'Yashirin'}
+                                        </span>
+                                        <Switch
+                                            checked={g.is_active}
+                                            onCheckedChange={(value) => toggleGroup(g.id, g.name, value)}
+                                            disabled={!canEdit || togglingGroupId === g.id}
+                                            aria-label={g.is_active ? `${g.name} guruhidan yashirish` : `${g.name} guruhi uchun yoqish`}
+                                        />
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                aria-label={`${g.name} guruhini olib tashlash`}
+                                                title="Guruhni testdan olib tashlash"
+                                                className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                                                disabled={removeGroup.isPending}
+                                                onClick={() => unassignGroup(g.id, g.name)}
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     )}
                 </CardContent>
             </Card>
 
             <Card>
-                <CardContent className="space-y-4 pt-6">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <MessageCircleQuestion className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                         <div>
-                            <h2 className="text-base font-semibold text-foreground">Savollar ({test.questions.length})</h2>
+                            <h2 className="text-base font-semibold text-foreground">Savollar</h2>
                             <p className="text-sm text-muted-foreground">
-                                {test.question_number && test.question_number < test.questions.length
-                                    ? `Har urinishda ${test.question_number} tasi tasodifiy tartibda beriladi`
-                                    : 'Har urinishda hammasi tasodifiy tartibda beriladi'}
+                                {test.question_count === 0
+                                    ? "«" + test.subject.name + "» fanining savollar bankida hali savol yo'q"
+                                    : test.question_number && test.question_number < test.question_count
+                                      ? `Har urinishda «${test.subject.name}» fani bankidagi ${test.question_count} ta savoldan ${test.question_number} tasi tasodifiy beriladi`
+                                      : `Har urinishda «${test.subject.name}» fani bankidagi barcha ${test.question_count} ta savol tasodifiy tartibda beriladi`}
                             </p>
                         </div>
-                        <PermissionGate permission="update:general_test">
-                            <div className="flex flex-wrap gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => generalTestService.downloadTemplate()}>
-                                    <Download className="h-4 w-4" /> Shablon
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()} isLoading={upload.isPending}>
-                                    <FileSpreadsheet className="h-4 w-4" /> Excel'dan yuklash
-                                </Button>
-                                <Button size="sm" onClick={() => setQuestionForm({ open: true, editing: null })}>
-                                    <Plus className="h-4 w-4" /> Savol qo'shish
-                                </Button>
-                                <input ref={fileInput} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-                            </div>
-                        </PermissionGate>
                     </div>
-
-                    {warnings.length > 0 && (
-                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                            <div className="mb-1 flex items-center justify-between">
-                                <p className="font-medium">Yuklashda ogohlantirishlar</p>
-                                <button className="text-xs underline" onClick={() => setWarnings([])}>
-                                    Yopish
-                                </button>
-                            </div>
-                            <ul className="list-disc space-y-0.5 pl-5">
-                                {warnings.map((w) => (
-                                    <li key={w}>{w}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {test.questions.length === 0 ? (
-                        <EmptyState
-                            icon={<MessageCircleQuestion className="h-6 w-6" />}
-                            title="Savollar yo'q"
-                            description="Savollarni qo'lda qo'shing yoki Excel fayldan yuklang (Savol, A, B, C, D, To'g'ri javob)."
-                        />
-                    ) : (
-                        <ol className="space-y-3">
-                            {test.questions.map((q, index) => (
-                                <li key={q.id} className="rounded-xl border border-border p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <p className="whitespace-pre-wrap font-medium text-foreground">
-                                            {index + 1}. {q.text}
-                                        </p>
-                                        <PermissionGate permission="update:general_test">
-                                            <div className="flex shrink-0 gap-1">
-                                                <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => setQuestionForm({ open: true, editing: q })}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(q)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </div>
-                                        </PermissionGate>
-                                    </div>
-                                    <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                                        {LETTERS.map((letter) => {
-                                            const isCorrect = q.correct_option === letter;
-                                            return (
-                                                <div
-                                                    key={letter}
-                                                    className={cn(
-                                                        'flex gap-2 rounded-lg px-2.5 py-1.5 text-sm',
-                                                        isCorrect
-                                                            ? 'bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300'
-                                                            : 'text-muted-foreground',
-                                                    )}
-                                                >
-                                                    <span className="uppercase">{letter})</span>
-                                                    <span className="whitespace-pre-wrap">{q[`option_${letter}`]}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </li>
-                            ))}
-                        </ol>
-                    )}
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/elementar-tests/subjects/${test.subject.id}`)}>
+                        Savollar banki <ArrowRight className="h-4 w-4" />
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -321,47 +256,6 @@ export default function GeneralTestDetailPage() {
                 />
             )}
 
-            {questionForm.open && (
-                <QuestionFormModal
-                    editing={questionForm.editing}
-                    onClose={() => setQuestionForm({ open: false, editing: null })}
-                    isPending={saveQuestion.isPending}
-                    onSubmit={(payload) =>
-                        saveQuestion.mutate(
-                            { id: questionForm.editing?.id, data: payload },
-                            {
-                                onSuccess: () => {
-                                    setQuestionForm({ open: false, editing: null });
-                                    toast.success('Savol saqlandi');
-                                },
-                                onError: (e) => toast.error(apiErrorMessage(e, 'Savolni saqlashda xatolik')),
-                            },
-                        )
-                    }
-                />
-            )}
-
-            <ConfirmDialog
-                isOpen={deleting !== null}
-                onClose={() => setDeleting(null)}
-                onConfirm={() =>
-                    deleting &&
-                    deleteQuestion.mutate(deleting.id, {
-                        onSuccess: () => {
-                            setDeleting(null);
-                            toast.success("Savol o'chirildi");
-                        },
-                        onError: (e) => {
-                            setDeleting(null);
-                            toast.error(apiErrorMessage(e, "Savolni o'chirishda xatolik"));
-                        },
-                    })
-                }
-                title="Savolni o'chirish"
-                description="Savol testdan o'chiriladi. Unga berilgan javoblar ham o'chadi."
-                confirmText="O'chirish"
-                isLoading={deleteQuestion.isPending}
-            />
         </div>
     );
 }

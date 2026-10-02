@@ -72,6 +72,7 @@ export default function GeneralTestSubjectsPage() {
                 </div>
             ),
         },
+        { key: 'questions', header: 'Savollar', cell: (s) => s.question_count, hideBelow: 'sm' },
         { key: 'users', header: 'Biriktirilganlar', cell: (s) => s.user_count, hideBelow: 'sm' },
         { key: 'tests', header: 'Testlar', cell: (s) => s.test_count, hideBelow: 'sm' },
         {

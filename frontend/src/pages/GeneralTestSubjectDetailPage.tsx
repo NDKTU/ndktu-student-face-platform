@@ -10,11 +10,13 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { TabBar } from '@/components/ui/TabBar';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { GeneralTestFormModal } from '@/components/generalTest/GeneralTestFormModal';
 import { SubjectFormModal } from '@/components/generalTest/SubjectFormModal';
+import { SubjectQuestionBank } from '@/components/generalTest/SubjectQuestionBank';
 import { SubjectUserPickerModal } from '@/components/generalTest/SubjectUserPickerModal';
 import { ACTIVE_BADGE, INACTIVE_BADGE, KIND_LABEL, questionsLabel, selectClassName } from '@/components/generalTest/labels';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
@@ -51,6 +53,7 @@ export default function GeneralTestSubjectDetailPage() {
     const removeUser = useRemoveSubjectUser(subjectId);
     const createTest = useCreateGeneralTest();
 
+    const [tab, setTab] = useState<'questions' | 'tests' | 'users'>('questions');
     const [editing, setEditing] = useState(false);
     const [picking, setPicking] = useState(false);
     const [creatingTest, setCreatingTest] = useState(false);
@@ -118,107 +121,123 @@ export default function GeneralTestSubjectDetailPage() {
                 }
             />
 
-            <Card>
-                <CardContent className="space-y-4 pt-6">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <h2 className="text-base font-semibold text-foreground">
-                                Biriktirilgan foydalanuvchilar ({subject.user_count})
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                Fanning faol testlarini ko'radi. O'qituvchi bo'lishi shart emas — talaba yoki xodim ham bo'ladi
-                            </p>
-                        </div>
-                        <PermissionGate permission="update:general_test_subject">
-                            <Button size="sm" onClick={() => setPicking(true)}>
-                                <UserPlus className="h-4 w-4" /> Foydalanuvchi biriktirish
-                            </Button>
-                        </PermissionGate>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                            placeholder="F.I.SH, login yoki guruh..."
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value);
-                                setPage(1);
-                            }}
-                            leftAddon={<Search className="h-4 w-4" />}
-                            className="sm:max-w-sm"
-                        />
-                        <select
-                            aria-label="Foydalanuvchi turi"
-                            className={`${selectClassName} sm:w-48`}
-                            value={kind}
-                            onChange={(e) => {
-                                setKind(e.target.value as UserKindFilter | '');
-                                setPage(1);
-                            }}
-                        >
-                            <option value="">Barcha turlar</option>
-                            <option value="student">Talabalar</option>
-                            <option value="teacher">O'qituvchilar</option>
-                            <option value="other">Boshqa xodimlar</option>
-                        </select>
-                    </div>
-                    <DataTable
-                        columns={userColumns}
-                        data={users.data?.users}
-                        rowKey={(u) => u.user_id}
-                        isLoading={users.isLoading}
-                        isError={users.isError}
-                        onRetry={() => users.refetch()}
-                        emptyIcon={<Users className="h-6 w-6" />}
-                        emptyTitle="Hech kim biriktirilmagan"
-                        emptyDescription="Biriktirilmagan fan testlari faqat testga biriktirilgan guruhlarga ko'rinadi."
-                    />
-                    {users.data && users.data.total > 0 && (
-                        <Pagination
-                            currentPage={page}
-                            totalPages={Math.ceil(users.data.total / pageSize)}
-                            onPageChange={setPage}
-                            totalItems={users.data.total}
-                            pageSize={pageSize}
-                            onPageSizeChange={setPageSize}
-                        />
-                    )}
-                </CardContent>
-            </Card>
+            <TabBar
+                tabs={[
+                    { id: 'questions', label: `Savollar banki (${subject.question_count})` },
+                    { id: 'tests', label: `Testlar (${subject.test_count})` },
+                    { id: 'users', label: `Foydalanuvchilar (${subject.user_count})` },
+                ]}
+                active={tab}
+                onChange={setTab}
+            />
 
-            <Card>
-                <CardContent className="space-y-4 pt-6">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-base font-semibold text-foreground">Testlar ({subject.test_count})</h2>
-                        <PermissionGate permission="create:general_test">
-                            <Button size="sm" variant="outline" onClick={() => setCreatingTest(true)}>
-                                <Plus className="h-4 w-4" /> Yangi test
-                            </Button>
-                        </PermissionGate>
-                    </div>
-                    {!tests?.tests.length ? (
-                        <EmptyState icon={<ClipboardList className="h-6 w-6" />} title="Testlar yo'q" description="Bu fanga hali test qo'shilmagan." />
-                    ) : (
-                        <ul className="divide-y divide-border rounded-xl border border-border">
-                            {tests.tests.map((t) => (
-                                <li key={t.id}>
-                                    <Link
-                                        to={`/elementar-tests/${t.id}`}
-                                        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent/40"
-                                    >
-                                        <span className="min-w-0">
-                                            <span className="block truncate font-medium text-foreground">{t.title}</span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                {questionsLabel(t)} savol · {t.group_count} guruh · {t.attempt_count} topshirgan
+            {tab === 'questions' && <SubjectQuestionBank subjectId={subject.id} />}
+
+            {tab === 'users' && (
+                <Card>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 className="text-base font-semibold text-foreground">
+                                    Biriktirilgan foydalanuvchilar ({subject.user_count})
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Fanning faol testlarini ko'radi. O'qituvchi bo'lishi shart emas — talaba yoki xodim ham bo'ladi
+                                </p>
+                            </div>
+                            <PermissionGate permission="update:general_test_subject">
+                                <Button size="sm" onClick={() => setPicking(true)}>
+                                    <UserPlus className="h-4 w-4" /> Foydalanuvchi biriktirish
+                                </Button>
+                            </PermissionGate>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                                placeholder="F.I.SH, login yoki guruh..."
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    setPage(1);
+                                }}
+                                leftAddon={<Search className="h-4 w-4" />}
+                                className="sm:max-w-sm"
+                            />
+                            <select
+                                aria-label="Foydalanuvchi turi"
+                                className={`${selectClassName} sm:w-48`}
+                                value={kind}
+                                onChange={(e) => {
+                                    setKind(e.target.value as UserKindFilter | '');
+                                    setPage(1);
+                                }}
+                            >
+                                <option value="">Barcha turlar</option>
+                                <option value="student">Talabalar</option>
+                                <option value="teacher">O'qituvchilar</option>
+                                <option value="other">Boshqa xodimlar</option>
+                            </select>
+                        </div>
+                        <DataTable
+                            columns={userColumns}
+                            data={users.data?.users}
+                            rowKey={(u) => u.user_id}
+                            isLoading={users.isLoading}
+                            isError={users.isError}
+                            onRetry={() => users.refetch()}
+                            emptyIcon={<Users className="h-6 w-6" />}
+                            emptyTitle="Hech kim biriktirilmagan"
+                            emptyDescription="Biriktirilmagan fan testlari faqat testga biriktirilgan guruhlarga ko'rinadi."
+                        />
+                        {users.data && users.data.total > 0 && (
+                            <Pagination
+                                currentPage={page}
+                                totalPages={Math.ceil(users.data.total / pageSize)}
+                                onPageChange={setPage}
+                                totalItems={users.data.total}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
+                            />
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {tab === 'tests' && (
+                <Card>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h2 className="text-base font-semibold text-foreground">Testlar ({subject.test_count})</h2>
+                            <PermissionGate permission="create:general_test">
+                                <Button size="sm" variant="outline" onClick={() => setCreatingTest(true)}>
+                                    <Plus className="h-4 w-4" /> Yangi test
+                                </Button>
+                            </PermissionGate>
+                        </div>
+                        {!tests?.tests.length ? (
+                            <EmptyState icon={<ClipboardList className="h-6 w-6" />} title="Testlar yo'q" description="Bu fanga hali test qo'shilmagan." />
+                        ) : (
+                            <ul className="divide-y divide-border rounded-xl border border-border">
+                                {tests.tests.map((t) => (
+                                    <li key={t.id}>
+                                        <Link
+                                            to={`/elementar-tests/${t.id}`}
+                                            className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent/40"
+                                        >
+                                            <span className="min-w-0">
+                                                <span className="block truncate font-medium text-foreground">{t.title}</span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    {questionsLabel(t)} savol · {t.group_count} guruh · {t.attempt_count} topshirgan
+                                                </span>
                                             </span>
-                                        </span>
-                                        <span className={t.is_active ? ACTIVE_BADGE : INACTIVE_BADGE}>{t.is_active ? 'Faol' : 'Nofaol'}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </CardContent>
-            </Card>
+                                            <span className={t.is_active ? ACTIVE_BADGE : INACTIVE_BADGE}>{t.is_active ? 'Faol' : 'Nofaol'}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {editing && (
                 <SubjectFormModal

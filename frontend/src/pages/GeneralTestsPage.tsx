@@ -53,7 +53,7 @@ export default function GeneralTestsPage() {
     // Admin testni ro'yxatning o'zida yoqib-o'chiradi — kartochkaga kirmasdan.
     const toggleActive = (test: GeneralTestSummary, value: boolean) => {
         if (value && test.question_count === 0) {
-            toast.error("Avval savollarni qo'shing");
+            toast.error("Avval fanning savollar bankiga savol qo'shing");
             return;
         }
         setTogglingId(test.id);

@@ -3,8 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import type { QuestionCreateRequest } from '@/services/questionService';
-import { API_BASE_URL } from '@/config/env';
-import { getToken } from '@/services/tokenStorage';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
@@ -22,6 +20,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 import { subjectOption } from '@/utils/subject';
+import { insertEditorImage, useQuestionEditorConfigs } from '@/components/questions/questionEditor';
 
 // Variantlar faqat klassik savolda majburiy: boshqa turlarda ular umuman
 // boshqa shaklda (`payload`) saqlanadi.
@@ -204,126 +203,8 @@ const QuestionFormPage = () => {
     }, [question, reset]);
 
 
-    const uploaderConfig = useMemo(() => ({
-        url: `${API_BASE_URL}/question/upload_image`,
-        format: 'json',
-        headers: {
-            Authorization: `Bearer ${getToken() || ''}`,
-        },
-        filesVariableName: () => 'file',
-        isSuccess: (resp: any) => Boolean(resp && !resp.error && resp.url),
-        process: (resp: any) => ({
-            files: resp?.url ? [resp.url] : [],
-            path: '',
-            baseurl: '',
-            error: resp?.error,
-            msg: resp?.message || resp?.detail,
-        }),
-        defaultHandlerSuccess: function (this: any, data: any) {
-            if (data?.files && data.files.length) {
-                for (let i = 0; i < data.files.length; i += 1) {
-                    this.selection.insertHTML(
-                        `<img src="${data.files[i]}" alt="savol-rasm" style="max-width: 100%; border-radius: 6px; margin: 4px 0;" />`
-                    );
-                }
-            }
-        },
-        defaultHandlerError: function (this: any, resp: any) {
-            toast.error(resp?.msg || resp?.message || 'Rasm yuklashda xatolik yuz berdi');
-        },
-        error: function (this: any, err: any) {
-            logger.error('Jodit upload error', err);
-            toast.error('Rasm yuklashda tarmoq xatoligi');
-        },
-    }), []);
-
-    const questionEditorConfig = useMemo(() => {
-        return {
-            readonly: false,
-            placeholder: 'Savol matnini kiriting...',
-            minHeight: 140,
-            // `true`: Jodit toolbarni ekran kengligiga qarab yig'adi (buttonsMD/SM/XS
-            // to'plamlari quyida yozilgan). `false` da telefonda tugmalar qatori
-            // yon tomonga chiqib ketardi.
-            toolbarAdaptive: true,
-            buttons: [
-                'bold', 'italic', 'underline', 'strikethrough', '|',
-                'superscript', 'subscript', '|',
-                'ul', 'ol', '|',
-                'brush', 'image', 'table', '|',
-                'undo', 'redo', '|',
-                'eraser'
-            ],
-            buttonsMD: [
-                'bold', 'italic', 'underline', '|',
-                'superscript', 'subscript', '|',
-                'ul', 'ol', '|',
-                'image', 'table', '|',
-                'undo', 'redo'
-            ],
-            buttonsSM: [
-                'bold', 'italic', '|',
-                'superscript', 'subscript', '|',
-                'ul', 'ol', '|',
-                'image', '|',
-                'undo', 'redo'
-            ],
-            buttonsXS: [
-                'bold', 'italic', '|',
-                'superscript', 'subscript', '|',
-                'image'
-            ],
-            showCharsCounter: true,
-            showWordsCounter: false,
-            showXPathInStatusbar: false,
-            uploader: uploaderConfig,
-        } as any;
-    }, [uploaderConfig]);
-
-    const optionEditorConfig = useMemo(() => {
-        return {
-            readonly: false,
-            placeholder: 'Variant matnini kiriting...',
-            minHeight: 70,
-            height: 80,
-            // `true`: Jodit toolbarni ekran kengligiga qarab yig'adi (buttonsMD/SM/XS
-            // to'plamlari quyida yozilgan). `false` da telefonda tugmalar qatori
-            // yon tomonga chiqib ketardi.
-            toolbarAdaptive: true,
-            buttons: [
-                'bold', 'italic', '|',
-                'superscript', 'subscript', '|',
-                'brush', 'image', '|',
-                'undo', 'redo'
-            ],
-            buttonsMD: [
-                'bold', 'italic', '|',
-                'superscript', 'subscript', '|',
-                'image'
-            ],
-            buttonsSM: [
-                'bold', 'italic', '|',
-                'superscript', 'subscript', '|',
-                'image'
-            ],
-            buttonsXS: [
-                'bold', 'italic', '|',
-                'image'
-            ],
-            showCharsCounter: false,
-            showWordsCounter: false,
-            showXPathInStatusbar: false,
-            uploader: uploaderConfig,
-        } as any;
-    }, [uploaderConfig]);
-
-    /** Havolani muharrirga rasm sifatida qoʻyadi (Kutubxonadan tanlanganda). */
-    const insertImage = (url: string, editorInstance: any) => {
-        if (!url || !editorInstance) return;
-        editorInstance.selection.insertHTML(
-            `<img src="${url}" alt="savol-rasm" style="max-width: 100%; border-radius: 6px; margin: 4px 0;" />`
-        );
-    };
+    // Muharrir sozlamalari elementar test savollari bilan umumiy.
+    const { questionEditorConfig, optionEditorConfig } = useQuestionEditorConfigs('/question/upload_image');
 
     // Kutubxonadan tanlash: fayl allaqachon serverda, qayta yuklanmaydi.
     const handleLibraryButtonClick = (editorInstance: any) => {
@@ -857,7 +738,7 @@ const QuestionFormPage = () => {
                 multiple={false}
                 kind="image"
                 title="Kutubxonadan rasm tanlash"
-                onSelect={(files) => insertImage(files[0]?.url ?? '', activeEditorRef.current)}
+                onSelect={(files) => insertEditorImage(activeEditorRef.current, files[0]?.url ?? '')}
             />
         </div>
     );

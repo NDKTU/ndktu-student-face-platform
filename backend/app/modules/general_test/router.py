@@ -1,9 +1,9 @@
 """Elementar test: управление (admin) и прохождение (назначенные пользователи).
 
 Права:
-- `create/read/update/delete:general_test_subject` — fanlar и назначение на
-  них пользователей;
-- `create/read/update/delete:general_test` — тесты, их вопросы и группы;
+- `create/read/update/delete:general_test_subject` — fanlar, их банк вопросов
+  и назначение на них пользователей;
+- `create/read/update/delete:general_test` — тесты и их группы;
 - `read/delete:general_test_result` — сводная таблица результатов;
 - `general_test:take` — пройти тест и увидеть свои результаты. Миграция
   `b7e1c4a9d2f3` выдаёт его всем существующим ролям, а `core/lifespan/defaults.py`
@@ -44,6 +44,7 @@ from .schemas import (
     ResultListRequest,
     ResultListResponse,
     SubjectCreateRequest,
+    SubjectQuestionListResponse,
     SubjectListResponse,
     SubjectSummary,
     SubjectUpdateRequest,
@@ -51,6 +52,7 @@ from .schemas import (
     SubjectUsersAddRequest,
     SubjectUsersAddResponse,
     TestGroupsAddRequest,
+    TestGroupUpdateRequest,
     UploadResponse,
     UserListRequest,
 )
@@ -290,6 +292,18 @@ async def add_test_groups(
     return await repo.add_test_groups(session=session, test_id=test_id, data=data)
 
 
+@router.patch("/{test_id}/groups/{group_id}", response_model=GeneralTestDetail)
+async def set_test_group_active(
+    test_id: int,
+    group_id: int,
+    data: TestGroupUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test")),
+):
+    """Guruh uchun testni yoqish yoki yashirish."""
+    return await repo.set_test_group_active(session=session, test_id=test_id, group_id=group_id, data=data)
+
+
 @router.delete("/{test_id}/groups/{group_id}", response_model=GeneralTestDetail)
 async def remove_test_group(
     test_id: int,
@@ -300,11 +314,11 @@ async def remove_test_group(
     return await repo.remove_test_group(session=session, test_id=test_id, group_id=group_id)
 
 
-# ─── Вопросы ─────────────────────────────────────────────────────────────────
+# ─── Вопросы (банк fan'а) ────────────────────────────────────────────────────
 
 
 @router.get("/excel_template")
-async def excel_template(_: "User" = Depends(PermissionRequired("create:general_test"))):
+async def excel_template(_: "User" = Depends(PermissionRequired("update:general_test_subject"))):
     # Шаблон общий с банком вопросов: формат один, парсер один.
     return StreamingResponse(
         io.BytesIO(get_question_repository.build_excel_template()),
@@ -318,7 +332,7 @@ async def update_question(
     question_id: int,
     data: QuestionUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
     return await repo.update_question(session=session, question_id=question_id, data=data)
 
@@ -327,33 +341,62 @@ async def update_question(
 async def delete_question(
     question_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
     await repo.delete_question(session=session, question_id=question_id)
 
 
-@router.post("/{test_id}/question", response_model=QuestionResponse, status_code=status.HTTP_201_CREATED)
-async def create_question(
-    test_id: int,
-    data: QuestionCreateRequest,
+@router.get("/subject/{subject_id}/questions", response_model=SubjectQuestionListResponse)
+async def list_subject_questions(
+    subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
 ):
-    return await repo.create_question(session=session, test_id=test_id, data=data)
+    return await repo.list_subject_questions(session=session, subject_id=subject_id)
 
 
 @router.post(
-    "/{test_id}/upload_excel",
+    "/subject/{subject_id}/question", response_model=QuestionResponse, status_code=status.HTTP_201_CREATED
+)
+async def create_question(
+    subject_id: int,
+    data: QuestionCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    return await repo.create_question(session=session, subject_id=subject_id, data=data)
+
+
+@router.post(
+    "/question/upload_image",
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def upload_question_image(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    """Savol matni yoki variantidagi rasm — kurs savollari bilan bir papkada.
+
+    Kursdagi `/question/upload_image` `create:question` ruxsatini so'raydi,
+    elementar test fanini yurituvchida esa u bo'lmasligi mumkin.
+    """
+    url = await get_question_repository.upload_image(session=session, file=file, current_user=current_user)
+    return {"url": url}
+
+
+@router.post(
+    "/subject/{subject_id}/upload_excel",
     response_model=UploadResponse,
     dependencies=[Depends(RateLimiter(times=10, seconds=60))],
 )
 async def upload_excel(
-    test_id: int,
+    subject_id: int,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.upload_questions_excel(session=session, test_id=test_id, file=file)
+    return await repo.upload_questions_excel(session=session, subject_id=subject_id, file=file)
 
 
 # ─── Тесты ───────────────────────────────────────────────────────────────────

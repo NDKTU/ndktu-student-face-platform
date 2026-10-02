@@ -3,9 +3,10 @@
 Отдельный модуль, а не ещё один `QuizType`: обычный тест держится на
 предмете из учебного плана, лекторе и группе (банк вопросов собирается по
 `subject_id`, результаты попадают в ведомости и статистику преподавателя).
-Здесь свои «fanlar» — их заводит админ, к ним не привязан преподаватель;
-вопросы принадлежат самому тесту, а результаты живут в своих таблицах и не
-смешиваются с академическими.
+Здесь свои «fanlar» — их заводит админ, к ним не привязан преподаватель.
+Вопросы — банк fan'а (`general_test_questions.subject_id`): каждый тест
+этого fan'а берёт из банка случайные `question_number` вопросов. Результаты
+живут в своих таблицах и не смешиваются с академическими.
 
 Кто видит тест: он должен быть активен, и пользователь либо назначен на его
 fan (`general_test_subject_users` — любой пользователь, не только
@@ -46,6 +47,14 @@ class GeneralTestSubject(Base, IdIntPk, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
+    questions: Mapped[list[GeneralTestQuestion]] = relationship(
+        "GeneralTestQuestion",
+        back_populates="subject",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="(GeneralTestQuestion.order, GeneralTestQuestion.id)",
+    )
+
     def __str__(self) -> str:
         return self.name
 
@@ -72,6 +81,10 @@ class GeneralTestGroup(Base, IdIntPk, TimestampMixin):
         ForeignKey("general_tests.id", ondelete="CASCADE"), nullable=False, index=True
     )
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    #: Guruh uchun yoqilganmi. O'chirilgan guruh testga biriktirilgan bo'lib
+    #: qoladi (ro'yxatda turadi, qayta yoqish bir bosish), lekin uning
+    #: talabalari testni ko'rmaydi va boshlay olmaydi.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)
 
     group: Mapped[Group] = relationship("Group")
 
@@ -94,8 +107,8 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     duration: Mapped[int] = mapped_column(Integer, nullable=False, server_default="30")
     #: Сколько попыток даётся одному пользователю.
     attempt_limit: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    #: Сколько вопросов достаётся одной попытке — случайные из всех вопросов
-    #: теста. NULL — все. Вопросов меньше, чем задано, — выдаются все, что есть:
+    #: Сколько вопросов достаётся одной попытке — случайные из банка fan'а.
+    #: NULL — все. Вопросов меньше, чем задано, — выдаются все, что есть:
     #: удалённый вопрос не должен ломать старт уже активного теста.
     question_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Неактивный тест не виден в списке «пройти» и не стартует. Активный
@@ -106,12 +119,6 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     )
 
     subject: Mapped[GeneralTestSubject] = relationship("GeneralTestSubject")
-    questions: Mapped[list[GeneralTestQuestion]] = relationship(
-        "GeneralTestQuestion",
-        back_populates="test",
-        cascade="all, delete-orphan",
-        order_by="(GeneralTestQuestion.order, GeneralTestQuestion.id)",
-    )
     group_links: Mapped[list[GeneralTestGroup]] = relationship(
         "GeneralTestGroup", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -121,10 +128,12 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
 
 
 class GeneralTestQuestion(Base, IdIntPk, TimestampMixin):
+    """Savol fanning bankida turadi; fan testlari undan tasodifiy oladi."""
+
     __tablename__ = "general_test_questions"
 
-    test_id: Mapped[int] = mapped_column(
-        ForeignKey("general_tests.id", ondelete="CASCADE"), nullable=False, index=True
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("general_test_subjects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     option_a: Mapped[str] = mapped_column(Text, nullable=False)
@@ -135,7 +144,7 @@ class GeneralTestQuestion(Base, IdIntPk, TimestampMixin):
     correct_option: Mapped[str] = mapped_column(String(1), nullable=False, server_default="a")
     order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
-    test: Mapped[GeneralTest] = relationship("GeneralTest", back_populates="questions")
+    subject: Mapped[GeneralTestSubject] = relationship("GeneralTestSubject", back_populates="questions")
 
     def option(self, letter: str) -> str:
         return getattr(self, f"option_{letter}")

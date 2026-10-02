@@ -132,3 +132,53 @@ async def test_topics_vanish_with_the_course(auth_client, async_db, course_for_t
         select(func.count()).select_from(IndependentTopic).where(IndependentTopic.course_id == course_id)
     )
     assert left == 0
+
+
+@pytest.mark.asyncio
+async def test_topic_attachments_are_saved_and_tracked(auth_client, async_db, course_for_topics):
+    """Kutubxonadan biriktirilgan fayl mavzuda saqlanadi va «ishlatilgan» deb belgilanadi."""
+    from sqlalchemy import select
+
+    from app.modules.file.model import FileBlob, FileUsage, StoredFile
+    from app.modules.file.storage import public_url
+
+    blob = FileBlob(sha256="b" * 64, stored_path="resources/mavzu.pdf", size_bytes=10, mime_type="application/pdf")
+    async_db.add(blob)
+    await async_db.flush()
+    stored = StoredFile(blob_id=blob.id, owner_user_id=1, title="Mavzu materiali", original_name="mavzu.pdf")
+    async_db.add(stored)
+    await async_db.commit()
+    stored_id = stored.id
+
+    attachment = {
+        "name": "Mavzu materiali",
+        "url": public_url("resources/mavzu.pdf"),
+        "size": 10,
+        "type": "application/pdf",
+    }
+    created = await auth_client.post(
+        f"/course/{course_for_topics['course_id']}/independent-topics",
+        json={"title": "Fayl bilan", "attachments": [attachment]},
+    )
+    assert created.status_code == 201, created.text
+    topic = created.json()
+    assert topic["attachments"] == [attachment]
+
+    async def usages() -> list[int]:
+        async_db.expire_all()
+        rows = await async_db.execute(
+            select(FileUsage.file_id).where(
+                FileUsage.entity_type == "independent_topic", FileUsage.entity_id == topic["id"]
+            )
+        )
+        return list(rows.scalars().all())
+
+    assert await usages() == [stored_id]
+
+    # Fayl olib tashlansa — ishlatilish yozuvi ham ketadi.
+    updated = await auth_client.put(
+        f"/course/independent-topics/{topic['id']}", json={"title": "Fayl bilan", "attachments": []}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["attachments"] == []
+    assert await usages() == []

@@ -43,7 +43,7 @@ async def scene(async_db, auth_client, test_faculty, make_group):
     assert test.status_code == 201, test.text
     test_id = test.json()["id"]
     question = await auth_client.post(
-        f"/general-test/{test_id}/question",
+        f"/general-test/subject/{subject_id}/question",
         json={"text": "2+2?", "option_a": "4", "option_b": "3", "option_c": "5", "option_d": "6"},
     )
     assert question.status_code == 201, question.text
@@ -182,7 +182,7 @@ async def test_question_number_limits_each_attempt(auth_client, async_client, sc
     test_id = scene["test_id"]
     for text in ("3+3?", "4+4?"):
         created = await auth_client.post(
-            f"/general-test/{test_id}/question",
+            f"/general-test/subject/{scene['subject_id']}/question",
             json={"text": text, "option_a": "x", "option_b": "y", "option_c": "z", "option_d": "w"},
         )
         assert created.status_code == 201
@@ -247,3 +247,98 @@ async def test_title_follows_subject_and_groups(auth_client, scene):
     assert created.status_code == 201
     assert created.json()["title"] == "Raqamli savodxonlik — GT-202"
     assert [g["id"] for g in created.json()["groups"]] == [scene["other_group_id"]]
+
+
+@pytest.mark.asyncio
+async def test_questions_live_in_subject_bank(auth_client, async_client, scene):
+    subject_id = scene["subject_id"]
+    bank = await auth_client.get(f"/general-test/subject/{subject_id}/questions")
+    assert bank.status_code == 200
+    assert [q["text"] for q in bank.json()["questions"]] == ["2+2?"]
+    assert bank.json()["questions"][0]["subject_id"] == subject_id
+
+    subject = await auth_client.get(f"/general-test/subject/{subject_id}")
+    assert subject.json()["question_count"] == 1
+
+    # Ikkinchi test ham o'sha bankdan oladi — o'zining savoli yo'q.
+    second = await auth_client.post(
+        "/general-test/", json={"subject_id": subject_id, "group_ids": [scene["group_id"]], "is_active": True}
+    )
+    assert second.json()["question_count"] == 1
+    assert "questions" not in second.json()
+
+    headers = await _login(async_client, "gt_student")
+    state = await async_client.post(f"/general-test/{second.json()['id']}/start", headers=headers)
+    assert state.status_code == 200, state.text
+    assert [q["text"] for q in state.json()["questions"]] == ["2+2?"]
+
+    # Bo'sh fanning testi boshlanmaydi.
+    empty = await auth_client.post("/general-test/subject", json={"name": "Bo'sh fan"})
+    lonely = await auth_client.post(
+        "/general-test/",
+        json={"subject_id": empty.json()["id"], "group_ids": [scene["group_id"]], "is_active": True},
+    )
+    refused = await async_client.post(f"/general-test/{lonely.json()['id']}/start", headers=headers)
+    assert refused.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_group_can_be_hidden_without_unassigning(auth_client, async_client, scene):
+    """Guruh uchun test yashiriladi: biriktirma qoladi, talaba ko'rmaydi."""
+    test_id = scene["test_id"]
+    added = await auth_client.post(
+        f"/general-test/{test_id}/groups", json={"group_ids": [scene["group_id"], scene["other_group_id"]]}
+    )
+    assert added.status_code == 200, added.text
+    assert all(g["is_active"] for g in added.json()["groups"])
+    assert await _available(async_client, "gt_student") == [test_id]
+    assert await _available(async_client, "gt_stranger") == [test_id]
+
+    hidden = await auth_client.patch(
+        f"/general-test/{test_id}/groups/{scene['group_id']}", json={"is_active": False}
+    )
+    assert hidden.status_code == 200, hidden.text
+    state = {g["id"]: g["is_active"] for g in hidden.json()["groups"]}
+    assert state == {scene["group_id"]: False, scene["other_group_id"]: True}
+
+    # Yashirilgan guruh talabasi testni ko'rmaydi va boshlay olmaydi,
+    # boshqa guruh esa ko'rishda davom etadi.
+    assert await _available(async_client, "gt_student") == []
+    start = await async_client.post(
+        f"/general-test/{test_id}/start", headers=await _login(async_client, "gt_student")
+    )
+    assert start.status_code == 404
+    assert await _available(async_client, "gt_stranger") == [test_id]
+
+    shown = await auth_client.patch(
+        f"/general-test/{test_id}/groups/{scene['group_id']}", json={"is_active": True}
+    )
+    assert shown.status_code == 200, shown.text
+    assert await _available(async_client, "gt_student") == [test_id]
+
+    missing = await auth_client.patch(f"/general-test/{test_id}/groups/999999", json={"is_active": True})
+    assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_question_image_upload_and_html_question(auth_client, scene, monkeypatch, tmp_path):
+    """Savol muharriri rasmni elementar bo'limning o'z manzili orqali yuklaydi
+    va HTML matnli savol bankda shundayligicha saqlanadi."""
+    from core.config import settings
+
+    monkeypatch.setattr(settings.file_url, "upload_dir", str(tmp_path))
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64 + b"gt-question"
+    uploaded = await auth_client.post(
+        "/general-test/question/upload_image", files={"file": ("rasm.png", png, "image/png")}
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    url = uploaded.json()["url"]
+    assert url
+
+    html = f'<p>Rasmga qarang:</p><img src="{url}" alt="savol-rasm" />'
+    created = await auth_client.post(
+        f"/general-test/subject/{scene['subject_id']}/question",
+        json={"text": html, "option_a": "<p>4</p>", "option_b": "3", "option_c": "5", "option_d": "6"},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["text"] == html

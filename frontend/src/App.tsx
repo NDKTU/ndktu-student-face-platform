@@ -68,6 +68,7 @@ const GeneralTestTakeListPage = lazy(() => import('@/pages/GeneralTestTakeListPa
 const GeneralTestTakePage = lazy(() => import('@/pages/GeneralTestTakePage'));
 const GeneralTestSubjectsPage = lazy(() => import('@/pages/GeneralTestSubjectsPage'));
 const GeneralTestSubjectDetailPage = lazy(() => import('@/pages/GeneralTestSubjectDetailPage'));
+const GeneralTestQuestionFormPage = lazy(() => import('@/pages/GeneralTestQuestionFormPage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
 const PublicQuizPage = lazy(() => import('@/pages/PublicQuizPage'));
@@ -366,6 +367,8 @@ function App() {
                                         <Route path="/elementar-tests/results" element={<PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/subjects" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectsPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/subjects/:id" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectDetailPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects/:subjectId/questions/new" element={<PermissionRoute permission="update:general_test_subject"><GeneralTestQuestionFormPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects/:subjectId/questions/:questionId/edit" element={<PermissionRoute permission="update:general_test_subject"><GeneralTestQuestionFormPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/:id" element={<PermissionRoute permission="read:general_test"><GeneralTestDetailPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />

@@ -2,8 +2,9 @@ import api from './api';
 
 /**
  * Elementar test (ilgari «Umumiy test») — admin ochgan fanga tegishli oddiy
- * test. Savollari testning o'ziniki, natijalari oddiy test natijalaridan
- * alohida saqlanadi (`backend/app/modules/general_test`).
+ * test. Savollar fanning bankida turadi: fan testlari undan tasodifiy oladi.
+ * Natijalar oddiy test natijalaridan alohida saqlanadi
+ * (`backend/app/modules/general_test`).
  *
  * Faol testni ikki xil odam ko'radi: fanga biriktirilgan foydalanuvchilar
  * (o'qituvchi bo'lishi shart emas — talaba ham, xodim ham) va testga
@@ -21,6 +22,8 @@ export interface GeneralTestSubject extends SubjectRef {
     description: string | null;
     user_count: number;
     test_count: number;
+    /** Fan savollar bankidagi savollar. */
+    question_count: number;
     created_at: string;
 }
 
@@ -101,7 +104,7 @@ export interface GeneralTestSummary {
 
 export interface GeneralTestQuestion {
     id: number;
-    test_id: number;
+    subject_id: number;
     text: string;
     option_a: string;
     option_b: string;
@@ -111,9 +114,13 @@ export interface GeneralTestQuestion {
     order: number;
 }
 
+/** Testga biriktirilgan guruh. `is_active: false` — guruh uchun yashirilgan. */
+export interface TestGroup extends GroupOption {
+    is_active: boolean;
+}
+
 export interface GeneralTestDetail extends GeneralTestSummary {
-    questions: GeneralTestQuestion[];
-    groups: GroupOption[];
+    groups: TestGroup[];
 }
 
 export interface GeneralTestListResponse {
@@ -262,6 +269,8 @@ export const generalTestService = {
         (await api.get<{ groups: GroupOption[] }>('/general-test/group-options', { params: filter })).data.groups,
     addGroups: async (testId: number, groupIds: number[]) =>
         (await api.post<GeneralTestDetail>(`/general-test/${testId}/groups`, { group_ids: groupIds })).data,
+    setGroupActive: async (testId: number, groupId: number, isActive: boolean) =>
+        (await api.patch<GeneralTestDetail>(`/general-test/${testId}/groups/${groupId}`, { is_active: isActive })).data,
     removeGroup: async (testId: number, groupId: number) =>
         (await api.delete<GeneralTestDetail>(`/general-test/${testId}/groups/${groupId}`)).data,
 
@@ -280,17 +289,21 @@ export const generalTestService = {
         await api.delete(`/general-test/${id}`);
     },
 
-    createQuestion: async (testId: number, data: QuestionPayload) =>
-        (await api.post<GeneralTestQuestion>(`/general-test/${testId}/question`, data)).data,
+    // ── Fan savollar banki ───────────────────────────────────────────────
+    subjectQuestions: async (subjectId: number) =>
+        (await api.get<{ questions: GeneralTestQuestion[] }>(`/general-test/subject/${subjectId}/questions`)).data
+            .questions,
+    createQuestion: async (subjectId: number, data: QuestionPayload) =>
+        (await api.post<GeneralTestQuestion>(`/general-test/subject/${subjectId}/question`, data)).data,
     updateQuestion: async (id: number, data: QuestionPayload) =>
         (await api.put<GeneralTestQuestion>(`/general-test/question/${id}`, data)).data,
     removeQuestion: async (id: number) => {
         await api.delete(`/general-test/question/${id}`);
     },
-    uploadExcel: async (testId: number, file: File) => {
+    uploadExcel: async (subjectId: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return (await api.post<UploadResponse>(`/general-test/${testId}/upload_excel`, formData)).data;
+        return (await api.post<UploadResponse>(`/general-test/subject/${subjectId}/upload_excel`, formData)).data;
     },
     downloadTemplate: async () => {
         const response = await api.get('/general-test/excel_template', { responseType: 'blob' });
