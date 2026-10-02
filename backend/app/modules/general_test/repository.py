@@ -6,37 +6,60 @@ import random
 from datetime import timedelta
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import and_, delete, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
-from app.modules.auth.model import Student, Teacher, User
-from app.modules.organization_structure.model import Group
+from app.modules.auth.model import Role, Student, Teacher, User, UserRole
+from app.modules.organization_structure.model import Faculty, Group, Kafedra
 from app.modules.quiz.question.excel_format import parse_correct_option, resolve_columns
 
-from .model import GeneralTest, GeneralTestAnswer, GeneralTestAttempt, GeneralTestQuestion
+from .model import (
+    GeneralTest,
+    GeneralTestAnswer,
+    GeneralTestAttempt,
+    GeneralTestGroup,
+    GeneralTestQuestion,
+    GeneralTestSubject,
+    GeneralTestSubjectUser,
+)
 from .schemas import (
     AnswerRequest,
     AttemptResult,
     AttemptState,
     AvailableTest,
     AvailableTestListResponse,
+    FilterOption,
+    FilterOptionsResponse,
     GeneralTestCreateRequest,
     GeneralTestDetail,
     GeneralTestListResponse,
     GeneralTestSummary,
     GeneralTestUpdateRequest,
+    GroupOption,
+    GroupOptionListResponse,
     MyResultListResponse,
     QuestionCreateRequest,
     QuestionUpdateRequest,
     ResultListRequest,
     ResultListResponse,
     ResultRow,
+    SubjectCreateRequest,
+    SubjectListResponse,
+    SubjectSummary,
+    SubjectUpdateRequest,
+    SubjectUserListResponse,
+    SubjectUserRow,
+    SubjectUsersAddRequest,
+    SubjectUsersAddResponse,
     TakeOption,
     TakeQuestion,
+    TestGroupsAddRequest,
     UploadResponse,
+    UserFilter,
+    UserListRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,11 +90,446 @@ def _is_expired(attempt: GeneralTestAttempt, test: GeneralTest) -> bool:
     return utcnow_naive() > _deadline(attempt, test) + timedelta(seconds=GRACE_SECONDS)
 
 
+def _latest_student():
+    """Har bir foydalanuvchining bitta talaba yozuvi — oxirgisi.
+
+    `students.user_id` не уникален (бывают повторные записи из HEMIS):
+    прямой join размножил бы строку. Берём одну — последнюю.
+    """
+    return (
+        select(Student.id, Student.user_id, Student.full_name, Student.group_id)
+        .distinct(Student.user_id)
+        .where(Student.user_id.is_not(None))
+        .order_by(Student.user_id, Student.id.desc())
+        .subquery()
+    )
+
+
+def _visible_to(user_id: int):
+    """Test shu foydalanuvchiga ko'rinadimi (faollikdan tashqari).
+
+    Ikki yo'l: foydalanuvchi testning faniga biriktirilgan yoki testga
+    biriktirilgan guruhlardan birida o'qiydi. Ikkalasi ham bo'lmasa — hech kim
+    ko'rmaydi: «hamma uchun» degan holat endi yo'q.
+    """
+    own_groups = select(Student.group_id).where(Student.user_id == user_id, Student.group_id.is_not(None))
+    by_subject = (
+        select(GeneralTestSubjectUser.id)
+        .where(
+            GeneralTestSubjectUser.subject_id == GeneralTest.subject_id,
+            GeneralTestSubjectUser.user_id == user_id,
+        )
+        .exists()
+    )
+    by_group = (
+        select(GeneralTestGroup.id)
+        .where(GeneralTestGroup.test_id == GeneralTest.id, GeneralTestGroup.group_id.in_(own_groups))
+        .exists()
+    )
+    return or_(by_subject, by_group)
+
+
+#: Nomda shuncha guruh yoziladi, qolgani «va yana N ta guruh» bo'lib qisqaradi.
+TITLE_GROUPS = 3
+
+
+def _compose_title(subject_name: str, group_names: list[str]) -> str:
+    """Test nomi: «Fan — 101-21, 102-21». Guruhsiz — fan nomining o'zi."""
+    names = sorted(group_names)
+    if not names:
+        return subject_name[:255]
+    shown = ", ".join(names[:TITLE_GROUPS])
+    rest = len(names) - TITLE_GROUPS
+    tail = f" va yana {rest} ta guruh" if rest > 0 else ""
+    return f"{subject_name} — {shown}{tail}"[:255]
+
+
+def _per_attempt(test: GeneralTest, available: int) -> int:
+    """Bitta urinishga beriladigan savollar: sozlangan son, lekin bor savoldan ko'p emas."""
+    return min(test.question_number, available) if test.question_number else available
+
+
+def _user_kind(student_id: int | None, teacher_id: int | None) -> str:
+    return "student" if student_id else "teacher" if teacher_id else "boshqa"
+
+
 class GeneralTestRepository:
+    # ── Fan ──────────────────────────────────────────────────────────────────
+
+    async def _get_subject(self, session: AsyncSession, subject_id: int) -> GeneralTestSubject:
+        subject = await session.get(GeneralTestSubject, subject_id)
+        if subject is None:
+            raise _not_found("Fan")
+        return subject
+
+    async def _ensure_unique_name(self, session: AsyncSession, name: str, exclude_id: int | None = None) -> None:
+        stmt = select(GeneralTestSubject.id).where(func.lower(GeneralTestSubject.name) == name.lower())
+        if exclude_id is not None:
+            stmt = stmt.where(GeneralTestSubject.id != exclude_id)
+        if (await session.execute(stmt.limit(1))).scalar_one_or_none() is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bunday nomli fan allaqachon bor")
+
+    async def _subject_counts(
+        self, session: AsyncSession, subject_ids: list[int]
+    ) -> tuple[dict[int, int], dict[int, int]]:
+        """Har bir fanga biriktirilgan foydalanuvchilar va testlar soni."""
+        if not subject_ids:
+            return {}, {}
+        users = dict(
+            (
+                await session.execute(
+                    select(GeneralTestSubjectUser.subject_id, func.count())
+                    .where(GeneralTestSubjectUser.subject_id.in_(subject_ids))
+                    .group_by(GeneralTestSubjectUser.subject_id)
+                )
+            ).all()
+        )
+        tests = dict(
+            (
+                await session.execute(
+                    select(GeneralTest.subject_id, func.count())
+                    .where(GeneralTest.subject_id.in_(subject_ids))
+                    .group_by(GeneralTest.subject_id)
+                )
+            ).all()
+        )
+        return users, tests
+
+    async def _subject_summary(self, session: AsyncSession, subject: GeneralTestSubject) -> SubjectSummary:
+        users, tests = await self._subject_counts(session, [subject.id])
+        return SubjectSummary(
+            id=subject.id,
+            name=subject.name,
+            description=subject.description,
+            created_at=subject.created_at,
+            user_count=users.get(subject.id, 0),
+            test_count=tests.get(subject.id, 0),
+        )
+
+    async def list_subjects(
+        self, session: AsyncSession, page: int, limit: int, search: str | None
+    ) -> SubjectListResponse:
+        stmt = select(GeneralTestSubject)
+        if search and search.strip():
+            stmt = stmt.where(GeneralTestSubject.name.ilike(f"%{search.strip()}%"))
+        total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        subjects = (
+            (
+                await session.execute(
+                    stmt.order_by(GeneralTestSubject.name, GeneralTestSubject.id)
+                    .offset((page - 1) * limit)
+                    .limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        users, tests = await self._subject_counts(session, [s.id for s in subjects])
+        return SubjectListResponse(
+            total=total,
+            page=page,
+            limit=limit,
+            subjects=[
+                SubjectSummary(
+                    id=s.id,
+                    name=s.name,
+                    description=s.description,
+                    created_at=s.created_at,
+                    user_count=users.get(s.id, 0),
+                    test_count=tests.get(s.id, 0),
+                )
+                for s in subjects
+            ],
+        )
+
+    async def get_subject(self, session: AsyncSession, subject_id: int) -> SubjectSummary:
+        return await self._subject_summary(session, await self._get_subject(session, subject_id))
+
+    async def create_subject(self, session: AsyncSession, data: SubjectCreateRequest, user: User) -> SubjectSummary:
+        await self._ensure_unique_name(session, data.name)
+        subject = GeneralTestSubject(
+            name=data.name,
+            description=(data.description or "").strip() or None,
+            created_by_user_id=user.id,
+        )
+        session.add(subject)
+        await session.commit()
+        await session.refresh(subject)
+        return await self._subject_summary(session, subject)
+
+    async def update_subject(
+        self, session: AsyncSession, subject_id: int, data: SubjectUpdateRequest
+    ) -> SubjectSummary:
+        subject = await self._get_subject(session, subject_id)
+        values = data.model_dump(exclude_unset=True)
+        renamed = bool(values.get("name")) and values["name"] != subject.name
+        if values.get("name"):
+            await self._ensure_unique_name(session, values["name"], exclude_id=subject_id)
+            subject.name = values["name"]
+        if "description" in values:
+            subject.description = (values["description"] or "").strip() or None
+        if renamed:
+            # Testlar nomi fan nomidan tuziladi.
+            await session.flush()
+            for test_id in (
+                await session.execute(select(GeneralTest.id).where(GeneralTest.subject_id == subject_id))
+            ).scalars():
+                await self._retitle(session, test_id)
+        await session.commit()
+        await session.refresh(subject)
+        return await self._subject_summary(session, subject)
+
+    async def delete_subject(self, session: AsyncSession, subject_id: int) -> None:
+        subject = await self._get_subject(session, subject_id)
+        has_tests = (
+            await session.execute(select(GeneralTest.id).where(GeneralTest.subject_id == subject_id).limit(1))
+        ).scalar_one_or_none()
+        if has_tests is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Fanda testlar bor. Avval testlarni o'chiring yoki boshqa fanga o'tkazing",
+            )
+        await session.delete(subject)
+        await session.commit()
+
+    # ── Fan foydalanuvchilari ────────────────────────────────────────────────
+
+    def _users_stmt(self, flt: UserFilter):
+        """Faol foydalanuvchilar: ism, login, guruh va turi bilan.
+
+        O'qituvchi fakulteti kafedra orqali olinadi — «fakultet» filtri
+        talabani guruhi, o'qituvchini kafedrasi bo'yicha topadi.
+        """
+        student = _latest_student()
+        full_name = func.coalesce(student.c.full_name, Teacher.full_name, User.username)
+        stmt = (
+            select(
+                User.id,
+                User.username,
+                full_name.label("full_name"),
+                Group.name.label("group_name"),
+                student.c.id.label("student_id"),
+                Teacher.id.label("teacher_id"),
+            )
+            .select_from(User)
+            .outerjoin(student, student.c.user_id == User.id)
+            .outerjoin(Group, Group.id == student.c.group_id)
+            .outerjoin(Teacher, Teacher.user_id == User.id)
+            .outerjoin(Kafedra, Kafedra.id == Teacher.kafedra_id)
+            .where(User.is_active.is_(True))
+        )
+        if flt.kind == "student":
+            stmt = stmt.where(student.c.id.is_not(None))
+        elif flt.kind == "teacher":
+            stmt = stmt.where(Teacher.id.is_not(None))
+        elif flt.kind == "other":
+            stmt = stmt.where(student.c.id.is_(None), Teacher.id.is_(None))
+        if flt.role_id:
+            stmt = stmt.where(
+                select(UserRole.id).where(UserRole.user_id == User.id, UserRole.role_id == flt.role_id).exists()
+            )
+        if flt.faculty_id:
+            stmt = stmt.where(or_(Group.faculty_id == flt.faculty_id, Kafedra.faculty_id == flt.faculty_id))
+        if flt.group_id:
+            stmt = stmt.where(student.c.group_id == flt.group_id)
+        if flt.course:
+            stmt = stmt.where(Group.course == flt.course)
+        if flt.search and flt.search.strip():
+            like = f"%{flt.search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    student.c.full_name.ilike(like),
+                    Teacher.full_name.ilike(like),
+                    User.username.ilike(like),
+                    Group.name.ilike(like),
+                )
+            )
+        return stmt, full_name
+
+    async def _page_users(
+        self, session: AsyncSession, stmt, full_name, request: UserListRequest, with_assigned: bool
+    ) -> SubjectUserListResponse:
+        total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        rows = (
+            await session.execute(
+                stmt.order_by(full_name, User.id).offset((request.page - 1) * request.limit).limit(request.limit)
+            )
+        ).all()
+        return SubjectUserListResponse(
+            total=total,
+            page=request.page,
+            limit=request.limit,
+            users=[
+                SubjectUserRow(
+                    user_id=r.id,
+                    full_name=r.full_name or "—",
+                    username=r.username,
+                    user_kind=_user_kind(r.student_id, r.teacher_id),
+                    group_name=r.group_name,
+                    assigned=bool(r.assigned) if with_assigned else True,
+                )
+                for r in rows
+            ],
+        )
+
+    async def list_subject_users(
+        self, session: AsyncSession, subject_id: int, request: UserListRequest
+    ) -> SubjectUserListResponse:
+        await self._get_subject(session, subject_id)
+        stmt, full_name = self._users_stmt(request)
+        stmt = stmt.join(
+            GeneralTestSubjectUser,
+            and_(GeneralTestSubjectUser.user_id == User.id, GeneralTestSubjectUser.subject_id == subject_id),
+        )
+        return await self._page_users(session, stmt, full_name, request, with_assigned=False)
+
+    async def list_candidates(
+        self, session: AsyncSession, subject_id: int, request: UserListRequest
+    ) -> SubjectUserListResponse:
+        """Fanga qo'shish uchun foydalanuvchilar — o'qituvchi bo'lishi shart emas."""
+        await self._get_subject(session, subject_id)
+        stmt, full_name = self._users_stmt(request)
+        assigned = (
+            select(GeneralTestSubjectUser.id)
+            .where(GeneralTestSubjectUser.subject_id == subject_id, GeneralTestSubjectUser.user_id == User.id)
+            .exists()
+        )
+        stmt = stmt.add_columns(assigned.label("assigned"))
+        return await self._page_users(session, stmt, full_name, request, with_assigned=True)
+
+    async def add_subject_users(
+        self, session: AsyncSession, subject_id: int, data: SubjectUsersAddRequest
+    ) -> SubjectUsersAddResponse:
+        await self._get_subject(session, subject_id)
+        if data.filter is not None:
+            stmt, _ = self._users_stmt(data.filter)
+            ids = stmt.with_only_columns(User.id).subquery()
+            source = select(literal(subject_id), ids.c.id)
+        elif data.user_ids:
+            source = select(literal(subject_id), User.id).where(User.id.in_(set(data.user_ids)))
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Foydalanuvchi tanlanmagan")
+
+        result = await session.execute(
+            pg_insert(GeneralTestSubjectUser)
+            .from_select(["subject_id", "user_id"], source)
+            .on_conflict_do_nothing(constraint="uq_general_test_subject_user")
+        )
+        await session.commit()
+        return SubjectUsersAddResponse(added=max(result.rowcount or 0, 0))
+
+    async def remove_subject_user(self, session: AsyncSession, subject_id: int, user_id: int) -> None:
+        result = await session.execute(
+            delete(GeneralTestSubjectUser).where(
+                GeneralTestSubjectUser.subject_id == subject_id, GeneralTestSubjectUser.user_id == user_id
+            )
+        )
+        if not result.rowcount:
+            raise _not_found("Biriktirilgan foydalanuvchi")
+        await session.commit()
+
+    async def filter_options(self, session: AsyncSession) -> FilterOptionsResponse:
+        roles = (await session.execute(select(Role.id, Role.name).order_by(Role.name))).all()
+        faculties = (
+            await session.execute(
+                select(Faculty.id, Faculty.name).where(Faculty.is_active.is_(True)).order_by(Faculty.name)
+            )
+        ).all()
+        return FilterOptionsResponse(
+            roles=[FilterOption(id=r.id, name=r.name) for r in roles],
+            faculties=[FilterOption(id=f.id, name=f.name) for f in faculties],
+        )
+
+    # ── Guruhlar ─────────────────────────────────────────────────────────────
+
+    async def _group_options(self, session: AsyncSession, stmt) -> list[GroupOption]:
+        """Guruhlar fakultet nomi va tizimga kira oladigan talabalar soni bilan."""
+        counts = (
+            select(Student.group_id, func.count(func.distinct(Student.user_id)).label("n"))
+            .where(Student.user_id.is_not(None))
+            .group_by(Student.group_id)
+            .subquery()
+        )
+        rows = (
+            await session.execute(
+                stmt.add_columns(Faculty.name.label("faculty_name"), func.coalesce(counts.c.n, 0).label("n"))
+                .outerjoin(Faculty, Faculty.id == Group.faculty_id)
+                .outerjoin(counts, counts.c.group_id == Group.id)
+                .order_by(Group.name, Group.id)
+            )
+        ).all()
+        return [
+            GroupOption(id=r[0].id, name=r[0].name, faculty_name=r.faculty_name, course=r[0].course, student_count=r.n)
+            for r in rows
+        ]
+
+    async def group_options(
+        self, session: AsyncSession, search: str | None, faculty_id: int | None, course: int | None, limit: int
+    ) -> GroupOptionListResponse:
+        stmt = select(Group).where(Group.is_active.is_(True))
+        if search and search.strip():
+            stmt = stmt.where(Group.name.ilike(f"%{search.strip()}%"))
+        if faculty_id:
+            stmt = stmt.where(Group.faculty_id == faculty_id)
+        if course:
+            stmt = stmt.where(Group.course == course)
+        return GroupOptionListResponse(groups=await self._group_options(session, stmt.limit(limit)))
+
+    async def add_test_groups(self, session: AsyncSession, test_id: int, data: TestGroupsAddRequest) -> GeneralTestDetail:
+        await self._get_test(session, test_id)
+        await session.execute(
+            pg_insert(GeneralTestGroup)
+            .from_select(
+                ["test_id", "group_id"],
+                select(literal(test_id), Group.id).where(Group.id.in_(set(data.group_ids))),
+            )
+            .on_conflict_do_nothing(constraint="uq_general_test_group")
+        )
+        await self._retitle(session, test_id)
+        await session.commit()
+        return await self.get_test(session, test_id)
+
+    async def remove_test_group(self, session: AsyncSession, test_id: int, group_id: int) -> GeneralTestDetail:
+        result = await session.execute(
+            delete(GeneralTestGroup).where(GeneralTestGroup.test_id == test_id, GeneralTestGroup.group_id == group_id)
+        )
+        if not result.rowcount:
+            raise _not_found("Biriktirilgan guruh")
+        await self._retitle(session, test_id)
+        await session.commit()
+        return await self.get_test(session, test_id)
+
     # ── Тест ─────────────────────────────────────────────────────────────────
 
+    async def _retitle(self, session: AsyncSession, test_id: int) -> None:
+        """Nomni bazadagi joriy fan va guruhlardan qayta tuzadi (commit chaqiruvchida)."""
+        subject_name = (
+            await session.execute(
+                select(GeneralTestSubject.name)
+                .join(GeneralTest, GeneralTest.subject_id == GeneralTestSubject.id)
+                .where(GeneralTest.id == test_id)
+            )
+        ).scalar_one()
+        group_names = (
+            (
+                await session.execute(
+                    select(Group.name)
+                    .join(GeneralTestGroup, GeneralTestGroup.group_id == Group.id)
+                    .where(GeneralTestGroup.test_id == test_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        await session.execute(
+            update(GeneralTest)
+            .where(GeneralTest.id == test_id)
+            .values(title=_compose_title(subject_name, list(group_names)))
+            .execution_options(synchronize_session="fetch")
+        )
+
     async def _get_test(self, session: AsyncSession, test_id: int, with_questions: bool = False) -> GeneralTest:
-        stmt = select(GeneralTest).where(GeneralTest.id == test_id)
+        stmt = select(GeneralTest).options(selectinload(GeneralTest.subject)).where(GeneralTest.id == test_id)
         if with_questions:
             stmt = stmt.options(selectinload(GeneralTest.questions))
         test = (await session.execute(stmt)).scalar_one_or_none()
@@ -79,10 +537,12 @@ class GeneralTestRepository:
             raise _not_found()
         return test
 
-    async def _counts(self, session: AsyncSession, test_ids: list[int]) -> tuple[dict[int, int], dict[int, int]]:
-        """Число вопросов и завершённых попыток по каждому тесту."""
+    async def _counts(
+        self, session: AsyncSession, test_ids: list[int]
+    ) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
+        """Число вопросов, завершённых попыток и назначенных групп по каждому тесту."""
         if not test_ids:
-            return {}, {}
+            return {}, {}, {}
         questions = dict(
             (
                 await session.execute(
@@ -101,20 +561,39 @@ class GeneralTestRepository:
                 )
             ).all()
         )
-        return questions, attempts
+        groups = dict(
+            (
+                await session.execute(
+                    select(GeneralTestGroup.test_id, func.count())
+                    .where(GeneralTestGroup.test_id.in_(test_ids))
+                    .group_by(GeneralTestGroup.test_id)
+                )
+            ).all()
+        )
+        return questions, attempts, groups
 
-    async def _summary(self, session: AsyncSession, test: GeneralTest) -> GeneralTestSummary:
-        questions, attempts = await self._counts(session, [test.id])
+    @staticmethod
+    def _with_counts(test: GeneralTest, counts) -> GeneralTestSummary:
+        questions, attempts, groups = counts
         return GeneralTestSummary.model_validate(test).model_copy(
-            update={"question_count": questions.get(test.id, 0), "attempt_count": attempts.get(test.id, 0)}
+            update={
+                "question_count": questions.get(test.id, 0),
+                "attempt_count": attempts.get(test.id, 0),
+                "group_count": groups.get(test.id, 0),
+            }
         )
 
+    async def _summary(self, session: AsyncSession, test: GeneralTest) -> GeneralTestSummary:
+        return self._with_counts(test, await self._counts(session, [test.id]))
+
     async def list_tests(
-        self, session: AsyncSession, page: int, limit: int, search: str | None
+        self, session: AsyncSession, page: int, limit: int, search: str | None, subject_id: int | None = None
     ) -> GeneralTestListResponse:
-        stmt = select(GeneralTest)
+        stmt = select(GeneralTest).options(selectinload(GeneralTest.subject))
         if search and search.strip():
             stmt = stmt.where(GeneralTest.title.ilike(f"%{search.strip()}%"))
+        if subject_id:
+            stmt = stmt.where(GeneralTest.subject_id == subject_id)
         total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
         tests = (
             (
@@ -125,29 +604,44 @@ class GeneralTestRepository:
             .scalars()
             .all()
         )
-        questions, attempts = await self._counts(session, [t.id for t in tests])
+        counts = await self._counts(session, [t.id for t in tests])
         return GeneralTestListResponse(
             total=total,
             page=page,
             limit=limit,
-            tests=[
-                GeneralTestSummary.model_validate(t).model_copy(
-                    update={"question_count": questions.get(t.id, 0), "attempt_count": attempts.get(t.id, 0)}
-                )
-                for t in tests
-            ],
+            tests=[self._with_counts(t, counts) for t in tests],
         )
 
     async def get_test(self, session: AsyncSession, test_id: int) -> GeneralTestDetail:
         test = await self._get_test(session, test_id, with_questions=True)
         summary = await self._summary(session, test)
-        return GeneralTestDetail(**summary.model_dump(), questions=test.questions)
+        groups = await self._group_options(
+            session,
+            select(Group).join(GeneralTestGroup, GeneralTestGroup.group_id == Group.id).where(
+                GeneralTestGroup.test_id == test_id
+            ),
+        )
+        return GeneralTestDetail(**summary.model_dump(), questions=test.questions, groups=groups)
 
     async def create_test(
         self, session: AsyncSession, data: GeneralTestCreateRequest, user: User
     ) -> GeneralTestDetail:
-        test = GeneralTest(**data.model_dump(), created_by_user_id=user.id)
+        subject = await self._get_subject(session, data.subject_id)
+        test = GeneralTest(
+            **data.model_dump(exclude={"group_ids"}), title=subject.name, created_by_user_id=user.id
+        )
         session.add(test)
+        await session.flush()
+        if data.group_ids:
+            await session.execute(
+                pg_insert(GeneralTestGroup)
+                .from_select(
+                    ["test_id", "group_id"],
+                    select(literal(test.id), Group.id).where(Group.id.in_(set(data.group_ids))),
+                )
+                .on_conflict_do_nothing(constraint="uq_general_test_group")
+            )
+            await self._retitle(session, test.id)
         await session.commit()
         return await self.get_test(session, test.id)
 
@@ -155,11 +649,22 @@ class GeneralTestRepository:
         self, session: AsyncSession, test_id: int, data: GeneralTestUpdateRequest
     ) -> GeneralTestDetail:
         test = await self._get_test(session, test_id)
+        subject_changed = False
         for field, value in data.model_dump(exclude_unset=True).items():
-            if field == "title" and value is None:
-                continue
+            if field == "subject_id":
+                if value is None or value == test.subject_id:
+                    continue
+                await self._get_subject(session, value)
+                subject_changed = True
             setattr(test, field, value)
+        if subject_changed:
+            await session.flush()
+            await self._retitle(session, test_id)
         await session.commit()
+        # Sessiya `expire_on_commit=False`: yuklangan `test.subject` fan
+        # almashtirilgandan keyin ham eskisi bo'lib qolardi va javobda eski
+        # fan nomi qaytardi.
+        session.expire(test)
         return await self.get_test(session, test_id)
 
     async def delete_test(self, session: AsyncSession, test_id: int) -> None:
@@ -340,10 +845,15 @@ class GeneralTestRepository:
     async def list_available(self, session: AsyncSession, user: User) -> AvailableTestListResponse:
         await self._close_expired(session, user.id)
 
-        active = select(GeneralTest).where(GeneralTest.is_active.is_(True)).order_by(GeneralTest.id.desc())
+        active = (
+            select(GeneralTest)
+            .options(selectinload(GeneralTest.subject))
+            .where(GeneralTest.is_active.is_(True), _visible_to(user.id))
+            .order_by(GeneralTest.id.desc())
+        )
         tests = (await session.execute(active)).scalars().all()
         ids = [t.id for t in tests]
-        question_counts, _ = await self._counts(session, ids)
+        question_counts, _, _ = await self._counts(session, ids)
 
         mine = (
             (
@@ -367,11 +877,11 @@ class GeneralTestRepository:
             result.append(
                 AvailableTest(
                     id=test.id,
+                    subject_name=test.subject.name,
                     title=test.title,
-                    description=test.description,
                     duration=test.duration,
                     attempt_limit=test.attempt_limit,
-                    question_count=question_counts.get(test.id, 0),
+                    question_count=_per_attempt(test, question_counts.get(test.id, 0)),
                     attempts_used=len(own),
                     in_progress_attempt_id=in_progress,
                     best_score=max(scores) if scores else None,
@@ -424,6 +934,13 @@ class GeneralTestRepository:
         await session.execute(text("SELECT pg_advisory_xact_lock(:a, :b)"), {"a": 7301 + test_id, "b": user.id})
 
         test = await self._get_test(session, test_id, with_questions=True)
+        visible = (
+            await session.execute(select(GeneralTest.id).where(GeneralTest.id == test_id, _visible_to(user.id)))
+        ).scalar_one_or_none()
+        # Biriktirilmagan foydalanuvchi uchun test yo'qdek: id ni terib kirib
+        # bo'lmasin.
+        if visible is None:
+            raise _not_found()
         if not test.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
 
@@ -454,7 +971,7 @@ class GeneralTestRepository:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda savollar yo'q")
 
         layout = []
-        for question in random.sample(test.questions, len(test.questions)):
+        for question in random.sample(test.questions, _per_attempt(test, len(test.questions))):
             layout.append({"q": question.id, "o": "".join(random.sample(LETTERS, len(LETTERS)))})
 
         attempt = GeneralTestAttempt(
@@ -559,20 +1076,13 @@ class GeneralTestRepository:
     # ── Результаты (администратор) ───────────────────────────────────────────
 
     def _results_stmt(self, request: ResultListRequest):
-        # `students.user_id` не уникален (бывают повторные записи из HEMIS):
-        # прямой join размножил бы строку результата. Берём одну — последнюю.
-        student = (
-            select(Student.id, Student.user_id, Student.full_name, Student.group_id)
-            .distinct(Student.user_id)
-            .where(Student.user_id.is_not(None))
-            .order_by(Student.user_id, Student.id.desc())
-            .subquery()
-        )
+        student = _latest_student()
         full_name = func.coalesce(student.c.full_name, Teacher.full_name, User.username, "—")
         stmt = (
             select(
                 GeneralTestAttempt,
                 GeneralTest.title,
+                GeneralTestSubject.name.label("subject_name"),
                 User.username,
                 full_name.label("full_name"),
                 Group.name.label("group_name"),
@@ -580,12 +1090,15 @@ class GeneralTestRepository:
                 Teacher.id.label("teacher_id"),
             )
             .join(GeneralTest, GeneralTest.id == GeneralTestAttempt.test_id)
+            .join(GeneralTestSubject, GeneralTestSubject.id == GeneralTest.subject_id)
             .outerjoin(User, User.id == GeneralTestAttempt.user_id)
             .outerjoin(student, student.c.user_id == User.id)
             .outerjoin(Group, Group.id == student.c.group_id)
             .outerjoin(Teacher, Teacher.user_id == User.id)
             .where(GeneralTestAttempt.status == COMPLETED)
         )
+        if request.subject_id:
+            stmt = stmt.where(GeneralTest.subject_id == request.subject_id)
         if request.test_id:
             stmt = stmt.where(GeneralTestAttempt.test_id == request.test_id)
         if request.search and request.search.strip():
@@ -603,16 +1116,16 @@ class GeneralTestRepository:
     @staticmethod
     def _row(row) -> ResultRow:
         attempt: GeneralTestAttempt = row[0]
-        kind = "student" if row.student_id else "teacher" if row.teacher_id else "boshqa"
         return ResultRow(
             attempt_id=attempt.id,
             test_id=attempt.test_id,
             test_title=row.title,
+            subject_name=row.subject_name,
             user_id=attempt.user_id,
             full_name=row.full_name,
             username=row.username,
             group_name=row.group_name,
-            user_kind=kind,
+            user_kind=_user_kind(row.student_id, row.teacher_id),
             total_questions=attempt.total_questions,
             correct_answers=attempt.correct_answers or 0,
             score=attempt.score or 0,
@@ -645,7 +1158,9 @@ class GeneralTestRepository:
 
         rows = (
             await session.execute(
-                self._results_stmt(request).order_by(GeneralTest.title, GeneralTestAttempt.score.desc())
+                self._results_stmt(request).order_by(
+                    GeneralTestSubject.name, GeneralTest.title, GeneralTestAttempt.score.desc()
+                )
             )
         ).all()
 
@@ -657,7 +1172,7 @@ class GeneralTestRepository:
         wb = Workbook()
         sheet = wb.active
         sheet.title = "Natijalar"
-        headers = ["№", "Test", "F.I.SH", "Login", "Guruh", "Savollar", "To'g'ri", "Foiz", "Yakunlangan"]
+        headers = ["№", "Fan", "Test", "F.I.SH", "Login", "Guruh", "Savollar", "To'g'ri", "Foiz", "Yakunlangan"]
         sheet.append(headers)
         for cell in sheet[1]:
             cell.font = Font(bold=True)
@@ -666,6 +1181,7 @@ class GeneralTestRepository:
             sheet.append(
                 [
                     number,
+                    r.subject_name,
                     r.test_title,
                     r.full_name,
                     r.username or "",
@@ -676,7 +1192,7 @@ class GeneralTestRepository:
                     local(raw[0].finished_at),
                 ]
             )
-        for column, width in zip("ABCDEFGHI", (6, 35, 35, 16, 18, 10, 10, 8, 18)):
+        for column, width in zip("ABCDEFGHIJ", (6, 25, 35, 35, 16, 18, 10, 10, 8, 18)):
             sheet.column_dimensions[column].width = width
 
         buffer = io.BytesIO()

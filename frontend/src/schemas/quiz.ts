@@ -21,7 +21,7 @@ export const quizSchema = z.object({
     group_id: z.string(),
     semester_number: z.string(),
     // Nazorat turi: dars testi, semestr yakuni, kursdan kursga yoki ochiq test.
-    quiz_type: z.enum(['LESSON_QUIZ', 'SEMESTER_FINAL', 'YEAR_PROMOTION', 'PUBLIC_FREE']),
+    quiz_type: z.enum(['LESSON_QUIZ', 'MIDTERM', 'SEMESTER_FINAL', 'YEAR_PROMOTION', 'PUBLIC_FREE']),
     is_active: z.boolean(),
     proctoring_mode: z.enum(['face', 'standard']),
 }).superRefine((values, ctx) => {

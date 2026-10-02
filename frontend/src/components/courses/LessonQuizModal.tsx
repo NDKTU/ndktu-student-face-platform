@@ -27,6 +27,10 @@ interface Props {
  * o'qituvchi-fan juftligiga bog'langan, bekend `lesson_id` bo'yicha o'zi
  * to'ldiradi. Shuning uchun forma qisqa — o'qituvchi darsdan chiqmasdan test
  * tuzadi.
+ *
+ * Yangi test doim oddiy (yuz nazoratisiz) dars testi bo'lib yaratiladi —
+ * nazorat turi va proktoring faqat tahrirlashda o'zgartiriladi. Ochiq test
+ * bu yerda taklif qilinmaydi: dars testini faqat shu guruh talabalari ko'rsin.
  */
 export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
     const createMut = useCreateQuiz();
@@ -110,18 +114,22 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={quiz ? 'Testni tahrirlash' : 'Dars testi'}>
             <div className="space-y-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Nazorat turi</label>
-                    <select
-                        className={selectClassName}
-                        value={quizType}
-                        onChange={(e) => setQuizType(e.target.value as QuizType)}
-                    >
-                        {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[]).map((value) => (
-                            <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
-                        ))}
-                    </select>
-                </div>
+                {quiz && (
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Nazorat turi</label>
+                        <select
+                            className={selectClassName}
+                            value={quizType}
+                            onChange={(e) => setQuizType(e.target.value as QuizType)}
+                        >
+                            {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
+                                .filter((value) => (value !== 'PUBLIC_FREE' && value !== 'MIDTERM') || quiz.quiz_type === value)
+                                .map((value) => (
+                                    <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
+                                ))}
+                        </select>
+                    </div>
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
@@ -140,17 +148,19 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
                     <p className="text-xs text-muted-foreground">Talaba testni shu PIN bilan boshlaydi.</p>
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Proktoring</label>
-                    <select
-                        className={selectClassName}
-                        value={proctoringMode}
-                        onChange={(e) => setProctoringMode(e.target.value as ProctoringMode)}
-                    >
-                        <option value="standard">Oddiy</option>
-                        <option value="face">Yuz nazorati</option>
-                    </select>
-                </div>
+                {quiz && (
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Proktoring</label>
+                        <select
+                            className={selectClassName}
+                            value={proctoringMode}
+                            onChange={(e) => setProctoringMode(e.target.value as ProctoringMode)}
+                        >
+                            <option value="standard">Oddiy</option>
+                            <option value="face">Yuz nazorati</option>
+                        </select>
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
                     <div>

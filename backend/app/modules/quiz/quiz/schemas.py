@@ -26,6 +26,12 @@ class QuizCreateRequest(BaseModel):
     # Dars sahifasidan tuzilgan test shu darsga biriktiriladi. Berilsa,
     # guruh/fan/lektor bo'sh qolsa — darsdan olinadi.
     lesson_id: Optional[int] = None
+    #: Oraliq nazorat (`MIDTERM`) kursga tegishli: fan va lektor kursdan
+    #: olinadi, guruh berilmasa — kursning barcha guruhlari.
+    course_id: Optional[int] = None
+    #: Oraliq nazorat savollari olinadigan darslar. `None` — tahrirlashda
+    #: tanlov o'zgarmaydi; bo'sh ro'yxat — birorta dars tanlanmagan.
+    lesson_ids: Optional[list[int]] = None
     # Своей колонки у семестра нет — он нужен только как часть названия.
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
@@ -73,6 +79,11 @@ class QuizCreateResponse(BaseModel):
     group_id: Optional[int]
     subject_id: Optional[int]
     lesson_id: Optional[int] = None
+    course_id: Optional[int] = None
+    #: Oraliq nazoratning manba darslari va testdagi savollar soni —
+    #: repozitoriy faqat `MIDTERM` uchun to'ldiradi.
+    lesson_ids: list[int] = []
+    linked_question_count: Optional[int] = None
 
     #: Fan va guruh nomlari javobning o'zida keladi.
     #:
@@ -106,6 +117,7 @@ class QuizListRequest(BaseModel):
     group_id: Optional[int] = None
     subject_id: Optional[int] = None
     lesson_id: Optional[int] = None
+    course_id: Optional[int] = None
     # «Darssiz testlar» — dars o'chirilganda test qolaveradi (ON DELETE SET
     # NULL), lekin guruhsiz qolgani uchun deyarli hech qaysi filtrga tushmaydi:
     # bor, lekin topib bo'lmaydi. Shu bayroq ularni ataylab ko'rsatadi.

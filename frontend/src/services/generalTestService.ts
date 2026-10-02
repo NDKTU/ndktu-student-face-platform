@@ -1,23 +1,101 @@
 import api from './api';
 
 /**
- * Umumiy test — fan, guruh va ma'ruzachiga bog'lanmagan oddiy test.
- * Savollari testning o'ziniki, uni istalgan foydalanuvchi ishlaydi,
- * natijalari esa oddiy test natijalaridan alohida saqlanadi
- * (`backend/app/modules/general_test`).
+ * Elementar test (ilgari «Umumiy test») — admin ochgan fanga tegishli oddiy
+ * test. Savollari testning o'ziniki, natijalari oddiy test natijalaridan
+ * alohida saqlanadi (`backend/app/modules/general_test`).
+ *
+ * Faol testni ikki xil odam ko'radi: fanga biriktirilgan foydalanuvchilar
+ * (o'qituvchi bo'lishi shart emas — talaba ham, xodim ham) va testga
+ * biriktirilgan guruhlarning talabalari.
  */
 
 export type OptionLetter = 'a' | 'b' | 'c' | 'd';
 
+export interface SubjectRef {
+    id: number;
+    name: string;
+}
+
+export interface GeneralTestSubject extends SubjectRef {
+    description: string | null;
+    user_count: number;
+    test_count: number;
+    created_at: string;
+}
+
+export interface SubjectListResponse {
+    total: number;
+    page: number;
+    limit: number;
+    subjects: GeneralTestSubject[];
+}
+
+export interface SubjectPayload {
+    name: string;
+    description: string | null;
+}
+
+export type UserKindFilter = 'student' | 'teacher' | 'other';
+
+export interface UserFilter {
+    search?: string;
+    kind?: UserKindFilter;
+    role_id?: number;
+    faculty_id?: number;
+    group_id?: number;
+    course?: number;
+}
+
+export interface SubjectUser {
+    user_id: number;
+    full_name: string;
+    username: string | null;
+    user_kind: 'student' | 'teacher' | 'boshqa';
+    group_name: string | null;
+    assigned: boolean;
+}
+
+export interface SubjectUserListResponse {
+    total: number;
+    page: number;
+    limit: number;
+    users: SubjectUser[];
+}
+
+export interface FilterOption {
+    id: number;
+    name: string;
+}
+
+export interface GroupOption {
+    id: number;
+    name: string;
+    faculty_name: string | null;
+    course: number | null;
+    student_count: number;
+}
+
+export interface GroupOptionFilter {
+    search?: string;
+    faculty_id?: number;
+    course?: number;
+    limit?: number;
+}
+
 export interface GeneralTestSummary {
     id: number;
+    subject: SubjectRef;
     title: string;
-    description: string | null;
     duration: number;
     attempt_limit: number;
+    /** Bitta urinishda beriladigan savollar; `null` — hammasi. */
+    question_number: number | null;
     is_active: boolean;
+    /** Testdagi barcha savollar. */
     question_count: number;
     attempt_count: number;
+    group_count: number;
     created_at: string;
 }
 
@@ -35,6 +113,7 @@ export interface GeneralTestQuestion {
 
 export interface GeneralTestDetail extends GeneralTestSummary {
     questions: GeneralTestQuestion[];
+    groups: GroupOption[];
 }
 
 export interface GeneralTestListResponse {
@@ -44,11 +123,14 @@ export interface GeneralTestListResponse {
     tests: GeneralTestSummary[];
 }
 
+/** Nom yo'q: u fan va guruhlardan avtomatik tuziladi. */
 export interface GeneralTestPayload {
-    title: string;
-    description: string | null;
+    subject_id: number;
+    /** Faqat yaratishda — darhol biriktiriladigan guruhlar. */
+    group_ids?: number[];
     duration: number;
     attempt_limit: number;
+    question_number: number | null;
     is_active: boolean;
 }
 
@@ -68,8 +150,8 @@ export interface UploadResponse {
 
 export interface AvailableTest {
     id: number;
+    subject_name: string;
     title: string;
-    description: string | null;
     duration: number;
     attempt_limit: number;
     question_count: number;
@@ -108,6 +190,7 @@ export interface ResultRow {
     attempt_id: number;
     test_id: number;
     test_title: string;
+    subject_name: string;
     user_id: number | null;
     full_name: string;
     username: string | null;
@@ -128,6 +211,7 @@ export interface ResultListResponse {
 }
 
 export interface ResultFilter {
+    subject_id?: number;
     test_id?: number;
     search?: string;
     page?: number;
@@ -148,9 +232,46 @@ function saveXlsx(data: BlobPart, name: string) {
 }
 
 export const generalTestService = {
+    // ── Fanlar ───────────────────────────────────────────────────────────
+    subjects: async (page = 1, limit = 20, search?: string) =>
+        (await api.get<SubjectListResponse>('/general-test/subject', { params: { page, limit, search: search || undefined } }))
+            .data,
+    subject: async (id: number) => (await api.get<GeneralTestSubject>(`/general-test/subject/${id}`)).data,
+    createSubject: async (data: SubjectPayload) =>
+        (await api.post<GeneralTestSubject>('/general-test/subject', data)).data,
+    updateSubject: async (id: number, data: SubjectPayload) =>
+        (await api.put<GeneralTestSubject>(`/general-test/subject/${id}`, data)).data,
+    removeSubject: async (id: number) => {
+        await api.delete(`/general-test/subject/${id}`);
+    },
+    subjectUsers: async (id: number, filter: UserFilter & { page: number; limit: number }) =>
+        (await api.get<SubjectUserListResponse>(`/general-test/subject/${id}/users`, { params: filter })).data,
+    subjectCandidates: async (id: number, filter: UserFilter & { page: number; limit: number }) =>
+        (await api.get<SubjectUserListResponse>(`/general-test/subject/${id}/candidates`, { params: filter })).data,
+    /** `user_ids` — tanlanganlar, `filter` — filtrga mos hammasi. */
+    addSubjectUsers: async (id: number, body: { user_ids?: number[]; filter?: UserFilter }) =>
+        (await api.post<{ added: number }>(`/general-test/subject/${id}/users`, body)).data,
+    removeSubjectUser: async (id: number, userId: number) => {
+        await api.delete(`/general-test/subject/${id}/users/${userId}`);
+    },
+    filterOptions: async () =>
+        (await api.get<{ roles: FilterOption[]; faculties: FilterOption[] }>('/general-test/subject/filter-options')).data,
+
+    // ── Guruhlar ─────────────────────────────────────────────────────────
+    groupOptions: async (filter: GroupOptionFilter) =>
+        (await api.get<{ groups: GroupOption[] }>('/general-test/group-options', { params: filter })).data.groups,
+    addGroups: async (testId: number, groupIds: number[]) =>
+        (await api.post<GeneralTestDetail>(`/general-test/${testId}/groups`, { group_ids: groupIds })).data,
+    removeGroup: async (testId: number, groupId: number) =>
+        (await api.delete<GeneralTestDetail>(`/general-test/${testId}/groups/${groupId}`)).data,
+
     // ── Boshqaruv ────────────────────────────────────────────────────────
-    list: async (page = 1, limit = 20, search?: string) =>
-        (await api.get<GeneralTestListResponse>('/general-test/', { params: { page, limit, search: search || undefined } })).data,
+    list: async (page = 1, limit = 20, search?: string, subjectId?: number) =>
+        (
+            await api.get<GeneralTestListResponse>('/general-test/', {
+                params: { page, limit, search: search || undefined, subject_id: subjectId || undefined },
+            })
+        ).data,
     get: async (id: number) => (await api.get<GeneralTestDetail>(`/general-test/${id}`)).data,
     create: async (data: GeneralTestPayload) => (await api.post<GeneralTestDetail>('/general-test/', data)).data,
     update: async (id: number, data: Partial<GeneralTestPayload>) =>
@@ -181,10 +302,10 @@ export const generalTestService = {
         (await api.get<ResultListResponse>('/general-test/results', { params: filter })).data,
     exportResults: async (filter: ResultFilter) => {
         const response = await api.get('/general-test/results/export', {
-            params: { test_id: filter.test_id, search: filter.search },
+            params: { subject_id: filter.subject_id, test_id: filter.test_id, search: filter.search },
             responseType: 'blob',
         });
-        saveXlsx(response.data, 'umumiy-test-natijalari.xlsx');
+        saveXlsx(response.data, 'elementar-test-natijalari.xlsx');
     },
     removeResult: async (attemptId: number) => {
         await api.delete(`/general-test/results/${attemptId}`);

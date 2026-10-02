@@ -11,20 +11,21 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useDeleteGeneralTestResult, useGeneralTestResults, useGeneralTests } from '@/hooks/useGeneralTests';
+import {
+    useDeleteGeneralTestResult,
+    useGeneralTestResults,
+    useGeneralTests,
+    useGeneralTestSubjects,
+} from '@/hooks/useGeneralTests';
 import { generalTestService, type ResultRow } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { cn } from '@/lib/utils';
+import { KIND_LABEL } from '@/components/generalTest/labels';
 import { scoreClass } from '@/components/generalTest/score';
 import { formatDateTime } from '@/utils/date';
 
-const KIND_LABEL: Record<ResultRow['user_kind'], string> = {
-    student: 'Talaba',
-    teacher: "O'qituvchi",
-    boshqa: 'Xodim',
-};
-
 export default function GeneralTestResultsPage() {
+    const [subjectId, setSubjectId] = useState('');
     const [testId, setTestId] = useState('');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
@@ -33,8 +34,11 @@ export default function GeneralTestResultsPage() {
     const [deleting, setDeleting] = useState<ResultRow | null>(null);
     const [exporting, setExporting] = useState(false);
 
-    const { data: tests } = useGeneralTests(1, 200);
+    const { data: subjects } = useGeneralTestSubjects(1, 500);
+    // Fan tanlanganda test ro'yxati o'sha fan testlari bilan cheklanadi.
+    const { data: tests } = useGeneralTests(1, 200, '', subjectId ? Number(subjectId) : undefined);
     const filter = {
+        subject_id: subjectId ? Number(subjectId) : undefined,
         test_id: testId ? Number(testId) : undefined,
         search: debounced || undefined,
         page,
@@ -43,8 +47,17 @@ export default function GeneralTestResultsPage() {
     const { data, isLoading, isError, refetch } = useGeneralTestResults(filter);
     const deleteResult = useDeleteGeneralTestResult();
 
+    const subjectOptions = useMemo(
+        () => (subjects?.subjects ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+        [subjects],
+    );
     const testOptions = useMemo(
-        () => [{ value: '', label: 'Barcha testlar' }, ...(tests?.tests ?? []).map((t) => ({ value: String(t.id), label: t.title }))],
+        () => [
+            { value: '', label: 'Barcha testlar' },
+            // Nom fan va guruhlardan tuziladi, ya'ni ikki test bir xil nomli
+            // bo'lishi mumkin — yaratilgan sanasi ularni ajratadi.
+            ...(tests?.tests ?? []).map((t) => ({ value: String(t.id), label: t.title, hint: formatDateTime(t.created_at) })),
+        ],
         [tests],
     );
 
@@ -73,7 +86,17 @@ export default function GeneralTestResultsPage() {
                 </div>
             ),
         },
-        { key: 'test', header: 'Test', cell: (r) => r.test_title, hideBelow: 'md' },
+        {
+            key: 'test',
+            header: 'Test',
+            cell: (r) => (
+                <div className="min-w-0">
+                    <p className="text-foreground">{r.test_title}</p>
+                    <p className="text-xs text-muted-foreground">{r.subject_name}</p>
+                </div>
+            ),
+            hideBelow: 'md',
+        },
         { key: 'correct', header: "To'g'ri", cell: (r) => `${r.correct_answers} / ${r.total_questions}`, hideBelow: 'sm' },
         {
             key: 'score',
@@ -100,7 +123,7 @@ export default function GeneralTestResultsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Umumiy test natijalari"
+                title="Elementar test natijalari"
                 description="Oddiy test natijalaridan alohida"
                 actions={
                     <Button variant="outline" onClick={handleExport} isLoading={exporting}>
@@ -111,7 +134,19 @@ export default function GeneralTestResultsPage() {
 
             <Card>
                 <CardContent className="space-y-4 pt-6">
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <Combobox
+                            options={subjectOptions}
+                            value={subjectId}
+                            onChange={(v) => {
+                                setSubjectId(v);
+                                setTestId('');
+                                setPage(1);
+                            }}
+                            placeholder="Barcha fanlar"
+                            searchPlaceholder="Fanni qidirish..."
+                            className="sm:w-60"
+                        />
                         <Combobox
                             options={testOptions}
                             value={testId}

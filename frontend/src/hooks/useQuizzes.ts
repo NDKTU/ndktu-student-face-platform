@@ -96,6 +96,18 @@ export const useRepeatQuiz = () => {
     });
 };
 
+export const useRemoveMidtermQuestion = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ quizId, questionId }: { quizId: number; questionId: number }) =>
+            quizService.removeMidtermQuestion(quizId, questionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+            queryClient.invalidateQueries({ queryKey: ['questions'] });
+        },
+    });
+};
+
 /** Dars testlarining yakuni: nechta topshirdi, o'rtacha baho. */
 export const useLessonQuizSummary = (lessonId?: number, enabled: boolean = true) =>
     useQuery({

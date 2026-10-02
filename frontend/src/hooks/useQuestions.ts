@@ -25,6 +25,14 @@ export const useLessonQuestions = (lessonId?: number) =>
         enabled: !!lessonId,
     });
 
+/** Oraliq nazoratga alohida qoʻshilgan savollar (darsdan kelmaganlari). */
+export const useMidtermExtraQuestions = (quizId?: number) =>
+    useQuery({
+        queryKey: ['questions', 'midterm', quizId],
+        queryFn: () => questionService.getQuestions(1, 200, undefined, undefined, undefined, undefined, quizId),
+        enabled: !!quizId,
+    });
+
 export const useQuestionCatalog = (search?: string) => useQuery({
     queryKey: ['question-catalog', search],
     queryFn: () => questionService.getCatalog(search),
@@ -45,6 +53,9 @@ export const useCreateQuestion = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
+            // Darsga yoki oraliq nazoratga qo'shilgan savol testdagi savollar
+            // sonini o'zgartiradi.
+            queryClient.invalidateQueries({ queryKey: ['quizzes'] });
         },
     });
 };

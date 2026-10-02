@@ -1,6 +1,6 @@
 import { AccessDenied } from '@/components/auth/AccessDenied';
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import MainLayout from '@/components/layout/MainLayout';
@@ -66,6 +66,8 @@ const GeneralTestDetailPage = lazy(() => import('@/pages/GeneralTestDetailPage')
 const GeneralTestResultsPage = lazy(() => import('@/pages/GeneralTestResultsPage'));
 const GeneralTestTakeListPage = lazy(() => import('@/pages/GeneralTestTakeListPage'));
 const GeneralTestTakePage = lazy(() => import('@/pages/GeneralTestTakePage'));
+const GeneralTestSubjectsPage = lazy(() => import('@/pages/GeneralTestSubjectsPage'));
+const GeneralTestSubjectDetailPage = lazy(() => import('@/pages/GeneralTestSubjectDetailPage'));
 const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
 const PublicQuizPage = lazy(() => import('@/pages/PublicQuizPage'));
@@ -249,6 +251,13 @@ const StudentRequestsRoute = ({ children }: { children: React.ReactElement }) =>
     return children;
 };
 
+// «Umumiy testlar» «Elementar testlar» bo'ldi: eski saqlangan havolalar
+// (`/general-tests/...`) yangi manzilga o'tadi.
+const LegacyGeneralTestsRedirect = () => {
+    const { pathname, search } = useLocation();
+    return <Navigate to={pathname.replace(/^\/general-tests/, '/elementar-tests') + search} replace />;
+};
+
 const DashboardRedirect = () => {
     const { user, activeRole } = useAuth();
     // Bir nechta roli borlar uchun tanlangan ko'rinish hal qiladi.
@@ -291,8 +300,9 @@ function App() {
                                     {/* Фокус-режим: прохождение тестов без сайдбара */}
                                     <Route element={<FocusLayout />}>
                                         <Route path="/psychology/test/:methodId" element={<PermissionRoute permission="read:psychology"><PsychologyTestPage /></PermissionRoute>} />
-                                        <Route path="/general-tests/attempt/:attemptId" element={<PermissionRoute permission="general_test:take"><GeneralTestTakePage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/attempt/:attemptId" element={<PermissionRoute permission="general_test:take"><GeneralTestTakePage /></PermissionRoute>} />
                                     </Route>
+                                    <Route path="/general-tests/*" element={<LegacyGeneralTestsRedirect />} />
 
                                     <Route element={<MainLayout />}>
                                         <Route path="/quiz-test" element={<PermissionRoute permission="quiz_process:start_quiz"><QuizTestPage /></PermissionRoute>} />
@@ -347,13 +357,16 @@ function App() {
                                         <Route path="/psychology/stats" element={<PsychologyRoute><PermissionRoute permission="read:psychology_results"><PsychologyStatsPage /></PermissionRoute></PsychologyRoute>} />
                                         <Route path="/psychology/student" element={<PermissionRoute permission="read:psychology"><StudentPsychologyPage /></PermissionRoute>} />
 
-                                        {/* Umumiy test: boshqaruv va natijalar — admin; ishlash — hamma
-                                            (`general_test:take` barcha rollarda). `/take` va `/results`
-                                            `/:id` dan oldin turadi. */}
-                                        <Route path="/general-tests" element={<PermissionRoute permission="read:general_test"><GeneralTestsPage /></PermissionRoute>} />
-                                        <Route path="/general-tests/take" element={<PermissionRoute permission="general_test:take"><GeneralTestTakeListPage /></PermissionRoute>} />
-                                        <Route path="/general-tests/results" element={<PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute>} />
-                                        <Route path="/general-tests/:id" element={<PermissionRoute permission="read:general_test"><GeneralTestDetailPage /></PermissionRoute>} />
+                                        {/* Elementar test: fanlar, boshqaruv va natijalar — admin; ishlash —
+                                            `general_test:take` (barcha rollarda), lekin ro'yxatda faqat
+                                            biriktirilgan testlar chiqadi. `/take`, `/results` va
+                                            `/subjects` `/:id` dan oldin turadi. */}
+                                        <Route path="/elementar-tests" element={<PermissionRoute permission="read:general_test"><GeneralTestsPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/take" element={<PermissionRoute permission="general_test:take"><GeneralTestTakeListPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/results" element={<PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectsPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects/:id" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectDetailPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/:id" element={<PermissionRoute permission="read:general_test"><GeneralTestDetailPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />
                                         <Route path="/courses" element={<PermissionRoute permission="read:course"><CoursesPage /></PermissionRoute>} />

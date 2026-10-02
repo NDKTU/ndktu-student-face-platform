@@ -24,6 +24,9 @@ class QuestionType(str, enum.Enum):
 
 class QuizType(str, enum.Enum):
     LESSON_QUIZ = "LESSON_QUIZ"
+    #: Oraliq nazorat — kurs testi, savollari tanlangan darslardan va
+    #: oʻqituvchi alohida qoʻshgan savollardan yigʻiladi.
+    MIDTERM = "MIDTERM"
     SEMESTER_FINAL = "SEMESTER_FINAL"
     YEAR_PROMOTION = "YEAR_PROMOTION"
     PUBLIC_FREE = "PUBLIC_FREE"

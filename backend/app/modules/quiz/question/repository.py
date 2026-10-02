@@ -1,16 +1,20 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.core.enums import QuizType
+from app.core.utils.course_access import can_manage
 from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import Teacher, User
+from app.modules.course.model import Course
 from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
-from app.modules.quiz.model import Question, QuizQuestion, Subject
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject
+from app.modules.quiz.quiz.repository import get_quiz_repository
 
 from .excel_format import parse_correct_option, resolve_columns
 from .schemas import (
@@ -27,6 +31,14 @@ logger = logging.getLogger(__name__)
 
 
 class QuestionRepository:
+    @staticmethod
+    def _midterm_extra_filter(quiz_id: int):
+        """Oraliq nazoratga alohida qoʻshilgan savollar — darsdan kelmaganlari."""
+        return and_(
+            Question.lesson_id.is_(None),
+            Question.id.in_(select(QuizQuestion.question_id).where(QuizQuestion.quiz_id == quiz_id)),
+        )
+
     def _visible_questions_filter(self, user: User, subject_ids: list[int]):
         """Oʻqituvchiga koʻrinadigan savollar sharti.
 
@@ -119,7 +131,11 @@ class QuestionRepository:
         is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
         author_id = data.user_id if is_admin and data.user_id else current_user.id
 
-        if not is_admin:
+        midterm = await self._midterm_for_new_question(session, data, current_user)
+
+        # Oraliq nazoratga qoʻshilayotgan savolni kurs huquqi hal qiladi:
+        # assistentga fan biriktirilmagan boʻlishi mumkin.
+        if not is_admin and midterm is None:
             # Oʻz fanidan tashqariga savol qoʻshib boʻlmaydi. Biriktirmasi
             # umuman yoʻq oʻqituvchini bloklamaymiz — EduPlan sinxronizatsiyasi
             # kechikkan boʻlishi mumkin, bu esa ishlashni butunlay toʻxtatardi.
@@ -133,7 +149,7 @@ class QuestionRepository:
         new_question = Question(
             subject_id=data.subject_id,
             user_id=author_id,
-            lesson_id=data.lesson_id,
+            lesson_id=None if midterm else data.lesson_id,
             text=data.text,
             option_a=data.option_a,
             option_b=data.option_b,
@@ -146,6 +162,11 @@ class QuestionRepository:
         session.add(new_question)
 
         try:
+            await session.flush()
+            if midterm is not None:
+                session.add(QuizQuestion(quiz_id=midterm.id, question_id=new_question.id))
+            else:
+                await get_quiz_repository.link_question_to_midterms(session, new_question)
             await session.commit()
             await session.refresh(new_question)
         except Exception:
@@ -155,6 +176,29 @@ class QuestionRepository:
                 detail="Database error",
             )
         return new_question
+
+    async def _midterm_for_new_question(
+        self, session: AsyncSession, data: QuestionCreateRequest, current_user: User
+    ) -> Quiz | None:
+        """`quiz_id` berilgan bo'lsa — savol qo'shiladigan oraliq nazorat.
+
+        Savol testning fanida bo'lishi shart: aks holda u boshqa fan
+        bankida yotib, shu fanning testiga tushib qolardi.
+        """
+        if data.quiz_id is None:
+            return None
+        quiz = await session.get(Quiz, data.quiz_id)
+        if quiz is None or quiz.quiz_type != QuizType.MIDTERM.value:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oraliq nazorat topilmadi")
+        if quiz.subject_id != data.subject_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Savol fani oraliq nazorat faniga mos emas",
+            )
+        course = await session.get(Course, quiz.course_id) if quiz.course_id else None
+        if course is None or not await can_manage(session, course, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+        return quiz
 
     async def get_question(self, session: AsyncSession, question_id: int, current_user: User) -> Question:
         stmt = (
@@ -219,6 +263,9 @@ class QuestionRepository:
         if request.lesson_id:
             stmt = stmt.where(Question.lesson_id == request.lesson_id)
 
+        if request.midterm_quiz_id:
+            stmt = stmt.where(self._midterm_extra_filter(request.midterm_quiz_id))
+
         stmt = stmt.order_by(desc(Question.created_at))
         stmt = stmt.offset(request.offset).limit(request.limit)
 
@@ -257,6 +304,8 @@ class QuestionRepository:
             count_stmt = count_stmt.where(Question.user_id == request.user_id)
         if request.lesson_id:
             count_stmt = count_stmt.where(Question.lesson_id == request.lesson_id)
+        if request.midterm_quiz_id:
+            count_stmt = count_stmt.where(self._midterm_extra_filter(request.midterm_quiz_id))
 
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -501,6 +550,10 @@ class QuestionRepository:
         session.add_all(questions)
 
         try:
+            if lesson_id is not None:
+                await session.flush()
+                for question in questions:
+                    await get_quiz_repository.link_question_to_midterms(session, question)
             await session.commit()
         except Exception:
             await session.rollback()

@@ -131,7 +131,7 @@ export default function GeneralTestTakePage() {
                         {result.correct_answers} / {result.total_questions} to'g'ri javob
                     </p>
                 </div>
-                <Button onClick={() => navigate('/general-tests/take')}>Testlar ro'yxatiga qaytish</Button>
+                <Button onClick={() => navigate('/elementar-tests/take')}>Testlar ro'yxatiga qaytish</Button>
             </div>
         );
     }
@@ -140,7 +140,7 @@ export default function GeneralTestTakePage() {
         return (
             <div className="mx-auto max-w-md px-4 py-12 text-center">
                 <p className="text-sm text-destructive">{loadError}</p>
-                <Link to="/general-tests/take" className="mt-4 inline-block text-sm text-primary underline">
+                <Link to="/elementar-tests/take" className="mt-4 inline-block text-sm text-primary underline">
                     Testlar ro'yxatiga qaytish
                 </Link>
             </div>

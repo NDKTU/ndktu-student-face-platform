@@ -17,6 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useLesson } from '@/hooks/useLessons';
+import { useQuiz } from '@/hooks/useQuizzes';
 import { Combobox } from '@/components/ui/Combobox';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
@@ -62,6 +63,9 @@ const QuestionFormPage = () => {
     const [puzzleItems, setPuzzleItems] = useState<string[]>(['', '']);
     const presetSubjectId = searchParams.get('subject_id') ?? '';
     const lessonIdParam = searchParams.get('lesson_id');
+    // Oraliq nazoratdan kelinganda savol shu testga qo'shiladi, fan esa
+    // testniki bo'ladi — tanlanmaydi.
+    const quizIdParam = searchParams.get('quiz_id');
     const returnTo = searchParams.get('return_to');
     const { user } = useAuth();
     const isEditMode = !!id;
@@ -80,6 +84,8 @@ const QuestionFormPage = () => {
     // dars allaqachon o'qituvchi-fan juftligiga bog'langan.
     const { data: lessonData } = useLesson(lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined);
     const lessonSubjectId = lessonData?.teacher_subject?.subject_id;
+    const midtermId = !isEditMode && quizIdParam ? Number.parseInt(quizIdParam, 10) : 0;
+    const { data: midterm } = useQuiz(midtermId);
     const { data: question, isLoading: isQuestionLoading } = useQuestion(questionId);
 
     const createMutation = useCreateQuestion();
@@ -355,6 +361,7 @@ const QuestionFormPage = () => {
             // Dars sahifasidan kelingan boʻlsa, savol oʻsha darsniki boʻladi.
             // Tahrirlashda yuborilmaydi: bekend eski versiyadan koʻchiradi.
             lesson_id: !isEditMode && lessonIdParam ? Number.parseInt(lessonIdParam, 10) : undefined,
+            quiz_id: midtermId || undefined,
             text: data.text,
             question_type: questionKind,
             option_a: data.option_a,
@@ -570,7 +577,18 @@ const QuestionFormPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-foreground">Fan</label>
-                                {lessonSubjectId ? (
+                                {midtermId ? (
+                                    <>
+                                        {/* Oraliq nazorat fani — kursdan, tanlanmaydi. */}
+                                        <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">
+                                            {midterm?.subject_name ?? (presetSubjectId ? `#${presetSubjectId}` : '…')}
+                                        </p>
+                                        <input type="hidden" {...register('subject_id')} />
+                                        <p className="text-xs text-muted-foreground">
+                                            Savol «{midterm?.title ?? 'oraliq nazorat'}» testiga qo'shiladi.
+                                        </p>
+                                    </>
+                                ) : lessonSubjectId ? (
                                     <>
                                         {/* Dars fani — tanlanmaydi, shunchaki ko'rsatiladi. */}
                                         <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">

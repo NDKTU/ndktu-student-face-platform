@@ -36,7 +36,7 @@ TEACHER_PERMISSIONS = (
     "delete:question",
     "delete:quiz",
     "delete:resource",
-    # Umumiy test — har bir foydalanuvchi uchun (`general_test/router.py`).
+    # Elementar test — biriktirilgan foydalanuvchi uchun (`general_test/router.py`).
     "general_test:take",
     "mark:attendance",
     "read:active_quiz",

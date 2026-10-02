@@ -203,6 +203,13 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         nullable=True,
         index=True,
     )
+    # Kurs testi (oraliq nazorat): bitta darsga emas, butun kursga tegishli.
+    # Guruh ko'rsatilmasa, test kursning barcha guruhlariga ko'rinadi.
+    course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Nazorat turi (QuizType). Ilgari bu ma'lumot hech qayerda saqlanmagan —
     # testlar faqat nomi bilan farqlangan, shuning uchun ro'yxatni turi
@@ -254,6 +261,12 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         cascade="all, delete-orphan",
     )
 
+    lesson_links: Mapped[list["QuizLesson"]] = relationship(
+        "QuizLesson",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
     def __str__(self):
         return self.title
 
@@ -276,6 +289,21 @@ class QuizQuestion(Base, IdIntPk, TimestampMixin):
 
     def __str__(self):
         return f"{self.quiz.title} - {self.question.text}"
+
+
+class QuizLesson(Base, IdIntPk, TimestampMixin):
+    """Oraliq nazorat savollari olinadigan dars.
+
+    Tanlov alohida saqlanadi, `quiz_questions` dan chiqarib olinmaydi: darsda
+    hali savol bo'lmasa ham u tanlangan bo'lib qolishi kerak — keyin qo'shilgan
+    savol testga avtomatik tushadi.
+    """
+
+    __tablename__ = "quiz_lessons"
+    __table_args__ = (UniqueConstraint("quiz_id", "lesson_id", name="uq_quiz_lesson"),)
+
+    quiz_id: Mapped[int] = mapped_column(ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)
 
 
 class Result(Base, IdIntPk, TimestampMixin):

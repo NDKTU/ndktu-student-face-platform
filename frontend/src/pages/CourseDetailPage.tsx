@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     Award,
@@ -63,7 +63,10 @@ export default function CourseDetailPage() {
 
     // Ochilganda doim darslar: kursga kirgan o'qituvchi avval nima o'tilganini
     // ko'rishi kerak, jurnal esa alohida qadam.
-    const [tab, setTab] = useState<CourseTab>('lessons');
+    // `?tab=` — boshqa sahifadan aynan kerakli vkladkaga qaytish uchun
+    // (masalan, oraliq nazoratga savol qo'shib bo'lgach).
+    const [searchParams] = useSearchParams();
+    const [tab, setTab] = useState<CourseTab>(() => (searchParams.get('tab') as CourseTab | null) ?? 'lessons');
     const [lessonModalOpen, setLessonModalOpen] = useState(false);
     const [lessonSearch, setLessonSearch] = useState('');
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -125,10 +128,9 @@ export default function CourseDetailPage() {
         ...(canReadLessons
             ? [{ id: 'lessons' as const, label: 'Darslar', icon: <BookOpen className="h-4 w-4" /> }]
             : []),
-        // «Fan topshiriqlari»: darslar bo'yicha savollar va mustaqil ish
-        // mavzulari. Savollar bloki ichkarida `read:question` bilan
-        // yopiladi (savolda to'g'ri javob bor — talabaga ko'rsatib
-        // bo'lmaydi), mavzular esa hammaga ko'rinadi.
+        // «Fan topshiriqlari»: oraliq nazorat va mustaqil ish mavzulari.
+        // Oraliq nazorat bloki ichkarida test/savol ruxsatlari bilan
+        // yopiladi, mavzular esa hammaga ko'rinadi.
         ...(canReadLessons
             ? [{ id: 'assignments' as const, label: 'Fan topshiriqlari', icon: <ClipboardList className="h-4 w-4" /> }]
             : []),
@@ -333,8 +335,13 @@ export default function CourseDetailPage() {
                 <CourseAssignments
                     courseId={course.id}
                     lessons={lessons}
-                    isLoadingLessons={lessonsQuery.isLoading}
-                    canSeeQuestions={hasPermission('read:question')}
+                    groups={course.groups ?? []}
+                    // Oraliq nazorat — test va savol ruxsatlari kerak: savolda
+                    // to'g'ri javob bor, talabaga ko'rsatib bo'lmaydi.
+                    canManageQuizzes={
+                        hasPermission('create:quiz') && hasPermission('read:question') && !isArchived
+                    }
+                    canSeeResults={hasPermission('read:result')}
                     canManageTopics={canCreateLessons}
                 />
             )}

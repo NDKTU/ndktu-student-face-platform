@@ -12,7 +12,7 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.security import create_face_ws_token
 from app.core.utils.lesson_scope import covers_group
 from app.modules.auth.model import Student, User
-from app.modules.course.model import Lesson
+from app.modules.course.model import CourseGroup, Lesson
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
 from . import errors
@@ -112,6 +112,16 @@ class QuizProcessRepository:
                 # testini ishlab, natijasi oʻsha guruh jurnaliga tushardi.
                 lesson = await session.get(Lesson, quiz.lesson_id)
                 if lesson is not None and not await covers_group(session, lesson, student.group_id):
+                    raise errors.quiz_not_for_your_group()
+            elif quiz.course_id is not None:
+                # Guruhsiz oraliq nazorat — kursning barcha guruhlariniki.
+                in_course = await session.scalar(
+                    select(CourseGroup.id).where(
+                        CourseGroup.course_id == quiz.course_id,
+                        CourseGroup.group_id == student.group_id,
+                    )
+                )
+                if in_course is None:
                     raise errors.quiz_not_for_your_group()
 
         # Prepare questions with shuffled options — only ever serve active questions;

@@ -25,7 +25,7 @@ export default function GeneralTestTakeListPage() {
         setStartingId(test.id);
         try {
             const state = await generalTestService.start(test.id);
-            navigate(`/general-tests/attempt/${state.attempt_id}`);
+            navigate(`/elementar-tests/attempt/${state.attempt_id}`);
         } catch (e) {
             toast.error(apiErrorMessage(e, 'Testni boshlab bo\'lmadi'));
             refetch();
@@ -36,7 +36,7 @@ export default function GeneralTestTakeListPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Umumiy testlar" description="Barcha foydalanuvchilar uchun ochiq testlar" />
+            <PageHeader title="Elementar testlar" description="Sizga biriktirilgan faol testlar" />
 
             {isLoading ? (
                 <div className="space-y-2">
@@ -51,7 +51,7 @@ export default function GeneralTestTakeListPage() {
                     <EmptyState
                         icon={<ClipboardCheck className="h-6 w-6" />}
                         title="Hozircha testlar yo'q"
-                        description="Faol umumiy test paydo bo'lganda shu yerda ko'rinadi."
+                        description="Sizga yoki guruhingizga elementar test biriktirilganda shu yerda ko'rinadi."
                     />
                 </Card>
             ) : (
@@ -66,8 +66,8 @@ export default function GeneralTestTakeListPage() {
                                 className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
                             >
                                 <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium text-primary">{test.subject_name}</p>
                                     <p className="font-medium text-foreground">{test.title}</p>
-                                    {test.description && <p className="text-sm text-muted-foreground">{test.description}</p>}
                                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                         <span className="inline-flex items-center gap-1">
                                             <ListOrdered className="h-3.5 w-3.5" /> {test.question_count} savol
@@ -92,7 +92,7 @@ export default function GeneralTestTakeListPage() {
                                         isLoading={startingId === test.id}
                                         onClick={() =>
                                             resumable
-                                                ? navigate(`/general-tests/attempt/${test.in_progress_attempt_id}`)
+                                                ? navigate(`/elementar-tests/attempt/${test.in_progress_attempt_id}`)
                                                 : start(test)
                                         }
                                     >

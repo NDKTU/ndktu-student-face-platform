@@ -357,6 +357,7 @@ async def create_quiz(
         session=session,
         data=data,
         created_by_user_id=current_user.id,
+        current_user=current_user,
     )
     return result
 
@@ -449,10 +450,25 @@ async def update_quiz(
     quiz_id: int,
     data: QuizCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("update:quiz")),
+    current_user: User = Depends(PermissionRequired("update:quiz")),
 ):
-    result = await get_quiz_repository.update_quiz(session=session, quiz_id=quiz_id, data=data)
+    result = await get_quiz_repository.update_quiz(
+        session=session, quiz_id=quiz_id, data=data, current_user=current_user
+    )
     return result
+
+
+@quiz_router.delete("/{quiz_id}/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_midterm_question(
+    quiz_id: int,
+    question_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:quiz")),
+):
+    """Oraliq nazoratga alohida qo'shilgan savolni olib tashlaydi."""
+    await get_quiz_repository.remove_midterm_question(
+        session=session, quiz_id=quiz_id, question_id=question_id, current_user=current_user
+    )
 
 
 @quiz_router.delete(

@@ -116,9 +116,11 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: "O'quv jarayoni", tone: 'green' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Baholash', tone: 'pink' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Baholash', tone: 'purple' },
-    // Umumiy test — fan va guruhsiz, hamma ishlaydigan test (`general_test` moduli).
-    general_test:  { label: 'Umumiy testlar',   href: '/general-tests', icon: ClipboardCheck, section: 'Baholash', tone: 'green' },
-    general_test_result: { label: 'Umumiy test natijalari', href: '/general-tests/results', icon: ChartColumnBig, section: 'Baholash', tone: 'orange' },
+    // Elementar test (ilgari «Umumiy test», `general_test` moduli): admin ochgan
+    // fanga tegishli, fanga biriktirilganlar va testga biriktirilgan guruhlar ishlaydi.
+    general_test:  { label: 'Elementar testlar', href: '/elementar-tests', icon: ClipboardCheck, section: 'Baholash', tone: 'green' },
+    general_test_subject: { label: 'Elementar fanlar', href: '/elementar-tests/subjects', icon: BookMarked, section: 'Baholash', tone: 'teal' },
+    general_test_result: { label: 'Elementar test natijalari', href: '/elementar-tests/results', icon: ChartColumnBig, section: 'Baholash', tone: 'orange' },
     psychology_stats: { label: 'Psixologiya statistikasi', href: '/psychology/stats', icon: ChartColumnBig, section: 'Baholash', tone: 'cyan' },
 
     me:            { label: 'Profil' },
@@ -210,6 +212,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'psychology',
     'psychology_results',
     'general_test',
+    'general_test_subject',
     'general_test_result',
 
     // Ma'lumotnoma
@@ -266,11 +269,11 @@ export const SIDEBAR_GROUPS: SidebarGroupSpec[] = [
         tone: 'pink',
     },
     {
-        name: 'Umumiy testlar',
+        name: 'Elementar testlar',
         icon: ClipboardCheck,
         section: 'Baholash',
-        resources: ['general_test', 'general_test_result'],
-        href: '/general-tests',
+        resources: ['general_test', 'general_test_subject', 'general_test_result'],
+        href: '/elementar-tests',
         tone: 'green',
     },
     {
@@ -305,6 +308,7 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
     psychology: 'Metodikalar',
     psychology_results: 'Natijalar',
     general_test: "Testlar ro'yxati",
+    general_test_subject: 'Fanlar',
     general_test_result: 'Natijalar',
     user: 'Barcha foydalanuvchilar',
 };
@@ -315,7 +319,7 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
-    { name: 'Umumiy testlar', href: '/general-tests/take', icon: ClipboardCheck, tone: 'teal', permission: 'general_test:take' },
+    { name: 'Elementar testlar', href: '/elementar-tests/take', icon: ClipboardCheck, tone: 'teal', permission: 'general_test:take' },
     { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
     // Ruxsatsiz: arizalar ROYD'da yuritiladi, bizda unga mos ruxsat yo'q.
     // Chegara rol bo'yicha — marshrutda ham (`StudentRequestsRoute`).
@@ -397,18 +401,19 @@ const STAFF_BESPOKE_ITEMS: {
         section: 'Tizim',
         group: 'Sozlamalar',
     },
-    // Umumiy testni ishlash — har bir xodim uchun (`general_test:take`
-    // barcha rollarda). Adminda boshqaruv guruhi ichiga tushadi, boshqalarda
-    // «Baholash» da alohida punkt bo'lib chiqadi.
+    // Elementar testni ishlash — har bir xodim uchun (`general_test:take`
+    // barcha rollarda; ro'yxatda faqat unga biriktirilgan testlar). Adminda
+    // boshqaruv guruhi ichiga tushadi, boshqalarda «Baholash» da alohida punkt
+    // bo'lib chiqadi.
     {
-        name: 'Umumiy testlar',
+        name: 'Elementar testlar',
         groupedName: 'Testni ishlash',
-        href: '/general-tests/take',
+        href: '/elementar-tests/take',
         icon: PlayCircle,
         tone: 'teal',
         permission: 'general_test:take',
         section: 'Baholash',
-        group: 'Umumiy testlar',
+        group: 'Elementar testlar',
     },
 ];
 

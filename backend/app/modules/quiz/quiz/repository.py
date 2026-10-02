@@ -10,11 +10,12 @@ from sqlalchemy.orm import selectinload
 from app.core.enums import QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
+from app.core.utils.course_access import can_manage, manageable_course_ids
 from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
-from app.modules.course.model import Lesson
+from app.modules.course.model import Course, CourseGroup, Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.file.storage import public_url, store_upload
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject, UserAnswers
+from app.modules.quiz.model import Question, Quiz, QuizLesson, QuizQuestion, Result, Subject, UserAnswers
 
 from .schemas import (
     LessonQuizSummaryItem,
@@ -320,8 +321,173 @@ class QuizRepository:
             data.user_id = lecturer_user_id
         return data
 
-    async def create_quiz(self, session: AsyncSession, data: QuizCreateRequest, created_by_user_id: int) -> Quiz:
+    async def _fill_from_course(
+        self, session: AsyncSession, data: QuizCreateRequest, current_user: User | None
+    ) -> QuizCreateRequest:
+        """Oraliq nazorat uchun fan va lektorni kursdan to'ldiradi.
+
+        Tanlangan darslar va guruh shu kursniki ekani ham shu yerda
+        tekshiriladi: aks holda begona kursning dars savollari testga
+        tushib qolardi.
+        """
+        if data.quiz_type != QuizType.MIDTERM:
+            return data
+        if data.course_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Oraliq nazorat kursga biriktirilishi kerak",
+            )
+        course = await session.get(Course, data.course_id)
+        if course is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        if current_user is not None and not await can_manage(session, course, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+
+        if data.lesson_ids:
+            data.lesson_ids = list(dict.fromkeys(data.lesson_ids))
+            found = (
+                await session.execute(
+                    select(func.count()).select_from(Lesson).where(
+                        Lesson.id.in_(data.lesson_ids), Lesson.course_id == course.id
+                    )
+                )
+            ).scalar() or 0
+            if found != len(data.lesson_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Tanlangan darslar bu kursga tegishli emas",
+                )
+
+        if data.group_id is not None:
+            in_course = await session.scalar(
+                select(CourseGroup.id).where(
+                    CourseGroup.course_id == course.id, CourseGroup.group_id == data.group_id
+                )
+            )
+            if in_course is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Guruh bu kursga tegishli emas",
+                )
+
+        data.lesson_id = None
+        data.subject_id = course.subject_id
+        if data.lecturer_id is None:
+            data.lecturer_id = course.teacher_id
+            data.user_id = course.teacher_id
+        return data
+
+    @staticmethod
+    def _lessons_questions_stmt(lesson_ids: list[int]):
+        """Tanlangan darslarning savollari — faol, oxirgi versiya.
+
+        Dars testidagi kabi muallif va fan bo'yicha filtr yo'q: darsga
+        biriktirilgan savolni kim kiritgani muhim emas.
+        """
+        return select(Question.id).where(
+            Question.lesson_id.in_(lesson_ids),
+            Question.is_active.is_(True),
+            Question.is_latest.is_(True),
+        )
+
+    async def _sync_midterm(self, session: AsyncSession, quiz: Quiz, lesson_ids: list[int]) -> None:
+        """Oraliq nazoratning dars savollarini tanlovga moslaydi.
+
+        Darsdan kelgan savollar (`lesson_id` to'ldirilgan) tanlovdan qayta
+        yig'iladi; o'qituvchi alohida qo'shgan savollar (`lesson_id` bo'sh)
+        tegilmaydi.
+        """
+        await session.execute(QuizLesson.__table__.delete().where(QuizLesson.quiz_id == quiz.id))
+        for lesson_id in lesson_ids:
+            session.add(QuizLesson(quiz_id=quiz.id, lesson_id=lesson_id))
+
+        wanted = (
+            set((await session.execute(self._lessons_questions_stmt(lesson_ids))).scalars().all())
+            if lesson_ids
+            else set()
+        )
+        current = dict(
+            (
+                await session.execute(
+                    select(QuizQuestion.question_id, QuizQuestion.id)
+                    .join(Question, Question.id == QuizQuestion.question_id)
+                    .where(QuizQuestion.quiz_id == quiz.id, Question.lesson_id.isnot(None))
+                )
+            ).all()
+        )
+        stale = [link_id for question_id, link_id in current.items() if question_id not in wanted]
+        if stale:
+            await session.execute(QuizQuestion.__table__.delete().where(QuizQuestion.id.in_(stale)))
+        for question_id in wanted - current.keys():
+            session.add(QuizQuestion(quiz_id=quiz.id, question_id=question_id))
+        await session.flush()
+
+    async def _linked_question_count(self, session: AsyncSession, quiz_id: int) -> int:
+        return (
+            await session.execute(
+                select(func.count())
+                .select_from(QuizQuestion)
+                .join(Question, Question.id == QuizQuestion.question_id)
+                .where(QuizQuestion.quiz_id == quiz_id, Question.is_active.is_(True))
+            )
+        ).scalar() or 0
+
+    async def link_question_to_midterms(self, session: AsyncSession, question: Question) -> None:
+        """Darsga yangi qo'shilgan savolni o'sha darsni tanlagan oraliq
+        nazoratlarga ham bog'laydi.
+
+        Usiz oraliq nazorat yaratilgan paytdagi savollar bilan qotib qolardi:
+        o'qituvchi darsga savol qo'shadi va uni testda kutadi. Commit
+        chaqiruvchida.
+        """
+        if question.lesson_id is None:
+            return
+        quiz_ids = (
+            await session.execute(select(QuizLesson.quiz_id).where(QuizLesson.lesson_id == question.lesson_id))
+        ).scalars().all()
+        for quiz_id in quiz_ids:
+            session.add(QuizQuestion(quiz_id=quiz_id, question_id=question.id))
+
+    async def _attach_midterm_info(self, session: AsyncSession, quizzes: list[Quiz]) -> None:
+        """Oraliq nazoratlarga manba darslar va savollar sonini yozib qo'yadi."""
+        midterms = [quiz for quiz in quizzes if quiz.quiz_type == QuizType.MIDTERM.value]
+        if not midterms:
+            return
+        ids = [quiz.id for quiz in midterms]
+        lessons: dict[int, list[int]] = {quiz_id: [] for quiz_id in ids}
+        for quiz_id, lesson_id in (
+            await session.execute(
+                select(QuizLesson.quiz_id, QuizLesson.lesson_id)
+                .join(Lesson, Lesson.id == QuizLesson.lesson_id)
+                .where(QuizLesson.quiz_id.in_(ids))
+                .order_by(Lesson.date, Lesson.id)
+            )
+        ).all():
+            lessons[quiz_id].append(lesson_id)
+        counts = dict(
+            (
+                await session.execute(
+                    select(QuizQuestion.quiz_id, func.count())
+                    .join(Question, Question.id == QuizQuestion.question_id)
+                    .where(QuizQuestion.quiz_id.in_(ids), Question.is_active.is_(True))
+                    .group_by(QuizQuestion.quiz_id)
+                )
+            ).all()
+        )
+        for quiz in midterms:
+            quiz.lesson_ids = lessons[quiz.id]
+            quiz.linked_question_count = counts.get(quiz.id, 0)
+
+    async def create_quiz(
+        self,
+        session: AsyncSession,
+        data: QuizCreateRequest,
+        created_by_user_id: int,
+        current_user: User | None = None,
+    ) -> Quiz:
         data = await self._fill_from_lesson(session, data)
+        data = await self._fill_from_course(session, data, current_user)
+        is_midterm = data.quiz_type == QuizType.MIDTERM
 
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
@@ -330,7 +496,20 @@ class QuizRepository:
         # Почему проверка вообще нужна: start_quiz молча выдаёт столько вопросов,
         # сколько нашлось, поэтому тест на 30 вопросов из банка в 12 превратился бы
         # в экзамен на 12 — с оценкой, несравнимой с другими группами.
-        if data.is_active and data.lecturer_id and data.subject_id:
+        if is_midterm and data.is_active:
+            available = (
+                (
+                    await session.execute(
+                        select(func.count()).select_from(self._lessons_questions_stmt(data.lesson_ids).subquery())
+                    )
+                ).scalar()
+                or 0
+                if data.lesson_ids
+                else 0
+            )
+            if available < data.question_number:
+                raise self._not_enough_questions(available, data.question_number)
+        elif data.is_active and data.lecturer_id and data.subject_id:
             available = await self.count_available_questions(
                 session=session,
                 lecturer_id=data.lecturer_id,
@@ -360,10 +539,15 @@ class QuizRepository:
             group_id=data.group_id,
             subject_id=data.subject_id,
             lesson_id=data.lesson_id,
+            course_id=data.course_id if is_midterm else None,
         )
         session.add(new_quiz)
 
-        if data.lecturer_id and data.subject_id:
+        if is_midterm:
+            # Oraliq nazorat lektor bankidan emas, tanlangan darslardan.
+            await session.flush()
+            await self._sync_midterm(session, new_quiz, data.lesson_ids or [])
+        elif data.lecturer_id and data.subject_id:
             # Dars testi faqat oʻsha darsning savollaridan yigʻiladi.
             result_questions = await session.execute(
                 self._lecturer_questions_stmt(data.lecturer_id, data.subject_id, data.lesson_id)
@@ -385,6 +569,7 @@ class QuizRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error",
             )
+        await self._attach_midterm_info(session, [new_quiz])
         return new_quiz
 
     async def get_quiz(self, session: AsyncSession, quiz_id: int) -> Quiz:
@@ -400,6 +585,7 @@ class QuizRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
         self._attach_names([quiz])
+        await self._attach_midterm_info(session, [quiz])
         return quiz
 
     @staticmethod
@@ -437,6 +623,11 @@ class QuizRepository:
             and_(
                 Quiz.group_id.is_(None),
                 Quiz.lesson_id.in_(select(Lesson.id).where(visible_to_group(group_id))),
+            ),
+            # Oraliq nazorat guruhsiz bo'lsa — kursning barcha guruhlariniki.
+            and_(
+                Quiz.group_id.is_(None),
+                Quiz.course_id.in_(select(CourseGroup.course_id).where(CourseGroup.group_id == group_id)),
             ),
         )
 
@@ -560,7 +751,12 @@ class QuizRepository:
             # видимость держалась на TeacherGroup, который создавался побочным
             # эффектом создания теста; теперь тест создаёт организатор, и такая
             # связка не появляется.
-            conditions = [Quiz.lecturer_id == current_user.id]
+            # Oraliq nazorat — kursniki: assistent ham ko'radi.
+            managed_courses = await manageable_course_ids(session, current_user)
+            conditions = [
+                Quiz.lecturer_id == current_user.id,
+                Quiz.course_id.in_(select(managed_courses.c[0])),
+            ]
             if allowed_group_ids:
                 conditions.append(Quiz.group_id.in_(allowed_group_ids))
             if allowed_subject_ids:
@@ -586,6 +782,9 @@ class QuizRepository:
 
         if request.lesson_id:
             stmt = stmt.where(Quiz.lesson_id == request.lesson_id)
+
+        if request.course_id:
+            stmt = stmt.where(Quiz.course_id == request.course_id)
 
         if request.without_lesson:
             # Faqat dars testi: semestr yakuni va kursdan kursga o'tish
@@ -639,6 +838,8 @@ class QuizRepository:
             count_stmt = count_stmt.where(Quiz.subject_id == request.subject_id)
         if request.lesson_id:
             count_stmt = count_stmt.where(Quiz.lesson_id == request.lesson_id)
+        if request.course_id:
+            count_stmt = count_stmt.where(Quiz.course_id == request.course_id)
         if request.without_lesson:
             count_stmt = count_stmt.where(Quiz.lesson_id.is_(None), Quiz.quiz_type == QuizType.LESSON_QUIZ.value)
         if request.has_lesson is not None:
@@ -656,16 +857,45 @@ class QuizRepository:
         total = total_result.scalar() or 0
 
         self._attach_names(list(quizzes))
+        await self._attach_midterm_info(session, list(quizzes))
 
         return QuizListResponse(total=total, page=request.page, limit=request.limit, quizzes=quizzes)
 
-    async def update_quiz(self, session: AsyncSession, quiz_id: int, data: QuizCreateRequest) -> Quiz:
+    async def update_quiz(
+        self,
+        session: AsyncSession,
+        quiz_id: int,
+        data: QuizCreateRequest,
+        current_user: User | None = None,
+    ) -> Quiz:
         stmt = select(Quiz).where(Quiz.id == quiz_id)
         result = await session.execute(stmt)
         quiz = result.scalar_one_or_none()
 
         if not quiz:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+
+        # Oraliq nazorat turini umumiy tahrirlash oynasi bilmaydi va boshqa
+        # tur yuborishi mumkin — u baribir kurs testi bo'lib qoladi.
+        is_midterm = quiz.quiz_type == QuizType.MIDTERM.value or data.quiz_type == QuizType.MIDTERM
+        if is_midterm:
+            data.quiz_type = QuizType.MIDTERM
+            if data.course_id is None:
+                data.course_id = quiz.course_id
+            if quiz.lecturer_id is not None:
+                data.lecturer_id = data.user_id = quiz.lecturer_id
+            data = await self._fill_from_course(session, data, current_user)
+            quiz.course_id = data.course_id
+            # Tanlov berilmagan bo'lsa ham sinxronlanadi: darsdagi savollar
+            # tahrirlash/o'chirish bilan o'zgargan bo'lishi mumkin.
+            lesson_ids = data.lesson_ids
+            if lesson_ids is None:
+                lesson_ids = list(
+                    (await session.execute(select(QuizLesson.lesson_id).where(QuizLesson.quiz_id == quiz.id)))
+                    .scalars()
+                    .all()
+                )
+            await self._sync_midterm(session, quiz, lesson_ids)
 
         # Смена лектора после создания запрещена: вопросы подобраны в quiz_questions
         # один раз, при создании, и молча разошлись бы с новым лектором — тест
@@ -728,7 +958,41 @@ class QuizRepository:
 
         await session.commit()
         await session.refresh(quiz)
+        await self._attach_midterm_info(session, [quiz])
         return quiz
+
+    async def remove_midterm_question(
+        self, session: AsyncSession, quiz_id: int, question_id: int, current_user: User
+    ) -> None:
+        """Oraliq nazoratga alohida qo'shilgan savolni olib tashlaydi.
+
+        Savol faqat shu test uchun yozilgan, shuning uchun boshqa testda
+        ishlatilmasa — bankdan ham olinadi (soft delete). Darsdan kelgan
+        savol bu yo'l bilan olinmaydi: u darsni tanlovdan chiqarish bilan
+        ketadi.
+        """
+        quiz = await session.get(Quiz, quiz_id)
+        if quiz is None or quiz.quiz_type != QuizType.MIDTERM.value:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oraliq nazorat topilmadi")
+        course = await session.get(Course, quiz.course_id) if quiz.course_id else None
+        if course is None or not await can_manage(session, course, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+
+        question = await session.get(Question, question_id)
+        if question is None or question.lesson_id is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savol topilmadi")
+
+        await session.execute(
+            QuizQuestion.__table__.delete().where(
+                QuizQuestion.quiz_id == quiz_id, QuizQuestion.question_id == question_id
+            )
+        )
+        elsewhere = await session.scalar(
+            select(QuizQuestion.id).where(QuizQuestion.question_id == question_id).limit(1)
+        )
+        if elsewhere is None:
+            question.is_active = False
+        await session.commit()
 
     async def delete_quiz(self, session: AsyncSession, quiz_id: int, force: bool = False) -> None:
         from sqlalchemy import delete as sa_delete
@@ -792,10 +1056,16 @@ class QuizRepository:
             subject_id=quiz.subject_id,
             # Qayta topshirish o'sha darsniki bo'lib qoladi.
             lesson_id=quiz.lesson_id,
+            course_id=quiz.course_id,
             attempt=2,
         )
         session.add(new_quiz)
         await session.flush()
+
+        for lesson_id in (
+            await session.execute(select(QuizLesson.lesson_id).where(QuizLesson.quiz_id == quiz.id))
+        ).scalars():
+            session.add(QuizLesson(quiz_id=new_quiz.id, lesson_id=lesson_id))
 
         for qq in quiz.quiz_questions:
             if qq.question:

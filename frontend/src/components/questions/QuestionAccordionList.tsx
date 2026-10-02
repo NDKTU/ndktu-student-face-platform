@@ -16,6 +16,13 @@ interface Props {
     canManage?: boolean;
     /** Tahrirlashdan keyin qaytib keladigan sahifa. */
     returnTo?: string;
+    /**
+     * Berilsa, o'chirish o'rniga shu chaqiriladi — masalan, savolni oraliq
+     * nazoratdan olib tashlash. Savol testda bo'lsa ham tugma ochiq qoladi:
+     * aynan testdan chiqarish so'ralyapti.
+     */
+    onRemove?: (question: Question) => void;
+    removeLabel?: string;
 }
 
 const LETTERS = ['A', 'B', 'C', 'D'] as const;
@@ -28,7 +35,13 @@ const LETTERS = ['A', 'B', 'C', 'D'] as const;
  * bo'yiga cho'ziladi — kerakli savolni topib bo'lmaydi. Shuning uchun
  * ro'yxat qisqa: faqat savol matni, variantlar esa so'ralganda.
  */
-export const QuestionAccordionList = ({ questions, canManage = false, returnTo }: Props) => {
+export const QuestionAccordionList = ({
+    questions,
+    canManage = false,
+    returnTo,
+    onRemove,
+    removeLabel = "Savolni o'chirish",
+}: Props) => {
     const navigate = useNavigate();
     const [openId, setOpenId] = useState<number | null>(null);
     const [toDelete, setToDelete] = useState<Question | null>(null);
@@ -94,7 +107,18 @@ export const QuestionAccordionList = ({ questions, canManage = false, returnTo }
                                         >
                                             <Pencil className="h-4 w-4" />
                                         </Button>
-                                        {question.in_quiz ? (
+                                        {onRemove ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={removeLabel}
+                                                title={removeLabel}
+                                                className="text-muted-foreground hover:text-destructive"
+                                                onClick={() => onRemove(question)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        ) : question.in_quiz ? (
                                             // Testga olingan savol o'chirilmaydi: test tarkibi
                                             // va javoblar unga tayanadi. Tugmani yashirmay,
                                             // sababi bilan ko'rsatamiz.

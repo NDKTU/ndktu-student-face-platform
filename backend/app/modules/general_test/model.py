@@ -1,11 +1,16 @@
-"""Общий тест («Umumiy test») — простой тест для всех пользователей.
+"""Elementar test (ilgari «Umumiy test») — fanga biriktirilgan oddiy test.
 
 Отдельный модуль, а не ещё один `QuizType`: обычный тест держится на
-предмете, лекторе и группе (банк вопросов собирается по `subject_id`,
-результаты попадают в ведомости и статистику преподавателя). Здесь ничего
-этого нет — вопросы принадлежат самому тесту, проходит его любой
-пользователь, а результаты живут в своих таблицах и не смешиваются с
-академическими.
+предмете из учебного плана, лекторе и группе (банк вопросов собирается по
+`subject_id`, результаты попадают в ведомости и статистику преподавателя).
+Здесь свои «fanlar» — их заводит админ, к ним не привязан преподаватель;
+вопросы принадлежат самому тесту, а результаты живут в своих таблицах и не
+смешиваются с академическими.
+
+Кто видит тест: он должен быть активен, и пользователь либо назначен на его
+fan (`general_test_subject_users` — любой пользователь, не только
+преподаватель), либо учится в одной из групп, назначенных самому тесту
+(`general_test_groups`).
 """
 
 from __future__ import annotations
@@ -23,28 +28,92 @@ from app.core.mixins.time_stamp_mixin import TimestampMixin, utcnow_naive
 
 if TYPE_CHECKING:
     from app.modules.auth.model import User
+    from app.modules.organization_structure.model import Group
+
+
+class GeneralTestSubject(Base, IdIntPk, TimestampMixin):
+    """Fan elementar testlar uchun — o'quv rejadagi `subjects` dan alohida.
+
+    `subjects` EPOS/HEMIS'dan keladi va o'qituvchiga bog'lanadi; bu yerda esa
+    fanni admin o'zi ochadi va unga istalgan foydalanuvchini biriktiradi.
+    """
+
+    __tablename__ = "general_test_subjects"
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class GeneralTestSubjectUser(Base, IdIntPk, TimestampMixin):
+    """Fanga biriktirilgan foydalanuvchi: fanning faol testlarini ko'radi."""
+
+    __tablename__ = "general_test_subject_users"
+    __table_args__ = (UniqueConstraint("subject_id", "user_id", name="uq_general_test_subject_user"),)
+
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("general_test_subjects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+
+class GeneralTestGroup(Base, IdIntPk, TimestampMixin):
+    """Testga biriktirilgan guruh: guruh talabalari shu testni ko'radi."""
+
+    __tablename__ = "general_test_groups"
+    __table_args__ = (UniqueConstraint("test_id", "group_id", name="uq_general_test_group"),)
+
+    test_id: Mapped[int] = mapped_column(
+        ForeignKey("general_tests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    group: Mapped[Group] = relationship("Group")
 
 
 class GeneralTest(Base, IdIntPk, TimestampMixin):
     __tablename__ = "general_tests"
 
+    #: Fanda testlar bor ekan, uni o'chirib bo'lmaydi (RESTRICT) — aks holda
+    #: testlar natijalari bilan birga jimgina yo'qolardi.
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("general_test_subjects.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    #: Fan va guruh nomlaridan avtomatik tuziladi (`repository._compose_title`):
+    #: qo'lda kiritilmaydi, fan yoki guruhlar o'zgarganda qayta yoziladi.
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Endi ishlatilmaydi — formadan olib tashlangan. Ustun eski testlardagi
+    #: matn yo'qolmasligi uchun qoldirildi.
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Минуты на одну попытку.
     duration: Mapped[int] = mapped_column(Integer, nullable=False, server_default="30")
     #: Сколько попыток даётся одному пользователю.
     attempt_limit: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    #: Неактивный тест не виден в списке «пройти» и не стартует.
+    #: Сколько вопросов достаётся одной попытке — случайные из всех вопросов
+    #: теста. NULL — все. Вопросов меньше, чем задано, — выдаются все, что есть:
+    #: удалённый вопрос не должен ломать старт уже активного теста.
+    question_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Неактивный тест не виден в списке «пройти» и не стартует. Активный
+    #: виден только назначенным: см. docstring модуля.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
+    subject: Mapped[GeneralTestSubject] = relationship("GeneralTestSubject")
     questions: Mapped[list[GeneralTestQuestion]] = relationship(
         "GeneralTestQuestion",
         back_populates="test",
         cascade="all, delete-orphan",
         order_by="(GeneralTestQuestion.order, GeneralTestQuestion.id)",
+    )
+    group_links: Mapped[list[GeneralTestGroup]] = relationship(
+        "GeneralTestGroup", cascade="all, delete-orphan", passive_deletes=True
     )
 
     def __str__(self) -> str:

@@ -107,6 +107,9 @@ class QuestionCreateRequest(BaseModel):
     #: Qaysi darsga qoʻshilyapti. Dars sahifasidan kelganda toʻldiriladi va
     #: oʻsha darsning testi aynan shu savollardan yigʻiladi.
     lesson_id: Optional[int] = None
+    #: Oraliq nazoratga alohida qoʻshilayotgan savol: hech qaysi darsga
+    #: tegishli emas va faqat shu testga bogʻlanadi.
+    quiz_id: Optional[int] = None
     text: str
     # `QUIZ` dan boshqa turlarda variantlar `payload` da, shuning uchun bu
     # ustunlar majburiy emas — ular faqat eski tur uchun.
@@ -204,6 +207,8 @@ class QuestionListRequest(BaseModel):
     user_id: Optional[int] = None
     #: Dars sahifasi aynan shu darsning savollarini soʻraydi.
     lesson_id: Optional[int] = None
+    #: Oraliq nazoratga alohida qoʻshilgan savollar (darsdan kelmaganlari).
+    midterm_quiz_id: Optional[int] = None
 
     page: int = 1
 

@@ -32,6 +32,7 @@ __all__ = [
     "Question",
     "Quiz",
     "QuizQuestion",
+    "QuizLesson",
     "Result",
     "UserAnswers",
     "TeacherGroup",
@@ -118,6 +119,7 @@ from app.modules.psychology.model import (
 from app.modules.quiz.model import (
     Question,
     Quiz,
+    QuizLesson,
     QuizQuestion,
     Result,
     Subject,

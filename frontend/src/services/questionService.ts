@@ -35,6 +35,8 @@ export interface QuestionCreateRequest {
      * toʻldiriladi — oʻsha darsning testi aynan shu savollardan yigʻiladi.
      */
     lesson_id?: number;
+    /** Oraliq nazoratga alohida qoʻshilayotgan savol — faqat shu testniki. */
+    quiz_id?: number;
     text: string;
     /** Standart tur — to'rt variant, bitta to'g'ri javob. */
     question_type?: QuestionType;
@@ -109,9 +111,10 @@ export const questionService = {
     },
     getQuestions: async (
         page = 1, limit = 10, text?: string, subject_id?: number, user_id?: number, lesson_id?: number,
+        midterm_quiz_id?: number,
     ) => {
         const response = await api.get<QuestionListResponse>('/question/', {
-            params: { page, limit, text, subject_id, user_id, lesson_id },
+            params: { page, limit, text, subject_id, user_id, lesson_id, midterm_quiz_id },
         });
         return response.data;
     },

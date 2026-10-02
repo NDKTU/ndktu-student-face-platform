@@ -17,22 +17,142 @@ class _LowerLetter(BaseModel):
         return value.strip().lower() if isinstance(value, str) else value
 
 
+# ─── Fan ─────────────────────────────────────────────────────────────────────
+
+
+class SubjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class SubjectUpdateRequest(SubjectCreateRequest):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class SubjectRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class SubjectSummary(SubjectRef):
+    description: str | None
+    user_count: int = 0
+    test_count: int = 0
+    created_at: TashkentDatetime
+
+
+class SubjectListResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    subjects: list[SubjectSummary]
+
+
+#: student — talaba profili bor; teacher — o'qituvchi profili bor;
+#: other — ikkalasi ham yo'q (xodim, admin).
+UserKind = Literal["student", "teacher", "other"]
+
+
+class UserFilter(BaseModel):
+    """Fanga foydalanuvchi tanlashdagi filtr.
+
+    Nomzodlar ro'yxati ham, «filtrga mos hammasini qo'shish» ham shu
+    filtrdan foydalanadi — ekranda ko'ringan ro'yxat bilan qo'shilgani bir xil
+    bo'lishi uchun.
+    """
+
+    search: str | None = None
+    kind: UserKind | None = None
+    role_id: int | None = None
+    faculty_id: int | None = None
+    group_id: int | None = None
+    course: int | None = Field(default=None, ge=1, le=7)
+
+
+class UserListRequest(UserFilter):
+    page: int = Field(default=1, ge=1)
+    limit: int = Field(default=20, ge=1, le=200)
+
+
+class SubjectUserRow(BaseModel):
+    user_id: int
+    full_name: str
+    username: str | None
+    user_kind: Literal["student", "teacher", "boshqa"]
+    group_name: str | None
+    #: Nomzodlar ro'yxatida: allaqachon shu fanga biriktirilganmi.
+    assigned: bool = False
+
+
+class SubjectUserListResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    users: list[SubjectUserRow]
+
+
+class SubjectUsersAddRequest(BaseModel):
+    """`user_ids` — tanlanganlar; `filter` — filtrga mos hammasi. Bittasi shart."""
+
+    user_ids: list[int] | None = Field(default=None, max_length=5000)
+    filter: UserFilter | None = None
+
+
+class SubjectUsersAddResponse(BaseModel):
+    added: int
+
+
+class FilterOption(BaseModel):
+    id: int
+    name: str
+
+
+class FilterOptionsResponse(BaseModel):
+    roles: list[FilterOption]
+    faculties: list[FilterOption]
+
+
+class GroupOption(BaseModel):
+    id: int
+    name: str
+    faculty_name: str | None
+    course: int | None
+    student_count: int
+
+
+class GroupOptionListResponse(BaseModel):
+    groups: list[GroupOption]
+
+
 # ─── Тест (управление) ───────────────────────────────────────────────────────
 
 
 class GeneralTestCreateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = None
+    """Nom yo'q: u fan va guruhlardan avtomatik tuziladi."""
+
+    subject_id: int
+    #: Yaratishda darhol biriktiriladigan guruhlar (keyin ham qo'shsa bo'ladi).
+    group_ids: list[int] = Field(default_factory=list, max_length=500)
     duration: int = Field(default=30, ge=1, le=600)
     attempt_limit: int = Field(default=1, ge=1, le=100)
+    #: Bitta urinishdagi savollar soni; bo'sh — hammasi.
+    question_number: int | None = Field(default=None, ge=1, le=1000)
     is_active: bool = False
 
 
 class GeneralTestUpdateRequest(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
+    subject_id: int | None = None
     duration: int | None = Field(default=None, ge=1, le=600)
     attempt_limit: int | None = Field(default=None, ge=1, le=100)
+    #: `null` yuborilsa — «hammasi»; maydon umuman yuborilmasa — o'zgarmaydi.
+    question_number: int | None = Field(default=None, ge=1, le=1000)
     is_active: bool | None = None
 
 
@@ -40,13 +160,16 @@ class GeneralTestSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    subject: SubjectRef
     title: str
-    description: str | None
     duration: int
     attempt_limit: int
+    question_number: int | None
     is_active: bool
+    #: Testdagi barcha savollar (urinishga beriladigani — `question_number`).
     question_count: int = 0
     attempt_count: int = 0
+    group_count: int = 0
     created_at: TashkentDatetime
 
 
@@ -96,6 +219,11 @@ class QuestionResponse(BaseModel):
 
 class GeneralTestDetail(GeneralTestSummary):
     questions: list[QuestionResponse] = []
+    groups: list[GroupOption] = []
+
+
+class TestGroupsAddRequest(BaseModel):
+    group_ids: list[int] = Field(min_length=1, max_length=500)
 
 
 class UploadResponse(BaseModel):
@@ -108,10 +236,11 @@ class UploadResponse(BaseModel):
 
 class AvailableTest(BaseModel):
     id: int
+    subject_name: str
     title: str
-    description: str | None
     duration: int
     attempt_limit: int
+    #: Bitta urinishda beriladigan savollar soni.
     question_count: int
     attempts_used: int
     #: Незавершённая попытка — «Davom ettirish» вместо «Boshlash».
@@ -174,6 +303,7 @@ class MyResultListResponse(BaseModel):
 
 
 class ResultListRequest(BaseModel):
+    subject_id: int | None = None
     test_id: int | None = None
     search: str | None = None
     page: int = Field(default=1, ge=1)
@@ -184,6 +314,7 @@ class ResultRow(BaseModel):
     attempt_id: int
     test_id: int
     test_title: str
+    subject_name: str
     user_id: int | None
     full_name: str
     username: str | None

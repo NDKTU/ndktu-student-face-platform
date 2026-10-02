@@ -1,11 +1,14 @@
-"""Общий тест: управление (admin) и прохождение (любой пользователь).
+"""Elementar test: управление (admin) и прохождение (назначенные пользователи).
 
 Права:
-- `create/read/update/delete:general_test` — тесты и их вопросы;
+- `create/read/update/delete:general_test_subject` — fanlar и назначение на
+  них пользователей;
+- `create/read/update/delete:general_test` — тесты, их вопросы и группы;
 - `read/delete:general_test_result` — сводная таблица результатов;
 - `general_test:take` — пройти тест и увидеть свои результаты. Миграция
   `b7e1c4a9d2f3` выдаёт его всем существующим ролям, а `core/lifespan/defaults.py`
-  — teacher и student на чистой базе.
+  — teacher и student на чистой базе. Какие тесты видны — решает назначение
+  (fan или группа), а не право: см. `model.py`.
 """
 
 from __future__ import annotations
@@ -28,17 +31,28 @@ from .schemas import (
     AttemptResult,
     AttemptState,
     AvailableTestListResponse,
+    FilterOptionsResponse,
     GeneralTestCreateRequest,
     GeneralTestDetail,
     GeneralTestListResponse,
     GeneralTestUpdateRequest,
+    GroupOptionListResponse,
     MyResultListResponse,
     QuestionCreateRequest,
     QuestionResponse,
     QuestionUpdateRequest,
     ResultListRequest,
     ResultListResponse,
+    SubjectCreateRequest,
+    SubjectListResponse,
+    SubjectSummary,
+    SubjectUpdateRequest,
+    SubjectUserListResponse,
+    SubjectUsersAddRequest,
+    SubjectUsersAddResponse,
+    TestGroupsAddRequest,
     UploadResponse,
+    UserListRequest,
 )
 
 if TYPE_CHECKING:
@@ -139,7 +153,7 @@ async def export_results(
     return StreamingResponse(
         io.BytesIO(content),
         media_type=XLSX,
-        headers={"Content-Disposition": 'attachment; filename="umumiy-test-natijalari.xlsx"'},
+        headers={"Content-Disposition": 'attachment; filename="elementar-test-natijalari.xlsx"'},
     )
 
 
@@ -150,6 +164,140 @@ async def delete_result(
     _: "User" = Depends(PermissionRequired("delete:general_test_result")),
 ):
     await repo.delete_result(session=session, attempt_id=attempt_id)
+
+
+# ─── Fanlar ──────────────────────────────────────────────────────────────────
+
+
+@router.get("/subject", response_model=SubjectListResponse)
+async def list_subjects(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=500),
+    search: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+):
+    return await repo.list_subjects(session=session, page=page, limit=limit, search=search)
+
+
+@router.post("/subject", response_model=SubjectSummary, status_code=status.HTTP_201_CREATED)
+async def create_subject(
+    data: SubjectCreateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(PermissionRequired("create:general_test_subject")),
+):
+    return await repo.create_subject(session=session, data=data, user=user)
+
+
+@router.get("/subject/filter-options", response_model=FilterOptionsResponse)
+async def subject_filter_options(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    return await repo.filter_options(session=session)
+
+
+@router.get("/subject/{subject_id}", response_model=SubjectSummary)
+async def get_subject(
+    subject_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+):
+    return await repo.get_subject(session=session, subject_id=subject_id)
+
+
+@router.put("/subject/{subject_id}", response_model=SubjectSummary)
+async def update_subject(
+    subject_id: int,
+    data: SubjectUpdateRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    return await repo.update_subject(session=session, subject_id=subject_id, data=data)
+
+
+@router.delete("/subject/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_subject(
+    subject_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("delete:general_test_subject")),
+):
+    await repo.delete_subject(session=session, subject_id=subject_id)
+
+
+@router.get("/subject/{subject_id}/users", response_model=SubjectUserListResponse)
+async def list_subject_users(
+    subject_id: int,
+    request: UserListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+):
+    return await repo.list_subject_users(session=session, subject_id=subject_id, request=request)
+
+
+@router.get("/subject/{subject_id}/candidates", response_model=SubjectUserListResponse)
+async def list_subject_candidates(
+    subject_id: int,
+    request: UserListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    return await repo.list_candidates(session=session, subject_id=subject_id, request=request)
+
+
+@router.post("/subject/{subject_id}/users", response_model=SubjectUsersAddResponse)
+async def add_subject_users(
+    subject_id: int,
+    data: SubjectUsersAddRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    return await repo.add_subject_users(session=session, subject_id=subject_id, data=data)
+
+
+@router.delete("/subject/{subject_id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_subject_user(
+    subject_id: int,
+    user_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+):
+    await repo.remove_subject_user(session=session, subject_id=subject_id, user_id=user_id)
+
+
+# ─── Guruhlar ────────────────────────────────────────────────────────────────
+
+
+@router.get("/group-options", response_model=GroupOptionListResponse)
+async def group_options(
+    search: str | None = None,
+    faculty_id: int | None = None,
+    course: int | None = Query(None, ge=1, le=7),
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test")),
+):
+    return await repo.group_options(session=session, search=search, faculty_id=faculty_id, course=course, limit=limit)
+
+
+@router.post("/{test_id}/groups", response_model=GeneralTestDetail)
+async def add_test_groups(
+    test_id: int,
+    data: TestGroupsAddRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test")),
+):
+    return await repo.add_test_groups(session=session, test_id=test_id, data=data)
+
+
+@router.delete("/{test_id}/groups/{group_id}", response_model=GeneralTestDetail)
+async def remove_test_group(
+    test_id: int,
+    group_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: "User" = Depends(PermissionRequired("update:general_test")),
+):
+    return await repo.remove_test_group(session=session, test_id=test_id, group_id=group_id)
 
 
 # ─── Вопросы ─────────────────────────────────────────────────────────────────
@@ -216,10 +364,11 @@ async def list_tests(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=200),
     search: str | None = None,
+    subject_id: int | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: "User" = Depends(PermissionRequired("read:general_test")),
 ):
-    return await repo.list_tests(session=session, page=page, limit=limit, search=search)
+    return await repo.list_tests(session=session, page=page, limit=limit, search=search, subject_id=subject_id)
 
 
 @router.post("/", response_model=GeneralTestDetail, status_code=status.HTTP_201_CREATED)

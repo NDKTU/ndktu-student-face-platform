@@ -1,21 +1,25 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ClipboardList, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { BookMarked, ClipboardList, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Combobox } from '@/components/ui/Combobox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
-import { PermissionGate } from '@/components/auth/PermissionGate';
+import { Switch } from '@/components/ui/Switch';
+import { PermissionGate, usePermission } from '@/components/auth/PermissionGate';
 import { GeneralTestFormModal } from '@/components/generalTest/GeneralTestFormModal';
+import { questionsLabel } from '@/components/generalTest/labels';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
     useCreateGeneralTest,
     useDeleteGeneralTest,
     useGeneralTests,
+    useGeneralTestSubjects,
     useUpdateGeneralTest,
 } from '@/hooks/useGeneralTests';
 import type { GeneralTestPayload, GeneralTestSummary } from '@/services/generalTestService';
@@ -26,12 +30,42 @@ export default function GeneralTestsPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [search, setSearch] = useState('');
+    const [subjectId, setSubjectId] = useState('');
     const debounced = useDebouncedValue(search);
-    const { data, isLoading, isError, refetch } = useGeneralTests(page, pageSize, debounced);
+    const { data, isLoading, isError, refetch } = useGeneralTests(
+        page,
+        pageSize,
+        debounced,
+        subjectId ? Number(subjectId) : undefined,
+    );
+    const { data: subjects } = useGeneralTestSubjects(1, 500);
+    const subjectOptions = useMemo(
+        () => (subjects?.subjects ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+        [subjects],
+    );
+    const canEdit = usePermission('update:general_test');
 
     const createTest = useCreateGeneralTest();
     const updateTest = useUpdateGeneralTest();
     const deleteTest = useDeleteGeneralTest();
+    const [togglingId, setTogglingId] = useState<number | null>(null);
+
+    // Admin testni ro'yxatning o'zida yoqib-o'chiradi — kartochkaga kirmasdan.
+    const toggleActive = (test: GeneralTestSummary, value: boolean) => {
+        if (value && test.question_count === 0) {
+            toast.error("Avval savollarni qo'shing");
+            return;
+        }
+        setTogglingId(test.id);
+        updateTest.mutate(
+            { id: test.id, data: { is_active: value } },
+            {
+                onSuccess: () => toast.success(value ? 'Test faollashtirildi' : "Test o'chirib qo'yildi"),
+                onError: (e) => toast.error(apiErrorMessage(e, 'Saqlashda xatolik')),
+                onSettled: () => setTogglingId(null),
+            },
+        );
+    };
 
     const [form, setForm] = useState<{ open: boolean; editing: GeneralTestSummary | null }>({ open: false, editing: null });
     const [deleting, setDeleting] = useState<GeneralTestSummary | null>(null);
@@ -54,7 +88,7 @@ export default function GeneralTestsPage() {
             onSuccess: (created) => {
                 setForm({ open: false, editing: null });
                 toast.success('Test yaratildi. Endi savollarni qo\'shing');
-                navigate(`/general-tests/${created.id}`);
+                navigate(`/elementar-tests/${created.id}`);
             },
             onError: (e) => toast.error(apiErrorMessage(e, 'Testni yaratishda xatolik')),
         });
@@ -81,11 +115,11 @@ export default function GeneralTestsPage() {
             cell: (t) => (
                 <div className="min-w-0">
                     <p className="font-medium text-foreground">{t.title}</p>
-                    {t.description && <p className="truncate text-xs text-muted-foreground">{t.description}</p>}
                 </div>
             ),
         },
-        { key: 'questions', header: 'Savollar', cell: (t) => t.question_count, hideBelow: 'sm' },
+        { key: 'questions', header: 'Savollar', cell: (t) => questionsLabel(t), hideBelow: 'sm' },
+        { key: 'groups', header: 'Guruhlar', cell: (t) => t.group_count, hideBelow: 'lg' },
         { key: 'duration', header: 'Vaqt', cell: (t) => `${t.duration} daq.`, hideBelow: 'md' },
         { key: 'attempts', header: 'Urinishlar', cell: (t) => t.attempt_limit, hideBelow: 'md' },
         { key: 'passed', header: 'Topshirganlar', cell: (t) => t.attempt_count, hideBelow: 'lg' },
@@ -93,15 +127,15 @@ export default function GeneralTestsPage() {
             key: 'status',
             header: 'Holati',
             cell: (t) => (
-                <span
-                    className={
-                        t.is_active
-                            ? 'rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400'
-                            : 'rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-                    }
-                >
-                    {t.is_active ? 'Faol' : 'Nofaol'}
-                </span>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                        checked={t.is_active}
+                        onCheckedChange={(value) => toggleActive(t, value)}
+                        disabled={!canEdit || togglingId === t.id}
+                        aria-label={t.is_active ? "O'chirib qo'yish" : 'Faollashtirish'}
+                    />
+                    <span className="text-xs text-muted-foreground">{t.is_active ? 'Faol' : 'Nofaol'}</span>
+                </div>
             ),
         },
         {
@@ -128,29 +162,49 @@ export default function GeneralTestsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Umumiy testlar"
-                description="Fan va guruhga bog'lanmagan, barcha foydalanuvchilar ishlaydigan testlar"
+                title="Elementar testlar"
+                description="Faol test fanga biriktirilgan foydalanuvchilar va testga biriktirilgan guruhlarga ko'rinadi"
                 actions={
-                    <PermissionGate permission="create:general_test">
-                        <Button onClick={() => setForm({ open: true, editing: null })}>
-                            <Plus className="h-4 w-4" /> Yangi test
-                        </Button>
-                    </PermissionGate>
+                    <div className="flex flex-wrap gap-2">
+                        <PermissionGate permission="read:general_test_subject">
+                            <Button variant="outline" onClick={() => navigate('/elementar-tests/subjects')}>
+                                <BookMarked className="h-4 w-4" /> Fanlar
+                            </Button>
+                        </PermissionGate>
+                        <PermissionGate permission="create:general_test">
+                            <Button onClick={() => setForm({ open: true, editing: null })}>
+                                <Plus className="h-4 w-4" /> Yangi test
+                            </Button>
+                        </PermissionGate>
+                    </div>
                 }
             />
 
             <Card>
                 <CardContent className="space-y-4 pt-6">
-                    <Input
-                        placeholder="Nomi bo'yicha qidirish..."
-                        value={search}
-                        onChange={(e) => {
-                            setSearch(e.target.value);
-                            setPage(1);
-                        }}
-                        leftAddon={<Search className="h-4 w-4" />}
-                        className="max-w-sm"
-                    />
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                            placeholder="Nomi bo'yicha qidirish..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1);
+                            }}
+                            leftAddon={<Search className="h-4 w-4" />}
+                            className="sm:max-w-sm"
+                        />
+                        <Combobox
+                            options={subjectOptions}
+                            value={subjectId}
+                            onChange={(value) => {
+                                setSubjectId(value);
+                                setPage(1);
+                            }}
+                            placeholder="Barcha fanlar"
+                            searchPlaceholder="Fanni qidirish..."
+                            className="sm:w-64"
+                        />
+                    </div>
                     <DataTable
                         columns={columns}
                         data={data?.tests}
@@ -158,10 +212,10 @@ export default function GeneralTestsPage() {
                         isLoading={isLoading}
                         isError={isError}
                         onRetry={() => refetch()}
-                        onRowClick={(t) => navigate(`/general-tests/${t.id}`)}
+                        onRowClick={(t) => navigate(`/elementar-tests/${t.id}`)}
                         emptyIcon={<ClipboardList className="h-6 w-6" />}
                         emptyTitle="Testlar yo'q"
-                        emptyDescription="Birinchi umumiy testni yarating."
+                        emptyDescription="Birinchi elementar testni yarating."
                     />
                     {data && data.total > 0 && (
                         <Pagination
@@ -179,6 +233,7 @@ export default function GeneralTestsPage() {
             {form.open && (
                 <GeneralTestFormModal
                     editing={form.editing}
+                    defaultSubjectId={subjectId ? Number(subjectId) : undefined}
                     onClose={() => setForm({ open: false, editing: null })}
                     onSubmit={handleSubmit}
                     isPending={createTest.isPending || updateTest.isPending}

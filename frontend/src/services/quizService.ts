@@ -3,10 +3,11 @@ import api from './api';
 export type ProctoringMode = 'face' | 'standard';
 
 /** Nazorat turi — bekenddagi `QuizType` bilan bir xil. */
-export type QuizType = 'LESSON_QUIZ' | 'SEMESTER_FINAL' | 'YEAR_PROMOTION' | 'PUBLIC_FREE';
+export type QuizType = 'LESSON_QUIZ' | 'MIDTERM' | 'SEMESTER_FINAL' | 'YEAR_PROMOTION' | 'PUBLIC_FREE';
 
 export const QUIZ_TYPE_LABELS: Record<QuizType, string> = {
     LESSON_QUIZ: 'Dars testi',
+    MIDTERM: 'Oraliq nazorat',
     SEMESTER_FINAL: 'Semestr yakuni',
     YEAR_PROMOTION: 'Kursdan kursga',
     PUBLIC_FREE: 'Ochiq test',
@@ -36,6 +37,10 @@ export interface Quiz {
     group_name?: string | null;
     /** Test qaysi darsga biriktirilgani — dars sahifasidan tuzilgan bo'lsa. */
     lesson_id?: number | null;
+    /** Oraliq nazorat: kurs, manba darslar va testdagi savollar soni. */
+    course_id?: number | null;
+    lesson_ids?: number[];
+    linked_question_count?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
     quiz_type?: QuizType;
@@ -56,6 +61,10 @@ export interface QuizCreateRequest {
     subject_id?: number | null;
     /** Berilsa, guruh/fan/ma'ruzachi darsdan to'ldiriladi. */
     lesson_id?: number | null;
+    /** Oraliq nazorat: fan va ma'ruzachi kursdan to'ldiriladi. */
+    course_id?: number | null;
+    /** Oraliq nazorat savollari olinadigan darslar. */
+    lesson_ids?: number[];
     /** Faqat sarlavhaga kiradi — quizzes jadvalida alohida ustun yo'q. */
     semester_number?: number | null;
     is_active: boolean;
@@ -123,6 +132,7 @@ export interface QuizListParams {
     group_id?: number;
     subject_id?: number;
     lesson_id?: number;
+    course_id?: number;
     /** Darsi o'chirilgan dars testlari: bor, lekin filtrlarda topilmaydi. */
     without_lesson?: boolean;
     /**
@@ -204,6 +214,11 @@ export const quizService = {
     },
 
 
+
+    /** Oraliq nazoratga alohida qo'shilgan savolni olib tashlaydi. */
+    removeMidtermQuestion: async (quizId: number, questionId: number) => {
+        await api.delete(`/quiz/${quizId}/questions/${questionId}`);
+    },
 
     repeatQuiz: async (id: number): Promise<Quiz> => {
         const response = await api.post<Quiz>(`/quiz/${id}/repeat`);

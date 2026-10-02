@@ -370,9 +370,13 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Nazorat turi</label>
                     <select className={selectClassName} {...register('quiz_type')}>
-                        {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[]).map((value) => (
-                            <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
-                        ))}
+                        {/* Oraliq nazorat kurs ichida («Fan topshiriqlari») tuziladi:
+                            unga kurs va darslar kerak, bu oynada ular yo'q. */}
+                        {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
+                            .filter((value) => value !== 'MIDTERM' || quiz?.quiz_type === 'MIDTERM')
+                            .map((value) => (
+                                <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
+                            ))}
                     </select>
                     {errors.quiz_type && <p className="text-sm text-destructive">{errors.quiz_type.message}</p>}
                 </div>
