@@ -182,6 +182,18 @@ export const quizService = {
         return response.data;
     },
 
+    /**
+     * Darsga biriktirilgan faol testlar — talaba dars sahifasida ko'radi.
+     * `/quiz/active` talabaning guruhi bo'yicha cheklaydi, shuning uchun
+     * `read:quiz` huquqi kerak emas.
+     */
+    getActiveLessonQuizzes: async (lesson_id: number) => {
+        const response = await api.get<QuizListResponse>('/quiz/active', {
+            params: { lesson_id, page: 1, limit: 50 },
+        });
+        return response.data;
+    },
+
     getQuizById: async (id: number): Promise<Quiz> => {
         const response = await api.get<Quiz>(`/quiz/${id}`);
         return response.data;

@@ -1,11 +1,11 @@
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { useAuth } from '@/context/AuthContext';
 import { type StartQuizResponse, type EndQuizResponse } from '@/services/quizProcessService';
-import type { ProctoringMode } from '@/services/quizService';
+import type { ProctoringMode, Quiz } from '@/services/quizService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -113,17 +113,26 @@ const QuizTestPage = () => {
     const quizIdParam = searchParams.get('quizId');
     const modeParam = searchParams.get('mode');
     const [proctoringOverride, setProctoringOverride] = useState<ProctoringMode | null>(null);
+    // Dars sahifasidan kelganda test `state` da ham keladi. Ro'yxat
+    // sahifalangan: test birinchi sahifada bo'lmasa, faqat ro'yxatga
+    // tayangan holda oyna ochilmay qolardi.
+    const location = useLocation();
+    const stateQuiz = (location.state as { quiz?: Quiz } | null)?.quiz;
 
     // Наличие камеры проверяется до начала теста: раньше тест с режимом `face`
     // просто шёл без надзора, и ни студент, ни преподаватель об этом не знали.
-    const selectedQuizMode = quizzesData?.quizzes.find((q) => q.id === selectedQuiz?.id)?.proctoring_mode;
+    const selectedQuizMode = (
+        quizzesData?.quizzes.find((q) => q.id === selectedQuiz?.id)
+        ?? (stateQuiz?.id === selectedQuiz?.id ? stateQuiz : undefined)
+    )?.proctoring_mode;
     const startNeedsCamera = ENABLE_QUIZ_PROCTORING && (proctoringOverride ?? selectedQuizMode) === 'face';
     const { status: cameraStatus } = useCameraAvailability(isModalOpen && startNeedsCamera);
 
     const autoOpenedRef = useRef(false);
     useEffect(() => {
         if (autoOpenedRef.current || !quizIdParam) return;
-        const quiz = quizzesData?.quizzes.find((q) => q.id === Number(quizIdParam));
+        const quiz = quizzesData?.quizzes.find((q) => q.id === Number(quizIdParam))
+            ?? (stateQuiz?.id === Number(quizIdParam) ? stateQuiz : undefined);
         if (quiz) {
             autoOpenedRef.current = true;
             handleOpenStartModal({ id: quiz.id, title: quiz.title });
@@ -132,9 +141,10 @@ const QuizTestPage = () => {
             }
             searchParams.delete('quizId');
             searchParams.delete('mode');
-            setSearchParams(searchParams, { replace: true });
+            // `state` saqlanadi: aks holda kamera tekshiruvi test rejimini yo'qotardi.
+            setSearchParams(searchParams, { replace: true, state: location.state });
         }
-    }, [quizIdParam, modeParam, quizzesData, searchParams, setSearchParams]);
+    }, [quizIdParam, modeParam, quizzesData, stateQuiz, location.state, searchParams, setSearchParams]);
 
     const handleCloseStartModal = () => {
         setIsModalOpen(false);

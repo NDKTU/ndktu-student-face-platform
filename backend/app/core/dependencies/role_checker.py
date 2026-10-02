@@ -219,6 +219,32 @@ class PermissionRequiredExceptStudent(PermissionRequiredExceptRole):
     DENIAL_DETAIL = "Access denied: quiz authoring is not available for students"
 
 
+class PsychologyStaffOnly(PermissionRequiredExceptRole):
+    """Psixologiya statistikasi va natijalar filtri — talabaga yopiq.
+
+    `read:psychology_results` talaba roliga Rollar oynasidan berilishi
+    mumkin — u oʻz natijalarini koʻrishi uchun. Natijalar roʻyxati shunda
+    uning oʻz natijalari bilan cheklanadi (`psychology/router.py`), statistika
+    va filtr variantlari esa butun universitet boʻyicha: ularda boshqa
+    talabalarning ismlari va xavf guruhi bor.
+    """
+
+    BLOCKED_ROLE = "student"
+    EXEMPT_ROLES = frozenset({"admin", "psixologik", "teacher"})
+    DENIAL_DETAIL = "Access denied: psychology statistics are not available for students"
+
+
+def is_student_only(user: User) -> bool:
+    """Faqat talaba: boshqa natijalarni emas, oʻzinikini koʻradi.
+
+    Faol rol tanlanganda `user.roles` shu rolga toraytirilgan
+    (`apply_active_role`), ya'ni talaba koʻrinishidagi admin ham talaba
+    sifatida koʻradi.
+    """
+    names = {role.name.lower() for role in (user.roles or [])}
+    return "student" in names and not (names & PsychologyStaffOnly.EXEMPT_ROLES)
+
+
 class DeviceUploadExceptTeacher(PermissionRequiredExceptRole):
     """Kurs materialini qurilmadan yuklash — o'qituvchiga yopiq.
 

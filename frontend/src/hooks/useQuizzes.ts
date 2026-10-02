@@ -30,6 +30,14 @@ export const useActiveQuizzes = (page = 1, limit = 10, title?: string, user_id?:
     });
 };
 
+export const useActiveLessonQuizzes = (lessonId?: number, enabled = true) => {
+    return useQuery({
+        queryKey: ['active-quizzes', 'lesson', lessonId],
+        queryFn: () => quizService.getActiveLessonQuizzes(lessonId!),
+        enabled: Boolean(lessonId) && enabled,
+    });
+};
+
 export const useQuiz = (id: number) => {
     return useQuery({
         queryKey: ['quiz', id],

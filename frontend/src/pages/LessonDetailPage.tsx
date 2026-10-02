@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, PlayCircle, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
@@ -16,7 +16,7 @@ import { ATTENDANCE_ENABLED } from '@/constants/features';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useLessonQuestions } from '@/hooks/useQuestions';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
-import { useQuizzes, useDeleteQuiz, useLessonQuizSummary, useUpdateQuiz } from '@/hooks/useQuizzes';
+import { useActiveLessonQuizzes, useQuizzes, useDeleteQuiz, useLessonQuizSummary, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS, type Quiz, type QuizCreateRequest } from '@/services/quizService';
 import { LessonHomeworkCard } from '@/components/homework/LessonHomeworkCard';
 import { toast } from 'sonner';
@@ -85,6 +85,14 @@ export default function LessonDetailPage() {
         lessonId ? { lesson_id: lessonId, limit: 20 } : {},
         Boolean(lessonId) && canSeeQuizzes,
     );
+    // Talaba uchun: darsdagi FAOL testlar `/quiz/active` orqali — u
+    // talabaning guruhi bo'yicha cheklaydi. Ilgari dars ichida tuzilgan test
+    // talabaga shu yerda umuman ko'rinmasdi: karta `read:quiz` ga bog'langan,
+    // talaba esa testni faqat umumiy «Test ishlash» ro'yxatidan topardi.
+    const canTakeQuizzes = !canSeeQuizzes
+        && hasPermission('read:active_quiz')
+        && hasPermission('quiz_process:start_quiz');
+    const activeLessonQuizzesQuery = useActiveLessonQuizzes(lessonId, canTakeQuizzes);
     const deleteQuiz = useDeleteQuiz();
     const updateQuiz = useUpdateQuiz();
     // Test yakunlari: nechta talaba topshirdi va o'rtacha baho. O'qituvchi
@@ -394,6 +402,51 @@ export default function LessonDetailPage() {
                     </div>
                 )}
             </SectionCard>}
+
+            {canTakeQuizzes && (() => {
+                const activeQuizzes = activeLessonQuizzesQuery.data?.quizzes ?? [];
+                return (
+                    <SectionCard
+                        icon={<ListChecks className="h-[18px] w-[18px]" />}
+                        tone="blue"
+                        title="Testlar"
+                        description={activeQuizzes.length > 0 ? `${activeQuizzes.length} ta faol test` : undefined}
+                    >
+                        {activeLessonQuizzesQuery.isLoading ? (
+                            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                        ) : activeQuizzes.length === 0 ? (
+                            <EmptyState icon={<ListChecks className="h-6 w-6" />} title="Faol test yo'q" description="O'qituvchi testni faollashtirganda shu yerda ko'rinadi." className="py-8" />
+                        ) : (
+                            <div className="space-y-3">
+                                {activeQuizzes.map((quiz) => (
+                                    <div key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_6px_16px_-8px_rgba(16,24,40,0.2)]">
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <ListChecks className="h-4 w-4" />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-semibold">{quiz.title}</p>
+                                            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                                                {QUIZ_TYPE_LABELS[quiz.quiz_type ?? 'LESSON_QUIZ']} · {quiz.question_number} savol · {quiz.duration} daqiqa
+                                            </p>
+                                        </div>
+                                        {/* Test sahifasi testni o'z ro'yxatidan qidiradi, u esa
+                                            sahifalangan — test birinchi sahifada bo'lmasa oyna
+                                            ochilmasdi. Shuning uchun testni `state` da uzatamiz. */}
+                                        <Button
+                                            size="sm"
+                                            className="shrink-0 gap-1.5"
+                                            onClick={() => navigate(`/quiz-test?quizId=${quiz.id}`, { state: { quiz } })}
+                                        >
+                                            <PlayCircle className="h-4 w-4" />
+                                            <span>Boshlash</span>
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </SectionCard>
+                );
+            })()}
 
             {canSeeQuestions && <SectionCard
                 icon={<FileQuestion className="h-[18px] w-[18px]" />}

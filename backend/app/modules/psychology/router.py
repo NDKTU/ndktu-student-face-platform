@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
-from fastapi import APIRouter, Depends, Query, status
+from core.dependencies.role_checker import PermissionRequired, PsychologyStaffOnly, is_student_only
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ from .schemas import (
     QuestionCreateRequest,
     QuestionResponse,
     QuestionUpdateRequest,
+    ResultFilterOptionsResponse,
     RiskListResponse,
     StatsFilter,
     StatsOverviewResponse,
@@ -178,13 +179,34 @@ async def submit_test(
     )
 
 
+async def _visible_result(session: AsyncSession, result_id: int, user: User):
+    """Natija — talabaga faqat oʻziniki. Begonasi 404: borligi ham bilinmasin."""
+    result = await get_psychology_service.get_result(session=session, result_id=result_id)
+    if is_student_only(user) and result.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+    return result
+
+
 @router.get("/test/results/", response_model=TestResultListResponse)
 async def list_results(
     request: TestResultListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: User = Depends(PermissionRequired("read:psychology_results")),
+    current_user: User = Depends(PermissionRequired("read:psychology_results")),
 ):
+    # Talaba faqat oʻz natijalarini koʻradi — `user_id` parametri bilan ham
+    # boshqasinikini soʻray olmaydi. Maʼmuriyat va psixolog — hammasini.
+    if is_student_only(current_user):
+        request.user_id = current_user.id
     return await get_psychology_service.list_results(session=session, request=request, user_id=None)
+
+
+@router.get("/test/results/filter-options", response_model=ResultFilterOptionsResponse)
+async def result_filter_options(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(PsychologyStaffOnly("read:psychology_results")),
+):
+    """Natijalar filtri uchun fakultet va guruhlar. `/{result_id}` dan oldin turadi."""
+    return await get_psychology_service.result_filter_options(session=session)
 
 
 @router.delete(
@@ -195,8 +217,9 @@ async def list_results(
 async def delete_result(
     result_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: PermissionRequired = Depends(PermissionRequired("delete:psychology_results")),
+    current_user: User = Depends(PermissionRequired("delete:psychology_results")),
 ):
+    await _visible_result(session, result_id, current_user)
     await get_psychology_service.delete_result(session=session, result_id=result_id)
 
 
@@ -204,15 +227,17 @@ async def delete_result(
 async def get_result(
     result_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: User = Depends(PermissionRequired("read:psychology_results")),
+    current_user: User = Depends(PermissionRequired("read:psychology_results")),
 ):
-    return await get_psychology_service.get_result(session=session, result_id=result_id)
+    return await _visible_result(session, result_id, current_user)
 
 
 # ─── Statistics ──────────────────────────────────────────────────────────────
 # Natijalar ro'yxati bilan bir xil ruxsat: statistika o'sha ma'lumotning yig'indisi.
+# Talabaga yopiq: u faqat o'z natijalarini ko'radi, statistikada esa butun
+# universitet — xavf guruhidagi talabalarning ismlari bilan.
 
-_read_results = PermissionRequired("read:psychology_results")
+_read_results = PsychologyStaffOnly("read:psychology_results")
 
 
 @router.get("/stats/overview", response_model=StatsOverviewResponse)

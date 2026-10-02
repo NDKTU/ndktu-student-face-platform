@@ -17,6 +17,7 @@ from .schemas import (
     QuestionCreateRequest,
     QuestionUpdateRequest,
     TestResultListRequest,
+    ResultFilterOptionsResponse,
     TestResultListResponse,
     TestSubmitRequest,
 )
@@ -76,6 +77,10 @@ class PsychologyService:
         user_id: int | None = None,
     ) -> TestResultListResponse:
         return await get_psychology_repository.list_results(session=session, request=request, user_id=user_id)
+
+
+    async def result_filter_options(self, session: AsyncSession) -> ResultFilterOptionsResponse:
+        return await get_psychology_repository.result_filter_options(session=session)
 
 
 get_psychology_service = PsychologyService()

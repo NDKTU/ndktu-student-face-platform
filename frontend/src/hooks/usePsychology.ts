@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { psychologyService, type BreakdownBy, type StatsFilterParams, type TimelinePeriod, type MethodCreateRequest, type MethodUpdateRequest, type QuestionCreateRequest, type QuestionUpdateRequest, type TestSubmitRequest } from '@/services/psychologyService';
+import { psychologyService, type BreakdownBy, type StatsFilterParams, type TimelinePeriod, type MethodCreateRequest, type MethodUpdateRequest, type QuestionCreateRequest, type QuestionUpdateRequest, type ResultListParams, type TestSubmitRequest } from '@/services/psychologyService';
 
 export const useMethods = (page = 1, limit = 20) =>
     useQuery({
@@ -94,16 +94,19 @@ export const useDeleteResult = () => {
     });
 };
 
-export const useMyResults = (params?: {
-    method_id?: number;
-    faculty_id?: number;
-    group_id?: number;
-    page?: number;
-    limit?: number;
-}) =>
+export const useMyResults = (params?: ResultListParams) =>
     useQuery({
         queryKey: ['psychology-my-results', params],
         queryFn: () => psychologyService.listMyResults(params),
+        placeholderData: (previousData) => previousData,
+    });
+
+/** Natijalar filtri — `read:faculty`/`read:group` ruxsatisiz ham ishlaydi. */
+export const useResultFilterOptions = (enabled = true) =>
+    useQuery({
+        queryKey: ['psychology-result-filter-options'],
+        queryFn: () => psychologyService.getResultFilterOptions(),
+        enabled,
     });
 
 // ── Statistika ──────────────────────────────────────────────────────────────

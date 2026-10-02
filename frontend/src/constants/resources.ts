@@ -319,6 +319,9 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
+    // Umumiy «Psixologiya natijalari» sahifasi, lekin talabaga bekend faqat
+    // o'z natijalarini beradi (`psychology/router.py`).
+    { name: 'Psixologik natijalarim', href: '/psychology/results', icon: ClipboardList, tone: 'purple', permission: 'read:psychology_results' },
     { name: 'Elementar testlar', href: '/elementar-tests/take', icon: ClipboardCheck, tone: 'teal', permission: 'general_test:take' },
     { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
     // Ruxsatsiz: arizalar ROYD'da yuritiladi, bizda unga mos ruxsat yo'q.

@@ -69,9 +69,42 @@ export interface TestSubmitRequest {
     answers: AnswerItem[];
 }
 
+/**
+ * Testni topshirgan foydalanuvchi. Talaba bo'lmasa (o'qituvchi ham
+ * topshirishi mumkin) talaba maydonlari bo'sh keladi.
+ */
 export interface TestResultUserInfo {
     id: number;
     username: string;
+    full_name?: string | null;
+    is_student?: boolean;
+    student_id_number?: string | null;
+    phone?: string | null;
+    gender?: string | null;
+    group_id?: number | null;
+    group_name?: string | null;
+    course?: number | null;
+    faculty_id?: number | null;
+    faculty_name?: string | null;
+    speciality?: string | null;
+    education_form?: string | null;
+}
+
+export interface ResultListParams {
+    method_id?: number;
+    faculty_id?: number;
+    group_id?: number;
+    course?: number;
+    /** F.I.Sh., login yoki talaba ID raqami. */
+    search?: string;
+    page?: number;
+    limit?: number;
+}
+
+/** Natijalar filtri: faqat natijasi bor fakultet va guruhlar. */
+export interface ResultFilterOptions {
+    faculties: { id: number; name: string }[];
+    groups: { id: number; name: string; faculty_id: number; course?: number | null }[];
 }
 
 export type DiagnosisSum = {
@@ -267,14 +300,13 @@ export const psychologyService = {
         return response.data;
     },
 
-    listMyResults: async (params?: {
-        method_id?: number;
-        faculty_id?: number;
-        group_id?: number;
-        page?: number;
-        limit?: number;
-    }) => {
+    listMyResults: async (params?: ResultListParams) => {
         const response = await api.get<TestResultListResponse>('/psychology/test/results/', { params });
+        return response.data;
+    },
+
+    getResultFilterOptions: async () => {
+        const response = await api.get<ResultFilterOptions>('/psychology/test/results/filter-options');
         return response.data;
     },
 
