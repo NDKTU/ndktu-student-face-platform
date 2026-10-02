@@ -36,8 +36,24 @@ TEACHER_PERMISSIONS = (
     "delete:question",
     "delete:quiz",
     "delete:resource",
-    # Elementar test — biriktirilgan foydalanuvchi uchun (`general_test/router.py`).
+    # Elementar test. Oʻqituvchi oʻz testini tuzadi, unga savol yuklaydi va
+    # natijalarini koʻradi. Egalik repozitoriyda tekshiriladi
+    # (`general_test/repository.py`): admin boʻlmagan foydalanuvchi faqat
+    # `created_by_user_id` oʻziniki boʻlgan fan va testlarni koʻradi.
+    #
+    # `delete:general_test_result` ataylab yoʻq: bu boshqa odamlarning
+    # urinishlari va ularni qaytarib boʻlmaydi — oʻchirish ma'muriyatda
+    # qoladi.
+    "create:general_test",
+    "create:general_test_subject",
+    "delete:general_test",
+    "delete:general_test_subject",
     "general_test:take",
+    "read:general_test",
+    "read:general_test_result",
+    "read:general_test_subject",
+    "update:general_test",
+    "update:general_test_subject",
     "mark:attendance",
     "read:active_quiz",
     "read:announcement",

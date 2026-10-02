@@ -140,18 +140,18 @@ async def finish(
 async def list_results(
     request: ResultListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_result")),
+    user: "User" = Depends(PermissionRequired("read:general_test_result")),
 ):
-    return await repo.list_results(session=session, request=request)
+    return await repo.list_results(session=session, request=request, user=user)
 
 
 @router.get("/results/export")
 async def export_results(
     request: ResultListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_result")),
+    user: "User" = Depends(PermissionRequired("read:general_test_result")),
 ):
-    content = await repo.export_results(session=session, request=request)
+    content = await repo.export_results(session=session, request=request, user=user)
     return StreamingResponse(
         io.BytesIO(content),
         media_type=XLSX,
@@ -177,9 +177,9 @@ async def list_subjects(
     limit: int = Query(20, ge=1, le=500),
     search: str | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("read:general_test_subject")),
 ):
-    return await repo.list_subjects(session=session, page=page, limit=limit, search=search)
+    return await repo.list_subjects(session=session, page=page, limit=limit, search=search, user=user)
 
 
 @router.post("/subject", response_model=SubjectSummary, status_code=status.HTTP_201_CREATED)
@@ -203,9 +203,9 @@ async def subject_filter_options(
 async def get_subject(
     subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("read:general_test_subject")),
 ):
-    return await repo.get_subject(session=session, subject_id=subject_id)
+    return await repo.get_subject(session=session, subject_id=subject_id, user=user)
 
 
 @router.put("/subject/{subject_id}", response_model=SubjectSummary)
@@ -213,18 +213,18 @@ async def update_subject(
     subject_id: int,
     data: SubjectUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.update_subject(session=session, subject_id=subject_id, data=data)
+    return await repo.update_subject(session=session, subject_id=subject_id, data=data, user=user)
 
 
 @router.delete("/subject/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject(
     subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("delete:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("delete:general_test_subject")),
 ):
-    await repo.delete_subject(session=session, subject_id=subject_id)
+    await repo.delete_subject(session=session, subject_id=subject_id, user=user)
 
 
 @router.get("/subject/{subject_id}/users", response_model=SubjectUserListResponse)
@@ -232,9 +232,9 @@ async def list_subject_users(
     subject_id: int,
     request: UserListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("read:general_test_subject")),
 ):
-    return await repo.list_subject_users(session=session, subject_id=subject_id, request=request)
+    return await repo.list_subject_users(session=session, subject_id=subject_id, request=request, user=user)
 
 
 @router.get("/subject/{subject_id}/candidates", response_model=SubjectUserListResponse)
@@ -242,9 +242,9 @@ async def list_subject_candidates(
     subject_id: int,
     request: UserListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.list_candidates(session=session, subject_id=subject_id, request=request)
+    return await repo.list_candidates(session=session, subject_id=subject_id, request=request, user=user)
 
 
 @router.post("/subject/{subject_id}/users", response_model=SubjectUsersAddResponse)
@@ -252,9 +252,9 @@ async def add_subject_users(
     subject_id: int,
     data: SubjectUsersAddRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.add_subject_users(session=session, subject_id=subject_id, data=data)
+    return await repo.add_subject_users(session=session, subject_id=subject_id, data=data, user=user)
 
 
 @router.delete("/subject/{subject_id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -262,9 +262,9 @@ async def remove_subject_user(
     subject_id: int,
     user_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    await repo.remove_subject_user(session=session, subject_id=subject_id, user_id=user_id)
+    await repo.remove_subject_user(session=session, subject_id=subject_id, user_id=user_id, user=user)
 
 
 # ─── Guruhlar ────────────────────────────────────────────────────────────────
@@ -287,9 +287,9 @@ async def add_test_groups(
     test_id: int,
     data: TestGroupsAddRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    user: "User" = Depends(PermissionRequired("update:general_test")),
 ):
-    return await repo.add_test_groups(session=session, test_id=test_id, data=data)
+    return await repo.add_test_groups(session=session, test_id=test_id, data=data, user=user)
 
 
 @router.patch("/{test_id}/groups/{group_id}", response_model=GeneralTestDetail)
@@ -298,10 +298,10 @@ async def set_test_group_active(
     group_id: int,
     data: TestGroupUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    user: "User" = Depends(PermissionRequired("update:general_test")),
 ):
     """Guruh uchun testni yoqish yoki yashirish."""
-    return await repo.set_test_group_active(session=session, test_id=test_id, group_id=group_id, data=data)
+    return await repo.set_test_group_active(session=session, test_id=test_id, group_id=group_id, data=data, user=user)
 
 
 @router.delete("/{test_id}/groups/{group_id}", response_model=GeneralTestDetail)
@@ -309,9 +309,9 @@ async def remove_test_group(
     test_id: int,
     group_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    user: "User" = Depends(PermissionRequired("update:general_test")),
 ):
-    return await repo.remove_test_group(session=session, test_id=test_id, group_id=group_id)
+    return await repo.remove_test_group(session=session, test_id=test_id, group_id=group_id, user=user)
 
 
 # ─── Вопросы (банк fan'а) ────────────────────────────────────────────────────
@@ -332,27 +332,27 @@ async def update_question(
     question_id: int,
     data: QuestionUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.update_question(session=session, question_id=question_id, data=data)
+    return await repo.update_question(session=session, question_id=question_id, data=data, user=user)
 
 
 @router.delete("/question/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_question(
     question_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    await repo.delete_question(session=session, question_id=question_id)
+    await repo.delete_question(session=session, question_id=question_id, user=user)
 
 
 @router.get("/subject/{subject_id}/questions", response_model=SubjectQuestionListResponse)
 async def list_subject_questions(
     subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("read:general_test_subject")),
 ):
-    return await repo.list_subject_questions(session=session, subject_id=subject_id)
+    return await repo.list_subject_questions(session=session, subject_id=subject_id, user=user)
 
 
 @router.post(
@@ -362,9 +362,9 @@ async def create_question(
     subject_id: int,
     data: QuestionCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.create_question(session=session, subject_id=subject_id, data=data)
+    return await repo.create_question(session=session, subject_id=subject_id, data=data, user=user)
 
 
 @router.post(
@@ -394,9 +394,9 @@ async def upload_excel(
     subject_id: int,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
 ):
-    return await repo.upload_questions_excel(session=session, subject_id=subject_id, file=file)
+    return await repo.upload_questions_excel(session=session, subject_id=subject_id, file=file, user=user)
 
 
 # ─── Тесты ───────────────────────────────────────────────────────────────────
@@ -409,9 +409,9 @@ async def list_tests(
     search: str | None = None,
     subject_id: int | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test")),
+    user: "User" = Depends(PermissionRequired("read:general_test")),
 ):
-    return await repo.list_tests(session=session, page=page, limit=limit, search=search, subject_id=subject_id)
+    return await repo.list_tests(session=session, page=page, limit=limit, search=search, subject_id=subject_id, user=user)
 
 
 @router.post("/", response_model=GeneralTestDetail, status_code=status.HTTP_201_CREATED)
@@ -427,9 +427,9 @@ async def create_test(
 async def get_test(
     test_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("read:general_test")),
+    user: "User" = Depends(PermissionRequired("read:general_test")),
 ):
-    return await repo.get_test(session=session, test_id=test_id)
+    return await repo.get_test(session=session, test_id=test_id, user=user)
 
 
 @router.put("/{test_id}", response_model=GeneralTestDetail)
@@ -437,15 +437,15 @@ async def update_test(
     test_id: int,
     data: GeneralTestUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("update:general_test")),
+    user: "User" = Depends(PermissionRequired("update:general_test")),
 ):
-    return await repo.update_test(session=session, test_id=test_id, data=data)
+    return await repo.update_test(session=session, test_id=test_id, data=data, user=user)
 
 
 @router.delete("/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_test(
     test_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: "User" = Depends(PermissionRequired("delete:general_test")),
+    user: "User" = Depends(PermissionRequired("delete:general_test")),
 ):
-    await repo.delete_test(session=session, test_id=test_id)
+    await repo.delete_test(session=session, test_id=test_id, user=user)
