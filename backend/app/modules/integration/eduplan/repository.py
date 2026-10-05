@@ -281,6 +281,45 @@ class EduPlanRepository:
         logger.info("EduPlan: роль teacher выдана %d пользователям", len(user_ids))
         return len(user_ids)
 
+    async def _free_hemis_id(self, session: AsyncSession, hemis_id: str | None, row: Teacher) -> str | None:
+        """`hemis_id` ni yozish mumkinmi — yoʻq boʻlsa, eskisi qoladi.
+
+        `uq_teachers_hemis_id` — qisman unikal indeks (`hemis_id IS NOT
+        NULL`). EPMOS ayni bir `hemis_id` ni ikki xodimga berib qoʻysa
+        (yoki xodim yangi yozuv bilan kelsa, eski yozuv esa oʻsha
+        `hemis_id` bilan qolsa), `UPDATE` indeksga urilardi va butun
+        sinxronizatsiya toʻxtardi — serverda aynan shunday boʻldi.
+        Koʻr-koʻrona koʻchirib ham boʻlmaydi: `hemis_id` — oʻqituvchining
+        HEMIS orqali kirish kaliti, uni boshqa qatorga olib oʻtish
+        notoʻgʻri odamni kirgizib yuborishi mumkin.
+
+        Shuning uchun band qiymat yozilmaydi: qator qolgan maydonlari
+        bilan yangilanadi, bogʻlanish esa avvalgidek qoladi. Admin buni
+        ikkala yozuvni koʻrib hal qiladi.
+        """
+        if hemis_id is None:
+            return None
+        # Boʻsh satr — bu «maʼlumot yoʻq», lekin indeks uchun u haqiqiy
+        # qiymat: ikkinchi shunday xodim indeksga urilardi.
+        hemis_id = hemis_id.strip()
+        if not hemis_id:
+            return None
+        if row.hemis_id == hemis_id:
+            return hemis_id
+
+        taken = await session.scalar(
+            select(Teacher.id).where(Teacher.hemis_id == hemis_id, Teacher.id != (row.id or -1)).limit(1)
+        )
+        if taken is not None:
+            logger.warning(
+                "EduPlan: hemis_id %s band (teachers.id=%s) — %r uchun yozilmadi",
+                hemis_id,
+                taken,
+                row.full_name,
+            )
+            return row.hemis_id
+        return hemis_id
+
     async def upsert_teacher(
         self,
         session: AsyncSession,
@@ -328,7 +367,7 @@ class EduPlanRepository:
         row.last_name = last_name
         row.third_name = third_name
         row.full_name = full_name
-        row.hemis_id = hemis_id
+        row.hemis_id = await self._free_hemis_id(session, hemis_id, row)
         row.kafedra_id = kafedra_id
         self._stamp(row, external_id)
         session.add(row)

@@ -657,139 +657,151 @@ class EduPlanSyncService:
         was_new = existing is None
         changes = proposal.changes
 
+        # Har bir qator — alohida SAVEPOINT.
+        #
+        # Pastdagi `except` bitta buzuq qator butun progonni yiqitmasligi
+        # uchun qoʻyilgan edi, lekin u yetarli emas: `IntegrityError` dan
+        # keyin SESSIYA buziladi va undan keyingi har bir amal
+        # `PendingRollbackError` beradi — progon baribir yiqilib, mijoz
+        # 500 olardi. Serverda `uq_teachers_hemis_id` da aynan shunday
+        # boʻldi: bitta xodim butun sinxronizatsiyani toʻxtatib qoʻydi.
+        #
+        # Ichki tranzaksiya buzuq qatorni yolgʻiz orqaga qaytaradi,
+        # undan oldingi muvaffaqiyatli qatorlar esa joyida qoladi.
         try:
-            if entity == EduPlanEntity.faculty:
-                row = await eduplan_repository.upsert_faculty(session, proposal.external_id, changes["name"], existing)
+            async with session.begin_nested():
+                if entity == EduPlanEntity.faculty:
+                    row = await eduplan_repository.upsert_faculty(session, proposal.external_id, changes["name"], existing)
 
-            elif entity == EduPlanEntity.kafedra:
-                faculty_id = parents(EduPlanEntity.faculty).get(changes["faculty_external_id"])
-                if faculty_id is None:
-                    result.errors.append(f"Кафедра {proposal.external_name}: факультет не разрешён, пропущена")
-                    result.skipped += 1
-                    return
-                row = await eduplan_repository.upsert_kafedra(
-                    session, proposal.external_id, changes["name"], faculty_id, existing
-                )
-                kafedra_faculty[row.id] = faculty_id
+                elif entity == EduPlanEntity.kafedra:
+                    faculty_id = parents(EduPlanEntity.faculty).get(changes["faculty_external_id"])
+                    if faculty_id is None:
+                        result.errors.append(f"Кафедра {proposal.external_name}: факультет не разрешён, пропущена")
+                        result.skipped += 1
+                        return
+                    row = await eduplan_repository.upsert_kafedra(
+                        session, proposal.external_id, changes["name"], faculty_id, existing
+                    )
+                    kafedra_faculty[row.id] = faculty_id
 
-            elif entity == EduPlanEntity.speciality:
-                kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
-                if kafedra_id is None:
-                    result.errors.append(f"Специальность {proposal.external_name}: кафедра не разрешена, пропущена")
-                    result.skipped += 1
-                    return
-                row = await eduplan_repository.upsert_speciality(
-                    session,
-                    proposal.external_id,
-                    changes["name"],
-                    kafedra_id,
-                    changes.get("education_type"),
-                    existing,
-                )
-                speciality_kafedra[row.id] = kafedra_id
+                elif entity == EduPlanEntity.speciality:
+                    kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
+                    if kafedra_id is None:
+                        result.errors.append(f"Специальность {proposal.external_name}: кафедра не разрешена, пропущена")
+                        result.skipped += 1
+                        return
+                    row = await eduplan_repository.upsert_speciality(
+                        session,
+                        proposal.external_id,
+                        changes["name"],
+                        kafedra_id,
+                        changes.get("education_type"),
+                        existing,
+                    )
+                    speciality_kafedra[row.id] = kafedra_id
 
-            elif entity == EduPlanEntity.group:
-                speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
-                # У группы в EduPlan факультета нет — выводим по цепочке
-                # специальность -> кафедра -> факультет.
-                faculty_id = None
-                if speciality_id is not None:
-                    kafedra_id = speciality_kafedra.get(speciality_id)
-                    faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
-                if faculty_id is None:
-                    result.errors.append(f"Группа {proposal.external_name}: не удалось вывести факультет, пропущена")
-                    result.skipped += 1
-                    return
-                row = await eduplan_repository.upsert_group(
-                    session,
-                    proposal.external_id,
-                    changes["name"],
-                    faculty_id,
-                    speciality_id,
-                    changes.get("course"),
-                    changes.get("education_shape"),
-                    changes.get("student_count"),
-                    existing,
-                    changes.get("hemis_group_id"),
-                    changes.get("education_language"),
-                )
+                elif entity == EduPlanEntity.group:
+                    speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
+                    # У группы в EduPlan факультета нет — выводим по цепочке
+                    # специальность -> кафедра -> факультет.
+                    faculty_id = None
+                    if speciality_id is not None:
+                        kafedra_id = speciality_kafedra.get(speciality_id)
+                        faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
+                    if faculty_id is None:
+                        result.errors.append(f"Группа {proposal.external_name}: не удалось вывести факультет, пропущена")
+                        result.skipped += 1
+                        return
+                    row = await eduplan_repository.upsert_group(
+                        session,
+                        proposal.external_id,
+                        changes["name"],
+                        faculty_id,
+                        speciality_id,
+                        changes.get("course"),
+                        changes.get("education_shape"),
+                        changes.get("student_count"),
+                        existing,
+                        changes.get("hemis_group_id"),
+                        changes.get("education_language"),
+                    )
 
-            elif entity == EduPlanEntity.subject:
-                kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
-                # Reja topilmasa — `None`: fan baribir saqlanadi, faqat
-                # ro'yxatda uni nom bilan ajratib bo'lmaydi. Bu qattiq
-                # bog'liqlik emas, shuning uchun progon to'xtamaydi.
-                curriculum_external_id = changes.get("curriculum_external_id")
-                curriculum_id = (
-                    parents(EduPlanEntity.curriculum).get(curriculum_external_id)
-                    if curriculum_external_id
-                    else None
-                )
-                row = await eduplan_repository.upsert_subject(
-                    session,
-                    proposal.external_id,
-                    changes["name"],
-                    kafedra_id,
-                    existing,
-                    curriculum_id,
-                    changes.get("semester"),
-                )
+                elif entity == EduPlanEntity.subject:
+                    kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
+                    # Reja topilmasa — `None`: fan baribir saqlanadi, faqat
+                    # ro'yxatda uni nom bilan ajratib bo'lmaydi. Bu qattiq
+                    # bog'liqlik emas, shuning uchun progon to'xtamaydi.
+                    curriculum_external_id = changes.get("curriculum_external_id")
+                    curriculum_id = (
+                        parents(EduPlanEntity.curriculum).get(curriculum_external_id)
+                        if curriculum_external_id
+                        else None
+                    )
+                    row = await eduplan_repository.upsert_subject(
+                        session,
+                        proposal.external_id,
+                        changes["name"],
+                        kafedra_id,
+                        existing,
+                        curriculum_id,
+                        changes.get("semester"),
+                    )
 
-            elif entity == EduPlanEntity.curriculum:
-                speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
-                # Кафедра и факультет выводятся по той же цепочке, что и у
-                # группы: специальность -> кафедра -> факультет.
-                #
-                # Если специальность не разрешена, связки НЕ затираем.
-                # Новый план заводим и без них — сам по себе он осмысленная
-                # строка справочника. А вот у существующего молчаливое
-                # обнуление означало бы, что план исчез из выборок по
-                # факультету, и причину пришлось бы искать в базе: строка на
-                # месте, данные на месте, а в списке её нет.
-                if speciality_id is None:
-                    if existing is not None and existing.speciality_id is not None:
-                        result.errors.append(
-                            f"O'quv reja {proposal.external_name}: mutaxassislik (EPMOS #"
-                            f"{changes['speciality_external_id']}) bog'lanmagan — avval "
-                            "«Mutaxassisliklarni sinxronlash» ni bajaring. Rejaning eski "
-                            "bog'lanishi saqlab qolindi."
-                        )
-                    speciality_id = existing.speciality_id if existing else None
-                    kafedra_id = existing.kafedra_id if existing else None
-                    faculty_id = existing.faculty_id if existing else None
+                elif entity == EduPlanEntity.curriculum:
+                    speciality_id = parents(EduPlanEntity.speciality).get(changes["speciality_external_id"])
+                    # Кафедра и факультет выводятся по той же цепочке, что и у
+                    # группы: специальность -> кафедра -> факультет.
+                    #
+                    # Если специальность не разрешена, связки НЕ затираем.
+                    # Новый план заводим и без них — сам по себе он осмысленная
+                    # строка справочника. А вот у существующего молчаливое
+                    # обнуление означало бы, что план исчез из выборок по
+                    # факультету, и причину пришлось бы искать в базе: строка на
+                    # месте, данные на месте, а в списке её нет.
+                    if speciality_id is None:
+                        if existing is not None and existing.speciality_id is not None:
+                            result.errors.append(
+                                f"O'quv reja {proposal.external_name}: mutaxassislik (EPMOS #"
+                                f"{changes['speciality_external_id']}) bog'lanmagan — avval "
+                                "«Mutaxassisliklarni sinxronlash» ni bajaring. Rejaning eski "
+                                "bog'lanishi saqlab qolindi."
+                            )
+                        speciality_id = existing.speciality_id if existing else None
+                        kafedra_id = existing.kafedra_id if existing else None
+                        faculty_id = existing.faculty_id if existing else None
+                    else:
+                        kafedra_id = speciality_kafedra.get(speciality_id)
+                        faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
+
+                    row = await eduplan_repository.upsert_curriculum(
+                        session,
+                        proposal.external_id,
+                        changes["name"],
+                        speciality_id,
+                        kafedra_id,
+                        faculty_id,
+                        changes.get("education_form"),
+                        changes.get("education_type"),
+                        existing,
+                    )
+
+                elif entity == EduPlanEntity.teacher:
+                    kafedra_ext = changes.get("kafedra_external_id")
+                    kafedra_id = parents(EduPlanEntity.kafedra).get(kafedra_ext) if kafedra_ext else None
+                    row = await eduplan_repository.upsert_teacher(
+                        session,
+                        external_id=proposal.external_id,
+                        username=changes["username"],
+                        hemis_id=changes.get("hemis_id"),
+                        first_name=changes["first_name"],
+                        last_name=changes["last_name"],
+                        third_name=changes["third_name"],
+                        full_name=changes["full_name"] or changes["username"],
+                        kafedra_id=kafedra_id,
+                        existing=existing,
+                    )
                 else:
-                    kafedra_id = speciality_kafedra.get(speciality_id)
-                    faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
-
-                row = await eduplan_repository.upsert_curriculum(
-                    session,
-                    proposal.external_id,
-                    changes["name"],
-                    speciality_id,
-                    kafedra_id,
-                    faculty_id,
-                    changes.get("education_form"),
-                    changes.get("education_type"),
-                    existing,
-                )
-
-            elif entity == EduPlanEntity.teacher:
-                kafedra_ext = changes.get("kafedra_external_id")
-                kafedra_id = parents(EduPlanEntity.kafedra).get(kafedra_ext) if kafedra_ext else None
-                row = await eduplan_repository.upsert_teacher(
-                    session,
-                    external_id=proposal.external_id,
-                    username=changes["username"],
-                    hemis_id=changes.get("hemis_id"),
-                    first_name=changes["first_name"],
-                    last_name=changes["last_name"],
-                    third_name=changes["third_name"],
-                    full_name=changes["full_name"] or changes["username"],
-                    kafedra_id=kafedra_id,
-                    existing=existing,
-                )
-            else:
-                return
+                    return
         except Exception as e:  # noqa: BLE001 — одна битая строка не должна валить прогон
             logger.warning("EduPlan: %s %r не применена: %s", entity.value, proposal.external_name, e)
             result.errors.append(f"{proposal.external_name}: {e}")
