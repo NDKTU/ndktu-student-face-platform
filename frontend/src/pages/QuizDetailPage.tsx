@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Pagination } from '@/components/ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { sanitizeHtml } from '@/utils/sanitize';
+import { safeReturnTo } from '@/utils/returnTo';
 import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 
 const formatDuration = (seconds?: number | null) => {
@@ -33,10 +34,7 @@ const QuizDetailPage = () => {
     // ichki yo'l qabul qilinadi: tashqi havola bo'lsa, tugma
     // foydalanuvchini saytdan olib chiqib ketardi.
     const [searchParams] = useSearchParams();
-    const requestedBack = searchParams.get('return_to');
-    const backTo = requestedBack && requestedBack.startsWith('/') && !requestedBack.startsWith('//')
-        ? requestedBack
-        : '/quizzes';
+    const backTo = safeReturnTo(searchParams.get('return_to'), '/quizzes');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const quiz = useQuiz(quizId);

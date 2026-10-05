@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { safeReturnTo } from '@/utils/returnTo';
 import { useMethod, useSubmitTest } from '@/hooks/usePsychology';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -374,6 +375,13 @@ function ResultScreen({ methodName, questions, answers, diagnosis, onBack }: {
 export default function PsychologyTestPage() {
     const { methodId } = useParams<{ methodId: string }>();
     const navigate = useNavigate();
+    // Bu sahifaga ikki yo'ldan kelishadi: talabaning «Psixologik testlar»
+    // sahifasidan va metodlarni boshqarish sahifasidan. «Orqaga» doim
+    // `/psychology` ga olib borardi — ya'ni testni boshlagan odam
+    // boshqaruv sahifasiga tushar, u yerda esa tahrirlash va o'chirish
+    // tugmalari turardi.
+    const [searchParams] = useSearchParams();
+    const backTo = safeReturnTo(searchParams.get('return_to'), '/psychology');
     const { data: method, isLoading, isError, refetch } = useMethod(methodId ? Number(methodId) : null);
     const submitTest = useSubmitTest();
 
@@ -433,7 +441,7 @@ export default function PsychologyTestPage() {
                     icon={<Brain className="h-6 w-6" />}
                     title="Savollar yo'q"
                     description="Bu metodda hali savollar yo'q."
-                    action={<Button variant="outline" onClick={() => navigate('/psychology')}>Orqaga</Button>}
+                    action={<Button variant="outline" onClick={() => navigate(backTo)}>Orqaga</Button>}
                 />
             </div>
         );
@@ -447,7 +455,7 @@ export default function PsychologyTestPage() {
                     questions={questions}
                     answers={result.answers}
                     diagnosis={result.diagnosis}
-                    onBack={() => navigate(-1)}
+                    onBack={() => navigate(backTo)}
                 />
             </div>
         );
@@ -461,7 +469,7 @@ export default function PsychologyTestPage() {
                     description={method.description}
                     total={total}
                     onStart={() => setStarted(true)}
-                    onBack={() => navigate('/psychology')}
+                    onBack={() => navigate(backTo)}
                 />
             </div>
         );
@@ -497,7 +505,7 @@ export default function PsychologyTestPage() {
             {/* Header */}
             <div className="mb-5 flex items-center gap-3">
                 <button
-                    onClick={() => navigate('/psychology')}
+                    onClick={() => navigate(backTo)}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     aria-label="Orqaga"
                 >
