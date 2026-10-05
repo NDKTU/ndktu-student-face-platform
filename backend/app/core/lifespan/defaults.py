@@ -97,6 +97,13 @@ STUDENT_PERMISSIONS = (
     "read:homework",
     "read:lesson",
     "read:psychology",
+    # Oʻz psixologik natijalari. Bekend talabaga faqat oʻzinikini
+    # beradi: `user_id` parametri bilan ham boshqasinikini soʻray
+    # olmaydi (`psychology/router.py::list_results`), sahifa esa
+    # «Psixologik natijalarim» koʻrinishida ochiladi. Ruxsatsiz esa
+    # menyu punkti ham, sahifa ham yopiq edi — yaʼni talaba oʻzi
+    # topshirgan testning natijasini koʻra olmasdi.
+    "read:psychology_results",
     "read:resource",
     "read:result",
     "read:submission",

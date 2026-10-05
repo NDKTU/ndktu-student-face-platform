@@ -222,13 +222,21 @@ def test_lists_have_no_duplicates():
 def test_student_has_no_dangerous_permissions():
     """Talabaga boshqalarning ma'lumotini ochadigan ruxsat berilmaydi.
 
-    `read:psychology_results` so'rovdagi `user_id` orqali BOSHQA
-    talabalarning natijalarini ham ko'rsatadi; `read:file` esa umumiy
-    kutubxonani, ya'ni o'qituvchilarning fayllarini. Ikkovi ham ataylab
-    yo'q va tasodifan qo'shilib qolmasligi kerak.
+    `read:file` umumiy kutubxonani, ya'ni o'qituvchilarning fayllarini
+    ochadi; `read:student`, `read:group` va `read:question` ham boshqalar
+    haqidagi ma'lumot (oxirgisida to'g'ri javoblar ham bor). Hammasi
+    ataylab yo'q va tasodifan qo'shilib qolmasligi kerak.
+
+    `read:psychology_results` ilgari shu ro'yxatda edi: o'sha paytda
+    so'rovdagi `user_id` orqali BOSHQA talabaning natijalarini olish
+    mumkin edi. 2026-10-02 dan beri endpoint talabaga parametrdan
+    qat'i nazar faqat o'zinikini beradi
+    (`psychology/router.py::list_results` + `is_student_only`), shuning
+    uchun ruxsat berildi — usiz talaba o'zi topshirgan testning
+    natijasini ham ko'ra olmasdi. Chegara endi shu yerda emas,
+    `test_psychology_student_results.py` da tekshiriladi.
     """
     forbidden = {
-        "read:psychology_results",
         "read:file",
         "read:student",
         "read:group",
