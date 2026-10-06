@@ -339,7 +339,20 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
 // `file` — «Fayllar kutubxonasi» talabaga yopiq: u faylni faqat o'z
 // qurilmasidan yuklaydi (App.tsx dagi FileLibraryRoute, bekendda
 // FileLibraryExceptStudent).
-const STUDENT_HIDDEN_RESOURCES = new Set(['psychology', 'psychology_results', 'active_quiz', 'announcement', 'file']);
+//
+// `general_test` — testlarni TUZISH sahifasi. Talabaning yo'li boshqa:
+// `/elementar-tests/take` (STUDENT_BESPOKE_ITEMS). Toza talabada bu
+// punkt baribir chiqmasdi — unda `read:general_test` yo'q; ikkalasi ham
+// ko'rinadigan joy — ikki rolli hisob (o'qituvchi + talaba), va u yerda
+// menyuda bir xil nomli ikkita punkt chiqardi.
+const STUDENT_HIDDEN_RESOURCES = new Set([
+    'psychology',
+    'psychology_results',
+    'active_quiz',
+    'announcement',
+    'file',
+    'general_test',
+]);
 
 const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {
     const grouped: Record<string, SidebarItem[]> = {};
