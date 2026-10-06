@@ -1,6 +1,10 @@
 """Elementar testlarda egalik.
 
-Oʻqituvchi endi oʻz elementar testini tuza oladi. `created_by_user_id`
+Bu yerdagi rollarga fan huquqi ataylab berilgan — tekshirilayotgan narsa
+huquq emas, EGALIK chegarasi. Ishlab turgan `teacher` roli bu huquqlarsiz
+ishlaydi, u fanni faqat koʻradi (`test_general_test_subject_rights.py`).
+
+`created_by_user_id`
 ilgari ham yozilardi, lekin hech qayerda tekshirilmasdi: roʻyxatlar
 hammaniki qaytarardi, tahrirlash va oʻchirish egasiga qaramasdi.
 Ruxsatni shundayligicha berish — har bir oʻqituvchiga begona testlarni
@@ -43,11 +47,19 @@ async def _make_user(async_db, username: str, role_name: str, permissions: tuple
     return {"id": user.id, "username": username}
 
 
-TEACHER_PERMS = (
+#: Fanga toʻliq huquqli rol. Bu ishlab turgan `teacher` roli EMAS: unda
+#: fan huquqlari yoʻq (fan — maʼmuriyat obyekti, qarang
+#: `test_general_test_subject_rights.py`). Bu yerda ular ataylab bor,
+#: chunki tekshirilayotgan narsa boshqa — EGALIK: fanni yaratgan odam
+#: begona fanni koʻrmasligi va oʻzgartira olmasligi.
+SUBJECT_OWNER_PERMS = (
     "read:general_test_subject",
     "create:general_test_subject",
     "update:general_test_subject",
     "delete:general_test_subject",
+    "create:general_test_question",
+    "update:general_test_question",
+    "delete:general_test_question",
     "read:general_test",
     "create:general_test",
     "update:general_test",
@@ -59,8 +71,8 @@ TEACHER_PERMS = (
 @pytest_asyncio.fixture
 async def two_teachers(async_client, async_db):
     """Ikki oʻqituvchi va ularning mijozlari."""
-    first = await _make_user(async_db, "gt_teacher_a", "teacher_a", TEACHER_PERMS)
-    second = await _make_user(async_db, "gt_teacher_b", "teacher_b", TEACHER_PERMS)
+    first = await _make_user(async_db, "gt_teacher_a", "teacher_a", SUBJECT_OWNER_PERMS)
+    second = await _make_user(async_db, "gt_teacher_b", "teacher_b", SUBJECT_OWNER_PERMS)
 
     async def login(username: str) -> str:
         response = await async_client.post(
@@ -84,8 +96,8 @@ def _as(client, token: str):
 
 
 @pytest.mark.asyncio
-async def test_teacher_can_create_subject_and_upload_question(two_teachers):
-    """Oʻqituvchi oʻz fanini ochib, unga savol qoʻsha oladi."""
+async def test_subject_owner_can_create_and_fill_it(two_teachers):
+    """Fan huquqi berilgan rol fanni ochib, unga savol qoʻsha oladi."""
     client = _as(two_teachers["client"], two_teachers["token_first"])
 
     created = await client.post("/general-test/subject", json={"name": "Oʻqituvchi fani"})

@@ -57,7 +57,7 @@ export function SubjectQuestionBank({ subjectId, canManage }: { subjectId: numbe
                             Fanning har bir testi shu savollardan tasodifiy oladi (nechtasi — testning «Savollar soni»)
                         </p>
                     </div>
-                    <PermissionGate permission="update:general_test_subject">
+                    <PermissionGate permission="create:general_test_question">
                         <div className="flex flex-wrap gap-2">
                             <Button variant="ghost" size="sm" onClick={() => generalTestService.downloadTemplate()}>
                                 <Download className="h-4 w-4" /> Shablon
@@ -113,16 +113,18 @@ export function SubjectQuestionBank({ subjectId, canManage }: { subjectId: numbe
                                         <RichText value={q.text} className="min-w-0 flex-1" />
                                     </div>
                                     {canManage && (
-                                        <PermissionGate permission="update:general_test_subject">
-                                            <div className="flex shrink-0 gap-1">
+                                        <div className="flex shrink-0 gap-1">
+                                            <PermissionGate permission="update:general_test_question">
                                                 <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => navigate(`/elementar-tests/subjects/${subjectId}/questions/${q.id}/edit`)}>
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
+                                            </PermissionGate>
+                                            <PermissionGate permission="delete:general_test_question">
                                                 <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(q)}>
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
-                                            </div>
-                                        </PermissionGate>
+                                            </PermissionGate>
+                                        </div>
                                     )}
                                 </div>
                                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">

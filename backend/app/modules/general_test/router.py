@@ -1,8 +1,13 @@
 """Elementar test: управление (admin) и прохождение (назначенные пользователи).
 
 Права:
-- `create/read/update/delete:general_test_subject` — fanlar, их банк вопросов
-  и назначение на них пользователей;
+- `create/read/update/delete:general_test_subject` — сам предмет: создание,
+  переименование, удаление и назначение на него пользователей;
+- `create/update/delete:general_test_question` — банк вопросов предмета.
+  Отделено от прав на предмет намеренно: преподаватель наполняет чужой
+  предмет вопросами, но не переименовывает его, не удаляет и не меняет
+  список допущенных. Пока это было одним правом `update:general_test_subject`,
+  второе нельзя было дать без первого;
 - `create/read/update/delete:general_test` — тесты и их группы;
 - `read/delete:general_test_result` — сводная таблица результатов;
 - `general_test:take` — пройти тест и увидеть свои результаты. Миграция
@@ -318,7 +323,7 @@ async def remove_test_group(
 
 
 @router.get("/excel_template")
-async def excel_template(_: "User" = Depends(PermissionRequired("update:general_test_subject"))):
+async def excel_template(_: "User" = Depends(PermissionRequired("create:general_test_question"))):
     # Шаблон общий с банком вопросов: формат один, парсер один.
     return StreamingResponse(
         io.BytesIO(get_question_repository.build_excel_template()),
@@ -332,7 +337,7 @@ async def update_question(
     question_id: int,
     data: QuestionUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("update:general_test_question")),
 ):
     return await repo.update_question(session=session, question_id=question_id, data=data, user=user)
 
@@ -341,7 +346,7 @@ async def update_question(
 async def delete_question(
     question_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("delete:general_test_question")),
 ):
     await repo.delete_question(session=session, question_id=question_id, user=user)
 
@@ -362,7 +367,7 @@ async def create_question(
     subject_id: int,
     data: QuestionCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("create:general_test_question")),
 ):
     return await repo.create_question(session=session, subject_id=subject_id, data=data, user=user)
 
@@ -374,7 +379,7 @@ async def create_question(
 async def upload_question_image(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    current_user: "User" = Depends(PermissionRequired("create:general_test_question")),
 ):
     """Savol matni yoki variantidagi rasm — kurs savollari bilan bir papkada.
 
@@ -394,7 +399,7 @@ async def upload_excel(
     subject_id: int,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: "User" = Depends(PermissionRequired("update:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("create:general_test_question")),
 ):
     return await repo.upload_questions_excel(session=session, subject_id=subject_id, file=file, user=user)
 

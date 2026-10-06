@@ -367,8 +367,8 @@ function App() {
                                         <Route path="/elementar-tests/results" element={<PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/subjects" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectsPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/subjects/:id" element={<PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectDetailPage /></PermissionRoute>} />
-                                        <Route path="/elementar-tests/subjects/:subjectId/questions/new" element={<PermissionRoute permission="update:general_test_subject"><GeneralTestQuestionFormPage /></PermissionRoute>} />
-                                        <Route path="/elementar-tests/subjects/:subjectId/questions/:questionId/edit" element={<PermissionRoute permission="update:general_test_subject"><GeneralTestQuestionFormPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects/:subjectId/questions/new" element={<PermissionRoute permission="create:general_test_question"><GeneralTestQuestionFormPage /></PermissionRoute>} />
+                                        <Route path="/elementar-tests/subjects/:subjectId/questions/:questionId/edit" element={<PermissionRoute permission="update:general_test_question"><GeneralTestQuestionFormPage /></PermissionRoute>} />
                                         <Route path="/elementar-tests/:id" element={<PermissionRoute permission="read:general_test"><GeneralTestDetailPage /></PermissionRoute>} />
 
                                         <Route path="/subjects" element={<PermissionRoute permission="read:subject"><SubjectsPage /></PermissionRoute>} />

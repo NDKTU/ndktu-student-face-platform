@@ -36,25 +36,32 @@ TEACHER_PERMISSIONS = (
     "delete:question",
     "delete:quiz",
     "delete:resource",
-    # Elementar test. Oʻqituvchi oʻz testini tuzadi, unga savol yuklaydi va
-    # natijalarini koʻradi. Egalik repozitoriyda tekshiriladi
-    # (`general_test/repository.py`): admin boʻlmagan foydalanuvchi faqat
-    # `created_by_user_id` oʻziniki boʻlgan fan va testlarni koʻradi; fanga
-    # biriktirilgan boʻlsa — oʻsha fanni ham koʻradi va unga faqat savol qoʻshadi.
+    # Elementar test. Oʻqituvchi fanni KOʻRADI, lekin uni tuzmaydi,
+    # nomini oʻzgartirmaydi va oʻchirmaydi — fan maʼmuriyat qoʻlida
+    # qoladi. Uning ishi fan ichida: savollar banki va testlar.
+    #
+    # Shuning uchun savollar ruxsati fan ruxsatidan AJRATILGAN
+    # (`create/update/delete:general_test_question`). Ilgari ikkalasi
+    # bitta `update:general_test_subject` ostida edi, yaʼni savol
+    # yuklashga ruxsat berish fanni tahrirlashga ham ruxsat berardi.
+    #
+    # Egalik repozitoriyda tekshiriladi (`general_test/repository.py`):
+    # admin boʻlmagan foydalanuvchi faqat oʻzi biriktirilgan yoki oʻzi
+    # yaratgan fanlarni koʻradi.
     #
     # `delete:general_test_result` ataylab yoʻq: bu boshqa odamlarning
     # urinishlari va ularni qaytarib boʻlmaydi — oʻchirish ma'muriyatda
     # qoladi.
     "create:general_test",
-    "create:general_test_subject",
+    "create:general_test_question",
     "delete:general_test",
-    "delete:general_test_subject",
+    "delete:general_test_question",
     "general_test:take",
     "read:general_test",
     "read:general_test_result",
     "read:general_test_subject",
     "update:general_test",
-    "update:general_test_subject",
+    "update:general_test_question",
     "mark:attendance",
     "read:active_quiz",
     "read:announcement",
