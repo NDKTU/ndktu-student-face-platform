@@ -157,7 +157,12 @@ class EduPlanConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.enabled and self.base_url and self.username and self.password)
+        # Ikki yoʻlning istalgan biri yetarli: xizmat kaliti yoki odam
+        # hisobi. Faqat kalit berilgan oʻrnatmada login/parol boʻsh
+        # qoladi, va eski shart buni «sozlanmagan» deb hisoblardi.
+        has_service_key = bool(self.client_id and self.client_secret)
+        has_account = bool(self.username and self.password)
+        return bool(self.enabled and self.base_url and (has_service_key or has_account))
 
 
 class FaceServiceConfig(BaseModel):

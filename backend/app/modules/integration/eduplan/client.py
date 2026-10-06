@@ -49,6 +49,9 @@ class EduPlanClient:
         self._cfg = cfg
         self._base_url = cfg.base_url.rstrip("/")
         self._token: str | None = None
+        # Xizmat kaliti bormi — shu rejimda ishlaymiz. Kalit maʼlumotnomalarga
+        # yetmasa (`_get` da 401), rejim oʻchadi va parol oqimiga qaytiladi.
+        self._service_mode = bool(cfg.client_id and cfg.client_secret)
         self._client = httpx.AsyncClient(timeout=cfg.timeout)
 
     async def __aenter__(self) -> "EduPlanClient":
@@ -65,33 +68,47 @@ class EduPlanClient:
     # ------------------------------------------------------------------ #
     #  Транспорт
     # ------------------------------------------------------------------ #
-    def _auth_payload(self) -> dict[str, str]:
-        """Avtorizatsiya tanasi: kalitlar boʻlsa — server-server oqimi.
+    def _auth_request(self) -> tuple[str, dict[str, str]]:
+        """Qaysi manzilga va qanday tana bilan token soʻraladi.
 
-        `client_credentials` — xizmat hisobi: u odamning loginiga
-        bogʻlanmagan, shuning uchun xodim parolini almashtirgani yoki
-        ishdan ketgani integratsiyani toʻxtatmaydi. Kalitlar
-        berilmaganda eski `password` oqimi ishlaydi — hali kalit
-        berilmagan oʻrnatma ham koʻtarilsin.
+        EPMOS da ikki MANZIL bor, bitta emas:
+
+        * `/oauth/token` — xizmat kaliti uchun (`client_credentials`).
+          Kalit juftligini EPMOS admini «Sozlamalar > API kalitlari» da
+          yaratadi;
+        * `/api/v1/auth/access-token` — odam hisobi uchun. U `grant_type`
+          ni `^password$` naqshi bilan tekshiradi, yaʼni unga
+          `client_credentials` yuborish 422 beradi.
+
+        Shuning uchun oqim bilan birga manzil ham almashadi — ilgari
+        ikkalasi bitta manzilga ketib, butun integratsiya 422 da
+        toʻxtab qolgandi.
         """
-        if self._cfg.client_id and self._cfg.client_secret:
-            return {
-                "grant_type": "client_credentials",
-                "client_id": self._cfg.client_id,
-                "client_secret": self._cfg.client_secret,
-            }
-        return {
-            "grant_type": "password",
-            "username": self._cfg.username,
-            "password": self._cfg.password,
-        }
+        if self._service_mode:
+            return (
+                f"{self._base_url}/oauth/token",
+                {
+                    "grant_type": "client_credentials",
+                    "client_id": self._cfg.client_id,
+                    "client_secret": self._cfg.client_secret,
+                },
+            )
+        return (
+            f"{self._base_url}/api/v1/auth/access-token",
+            {
+                "grant_type": "password",
+                "username": self._cfg.username,
+                "password": self._cfg.password,
+            },
+        )
 
     async def _login(self) -> str:
         """OAuth2. Тело — form-urlencoded, не JSON."""
+        url, payload = self._auth_request()
         try:
             resp = await self._client.post(
-                f"{self._base_url}/api/v1/auth/access-token",
-                data=self._auth_payload(),
+                url,
+                data=payload,
                 headers={"Accept": "application/json"},
             )
         except httpx.RequestError as e:
@@ -127,8 +144,8 @@ class EduPlanClient:
         # Какой поток сработал — видно в логе: при client_credentials
         # `username` пуст, и прежняя строка выглядела как «аккаунт ''
         # аутентифицирован».
-        if self._cfg.client_id and self._cfg.client_secret:
-            logger.info("EduPlan: client_credentials, client_id=%s", self._cfg.client_id)
+        if self._service_mode:
+            logger.info("EduPlan: xizmat kaliti, client_id=%s", self._cfg.client_id)
         else:
             logger.info("EduPlan: сервисный аккаунт %s аутентифицирован", self._cfg.username)
         return token
@@ -158,7 +175,21 @@ class EduPlanClient:
             # Токен мог протухнуть в середине долгого прогона — один
             # перелогин и повтор, дальше уже ошибка доступа.
             if resp.status_code == 401 and attempt == 1:
-                logger.info("EduPlan: токен отклонён на %s, повторный вход", path)
+                # Xizmat kaliti maʼlumotnomalarga yetmasligi mumkin: hozir
+                # uning `main_data:read` doirasi faqat `/api/v1/data/{id}`
+                # ni ochadi, qolgan hamma joyda token «validate» dan
+                # oʻtmaydi. Bunday holda progon toʻxtamasin — parol oqimi
+                # bor boʻlsa, unga qaytamiz. Kalit doirasi kengaytirilgan
+                # kuni qaytish oʻz-oʻzidan kerak boʻlmay qoladi.
+                if self._service_mode and self._cfg.username and self._cfg.password:
+                    logger.warning(
+                        "EduPlan: xizmat kaliti %s uchun yetmadi (doirasi tor) — "
+                        "parol oqimiga qaytildi",
+                        path,
+                    )
+                    self._service_mode = False
+                else:
+                    logger.info("EduPlan: токен отклонён на %s, повторный вход", path)
                 self._token = await self._login()
                 continue
 
