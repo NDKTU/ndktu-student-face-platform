@@ -104,8 +104,13 @@ const ENTITY_QUERY_KEYS: Record<EduPlanEntity, string[]> = {
 export const useSyncEntity = (entity: EduPlanEntity) => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (applyDeactivations: boolean = false) =>
-            eduplanService.syncEntity(entity, applyDeactivations),
+        mutationFn: (
+            options: { applyDeactivations?: boolean; applyDeletions?: boolean; allowBulkDelete?: boolean } = {},
+        ) =>
+            eduplanService.syncEntity(entity, options.applyDeactivations ?? false, {
+                applyDeletions: options.applyDeletions,
+                allowBulkDelete: options.allowBulkDelete,
+            }),
         onSuccess: () => {
             ENTITY_QUERY_KEYS[entity].forEach((key) =>
                 queryClient.invalidateQueries({ queryKey: [key] }),

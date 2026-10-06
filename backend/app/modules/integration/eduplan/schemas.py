@@ -267,6 +267,18 @@ class ApplyRequest(BaseModel):
     decisions: list[Decision] = Field(default_factory=list)
     #: Применять ли предложения о деактивации пропавших строк.
     apply_deactivations: bool = False
+    #: EPMOS'da yoʻq oʻqituvchini BUTUNLAY oʻchirish (kartochka,
+    #: foydalanuvchi, kurslari, savollari, testlari va yuklamasi bilan).
+    #: Faqat oʻqituvchilar boʻlimida ishlaydi va qaytarib boʻlmaydi,
+    #: shuning uchun standart holda oʻchiq: tungi cron hech narsani
+    #: oʻchirmaydi.
+    apply_deletions: bool = False
+    #: Chegarani ataylab chetlab oʻtish: bir progonda oʻqituvchilarning
+    #: 10% dan koʻpi oʻchiriladigan boʻlsa, soʻrov 409 bilan toʻxtaydi
+    #: (`service.py::_guard_mass_deletion`) — bu EPMOS tomonidagi uzilish
+    #: koʻrinishi. Admin ogohlantirishni oʻqib tasdiqlasa, shu bayroq
+    #: bilan qaytadi.
+    allow_bulk_delete: bool = False
 
 
 class ApplyResult(BaseModel):
@@ -275,6 +287,10 @@ class ApplyResult(BaseModel):
     linked: int = 0
     updated: int = 0
     deactivated: int = 0
+    #: Butunlay oʻchirilgan satrlar (hozircha faqat oʻqituvchilar).
+    deleted: int = 0
+    #: Ular bilan birga ketgan bogʻliq maʼlumot: kurs, savol, test, natija.
+    deleted_related: dict[str, int] = Field(default_factory=dict)
     skipped: int = 0
     errors: list[str] = Field(default_factory=list)
 
@@ -299,6 +315,9 @@ class EntitySyncResponse(BaseModel):
     linked: int = 0
     updated: int = 0
     deactivated: int = 0
+    #: Butunlay oʻchirilganlar va ular bilan ketgan bogʻliq maʼlumot.
+    deleted: int = 0
+    deleted_related: dict[str, int] = Field(default_factory=dict)
     skipped: int = 0
     #: Неоднозначные совпадения. Автоматически не применяются — их разбирают
     #: на общем экране сопоставления.

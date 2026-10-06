@@ -58,6 +58,10 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 
+#: Bir progonda oʻchirilishi mumkin boʻlgan oʻqituvchilarning eng katta
+#: ulushi. Oshsa — tasdiqsiz oʻchirilmaydi (`_guard_mass_deletion`).
+DELETE_SHARE_THRESHOLD = 0.10
+
 #: Снимок живёт час — столько администратору хватает на разбор конфликтов,
 #: и при этом применение не работает с безнадёжно устаревшими данными.
 SNAPSHOT_TTL_SECONDS = 3600
@@ -536,6 +540,9 @@ class EduPlanSyncService:
         )
         decisions: dict[str, Decision] = {d.key: d for d in request.decisions}
 
+        if request.apply_deletions:
+            self._guard_mass_deletion(proposals, request)
+
         # external_id -> локальный id, по сущностям. Заполняется как уже
         # связанными строками, так и созданными в этом прогоне: ребёнок
         # разрешает родителя именно отсюда. Берём и зависимости выбранного:
@@ -596,6 +603,8 @@ class EduPlanSyncService:
         entity: EduPlanEntity,
         *,
         apply_deactivations: bool = False,
+        apply_deletions: bool = False,
+        allow_bulk_delete: bool = False,
     ) -> tuple[PreviewResponse, ApplyResponse]:
         """Один раздел: предпросмотр и сразу применение однозначного.
 
@@ -610,9 +619,42 @@ class EduPlanSyncService:
                 run_id=preview.run_id,
                 decisions=[],
                 apply_deactivations=apply_deactivations,
+                apply_deletions=apply_deletions,
+                allow_bulk_delete=allow_bulk_delete,
             ),
         )
         return preview, applied
+
+    @staticmethod
+    def _guard_mass_deletion(proposals: list[Proposal], request: ApplyRequest) -> None:
+        """Ommaviy oʻchirishdan saqlaydi.
+
+        «EPMOS da yoʻq — oʻchiramiz» qoidasi tashqi tizim javobiga toʻliq
+        ishonadi. EPMOS sahifani uzib qoʻysa, vaqt tugasa yoki manzil
+        almashsa (bu allaqachon boʻlgan: 502 va `edu.plan` dan `epmos` ga
+        koʻchish), yetib kelmagan xodimlar «ishdan ketgan» deb tushuniladi
+        va kurslari bilan birga oʻchib ketardi. Qaytarib boʻlmaydi.
+        Shuning uchun ulush chegaradan oshsa, progon toʻxtaydi va
+        administratordan alohida tasdiq soʻraydi.
+        """
+        teacher_proposals = [p for p in proposals if p.entity == EduPlanEntity.teacher]
+        if not teacher_proposals:
+            return
+        to_delete = sum(1 for p in teacher_proposals if p.action == ProposalAction.deactivate)
+        if to_delete == 0 or request.allow_bulk_delete:
+            return
+
+        share = to_delete / len(teacher_proposals)
+        if share > DELETE_SHARE_THRESHOLD:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"EPMOS {len(teacher_proposals) - to_delete} ta oʻqituvchini qaytardi, "
+                    f"{to_delete} tasi esa yoʻq ({share:.0%}). Bu EPMOS tomonidagi nosozlikka "
+                    "oʻxshaydi. Haqiqatan oʻchirish kerak boʻlsa, «ommaviy oʻchirishga ruxsat» "
+                    "bilan qayta yuboring."
+                ),
+            )
 
     async def _apply_one(
         self,
@@ -644,7 +686,27 @@ class EduPlanSyncService:
             return
 
         if action == ProposalAction.deactivate:
-            if not request.apply_deactivations or local_id is None:
+            if local_id is None:
+                result.skipped += 1
+                return
+
+            # Oʻqituvchilar boʻlimida admin butunlay oʻchirishni tanlashi
+            # mumkin: EPMOS dan ketgan xodim platformada qolmasin.
+            # Qaytarib boʻlmaydi, shuning uchun aniq bayroq talab etiladi.
+            if entity == EduPlanEntity.teacher and request.apply_deletions:
+                row = await session.get(Teacher, local_id)
+                if row is None:
+                    # Qator allaqachon yoʻq (masalan qoʻlda oʻchirilgan):
+                    # hisobotda u oʻchirilgan deb koʻrinmasligi kerak.
+                    result.skipped += 1
+                    return
+                removed = await eduplan_repository.delete_teacher(session, row)
+                result.deleted += 1
+                for key, count in removed.items():
+                    result.deleted_related[key] = result.deleted_related.get(key, 0) + count
+                return
+
+            if not request.apply_deactivations:
                 result.skipped += 1
                 return
             row = await session.get(ENTITY_MODEL[entity], local_id)

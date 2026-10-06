@@ -214,6 +214,11 @@ async def eduplan_apply(
 async def eduplan_sync_entity(
     entity: EduPlanEntity,
     apply_deactivations: bool = False,
+    #: EPMOS'da yoʻq oʻqituvchini butunlay oʻchirish. Faqat oʻqituvchilar
+    #: boʻlimida ishlaydi, qaytarib boʻlmaydi — shuning uchun aniq soʻraladi.
+    apply_deletions: bool = False,
+    #: Chegaradan oshgan ommaviy oʻchirishga ruxsat (`_guard_mass_deletion`).
+    allow_bulk_delete: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("sync:eduplan")),
 ):
@@ -231,6 +236,8 @@ async def eduplan_sync_entity(
         session,
         entity,
         apply_deactivations=apply_deactivations,
+        apply_deletions=apply_deletions and entity == EduPlanEntity.teacher,
+        allow_bulk_delete=allow_bulk_delete,
     )
 
     result = next((r for r in applied.results if r.entity == entity), None)
@@ -247,6 +254,8 @@ async def eduplan_sync_entity(
         linked=result.linked if result else 0,
         updated=result.updated if result else 0,
         deactivated=result.deactivated if result else 0,
+        deleted=result.deleted if result else 0,
+        deleted_related=result.deleted_related if result else {},
         skipped=result.skipped if result else 0,
         requires_decision=preview.requires_decision,
         errors=result.errors if result else [],

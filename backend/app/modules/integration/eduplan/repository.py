@@ -17,11 +17,11 @@ import secrets
 from core.mixins.external_ref import SOURCE_EDUPLAN
 from core.mixins.time_stamp_mixin import utcnow_naive
 from core.utils.password_hash import hash_password_async
-from sqlalchemy import func, insert, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.auth.model import Teacher, User, UserRole
+from app.modules.auth.model import Teacher, TeacherAssignment, User, UserRole
 from app.modules.auth.user.repository import get_user_repository
 from app.modules.organization_structure.model import (
     Curriculum,
@@ -30,7 +30,8 @@ from app.modules.organization_structure.model import (
     Kafedra,
     Speciality,
 )
-from app.modules.quiz.model import Subject
+from app.modules.course.model import Course
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +364,19 @@ class EduPlanRepository:
                 await session.execute(select(User).where(User.id == row.user_id).options(selectinload(User.roles)))
             ).scalar_one_or_none()
 
+        # Login ham EPMOS dan yangilanadi: xodimga u yerda boshqa login
+        # berilsa, platformaga eskisi bilan kira olmay qolardi. Band
+        # boʻlsa — tegilmaydi: begona hisobning loginini tortib olish
+        # mumkin emas.
+        if user is not None and username and user.username != username:
+            if await self.username_exists(session, username):
+                logger.warning(
+                    "EduPlan: login %r band — %r uchun yangilanmadi", username, row.full_name
+                )
+            else:
+                user.username = username
+                session.add(user)
+
         row.first_name = first_name
         row.last_name = last_name
         row.third_name = third_name
@@ -384,6 +398,79 @@ class EduPlanRepository:
     # ------------------------------------------------------------------ #
     #  Деактивация
     # ------------------------------------------------------------------ #
+    async def teacher_footprint(self, session: AsyncSession, row: Teacher) -> dict[str, int]:
+        """Oʻqituvchi bilan birga nima oʻchishini sanaydi.
+
+        Oʻchirishdan OLDIN chaqiriladi — keyin bu qatorlar yoʻq boʻladi
+        va sanab boʻlmaydi. Natija hisobotga tushadi: «oʻchirildi: 12»
+        degan raqam ortida 300 kurs turganini admin koʻrishi kerak.
+        """
+        uid = row.user_id
+        counts = {}
+        for key, stmt in (
+            ("courses", select(func.count()).select_from(Course).where(Course.teacher_id == uid)),
+            ("questions", select(func.count()).select_from(Question).where(Question.user_id == uid)),
+            ("quizzes", select(func.count()).select_from(Quiz).where(Quiz.lecturer_id == uid)),
+            (
+                "results",
+                select(func.count())
+                .select_from(Result)
+                .join(Quiz, Quiz.id == Result.quiz_id)
+                .where(Quiz.lecturer_id == uid),
+            ),
+            (
+                "assignments",
+                select(func.count()).select_from(TeacherAssignment).where(TeacherAssignment.teacher_id == row.id),
+            ),
+        ):
+            counts[key] = int((await session.scalar(stmt)) or 0)
+        return counts
+
+    async def delete_teacher(self, session: AsyncSession, row: Teacher) -> dict[str, int]:
+        """Oʻqituvchini va unga tegishli hamma narsani oʻchiradi.
+
+        EPMOS dan yoʻqolgan xodim platformadan butunlay olib tashlanadi —
+        bu admin qarori (`apply_deletions`). Tartib muhim: ayrim bogʻlar
+        oʻchirishni TAQIQLAYDI, shuning uchun ular qoʻlda olib tashlanadi.
+
+        * `quiz_questions.question_id` — `NO ACTION`: savolni oʻchirishdan
+          oldin test bilan bogʻlanishi uziladi;
+        * `courses.teacher_id` — `RESTRICT`: kurs turgan foydalanuvchini
+          oʻchirib boʻlmaydi, shuning uchun kurslar avval ketadi (ular
+          bilan birga darslar, uy vazifalari va topshirilgan ishlar —
+          `CASCADE`);
+        * `teachers.user_id` — `NO ACTION`: kartochka foydalanuvchidan
+          oldin oʻchiriladi.
+
+        Qolgan bogʻlar (`results.user_id`, `audit_logs.user_id` va h.k.)
+        `SET NULL`: yozuv qoladi, muallifi boʻshaydi.
+        """
+        uid = row.user_id
+        removed = await self.teacher_footprint(session, row)
+
+        # Natijalar — oʻqituvchi testlarining javoblari. Test oʻchirilsa
+        # ular `quiz_id = NULL` bilan osilib qolardi: jurnalda testi yoʻq
+        # baho koʻrinardi.
+        await session.execute(
+            delete(Result).where(Result.quiz_id.in_(select(Quiz.id).where(Quiz.lecturer_id == uid)))
+        )
+        await session.execute(
+            delete(QuizQuestion).where(
+                QuizQuestion.question_id.in_(select(Question.id).where(Question.user_id == uid))
+            )
+        )
+        await session.execute(delete(Question).where(Question.user_id == uid))
+        await session.execute(delete(Quiz).where(Quiz.lecturer_id == uid))
+        await session.execute(delete(Course).where(Course.teacher_id == uid))
+        await session.delete(row)
+        await session.flush()
+
+        user = await session.get(User, uid)
+        if user is not None:
+            await session.delete(user)
+        await session.flush()
+        return removed
+
     async def deactivate(self, session: AsyncSession, row) -> None:
         """Пропавшее в EduPlan не удаляем: на нём висят результаты и вопросы."""
         row.is_active = False

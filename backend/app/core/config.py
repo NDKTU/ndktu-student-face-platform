@@ -129,6 +129,15 @@ class EduPlanConfig(BaseModel):
 
     enabled: bool = False
     base_url: str = "https://epmos.nsumt.uz/rest"
+    # Server-server avtorizatsiya (OAuth2 client_credentials). Berilgan
+    # boʻlsa — shu ishlatiladi: xizmat hisobi odam hisobi emas, parol
+    # almashtirilganda integratsiya toʻxtab qolmaydi va EPMOS tomonida
+    # kalitni bekor qilish oson.
+    client_id: str = ""
+    client_secret: str = ""
+    # Eski yoʻl (`grant_type=password`) — kalitlar berilmaganda zaxira
+    # sifatida qoladi: kalit bekor qilinsa yoki hali berilmagan oʻrnatmada
+    # integratsiya ishlayverishi kerak.
     username: str = ""
     password: str = ""
     # Все защищённые эндпоинты EduPlan принимают X-Active-Role: у них

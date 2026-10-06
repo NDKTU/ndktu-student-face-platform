@@ -65,16 +65,33 @@ class EduPlanClient:
     # ------------------------------------------------------------------ #
     #  Транспорт
     # ------------------------------------------------------------------ #
+    def _auth_payload(self) -> dict[str, str]:
+        """Avtorizatsiya tanasi: kalitlar boʻlsa — server-server oqimi.
+
+        `client_credentials` — xizmat hisobi: u odamning loginiga
+        bogʻlanmagan, shuning uchun xodim parolini almashtirgani yoki
+        ishdan ketgani integratsiyani toʻxtatmaydi. Kalitlar
+        berilmaganda eski `password` oqimi ishlaydi — hali kalit
+        berilmagan oʻrnatma ham koʻtarilsin.
+        """
+        if self._cfg.client_id and self._cfg.client_secret:
+            return {
+                "grant_type": "client_credentials",
+                "client_id": self._cfg.client_id,
+                "client_secret": self._cfg.client_secret,
+            }
+        return {
+            "grant_type": "password",
+            "username": self._cfg.username,
+            "password": self._cfg.password,
+        }
+
     async def _login(self) -> str:
-        """OAuth2 password flow. Тело — form-urlencoded, не JSON."""
+        """OAuth2. Тело — form-urlencoded, не JSON."""
         try:
             resp = await self._client.post(
                 f"{self._base_url}/api/v1/auth/access-token",
-                data={
-                    "grant_type": "password",
-                    "username": self._cfg.username,
-                    "password": self._cfg.password,
-                },
+                data=self._auth_payload(),
                 headers={"Accept": "application/json"},
             )
         except httpx.RequestError as e:
@@ -98,7 +115,7 @@ class EduPlanClient:
 
             suffix = f": {detail}" if detail else ""
             raise EduPlanError(
-                f"EduPlan servis akkaunti login yoki parolini qabul qilmadi "
+                f"EduPlan servis akkaunti kalitlarini qabul qilmadi "
                 f"(HTTP {resp.status_code}){suffix}",
                 status_code=status.HTTP_502_BAD_GATEWAY,
             )
@@ -107,7 +124,13 @@ class EduPlanClient:
         if not token:
             raise EduPlanError("EduPlan login javobida access_token yo‘q")
 
-        logger.info("EduPlan: сервисный аккаунт %s аутентифицирован", self._cfg.username)
+        # Какой поток сработал — видно в логе: при client_credentials
+        # `username` пуст, и прежняя строка выглядела как «аккаунт ''
+        # аутентифицирован».
+        if self._cfg.client_id and self._cfg.client_secret:
+            logger.info("EduPlan: client_credentials, client_id=%s", self._cfg.client_id)
+        else:
+            logger.info("EduPlan: сервисный аккаунт %s аутентифицирован", self._cfg.username)
         return token
 
     def _headers(self) -> dict[str, str]:

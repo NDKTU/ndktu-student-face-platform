@@ -59,6 +59,10 @@ export interface EntitySyncResponse {
     linked: number;
     updated: number;
     deactivated: number;
+    /** Butunlay oʻchirilganlar (faqat oʻqituvchilar boʻlimida). */
+    deleted: number;
+    /** Ular bilan birga ketgan maʼlumot: kurs, savol, test, natija, yuklama. */
+    deleted_related: Record<string, number>;
     skipped: number;
     /** Koʻp maʼnoli mosliklar — avtomatik qoʻllanmaydi, admin hal qiladi. */
     requires_decision: number;
@@ -330,13 +334,23 @@ export const eduplanService = {
      * oʻqiladi. Koʻp maʼnoli mosliklar qoʻllanmaydi, `requires_decision` da
      * sanog\`i qaytadi.
      */
-    syncEntity: async (entity: EduPlanEntity, applyDeactivations = false) => {
+    syncEntity: async (
+        entity: EduPlanEntity,
+        applyDeactivations = false,
+        options: { applyDeletions?: boolean; allowBulkDelete?: boolean } = {},
+    ) => {
         const response = await api.post<EntitySyncResponse>(
             `/integration/eduplan/sync/${entity}`,
             null,
             {
                 timeout: SYNC_TIMEOUT_MS,
-                ...(applyDeactivations ? { params: { apply_deactivations: true } } : {}),
+                params: {
+                    ...(applyDeactivations ? { apply_deactivations: true } : {}),
+                    // EPMOS'da yoʻq oʻqituvchini butunlay oʻchirish — faqat
+                    // admin ataylab yoqqanda. Qaytarib boʻlmaydi.
+                    ...(options.applyDeletions ? { apply_deletions: true } : {}),
+                    ...(options.allowBulkDelete ? { allow_bulk_delete: true } : {}),
+                },
             },
         );
         return response.data;

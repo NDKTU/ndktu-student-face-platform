@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
     AlertCircle,
+    AlertTriangle,
     ArrowRight,
     CheckCircle2,
     Loader2,
@@ -27,6 +28,15 @@ const errorText = (e: unknown) => {
     return (e as Error)?.message ?? "Noma'lum xatolik";
 };
 
+/** `deleted_related` kalitlari — hisobotdagi inson o'qiydigan nomlar. */
+const RELATED_LABEL: Record<string, string> = {
+    courses: 'kurslar',
+    questions: 'savollar',
+    quizzes: 'testlar',
+    results: 'natijalar',
+    assignments: 'biriktirmalar',
+};
+
 /** Bo'lim tugmasidagi matn: «Fakultetlarni sinxronlash». */
 const buttonLabel = (entity: EduPlanEntity) => `${ENTITY_LABEL[entity]}ni sinxronlash`;
 
@@ -36,7 +46,15 @@ const buttonLabel = (entity: EduPlanEntity) => `${ENTITY_LABEL[entity]}ni sinxro
  * Faqat ma'noli qatorlar: «o'zgarishsiz» ni ko'rsatish shovqin bo'lardi,
  * chunki takroriy prognda deyarli hamma satr shunday bo'ladi.
  */
-const PreviewSummary = ({ preview, entity }: { preview: PreviewResponse; entity: EduPlanEntity }) => {
+const PreviewSummary = ({
+    preview,
+    entity,
+    willDelete,
+}: {
+    preview: PreviewResponse;
+    entity: EduPlanEntity;
+    willDelete: boolean;
+}) => {
     const row = preview.summary.find((s) => s.entity === entity);
     if (!row) return null;
 
@@ -44,7 +62,11 @@ const PreviewSummary = ({ preview, entity }: { preview: PreviewResponse; entity:
         { label: 'yangi', value: row.create, tone: 'text-emerald-600 dark:text-emerald-400' },
         { label: "bog'lanadi", value: row.link, tone: 'text-blue-600 dark:text-blue-400' },
         { label: 'yangilanadi', value: row.update, tone: 'text-amber-600 dark:text-amber-400' },
-        { label: 'nofaol bo‘ladi', value: row.deactivate, tone: 'text-muted-foreground' },
+        // Bitta son, ikki xil taqdir: galochka qo'yilgan bo'lsa, bu satrlar
+        // nofaol bo'lmaydi, butunlay o'chadi — matn shuni aytishi kerak.
+        willDelete
+            ? { label: "o'chiriladi", value: row.deactivate, tone: 'text-red-600 dark:text-red-400' }
+            : { label: 'nofaol bo‘ladi', value: row.deactivate, tone: 'text-muted-foreground' },
         { label: 'ikkilanish', value: row.conflict, tone: 'text-red-600 dark:text-red-400' },
     ].filter((p) => p.value > 0);
 
@@ -75,8 +97,14 @@ const SyncResult = ({ result }: { result: EntitySyncResponse }) => {
         { label: "bog'landi", value: result.linked },
         { label: 'yangilandi', value: result.updated },
         { label: 'nofaol qilindi', value: result.deactivated },
+        { label: "o'chirildi", value: result.deleted },
         { label: "o'tkazib yuborildi", value: result.skipped },
     ].filter((p) => p.value > 0);
+
+    // Qaytarib bo'lmaydigan amalning narxi: o'qituvchi bilan birga nimalar
+    // ketgani. Sonlarsiz admin faqat «o'chirildi: 12» ni ko'radi va ortida
+    // 300 kurs bo'lganini bilmay qoladi.
+    const related = Object.entries(result.deleted_related).filter(([, n]) => n > 0);
 
     return (
         <div className="mt-2 space-y-2 text-sm">
@@ -88,6 +116,16 @@ const SyncResult = ({ result }: { result: EntitySyncResponse }) => {
                         : parts.map((p) => `${p.label}: ${p.value}`).join(' · ')}
                 </div>
             </div>
+
+            {related.length > 0 && (
+                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                        O'qituvchilar bilan birga o'chirildi:{' '}
+                        {related.map(([key, n]) => `${RELATED_LABEL[key] ?? key}: ${n}`).join(' · ')}.
+                    </div>
+                </div>
+            )}
 
             {result.requires_decision > 0 && (
                 <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
@@ -129,12 +167,21 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
     const syncMutation = useSyncEntity(entity);
     const [preview, setPreview] = useState<PreviewResponse | null>(null);
     const [result, setResult] = useState<EntitySyncResponse | null>(null);
+    const [applyDeletions, setApplyDeletions] = useState(false);
+    // Backend ommaviy o'chirishni to'sganda — uning matni. Shu holatda
+    // karta tasdiq so'raydi, so'rov esa hali yozilmagan.
+    const [bulkWarning, setBulkWarning] = useState<string | null>(null);
 
     const busy = previewMutation.isPending || syncMutation.isPending;
     const deps = ENTITY_DEPENDENCIES[entity];
+    // O'chirish faqat o'qituvchilarda: EPMOS ulardagina yagona manba.
+    // Qolgan ma'lumotnomalarda yo'qolgan satr nofaol deb belgilanadi,
+    // chunki unga test natijalari va jurnallar bog'langan.
+    const deletable = entity === 'teacher';
 
     const runPreview = async () => {
         setResult(null);
+        setBulkWarning(null);
         try {
             setPreview(await previewMutation.mutateAsync());
         } catch {
@@ -142,15 +189,30 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
         }
     };
 
-    const runSync = async () => {
+    /**
+     * Sinxronlashni ishga tushirish.
+     *
+     * `allowBulkDelete` — faqat admin chegara ogohlantirishini o'qib,
+     * ataylab tasdiqlagandan keyin. Uni avtomatik qo'yish chegarani
+     * umuman ma'nosiz qilardi.
+     */
+    const runSync = async (allowBulkDelete = false) => {
+        setBulkWarning(null);
         try {
-            const data = await syncMutation.mutateAsync(false);
+            const data = await syncMutation.mutateAsync({
+                applyDeletions: deletable && applyDeletions,
+                allowBulkDelete,
+            });
             setResult(data);
             // Ko'rib chiqish endi eskirgan: u qo'llanguncha bo'lgan holatni
             // ko'rsatadi va ekranda qolsa chalg'itardi.
             setPreview(null);
-        } catch {
+        } catch (e) {
             setResult(null);
+            // 409 — xato emas, savol: «haqiqatan shunchasini o'chirasizmi?».
+            // Shuning uchun u qizil xato bloki emas, tasdiq bo'lib chiqadi.
+            const status = (e as { response?: { status?: number } })?.response?.status;
+            if (status === 409) setBulkWarning(errorText(e));
         }
     };
 
@@ -174,7 +236,7 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
                         ) : null}
                         Ko'rish
                     </Button>
-                    <Button size="sm" onClick={runSync} disabled={disabled || busy}>
+                    <Button size="sm" onClick={() => runSync()} disabled={disabled || busy}>
                         {syncMutation.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
@@ -185,9 +247,54 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
                 </div>
             </div>
 
+            {deletable && (
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                        checked={applyDeletions}
+                        disabled={disabled || busy}
+                        onChange={(e) => setApplyDeletions(e.target.checked)}
+                    />
+                    <span>
+                        <span className="font-medium">EPMOS'da yo'q o'qituvchilarni o'chirish</span>
+                        <span className="block text-xs text-muted-foreground">
+                            Hisob, kartochka va unga bog'langan hamma narsa — kurslari, savollari,
+                            testlari va natijalari — butunlay o'chadi. Qaytarib bo'lmaydi. Belgilanmasa,
+                            ular avvalgidek faqat nofaol deb belgilanadi.
+                        </span>
+                    </span>
+                </label>
+            )}
+
             {syncMutation.isPending && (
                 <div className="mt-2 text-sm text-muted-foreground">
                     EPMOS o'qilmoqda va o'zgarishlar qo'llanmoqda…
+                </div>
+            )}
+
+            {bulkWarning && (
+                <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+                    <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>{bulkWarning}</div>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                        Hech narsa o'chirilmadi. Avval «Ko'rish» bilan ro'yxatni tekshirib oling.
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => runSync(true)}
+                            disabled={disabled || busy}
+                        >
+                            Baribir o'chirish
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setBulkWarning(null)}>
+                            Bekor qilish
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -197,7 +304,7 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
                     <span>Ko'rib chiqib bo'lmadi: {errorText(previewMutation.error)}</span>
                 </div>
             )}
-            {syncMutation.isError && (
+            {syncMutation.isError && !bulkWarning && (
                 <div className="mt-2 flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
                     <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>Sinxronlanmadi: {errorText(syncMutation.error)}</span>
@@ -206,7 +313,11 @@ const EntityCard = ({ entity, disabled }: { entity: EduPlanEntity; disabled: boo
 
             {preview && !result && (
                 <>
-                    <PreviewSummary preview={preview} entity={entity} />
+                    <PreviewSummary
+                        preview={preview}
+                        entity={entity}
+                        willDelete={deletable && applyDeletions}
+                    />
                     <div className="mt-2 text-xs text-muted-foreground">
                         Bu faqat ko'rsatuv — hech narsa yozilmadi. Qo'llash uchun «
                         {buttonLabel(entity)}» tugmasini bosing.
@@ -375,8 +486,9 @@ export const EntitySyncMenu = ({ disabled }: { disabled: boolean }) => (
         <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
                 Har bir bo'lim mustaqil ishlaydi: bittasini sinxronlash qolganlarini qayta
-                yuklamaydi. Hech narsa o'chirilmaydi — EPMOS'dan yo'qolgan yozuvlar nofaol deb
-                belgilanadi, chunki ularga test natijalari va jurnallar bog'langan.
+                yuklamaydi. EPMOS'dan yo'qolgan yozuvlar nofaol deb belgilanadi, chunki ularga test
+                natijalari va jurnallar bog'langan. Istisno — o'qituvchilar: ularni butunlay
+                o'chirishni alohida belgilash bilan so'rash mumkin.
             </p>
 
             {/* Foydalanuvchi ko'radigan tartib: ma'lumotnomalar, keyin ular
