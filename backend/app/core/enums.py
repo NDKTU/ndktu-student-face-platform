@@ -38,10 +38,24 @@ class ControlType(str, enum.Enum):
     OTHER = "OTHER"
 
 
+#: Kurs nazorati (`MIDTERM`) nomi — turidan yasaladi, oʻqituvchi yozmaydi:
+#: aks holda bir xil nazorat «1-oraliq», «1 oraliq nazorat», «ON1» boʻlib
+#: ketardi va natijalarni nomi boʻyicha solishtirib boʻlmasdi.
+CONTROL_TYPE_TITLES = {
+    ControlType.ON1: "1-oraliq nazorat",
+    ControlType.ON2: "2-oraliq nazorat",
+    ControlType.JN1: "1-joriy nazorat",
+    ControlType.JN2: "2-joriy nazorat",
+    ControlType.YN: "Yakuniy nazorat",
+    ControlType.OTHER: "Boshqa nazorat",
+}
+
+
 class QuizType(str, enum.Enum):
     LESSON_QUIZ = "LESSON_QUIZ"
-    #: Oraliq nazorat — kurs testi, savollari tanlangan darslardan va
-    #: oʻqituvchi alohida qoʻshgan savollardan yigʻiladi.
+    #: Kurs nazorati (UI da «Nazorat») — kurs testi. Savollari tanlangan
+    #: darslardan va kursning «Test savollari» dagi oʻsha turdagi
+    #: (``Quiz.control_type``) savollardan yigʻiladi.
     MIDTERM = "MIDTERM"
     SEMESTER_FINAL = "SEMESTER_FINAL"
     YEAR_PROMOTION = "YEAR_PROMOTION"

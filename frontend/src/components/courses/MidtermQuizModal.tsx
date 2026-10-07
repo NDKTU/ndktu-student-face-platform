@@ -1,17 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Search } from 'lucide-react';
+import { FileSpreadsheet, Loader2, Plus, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
+import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
+import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
+import { useControlQuestions, useLessonQuestionCounts } from '@/hooks/useQuestions';
 import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import type { CourseGroupInfo } from '@/services/courseService';
 import type { Lesson } from '@/services/lessonService';
+import { CONTROL_TYPES, type ControlType } from '@/services/questionService';
 import type { ProctoringMode, Quiz, QuizCreateRequest } from '@/services/quizService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate } from '@/utils/date';
+import { NAZORAT_REOPEN_PARAM, clearNazoratDraft, readNazoratDraft, saveNazoratDraft } from './nazoratDraft';
 
 const selectClassName =
     'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -20,29 +26,59 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     courseId: number;
+    /** Kurs fani — «Savol qo'shish» shu fanga yozadi. */
+    subjectId: number;
+    subjectName?: string;
     lessons: Lesson[];
     groups: CourseGroupInfo[];
-    /** Yangi test uchun taklif qilinadigan nom: «2-oraliq nazorat». */
-    defaultTitle: string;
+    /** Yangi nazorat uchun taklif qilinadigan tur — kursda hali yo'q birinchisi. */
+    defaultControlType: ControlType;
+    /** Kursda allaqachon bor turlar — ro'yxatda belgilanadi. */
+    usedControlTypes: ControlType[];
     /** Berilgan bo'lsa — tahrirlash rejimi. */
     quiz?: Quiz | null;
+    /** Savol formasidan qaytildi — holat qoralamadan tiklanadi. */
+    restoreDraft?: boolean;
 }
 
 /**
- * Oraliq nazorat oynasi.
+ * Kurs nazorati oynasi.
  *
- * Savollar o'qituvchi tanlagan darslardan olinadi: oraliq nazorat odatda
- * semestrning bir qismini (masalan, 1–6-mavzular) qamraydi. Testning
- * o'ziga alohida savol qo'shish — ro'yxatdagi kartochkada.
+ * Nom yozilmaydi — u nazorat turidan (1-oraliq, 1-joriy, yakuniy...)
+ * serverda yasaladi. Savollar ikki manbadan: o'qituvchi tanlagan darslar
+ * (faqat savoli borlari ko'rsatiladi) va kursning «Test savollari» dagi
+ * shu turdagi savollar. Shu turga savolni oynaning o'zidan qo'shish
+ * mumkin: Excel — joyida, bittalab — savol formasida (oyna holati
+ * qoralamada saqlanib, qaytganda tiklanadi).
  *
  * Fan va ma'ruzachi so'ralmaydi — bekend ularni kursdan oladi.
  */
-export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, defaultTitle, quiz }: Props) => {
+export const MidtermQuizModal = ({
+    isOpen,
+    onClose,
+    courseId,
+    subjectId,
+    subjectName,
+    lessons,
+    groups,
+    defaultControlType,
+    usedControlTypes,
+    quiz,
+    restoreDraft = false,
+}: Props) => {
+    const navigate = useNavigate();
     const createMut = useCreateQuiz();
     const updateMut = useUpdateQuiz();
+    const lessonCountsQuery = useLessonQuestionCounts(courseId, isOpen);
+    const lessonCounts = lessonCountsQuery.data;
+    const [excelOpen, setExcelOpen] = useState(false);
 
-    const [title, setTitle] = useState('');
+    // Eski, nomi tanilmagan testda tur bo'sh — o'qituvchi tanlaydi.
+    const [controlType, setControlType] = useState<ControlType | ''>('');
     const [selected, setSelected] = useState<Set<number>>(new Set());
+    // Oyna ochilgandagi tanlov: savollari o'chib ketgan dars ham ro'yxatda
+    // qolishi kerak, aks holda u tanlovdan jimgina tushib ketardi.
+    const [initialIds, setInitialIds] = useState<Set<number>>(new Set());
     const [lessonSearch, setLessonSearch] = useState('');
     const [groupId, setGroupId] = useState('');
     const [questionNumber, setQuestionNumber] = useState('20');
@@ -51,11 +87,30 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
     const [proctoringMode, setProctoringMode] = useState<ProctoringMode>('standard');
     const [isActive, setIsActive] = useState(false);
     const [error, setError] = useState('');
+    const controlQuestionsQuery = useControlQuestions(courseId, isOpen ? controlType : '');
+    const controlQuestions = controlQuestionsQuery.data?.questions ?? [];
 
     useEffect(() => {
         if (!isOpen) return;
-        setTitle(quiz?.title ?? defaultTitle);
+        const draft = restoreDraft ? readNazoratDraft(courseId) : null;
+        if (draft && draft.quizId === (quiz?.id ?? null)) {
+            setControlType(draft.controlType);
+            setSelected(new Set(draft.lessonIds));
+            // Tanlangan darslar savolsiz bo'lib qolsa ham ko'rinib tursin.
+            setInitialIds(new Set([...(quiz?.lesson_ids ?? []), ...draft.lessonIds]));
+            setLessonSearch('');
+            setGroupId(draft.groupId);
+            setQuestionNumber(draft.questionNumber);
+            setDuration(draft.duration);
+            setPin(draft.pin);
+            setProctoringMode(draft.proctoringMode);
+            setIsActive(draft.isActive);
+            setError('');
+            return;
+        }
+        setControlType(quiz ? (quiz.control_type ?? '') : defaultControlType);
         setSelected(new Set(quiz?.lesson_ids ?? []));
+        setInitialIds(new Set(quiz?.lesson_ids ?? []));
         setLessonSearch('');
         setGroupId(quiz?.group_id ? String(quiz.group_id) : '');
         setQuestionNumber(String(quiz?.question_number ?? 20));
@@ -64,15 +119,59 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
         setProctoringMode(quiz?.proctoring_mode ?? 'standard');
         setIsActive(quiz?.is_active ?? false);
         setError('');
-        // `defaultTitle` ataylab kuzatilmaydi: ro'yxat yangilanganda
-        // o'qituvchi yozayotgan nom ustidan yozilib ketmasin.
+        // `defaultControlType` ataylab kuzatilmaydi: ro'yxat yangilanganda
+        // o'qituvchi tanlagan tur ustidan yozilib ketmasin.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, quiz]);
 
+    const close = () => {
+        clearNazoratDraft(courseId);
+        onClose();
+    };
+
+    /** Savol formasiga o'tadi; qaytganda oyna shu holatda qayta ochiladi. */
+    const goAddQuestion = () => {
+        if (!controlType) return;
+        saveNazoratDraft(courseId, {
+            quizId: quiz?.id ?? null,
+            controlType,
+            lessonIds: [...selected],
+            groupId,
+            questionNumber,
+            duration,
+            pin,
+            proctoringMode,
+            isActive,
+        });
+        const returnTo = `/courses/${courseId}?tab=assignments&${NAZORAT_REOPEN_PARAM}=1`;
+        navigate(
+            `/questions/create?course_id=${courseId}&subject_id=${subjectId}`
+            + `&control_type=${controlType}&return_to=${encodeURIComponent(returnTo)}`,
+        );
+    };
+
+    const questionCount = (lessonId: number) => lessonCounts?.[lessonId] ?? 0;
+
+    /** Savoli bor darslar — savolsiz dars testga hech narsa bermaydi. */
+    const availableLessons = useMemo(
+        () => lessons.filter((lesson) => (lessonCounts?.[lesson.id] ?? 0) > 0 || initialIds.has(lesson.id)),
+        [lessons, lessonCounts, initialIds],
+    );
+
     const visibleLessons = useMemo(() => {
         const needle = lessonSearch.trim().toLocaleLowerCase();
-        return needle ? lessons.filter((lesson) => lesson.topic.toLocaleLowerCase().includes(needle)) : lessons;
-    }, [lessons, lessonSearch]);
+        return needle
+            ? availableLessons.filter((lesson) => lesson.topic.toLocaleLowerCase().includes(needle))
+            : availableLessons;
+    }, [availableLessons, lessonSearch]);
+
+    const controlInfo = CONTROL_TYPES.find((item) => item.value === controlType);
+    const fromLessons = availableLessons
+        .filter((lesson) => selected.has(lesson.id))
+        .reduce((sum, lesson) => sum + questionCount(lesson.id), 0);
+    const fromBank = controlType ? controlQuestions.length : 0;
+    const pool = fromLessons + fromBank;
+    const wanted = parseInt(questionNumber, 10) || 0;
 
     const toggleLesson = (id: number) => {
         setSelected((prev) => {
@@ -98,8 +197,8 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
     const handleSubmit = () => {
         const questions = parseInt(questionNumber, 10);
         const minutes = parseInt(duration, 10);
-        if (!title.trim()) {
-            setError('Test nomini kiriting');
+        if (!controlType) {
+            setError('Nazorat turini tanlang');
             return;
         }
         if (!questions || questions < 1) {
@@ -117,11 +216,14 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
 
         setError('');
         const payload: QuizCreateRequest = {
-            title: title.trim(),
+            // Nomni server turidan yasaydi.
             quiz_type: 'MIDTERM',
+            control_type: controlType,
             course_id: courseId,
-            // Kurs tartibida (sana bo'yicha) yuboriladi.
-            lesson_ids: lessons.filter((lesson) => selected.has(lesson.id)).map((lesson) => lesson.id),
+            // Kurs tartibida (sana bo'yicha) yuboriladi. Tanlangan, lekin
+            // ro'yxatda yo'q dars bo'lmaydi: savolsiz darslar faqat oyna
+            // ochilganda tanlangan bo'lsa ko'rinadi.
+            lesson_ids: availableLessons.filter((lesson) => selected.has(lesson.id)).map((lesson) => lesson.id),
             group_id: groupId ? Number(groupId) : null,
             question_number: questions,
             duration: minutes,
@@ -135,16 +237,16 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
         if (quiz) {
             updateMut.mutate({ id: quiz.id, data: payload }, {
                 onSuccess: () => {
-                    toast.success('Oraliq nazorat yangilandi');
-                    onClose();
+                    toast.success('Nazorat yangilandi');
+                    close();
                 },
                 onError,
             });
         } else {
             createMut.mutate(payload, {
                 onSuccess: () => {
-                    toast.success('Oraliq nazorat yaratildi');
-                    onClose();
+                    toast.success('Nazorat yaratildi');
+                    close();
                 },
                 onError,
             });
@@ -156,26 +258,101 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
-            title={quiz ? 'Oraliq nazoratni tahrirlash' : 'Oraliq nazorat'}
+            onClose={close}
+            title={quiz ? 'Nazoratni tahrirlash' : 'Nazorat'}
             className="md:max-w-2xl"
         >
             <div className="space-y-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Nomi</label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="1-oraliq nazorat" />
+                    <label className="text-sm font-medium" htmlFor="control-type">Nazorat</label>
+                    <select
+                        id="control-type"
+                        className={selectClassName}
+                        value={controlType}
+                        onChange={(e) => setControlType(e.target.value as ControlType)}
+                    >
+                        {!controlType && <option value="" disabled>Nazorat turini tanlang</option>}
+                        {CONTROL_TYPES.map((item) => (
+                            <option key={item.value} value={item.value}>
+                                {item.title}
+                                {usedControlTypes.includes(item.value) && item.value !== quiz?.control_type
+                                    ? ' — kursda bor'
+                                    : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">Test nomi turidan avtomatik qo'yiladi.</p>
                 </div>
+
+                {controlInfo && (
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="text-sm font-medium">
+                                «{controlInfo.title}» savollari
+                                <span className="ml-1.5 text-xs font-normal tabular-nums text-muted-foreground">
+                                    {controlQuestions.length} ta
+                                </span>
+                            </label>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5"
+                                    onClick={() => setExcelOpen(true)}
+                                >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    <span>Excel'dan yuklash</span>
+                                </Button>
+                                <Button type="button" size="sm" className="h-8 gap-1.5" onClick={goAddQuestion}>
+                                    <Plus className="h-4 w-4" />
+                                    <span>Savol qo'shish</span>
+                                </Button>
+                            </div>
+                        </div>
+                        {controlQuestionsQuery.isLoading ? (
+                            <div className="flex items-center gap-2 rounded-xl border border-border/60 p-3 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Savollar yuklanmoqda…
+                            </div>
+                        ) : controlQuestionsQuery.isError ? (
+                            <p className="rounded-xl border border-border/60 p-3 text-sm text-destructive">
+                                Savollarni yuklab bo'lmadi.
+                            </p>
+                        ) : controlQuestions.length === 0 ? (
+                            <p className="rounded-xl border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
+                                Bu nazorat uchun alohida savol yo'q. Qo'shilgan savollar kursning «Test savollari»
+                                bo'limida ham turadi va shu turdagi barcha nazoratlarga tushadi.
+                            </p>
+                        ) : (
+                            <div className="max-h-56 overflow-y-auto">
+                                <QuestionAccordionList questions={controlQuestions} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                         <label className="text-sm font-medium">Savollar olinadigan darslar</label>
                         <span className="text-xs tabular-nums text-muted-foreground">
-                            {selected.size} / {lessons.length} tanlandi
+                            {availableLessons.filter((lesson) => selected.has(lesson.id)).length}
+                            {' / '}
+                            {availableLessons.length} tanlandi
                         </span>
                     </div>
-                    {lessons.length === 0 ? (
+                    {lessonCountsQuery.isLoading ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-border/60 p-3 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Darslar yuklanmoqda…
+                        </div>
+                    ) : lessonCountsQuery.isError ? (
+                        <p className="rounded-xl border border-border/60 p-3 text-sm text-destructive">
+                            Darslardagi savollar sonini yuklab bo'lmadi.
+                        </p>
+                    ) : availableLessons.length === 0 ? (
                         <p className="rounded-xl border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
-                            Kursda hali dars yo'q. Testga savollarni keyin alohida qo'shishingiz mumkin.
+                            Darslarda hali savol yo'q. Savollar «Test savollari» dan olinadi.
                         </p>
                     ) : (
                         <div className="rounded-xl border border-border/60">
@@ -215,6 +392,15 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
                                                     {formatDate(lesson.date)}
                                                 </span>
                                             </span>
+                                            {questionCount(lesson.id) > 0 ? (
+                                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                                    {questionCount(lesson.id)} savol
+                                                </span>
+                                            ) : (
+                                                <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
+                                                    Savol yo'q
+                                                </span>
+                                            )}
                                         </label>
                                     </li>
                                 ))}
@@ -227,7 +413,16 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        Tanlangan darslarga keyin qo'shilgan savollar ham testga avtomatik tushadi.
+                        Tanlangan darslarga va «Test savollari» ga keyin qo'shilgan savollar ham testga avtomatik tushadi.
+                    </p>
+                    <p
+                        className={
+                            'text-xs tabular-nums '
+                            + (wanted > pool ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-muted-foreground')
+                        }
+                    >
+                        Testga {pool} ta savol tushadi: darslardan {fromLessons}, «Test savollari» dan {fromBank}.
+                        {wanted > pool && ` Faollashtirish uchun kamida ${wanted} ta kerak.`}
                     </p>
                 </div>
 
@@ -280,9 +475,24 @@ export const MidtermQuizModal = ({ isOpen, onClose, courseId, lessons, groups, d
                     <Switch checked={isActive} onCheckedChange={setIsActive} />
                 </div>
 
+                {controlInfo && (
+                    // Oyna ichida: Radix ichma-ich dialoglarni shu tarzda
+                    // to'g'ri qatlamlaydi, nazorat oynasi esa yopilmaydi.
+                    <QuestionExcelUploadModal
+                        isOpen={excelOpen}
+                        onClose={() => setExcelOpen(false)}
+                        subjects={[]}
+                        defaultSubjectId={subjectId}
+                        subjectName={subjectName}
+                        lockSubject
+                        control={{ course_id: courseId, control_type: controlInfo.value }}
+                        targetHint={`Savollar «${controlInfo.title}» bo'limiga yuklanadi.`}
+                    />
+                )}
+
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={onClose} disabled={isPending}>Bekor qilish</Button>
+                    <Button variant="outline" onClick={close} disabled={isPending}>Bekor qilish</Button>
                     <Button onClick={handleSubmit} disabled={isPending}>
                         {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {quiz ? 'Saqlash' : 'Yaratish'}

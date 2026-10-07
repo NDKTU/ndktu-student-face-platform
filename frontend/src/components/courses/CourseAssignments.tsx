@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     BarChart3,
     BookOpen,
@@ -41,6 +41,7 @@ import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { IndependentTopicModal } from './IndependentTopicModal';
 import { MidtermQuizModal } from './MidtermQuizModal';
+import { NAZORAT_REOPEN_PARAM, readNazoratDraft } from './nazoratDraft';
 
 interface Props {
     courseId: number;
@@ -49,7 +50,7 @@ interface Props {
     subjectName?: string;
     lessons: Lesson[];
     groups: CourseGroupInfo[];
-    /** Oraliq nazorat bloki — test va savollarni boshqara oladiganlarga. */
+    /** Nazorat bloki — test va savollarni boshqara oladiganlarga. */
     canManageQuizzes: boolean;
     /** Natijalar sahifasiga havola. */
     canSeeResults: boolean;
@@ -57,13 +58,78 @@ interface Props {
     canManageTopics: boolean;
 }
 
+/** «Test savollari» dagi shu nazorat turining savol qo'shish sahifasi. */
+const controlQuestionCreateUrl = (courseId: number, subjectId: number, controlType: ControlType) => {
+    const returnTo = `/courses/${courseId}?tab=assignments&control=${controlType}`;
+    return (
+        `/questions/create?course_id=${courseId}&subject_id=${subjectId}`
+        + `&control_type=${controlType}&return_to=${encodeURIComponent(returnTo)}`
+    );
+};
+
 /**
- * Oraliq nazoratga alohida qo'shilgan savollar — kartochka ochilganda so'raladi.
+ * Nazorat turiga tegishli savollar — kursning «Test savollari» dagi shu tur.
+ *
+ * Ular kursning shu turdagi barcha nazoratlariga (masalan, har bir guruhning
+ * «1-oraliq nazorat» iga) tushadi, shuning uchun bu yerda testdan alohida
+ * olib tashlanmaydi — tahrirlash va o'chirish «Test savollari» dagidek.
+ */
+const ControlTypeQuestions = ({
+    courseId,
+    controlType,
+}: {
+    courseId: number;
+    controlType: ControlType;
+}) => {
+    const { data, isLoading, isError } = useControlQuestions(courseId, controlType);
+    const questions = data?.questions ?? [];
+    const title = CONTROL_TYPES.find((item) => item.value === controlType)?.title ?? controlType;
+
+    return (
+        <div className="space-y-3 border-t border-border/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                «{title}» savollari · {questions.length} ta
+            </p>
+            {isLoading ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-9 w-full rounded-lg" />
+                    <Skeleton className="h-9 w-4/5 rounded-lg" />
+                </div>
+            ) : isError ? (
+                <p className="text-sm text-destructive">Savollarni yuklab bo'lmadi.</p>
+            ) : questions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    Bu nazorat uchun alohida savol yo'q — test tanlangan darslarning savollaridan tuziladi.
+                </p>
+            ) : (
+                <QuestionAccordionList
+                    questions={questions}
+                    canManage
+                    returnTo={`/courses/${courseId}?tab=assignments&control=${controlType}`}
+                />
+            )}
+        </div>
+    );
+};
+
+/**
+ * Nazoratning o'ziga alohida qo'shilgan savollar — kartochka ochilganda so'raladi.
  *
  * Darslardan kelgan savollar bu yerda ko'rsatilmaydi: ular dars
  * sahifasida turadi va tahrirlanadi, bu yerda faqat soni ko'rinadi.
+ *
+ * `legacyOnly` — turi bor nazorat: yangi savol «Test savollari» ga
+ * qo'shiladi, bu yerda faqat avval testga yozilganlari (bo'lsa) ko'rinadi.
  */
-const MidtermExtraQuestions = ({ quiz, courseId }: { quiz: Quiz; courseId: number }) => {
+const MidtermExtraQuestions = ({
+    quiz,
+    courseId,
+    legacyOnly = false,
+}: {
+    quiz: Quiz;
+    courseId: number;
+    legacyOnly?: boolean;
+}) => {
     const navigate = useNavigate();
     const { data, isLoading, isError } = useMidtermExtraQuestions(quiz.id);
     const removeQuestion = useRemoveMidtermQuestion();
@@ -71,13 +137,15 @@ const MidtermExtraQuestions = ({ quiz, courseId }: { quiz: Quiz; courseId: numbe
     const questions = data?.questions ?? [];
     const returnTo = `/courses/${courseId}?tab=assignments`;
 
+    if (legacyOnly && (isLoading || isError || questions.length === 0)) return null;
+
     return (
         <div className="space-y-3 border-t border-border/60 bg-muted/10 px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Testga alohida qo'shilgan savollar
                 </p>
-                <Button
+                {!legacyOnly && <Button
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1.5"
@@ -91,7 +159,7 @@ const MidtermExtraQuestions = ({ quiz, courseId }: { quiz: Quiz; courseId: numbe
                 >
                     <Plus className="h-4 w-4" />
                     <span>Savol qo'shish</span>
-                </Button>
+                </Button>}
             </div>
 
             {isLoading ? (
@@ -133,7 +201,7 @@ const MidtermExtraQuestions = ({ quiz, courseId }: { quiz: Quiz; courseId: numbe
                     );
                 }}
                 title="Savolni olib tashlash"
-                description="Savol bu oraliq nazoratdan olib tashlanadi."
+                description="Savol bu nazoratdan olib tashlanadi."
                 confirmText="Olib tashlash"
                 isLoading={removeQuestion.isPending}
                 variant="danger"
@@ -143,16 +211,21 @@ const MidtermExtraQuestions = ({ quiz, courseId }: { quiz: Quiz; courseId: numbe
 };
 
 /**
- * «Oraliq nazorat» — kurs testlari: savollar tanlangan darslardan va
- * testning o'ziga qo'shilgan savollardan yig'iladi.
+ * «Nazorat» — kurs testlari (1-oraliq, 1-joriy, yakuniy...): savollar
+ * tanlangan darslardan va «Test savollari» dagi shu turdagi savollardan
+ * yig'iladi.
  */
 const MidtermQuizzes = ({
     courseId,
+    subjectId,
+    subjectName,
     lessons,
     groups,
     canSeeResults,
 }: {
     courseId: number;
+    subjectId: number;
+    subjectName?: string;
     lessons: Lesson[];
     groups: CourseGroupInfo[];
     canSeeResults: boolean;
@@ -167,16 +240,45 @@ const MidtermQuizzes = ({
     const [toDelete, setToDelete] = useState<Quiz | null>(null);
     const [deleteWarnings, setDeleteWarnings] = useState<string[]>([]);
     const [togglingId, setTogglingId] = useState<number | null>(null);
+    const [restoreDraft, setRestoreDraft] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const reopen = searchParams.get(NAZORAT_REOPEN_PARAM);
 
     const quizzes = quizzesQuery.data?.quizzes ?? [];
+
+    // Oynadan savol formasiga o'tilgan bo'lsa — qaytganda oyna qoralama
+    // bilan qayta ochiladi. Tahrirlash rejimi uchun ro'yxat kerak.
+    useEffect(() => {
+        if (!reopen || !quizzesQuery.isSuccess) return;
+        const draft = readNazoratDraft(courseId);
+        const target = draft?.quizId ? quizzesQuery.data.quizzes.find((quiz) => quiz.id === draft.quizId) : null;
+        setEditing(target ?? null);
+        setRestoreDraft(Boolean(draft) && (draft?.quizId == null || Boolean(target)));
+        setModalOpen(true);
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete(NAZORAT_REOPEN_PARAM);
+                return next;
+            },
+            { replace: true },
+        );
+    }, [reopen, quizzesQuery.isSuccess, quizzesQuery.data, courseId, setSearchParams]);
     const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
     const groupName = (id?: number | null) => groups.find((group) => group.id === id)?.name;
+    const usedControlTypes = quizzes
+        .map((quiz) => quiz.control_type)
+        .filter((value): value is ControlType => Boolean(value));
+    // «Boshqa» bir necha bo'lishi mumkin, qolganlari odatda bittadan.
+    const defaultControlType =
+        CONTROL_TYPES.find((item) => item.value !== 'OTHER' && !usedControlTypes.includes(item.value))?.value
+        ?? 'OTHER';
 
     const toggleActive = (quiz: Quiz) => {
         setTogglingId(quiz.id);
         const payload: QuizCreateRequest = {
-            title: quiz.title,
             quiz_type: 'MIDTERM',
+            control_type: quiz.control_type ?? undefined,
             course_id: courseId,
             group_id: quiz.group_id ?? null,
             question_number: quiz.question_number,
@@ -202,7 +304,7 @@ const MidtermQuizzes = ({
             { id: toDelete.id, force: deleteWarnings.length > 0 },
             {
                 onSuccess: () => {
-                    toast.success("Oraliq nazorat o'chirildi");
+                    toast.success("Nazorat o'chirildi");
                     setToDelete(null);
                     setDeleteWarnings([]);
                 },
@@ -226,17 +328,17 @@ const MidtermQuizzes = ({
         <SectionCard
             icon={<ClipboardCheck className="h-[18px] w-[18px]" />}
             tone="blue"
-            title="Oraliq nazorat"
+            title="Nazorat"
             description={
                 quizzes.length > 0
                     ? `${quizzes.length} ta test`
-                    : "Savollar tanlangan darslardan va testga alohida qo'shilganlaridan yig'iladi"
+                    : "Savollar tanlangan darslardan va «Test savollari» dagi shu nazorat savollaridan yig'iladi"
             }
             action={
                 <CardAction
-                    onClick={() => { setEditing(null); setModalOpen(true); }}
+                    onClick={() => { setEditing(null); setRestoreDraft(false); setModalOpen(true); }}
                     icon={<Plus className="h-4 w-4" />}
-                    label="Oraliq nazorat"
+                    label="Nazorat"
                 />
             }
         >
@@ -250,8 +352,8 @@ const MidtermQuizzes = ({
             ) : quizzes.length === 0 ? (
                 <EmptyState
                     icon={<ClipboardCheck className="h-6 w-6" />}
-                    title="Oraliq nazorat yo'q"
-                    description="Oraliq nazorat yarating: qaysi darslarning savollari kirishini tanlang va kerak bo'lsa alohida savol qo'shing."
+                    title="Nazorat yo'q"
+                    description="Nazorat yarating: turini tanlang, qaysi darslarning savollari kirishini belgilang va kerak bo'lsa shu nazorat uchun alohida savol qo'shing."
                     className="py-8"
                 />
             ) : (
@@ -317,6 +419,20 @@ const MidtermQuizzes = ({
                                             {quiz.is_active ? 'Faol' : 'Faol emas'}
                                         </span>
                                     </div>
+                                    {quiz.control_type && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="shrink-0 gap-1.5"
+                                            title="Savol shu nazorat uchun «Test savollari» ga qo'shiladi"
+                                            onClick={() =>
+                                                navigate(controlQuestionCreateUrl(courseId, subjectId, quiz.control_type!))
+                                            }
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            <span>Savol qo'shish</span>
+                                        </Button>
+                                    )}
                                     {canSeeResults && (
                                         <Button
                                             variant="outline"
@@ -337,7 +453,7 @@ const MidtermQuizzes = ({
                                             variant="ghost"
                                             size="icon"
                                             aria-label="Testni tahrirlash"
-                                            onClick={() => { setEditing(quiz); setModalOpen(true); }}
+                                            onClick={() => { setEditing(quiz); setRestoreDraft(false); setModalOpen(true); }}
                                         >
                                             <Pencil className="h-4 w-4" />
                                         </Button>
@@ -379,7 +495,14 @@ const MidtermQuizzes = ({
                                                 </div>
                                             )}
                                         </div>
-                                        <MidtermExtraQuestions quiz={quiz} courseId={courseId} />
+                                        {quiz.control_type ? (
+                                            <>
+                                                <ControlTypeQuestions courseId={courseId} controlType={quiz.control_type} />
+                                                <MidtermExtraQuestions quiz={quiz} courseId={courseId} legacyOnly />
+                                            </>
+                                        ) : (
+                                            <MidtermExtraQuestions quiz={quiz} courseId={courseId} />
+                                        )}
                                     </>
                                 )}
                             </li>
@@ -392,17 +515,21 @@ const MidtermQuizzes = ({
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
                 courseId={courseId}
+                subjectId={subjectId}
+                subjectName={subjectName}
                 lessons={lessons}
                 groups={groups}
-                defaultTitle={`${quizzes.length + 1}-oraliq nazorat`}
+                defaultControlType={defaultControlType}
+                usedControlTypes={usedControlTypes}
                 quiz={editing}
+                restoreDraft={restoreDraft}
             />
 
             <ConfirmDialog
                 isOpen={toDelete !== null}
                 onClose={() => { setToDelete(null); setDeleteWarnings([]); }}
                 onConfirm={confirmDelete}
-                title="Oraliq nazoratni o'chirish"
+                title="Nazoratni o'chirish"
                 description={
                     deleteWarnings.length > 0
                         ? `${deleteWarnings.join('. ')}. Baribir o'chirilsinmi?`
@@ -547,12 +674,12 @@ const ControlQuestions = ({
 };
 
 /**
- * «Fan topshiriqlari» — oraliq nazorat, mustaqil ish mavzulari va
+ * «Fan topshiriqlari» — nazoratlar, mustaqil ish mavzulari va
  * nazoratlar bo'yicha test savollari.
  *
  * Ilgari bu yerda darslar bo'yicha savollar ro'yxati turardi. U dars
  * sahifasini takrorlardi; savollar dars sahifasida qo'shiladi va
- * ko'rinadi, bu yerda esa ulardan oraliq nazorat yig'iladi.
+ * ko'rinadi, bu yerda esa ulardan nazorat yig'iladi.
  */
 export const CourseAssignments = ({
     courseId,
@@ -579,6 +706,8 @@ export const CourseAssignments = ({
             {canManageQuizzes && (
                 <MidtermQuizzes
                     courseId={courseId}
+                    subjectId={subjectId}
+                    subjectName={subjectName}
                     lessons={lessons}
                     groups={groups}
                     canSeeResults={canSeeResults}

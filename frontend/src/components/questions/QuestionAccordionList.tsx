@@ -101,7 +101,7 @@ export const QuestionAccordionList = ({
                                             aria-label="Savolni tahrirlash"
                                             onClick={() =>
                                                 navigate(
-                                                    `/questions/${question.id}/edit${returnTo ? `?return_to=${returnTo}` : ''}`,
+                                                    `/questions/${question.id}/edit${returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : ''}`,
                                                 )
                                             }
                                         >

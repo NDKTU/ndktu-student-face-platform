@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
-from app.core.enums import QuizType
+from app.core.enums import ControlType, QuizType
 from app.core.schemas import TashkentDatetime
 
 ProctoringMode = Literal["face", "standard"]
@@ -32,6 +32,9 @@ class QuizCreateRequest(BaseModel):
     #: Oraliq nazorat savollari olinadigan darslar. `None` — tahrirlashda
     #: tanlov o'zgarmaydi; bo'sh ro'yxat — birorta dars tanlanmagan.
     lesson_ids: Optional[list[int]] = None
+    #: Kurs nazoratining turi. Nom shundan yasaladi va «Test savollari» dagi
+    #: shu turdagi savollar testga qo'shiladi. Tahrirlashda `None` — o'zgarmaydi.
+    control_type: Optional[ControlType] = None
     # Своей колонки у семестра нет — он нужен только как часть названия.
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
@@ -80,6 +83,7 @@ class QuizCreateResponse(BaseModel):
     subject_id: Optional[int]
     lesson_id: Optional[int] = None
     course_id: Optional[int] = None
+    control_type: Optional[ControlType] = None
     #: Oraliq nazoratning manba darslari va testdagi savollar soni —
     #: repozitoriy faqat `MIDTERM` uchun to'ldiradi.
     lesson_ids: list[int] = []

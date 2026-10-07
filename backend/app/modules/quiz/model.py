@@ -229,6 +229,11 @@ class Quiz(Base, IdIntPk, TimestampMixin):
         nullable=False,
         server_default=text(f"'{QuizType.LESSON_QUIZ.value}'"),
     )
+    #: Kurs nazoratining turi (ControlType): ON1, ON2, JN1, JN2, YN, OTHER.
+    #: Nomi shundan yasaladi, savollar esa tanlangan darslardan tashqari
+    #: kursning «Test savollari» dagi shu turdagi savollardan ham olinadi.
+    #: Faqat `MIDTERM` uchun; eski, nomi tanilmagan testlarda bo'sh.
+    control_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     title: Mapped[str] = mapped_column(nullable=False)
     question_number: Mapped[int] = mapped_column(nullable=False)

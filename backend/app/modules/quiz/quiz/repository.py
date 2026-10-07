@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 
 from core.config import settings
 from fastapi import HTTPException, status
-from sqlalchemy import and_, asc, case, desc, func, or_, select
+from sqlalchemy import and_, asc, case, desc, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.enums import QuizType, semester_label
+from app.core.enums import CONTROL_TYPE_TITLES, ControlType, QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.core.utils.course_access import can_manage, manageable_course_ids
@@ -370,6 +370,11 @@ class QuizRepository:
                     detail="Guruh bu kursga tegishli emas",
                 )
 
+        # Nom turidan yasaladi — o'qituvchi yozgan nom e'tiborga olinmaydi.
+        # Tursiz eski testda (tahrirlash) nom o'zgarmaydi.
+        if data.control_type is not None:
+            data.title = CONTROL_TYPE_TITLES[data.control_type]
+
         data.lesson_id = None
         data.subject_id = course.subject_id
         if data.lecturer_id is None:
@@ -378,40 +383,49 @@ class QuizRepository:
         return data
 
     @staticmethod
-    def _lessons_questions_stmt(lesson_ids: list[int]):
-        """Tanlangan darslarning savollari — faol, oxirgi versiya.
+    def _midterm_pool_stmt(course_id: int | None, control_type: str | None, lesson_ids: list[int] | None):
+        """Kurs nazoratiga o'zi tushadigan savollar — faol, oxirgi versiya.
 
-        Dars testidagi kabi muallif va fan bo'yicha filtr yo'q: darsga
-        biriktirilgan savolni kim kiritgani muhim emas.
+        Ikki manba: tanlangan darslarning savollari va kursning «Test
+        savollari» dagi nazorat turiga mos savollar. Dars testidagi kabi
+        muallif bo'yicha filtr yo'q: savolni kim kiritgani muhim emas.
         """
+        sources = []
+        if lesson_ids:
+            sources.append(Question.lesson_id.in_(lesson_ids))
+        if course_id is not None and control_type:
+            sources.append(and_(Question.course_id == course_id, Question.control_type == control_type))
         return select(Question.id).where(
-            Question.lesson_id.in_(lesson_ids),
+            or_(*sources) if sources else false(),
             Question.is_active.is_(True),
             Question.is_latest.is_(True),
         )
 
     async def _sync_midterm(self, session: AsyncSession, quiz: Quiz, lesson_ids: list[int]) -> None:
-        """Oraliq nazoratning dars savollarini tanlovga moslaydi.
+        """Kurs nazoratining savollarini darslar tanlovi va turiga moslaydi.
 
-        Darsdan kelgan savollar (`lesson_id` to'ldirilgan) tanlovdan qayta
-        yig'iladi; o'qituvchi alohida qo'shgan savollar (`lesson_id` bo'sh)
-        tegilmaydi.
+        Darsdan (`lesson_id`) va «Test savollari» dan (`control_type`) kelgan
+        savollar qayta yig'iladi; testning o'ziga alohida qo'shilgan eski
+        savollar (ikkalasi ham bo'sh) tegilmaydi.
         """
         await session.execute(QuizLesson.__table__.delete().where(QuizLesson.quiz_id == quiz.id))
         for lesson_id in lesson_ids:
             session.add(QuizLesson(quiz_id=quiz.id, lesson_id=lesson_id))
 
-        wanted = (
-            set((await session.execute(self._lessons_questions_stmt(lesson_ids))).scalars().all())
-            if lesson_ids
-            else set()
+        wanted = set(
+            (
+                await session.execute(self._midterm_pool_stmt(quiz.course_id, quiz.control_type, lesson_ids))
+            ).scalars().all()
         )
         current = dict(
             (
                 await session.execute(
                     select(QuizQuestion.question_id, QuizQuestion.id)
                     .join(Question, Question.id == QuizQuestion.question_id)
-                    .where(QuizQuestion.quiz_id == quiz.id, Question.lesson_id.isnot(None))
+                    .where(
+                        QuizQuestion.quiz_id == quiz.id,
+                        or_(Question.lesson_id.isnot(None), Question.control_type.isnot(None)),
+                    )
                 )
             ).all()
         )
@@ -433,18 +447,34 @@ class QuizRepository:
         ).scalar() or 0
 
     async def link_question_to_midterms(self, session: AsyncSession, question: Question) -> None:
-        """Darsga yangi qo'shilgan savolni o'sha darsni tanlagan oraliq
-        nazoratlarga ham bog'laydi.
+        """Yangi savolni u tushishi kerak bo'lgan kurs nazoratlariga bog'laydi:
+        darsning savoli — o'sha darsni tanlaganlariga, «Test savollari» dagi
+        savol — kursning shu turdagi nazoratlariga.
 
-        Usiz oraliq nazorat yaratilgan paytdagi savollar bilan qotib qolardi:
-        o'qituvchi darsga savol qo'shadi va uni testda kutadi. Commit
-        chaqiruvchida.
+        Usiz nazorat yaratilgan paytdagi savollar bilan qotib qolardi:
+        o'qituvchi savol qo'shadi va uni testda kutadi. Commit chaqiruvchida.
         """
-        if question.lesson_id is None:
-            return
-        quiz_ids = (
-            await session.execute(select(QuizLesson.quiz_id).where(QuizLesson.lesson_id == question.lesson_id))
-        ).scalars().all()
+        quiz_ids: set[int] = set()
+        if question.lesson_id is not None:
+            quiz_ids.update(
+                (
+                    await session.execute(
+                        select(QuizLesson.quiz_id).where(QuizLesson.lesson_id == question.lesson_id)
+                    )
+                ).scalars().all()
+            )
+        if question.course_id is not None and question.control_type:
+            quiz_ids.update(
+                (
+                    await session.execute(
+                        select(Quiz.id).where(
+                            Quiz.course_id == question.course_id,
+                            Quiz.quiz_type == QuizType.MIDTERM.value,
+                            Quiz.control_type == question.control_type,
+                        )
+                    )
+                ).scalars().all()
+            )
         for quiz_id in quiz_ids:
             session.add(QuizQuestion(quiz_id=quiz_id, question_id=question.id))
 
@@ -488,6 +518,11 @@ class QuizRepository:
         data = await self._fill_from_lesson(session, data)
         data = await self._fill_from_course(session, data, current_user)
         is_midterm = data.quiz_type == QuizType.MIDTERM
+        if is_midterm and data.control_type is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Nazorat turini tanlang",
+            )
 
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
@@ -497,16 +532,10 @@ class QuizRepository:
         # сколько нашлось, поэтому тест на 30 вопросов из банка в 12 превратился бы
         # в экзамен на 12 — с оценкой, несравнимой с другими группами.
         if is_midterm and data.is_active:
-            available = (
-                (
-                    await session.execute(
-                        select(func.count()).select_from(self._lessons_questions_stmt(data.lesson_ids).subquery())
-                    )
-                ).scalar()
-                or 0
-                if data.lesson_ids
-                else 0
+            pool = self._midterm_pool_stmt(
+                data.course_id, data.control_type.value if data.control_type else None, data.lesson_ids
             )
+            available = (await session.execute(select(func.count()).select_from(pool.subquery()))).scalar() or 0
             if available < data.question_number:
                 raise self._not_enough_questions(available, data.question_number)
         elif data.is_active and data.lecturer_id and data.subject_id:
@@ -540,6 +569,7 @@ class QuizRepository:
             subject_id=data.subject_id,
             lesson_id=data.lesson_id,
             course_id=data.course_id if is_midterm else None,
+            control_type=data.control_type.value if is_midterm and data.control_type else None,
         )
         session.add(new_quiz)
 
@@ -884,8 +914,12 @@ class QuizRepository:
                 data.course_id = quiz.course_id
             if quiz.lecturer_id is not None:
                 data.lecturer_id = data.user_id = quiz.lecturer_id
+            # Umumiy tahrirlash oynasi va «Faol» tugmasi turni yubormaydi.
+            if data.control_type is None and quiz.control_type in ControlType._value2member_map_:
+                data.control_type = ControlType(quiz.control_type)
             data = await self._fill_from_course(session, data, current_user)
             quiz.course_id = data.course_id
+            quiz.control_type = data.control_type.value if data.control_type else None
             # Tanlov berilmagan bo'lsa ham sinxronlanadi: darsdagi savollar
             # tahrirlash/o'chirish bilan o'zgargan bo'lishi mumkin.
             lesson_ids = data.lesson_ids
@@ -969,7 +1003,8 @@ class QuizRepository:
         Savol faqat shu test uchun yozilgan, shuning uchun boshqa testda
         ishlatilmasa — bankdan ham olinadi (soft delete). Darsdan kelgan
         savol bu yo'l bilan olinmaydi: u darsni tanlovdan chiqarish bilan
-        ketadi.
+        ketadi. «Test savollari» dagi savol ham — u o'sha bo'limda boshqariladi
+        va kursning shu turdagi barcha nazoratlariga tegishli.
         """
         quiz = await session.get(Quiz, quiz_id)
         if quiz is None or quiz.quiz_type != QuizType.MIDTERM.value:
@@ -979,7 +1014,7 @@ class QuizRepository:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
 
         question = await session.get(Question, question_id)
-        if question is None or question.lesson_id is not None:
+        if question is None or question.lesson_id is not None or question.control_type is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savol topilmadi")
 
         await session.execute(

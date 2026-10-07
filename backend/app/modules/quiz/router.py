@@ -18,6 +18,7 @@ from .model import Result
 from .question.repository import get_question_repository
 from .question.schemas import (
     ControlQuestionCountsResponse,
+    LessonQuestionCountsResponse,
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
     QuestionCreateRequest,
@@ -239,6 +240,18 @@ async def get_control_question_counts(
 ):
     """Kursning «Test savollari»: har bir nazorat turida nechta savol."""
     return await get_question_repository.control_counts(
+        session=session, course_id=course_id, current_user=current_user
+    )
+
+
+@question_router.get("/lesson_counts", response_model=LessonQuestionCountsResponse)
+async def get_lesson_question_counts(
+    course_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("read:question")),
+):
+    """Kurs darslarining har birida nechta savol — nazorat uchun dars tanlovi."""
+    return await get_question_repository.lesson_counts(
         session=session, course_id=course_id, current_user=current_user
     )
 

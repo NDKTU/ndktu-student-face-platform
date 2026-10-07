@@ -486,7 +486,7 @@ const QuestionFormPage = () => {
                                         </p>
                                         <input type="hidden" {...register('subject_id')} />
                                         <p className="text-xs text-muted-foreground">
-                                            Savol «{midterm?.title ?? 'oraliq nazorat'}» testiga qo'shiladi.
+                                            Savol «{midterm?.title ?? 'nazorat'}» testiga qo'shiladi.
                                         </p>
                                     </>
                                 ) : lessonSubjectId ? (

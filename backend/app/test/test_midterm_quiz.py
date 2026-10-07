@@ -1,4 +1,4 @@
-"""Oraliq nazorat — kurs testi tanlangan darslar va alohida savollardan.
+"""Kurs nazorati — tanlangan darslar, «Test savollari» va alohida savollardan.
 
 O'qituvchi «Fan topshiriqlari» da oraliq nazorat tuzadi: qaysi darslarning
 savollari kirishini tanlaydi va xohlasa testning o'ziga savol qo'shadi.
@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.modules.auth.model import TeacherSubject
 from app.modules.course.model import Course, CourseGroup, Lesson
-from app.modules.quiz.model import Question, Quiz, QuizLesson, QuizQuestion
+from app.modules.quiz.model import Question, Quiz, QuizLesson, QuizQuestion, UserAnswers
 from app.test.test_lesson_quiz_visibility import student_client  # noqa: F401 — fixture
 
 
@@ -56,7 +56,16 @@ async def midterm_setup(async_db, make_teacher, make_subject, make_group, test_f
     }
 
 
-async def _add_question(async_db, *, subject_id: int, user_id: int, lesson_id: int | None, text: str) -> int:
+async def _add_question(
+    async_db,
+    *,
+    subject_id: int,
+    user_id: int,
+    lesson_id: int | None,
+    text: str,
+    course_id: int | None = None,
+    control_type: str | None = None,
+) -> int:
     question = Question(
         text=text,
         option_a="a",
@@ -67,6 +76,8 @@ async def _add_question(async_db, *, subject_id: int, user_id: int, lesson_id: i
         subject_id=subject_id,
         user_id=user_id,
         lesson_id=lesson_id,
+        course_id=course_id,
+        control_type=control_type,
     )
     async_db.add(question)
     await async_db.commit()
@@ -83,6 +94,7 @@ async def _linked(async_db, quiz_id: int) -> set[int]:
 def _payload(setup, **extra):
     return {
         "quiz_type": "MIDTERM",
+        "control_type": "ON1",
         "course_id": setup["course_id"],
         "question_number": 2,
         "duration": 30,
@@ -330,3 +342,130 @@ async def test_course_wide_midterm_visible_only_to_course_groups(
 
     started = await data["client"].post("/quiz_process/start_quiz", json={"quiz_id": foreign_id, "pin": "1002"})
     assert started.status_code == 403, started.text
+
+
+async def _bank_question(auth_client, s, control_type: str, text: str):
+    """Kursning «Test savollari» ga API orqali savol qo'shadi."""
+    return await auth_client.post(
+        "/question/",
+        json={
+            "subject_id": s["subject_id"],
+            "user_id": s["teacher_user_id"],
+            "course_id": s["course_id"],
+            "control_type": control_type,
+            "text": text,
+            "option_a": "a",
+            "option_b": "b",
+            "option_c": "c",
+            "option_d": "d",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_title_comes_from_control_type(auth_client, midterm_setup):
+    s = midterm_setup
+
+    created = await auth_client.post("/quiz/", json=_payload(s, control_type="JN2", title="O'zim yozgan nom"))
+    assert created.status_code == 201, created.text
+    assert created.json()["title"] == "2-joriy nazorat"
+    assert created.json()["control_type"] == "JN2"
+
+    # Tur berilmasa, tahrirlash turni ham, nomni ham saqlaydi.
+    payload = _payload(s, title="Boshqa nom")
+    del payload["control_type"]
+    updated = await auth_client.put(f"/quiz/{created.json()['id']}", json=payload)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["control_type"] == "JN2"
+    assert updated.json()["title"] == "2-joriy nazorat"
+
+    payload = _payload(s)
+    del payload["control_type"]
+    missing = await auth_client.post("/quiz/", json=payload)
+    assert missing.status_code == 422, missing.text
+
+
+@pytest.mark.asyncio
+async def test_bank_questions_of_same_control_join(auth_client, async_db, midterm_setup):
+    """«Test savollari» dagi shu turdagi savollar nazoratga o'zi tushadi."""
+    s = midterm_setup
+    l1 = s["lesson_ids"][0]
+    lesson_q = await _add_question(
+        async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=l1, text="dars"
+    )
+    on1 = await _add_question(
+        async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=None, text="on1",
+        course_id=s["course_id"], control_type="ON1",
+    )
+    on2 = await _add_question(
+        async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=None, text="on2",
+        course_id=s["course_id"], control_type="ON2",
+    )
+
+    # Dars + bank birga yetadi — faollashtirish mumkin.
+    created = await auth_client.post("/quiz/", json=_payload(s, lesson_ids=[l1], is_active=True))
+    assert created.status_code == 201, created.text
+    quiz_id = created.json()["id"]
+    assert created.json()["linked_question_count"] == 2
+    assert await _linked(async_db, quiz_id) == {lesson_q, on1}
+
+    # Keyin qo'shilgan ON1 savoli tushadi, ON2 — yo'q.
+    later = await _bank_question(auth_client, s, "ON1", "keyin")
+    other = await _bank_question(auth_client, s, "ON2", "boshqa tur")
+    assert later.status_code == 201, later.text
+    assert other.status_code == 201, other.text
+    assert await _linked(async_db, quiz_id) == {lesson_q, on1, later.json()["id"]}
+
+    # Bank savoli «alohida savollar» ro'yxatida ko'rinmaydi va testdan
+    # alohida olib tashlanmaydi — u «Test savollari» da boshqariladi.
+    listed = await auth_client.get("/question/", params={"midterm_quiz_id": quiz_id})
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["questions"] == []
+    removed = await auth_client.delete(f"/quiz/{quiz_id}/questions/{on1}")
+    assert removed.status_code == 404, removed.text
+
+    # Tur o'zgarsa, savollar yangi turga moslanadi.
+    updated = await auth_client.put(f"/quiz/{quiz_id}", json=_payload(s, control_type="ON2", lesson_ids=[l1]))
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["title"] == "2-oraliq nazorat"
+    assert await _linked(async_db, quiz_id) == {lesson_q, on2, other.json()["id"]}
+
+
+@pytest.mark.asyncio
+async def test_lesson_question_counts(auth_client, async_db, midterm_setup):
+    s = midterm_setup
+    l1, l2, _ = s["lesson_ids"]
+    for text in ("1", "2"):
+        await _add_question(async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=l1, text=text)
+    await _add_question(async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=l2, text="3")
+    hidden = await _add_question(
+        async_db, subject_id=s["subject_id"], user_id=s["teacher_user_id"], lesson_id=l2, text="o'chgan"
+    )
+    question = await async_db.get(Question, hidden)
+    question.is_active = False
+    await async_db.commit()
+
+    response = await auth_client.get("/question/lesson_counts", params={"course_id": s["course_id"]})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["counts"] == {str(l1): 2, str(l2): 1}
+
+
+@pytest.mark.asyncio
+async def test_unanswered_bank_question_can_be_deleted(auth_client, async_db, midterm_setup):
+    """Nazoratga avtomatik tushgan «Test savollari» savoli — yechilmagan
+    bo'lsa o'chiriladi; yechilgani himoyada qoladi."""
+    s = midterm_setup
+    quiz = (await auth_client.post("/quiz/", json=_payload(s))).json()
+    fresh = (await _bank_question(auth_client, s, "ON1", "yangi")).json()["id"]
+    answered = (await _bank_question(auth_client, s, "ON1", "yechilgan")).json()["id"]
+    assert await _linked(async_db, quiz["id"]) == {fresh, answered}
+    async_db.add(UserAnswers(quiz_id=quiz["id"], question_id=answered, user_id=s["teacher_user_id"]))
+    await async_db.commit()
+
+    deleted = await auth_client.delete(f"/question/{fresh}")
+    blocked = await auth_client.delete(f"/question/{answered}")
+
+    assert deleted.status_code in (200, 204), deleted.text
+    assert blocked.status_code == 409, blocked.text
+    assert await _linked(async_db, quiz["id"]) == {answered}

@@ -34,10 +34,11 @@ export const useMidtermExtraQuestions = (quizId?: number) =>
     });
 
 /** Kursning «Test savollari» — tanlangan nazorat turi. */
-export const useControlQuestions = (courseId: number, controlType: ControlType) =>
+export const useControlQuestions = (courseId: number, controlType: ControlType | '') =>
     useQuery({
         queryKey: ['questions', 'control', courseId, controlType],
-        queryFn: () => questionService.getControlQuestions(courseId, controlType),
+        queryFn: () => questionService.getControlQuestions(courseId, controlType as ControlType),
+        enabled: !!controlType,
     });
 
 /** Nazorat turlari yonidagi savollar soni. */
@@ -45,6 +46,14 @@ export const useControlQuestionCounts = (courseId: number) =>
     useQuery({
         queryKey: ['questions', 'control-counts', courseId],
         queryFn: () => questionService.getControlCounts(courseId),
+    });
+
+/** Kurs darslaridagi savollar soni — nazorat oynasida savolsiz darslar yashiriladi. */
+export const useLessonQuestionCounts = (courseId: number, enabled = true) =>
+    useQuery({
+        queryKey: ['questions', 'lesson-counts', courseId],
+        queryFn: () => questionService.getLessonCounts(courseId),
+        enabled,
     });
 
 export const useQuestionCatalog = (search?: string) => useQuery({
@@ -82,6 +91,7 @@ export const useUpdateQuestion = () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
             queryClient.invalidateQueries({ queryKey: ['question', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['quizzes'] });
         },
     });
 };
@@ -93,6 +103,7 @@ export const useDeleteQuestion = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
+            queryClient.invalidateQueries({ queryKey: ['quizzes'] });
         },
     });
 };
@@ -111,6 +122,8 @@ export const useUploadQuestions = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['questions'] });
             queryClient.invalidateQueries({ queryKey: ['question-catalog'] });
+            // Darsga yoki «Test savollari» ga yuklangan savollar nazoratga tushadi.
+            queryClient.invalidateQueries({ queryKey: ['quizzes'] });
         },
     });
 };

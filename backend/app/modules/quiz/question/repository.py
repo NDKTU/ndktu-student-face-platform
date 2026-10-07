@@ -10,15 +10,16 @@ from app.core.enums import ControlType, QuizType
 from app.core.utils.course_access import can_manage
 from app.core.utils.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import Teacher, User
-from app.modules.course.model import Course
+from app.modules.course.model import Course, Lesson
 from app.modules.organization_structure.model import Kafedra
 from app.modules.file.storage import public_url, store_upload
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject
+from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject, UserAnswers
 from app.modules.quiz.quiz.repository import get_quiz_repository
 
 from .excel_format import parse_correct_option, resolve_columns
 from .schemas import (
     ControlQuestionCountsResponse,
+    LessonQuestionCountsResponse,
     QuestionBulkDeleteRequest,
     QuestionCatalogResponse,
     QuestionCreateRequest,
@@ -34,9 +35,11 @@ logger = logging.getLogger(__name__)
 class QuestionRepository:
     @staticmethod
     def _midterm_extra_filter(quiz_id: int):
-        """Oraliq nazoratga alohida qoʻshilgan savollar — darsdan kelmaganlari."""
+        """Nazoratga alohida qoʻshilgan savollar — darsdan ham, «Test
+        savollari» dan ham kelmaganlari."""
         return and_(
             Question.lesson_id.is_(None),
+            Question.control_type.is_(None),
             Question.id.in_(select(QuizQuestion.question_id).where(QuizQuestion.quiz_id == quiz_id)),
         )
 
@@ -243,6 +246,27 @@ class QuestionRepository:
             if kind in ControlType._value2member_map_:
                 counts[ControlType(kind)] = count
         return ControlQuestionCountsResponse(counts=counts)
+
+    async def lesson_counts(
+        self, session: AsyncSession, course_id: int, current_user: User
+    ) -> LessonQuestionCountsResponse:
+        """Kurs darslaridagi savollar soni — nazorat oynasi faqat savolli
+        darslarni koʻrsatadi. Hisob nazoratga tushadigan savollar bilan bir
+        xil: faol, oxirgi versiya."""
+        await self._course_for_control_questions(session, course_id, current_user)
+        rows = (
+            await session.execute(
+                select(Question.lesson_id, func.count(Question.id))
+                .join(Lesson, Lesson.id == Question.lesson_id)
+                .where(
+                    Lesson.course_id == course_id,
+                    Question.is_latest.is_(True),
+                    Question.is_active.is_(True),
+                )
+                .group_by(Question.lesson_id)
+            )
+        ).all()
+        return LessonQuestionCountsResponse(counts=dict(rows))
 
     async def get_question(self, session: AsyncSession, question_id: int, current_user: User) -> Question:
         stmt = (
@@ -474,6 +498,7 @@ class QuestionRepository:
         # testdan tushib qolardi: `start_quiz` faqat `is_active` savollarni
         # beradi, ya'ni tayyor test jimgina qisqarardi — va allaqachon
         # ishlagan talabalar bilan keyingilari boshqa testni yechardi.
+        await self._release_unanswered_control_question(session, question)
         used = await session.scalar(
             select(QuizQuestion.id).where(QuizQuestion.question_id == question.id).limit(1)
         )
@@ -487,6 +512,43 @@ class QuestionRepository:
         # user_answers) — it's just excluded from future selection.
         question.is_active = False
         await session.commit()
+
+    async def _release_unanswered_control_question(self, session: AsyncSession, question: Question) -> None:
+        """«Test savollari» dagi savolni kurs nazoratlaridan uzadi — agar uni
+        hali hech kim yechmagan boʻlsa.
+
+        Bunday savol nazoratga avtomatik tushadi va u yerdan alohida olib
+        tashlanmaydi. Usiz shu turdagi nazorat yaratilgan zahoti savolni
+        oʻchirishning hech qanday yoʻli qolmasdi. Yechilgan savol esa
+        himoyada qoladi: test natijalar oʻrtasida qisqarmasligi kerak.
+        Versiyalar birga tekshiriladi — talaba eski versiyani koʻrgan boʻlishi
+        mumkin. Commit chaqiruvchida.
+        """
+        if question.course_id is None or question.control_type is None:
+            return
+        foreign = await session.scalar(
+            select(QuizQuestion.id)
+            .join(Quiz, Quiz.id == QuizQuestion.quiz_id)
+            .where(
+                QuizQuestion.question_id == question.id,
+                or_(
+                    Quiz.quiz_type != QuizType.MIDTERM.value,
+                    Quiz.course_id.is_distinct_from(question.course_id),
+                    Quiz.control_type.is_distinct_from(question.control_type),
+                ),
+            )
+            .limit(1)
+        )
+        if foreign is not None:
+            return
+        root_id = question.original_question_id or question.id
+        versions = select(Question.id).where(or_(Question.id == root_id, Question.original_question_id == root_id))
+        answered = await session.scalar(
+            select(UserAnswers.id).where(UserAnswers.question_id.in_(versions)).limit(1)
+        )
+        if answered is not None:
+            return
+        await session.execute(QuizQuestion.__table__.delete().where(QuizQuestion.question_id == question.id))
 
     async def bulk_delete_questions(
         self, session: AsyncSession, data: QuestionBulkDeleteRequest, current_user: User
@@ -635,7 +697,9 @@ class QuestionRepository:
         session.add_all(questions)
 
         try:
-            if lesson_id is not None:
+            # Darsga yoki kurs nazoratiga yuklangan savollar shu darsni/turni
+            # olgan nazoratlarga darhol tushadi.
+            if lesson_id is not None or control_type is not None:
                 await session.flush()
                 for question in questions:
                     await get_quiz_repository.link_question_to_midterms(session, question)

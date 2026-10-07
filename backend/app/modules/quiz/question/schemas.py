@@ -255,6 +255,12 @@ class ControlQuestionCountsResponse(BaseModel):
     counts: dict[ControlType, int]
 
 
+class LessonQuestionCountsResponse(BaseModel):
+    """Kurs darslaridagi savollar soni: `lesson_id -> soni`. Savolsiz dars kirmaydi."""
+
+    counts: dict[int, int]
+
+
 class QuestionSubjectSummary(BaseModel):
     subject_id: int
     subject_name: str

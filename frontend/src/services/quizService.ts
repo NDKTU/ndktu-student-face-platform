@@ -1,4 +1,5 @@
 import api from './api';
+import type { ControlType } from './questionService';
 
 export type ProctoringMode = 'face' | 'standard';
 
@@ -7,7 +8,7 @@ export type QuizType = 'LESSON_QUIZ' | 'MIDTERM' | 'SEMESTER_FINAL' | 'YEAR_PROM
 
 export const QUIZ_TYPE_LABELS: Record<QuizType, string> = {
     LESSON_QUIZ: 'Dars testi',
-    MIDTERM: 'Oraliq nazorat',
+    MIDTERM: 'Nazorat',
     SEMESTER_FINAL: 'Semestr yakuni',
     YEAR_PROMOTION: 'Kursdan kursga',
     PUBLIC_FREE: 'Ochiq test',
@@ -37,8 +38,10 @@ export interface Quiz {
     group_name?: string | null;
     /** Test qaysi darsga biriktirilgani — dars sahifasidan tuzilgan bo'lsa. */
     lesson_id?: number | null;
-    /** Oraliq nazorat: kurs, manba darslar va testdagi savollar soni. */
+    /** Kurs nazorati: kurs, turi, manba darslar va testdagi savollar soni. */
     course_id?: number | null;
+    /** Nom shundan yasaladi; «Test savollari» ning shu turi testga tushadi. Eski testda bo'sh. */
+    control_type?: ControlType | null;
     lesson_ids?: number[];
     linked_question_count?: number | null;
     is_active: boolean;
@@ -63,8 +66,10 @@ export interface QuizCreateRequest {
     lesson_id?: number | null;
     /** Oraliq nazorat: fan va ma'ruzachi kursdan to'ldiriladi. */
     course_id?: number | null;
-    /** Oraliq nazorat savollari olinadigan darslar. */
+    /** Kurs nazorati savollari olinadigan darslar. */
     lesson_ids?: number[];
+    /** Kurs nazorati turi — nomni server shundan yasaydi. */
+    control_type?: ControlType;
     /** Faqat sarlavhaga kiradi — quizzes jadvalida alohida ustun yo'q. */
     semester_number?: number | null;
     is_active: boolean;

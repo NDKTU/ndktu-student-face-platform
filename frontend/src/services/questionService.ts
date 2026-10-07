@@ -152,6 +152,14 @@ export const questionService = {
         return response.data.counts;
     },
 
+    /** Kurs darslaridagi savollar soni: `lesson_id -> soni`, savolsiz dars kirmaydi. */
+    getLessonCounts: async (courseId: number) => {
+        const response = await api.get<{ counts: Record<string, number> }>('/question/lesson_counts', {
+            params: { course_id: courseId },
+        });
+        return response.data.counts;
+    },
+
     getQuestionById: async (id: number): Promise<Question> => {
         const response = await api.get<Question>(`/question/${id}`);
         return response.data;
