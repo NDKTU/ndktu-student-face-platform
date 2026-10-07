@@ -87,12 +87,16 @@ async def test_subject_user_sees_active_test(auth_client, async_client, scene):
     assert await _available(async_client, "gt_staff") == [scene["test_id"]]
     assert await _available(async_client, "gt_stranger") == []
 
-    start = await async_client.post(
-        f"/general-test/{scene['test_id']}/start", headers=await _login(async_client, "gt_staff")
-    )
+    headers = await _login(async_client, "gt_staff")
+    start = await async_client.post(f"/general-test/{scene['test_id']}/start", headers=headers)
     assert start.status_code == 200, start.text
+    finished = await async_client.post(
+        f"/general-test/attempt/{start.json()['attempt_id']}/finish", headers=headers
+    )
+    assert finished.status_code == 200, finished.text
 
-    # O'chirib qo'yilgan test biriktirilganga ham ko'rinmaydi.
+    # O'chirib qo'yilgan test biriktirilganga ham ko'rinmaydi (boshlangan
+    # urinishi bo'lmasa — u holda qaytish uchun ro'yxatda qoladi).
     off = await auth_client.put(f"/general-test/{scene['test_id']}", json={"is_active": False})
     assert off.status_code == 200
     assert await _available(async_client, "gt_staff") == []

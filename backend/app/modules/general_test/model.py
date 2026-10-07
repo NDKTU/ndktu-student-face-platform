@@ -173,6 +173,12 @@ class GeneralTestAttempt(Base, IdIntPk, TimestampMixin):
     #: сравнивается `utcnow_naive()` при расчёте оставшегося времени.
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow_naive)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: Длительность в минутах, зафиксированная при старте. Срок считается от
+    #: неё, а не от `GeneralTest.duration`: иначе правка теста во время
+    #: экзамена мгновенно обрывала (или продлевала) уже идущие попытки, а
+    #: таймер у студента продолжал считать по-старому. Пусто — у попыток,
+    #: начатых до появления колонки; для них берётся длительность теста.
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
     layout: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, server_default="[]")
     total_questions: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     correct_answers: Mapped[int | None] = mapped_column(Integer, nullable=True)

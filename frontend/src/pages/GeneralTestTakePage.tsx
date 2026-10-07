@@ -16,6 +16,9 @@ import { apiErrorMessage } from '@/utils/apiError';
 import { RichText } from '@/components/questions/RichText';
 import { cn } from '@/lib/utils';
 
+/** Vaqt tugaganda yakunlash o'tmasa — shuncha vaqtdan keyin qayta urinadi. */
+const FINISH_RETRY_MS = 5000;
+
 const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -38,6 +41,9 @@ export default function GeneralTestTakePage() {
     const [confirmFinish, setConfirmFinish] = useState(false);
     const [finishing, setFinishing] = useState(false);
     const finishedRef = useRef(false);
+    // Muddat bir marta — javob kelganda qotiriladi. Taymer effekti qayta
+    // ishga tushsa ham hisob shu nuqtadan davom etadi, boshidan emas.
+    const deadlineRef = useRef(0);
 
     const finish = useCallback(async () => {
         if (finishedRef.current) return;
@@ -62,6 +68,7 @@ export default function GeneralTestTakePage() {
             .getAttempt(attemptId)
             .then((s) => {
                 if (cancelled) return;
+                deadlineRef.current = Date.now() + s.remaining_seconds * 1000;
                 setState(s);
                 setSecondsLeft(s.remaining_seconds);
                 setAnswers(
@@ -84,16 +91,25 @@ export default function GeneralTestTakePage() {
     }, [attemptId]);
 
     // Vaqt serverdan keladi (`remaining_seconds`): sahifani yangilash uni tiklamaydi.
+    //
+    // Nolda taymer to'xtamaydi: yakunlash so'rovi tarmoq tufayli o'tmasa,
+    // har FINISH_RETRY_MS da qayta yuboriladi. Ilgari taymer birinchi
+    // urinishdan keyin to'xtardi va talaba 00:00 bilan qolib, «Yakunlash»
+    // ni o'zi bosishi kerak edi.
     useEffect(() => {
         if (!state || result) return;
-        const startedAt = Date.now();
-        const initial = state.remaining_seconds;
+        let announced = false;
+        let lastTry = 0;
         const timer = setInterval(() => {
-            const left = Math.max(0, initial - Math.floor((Date.now() - startedAt) / 1000));
+            const left = Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
             setSecondsLeft(left);
-            if (left === 0) {
-                clearInterval(timer);
+            if (left > 0 || finishedRef.current) return;
+            if (!announced) {
+                announced = true;
                 toast.info('Vaqt tugadi');
+            }
+            if (Date.now() - lastTry >= FINISH_RETRY_MS) {
+                lastTry = Date.now();
                 finish();
             }
         }, 1000);

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     generalTestService,
@@ -284,8 +285,11 @@ export const useMyGeneralTestResults = () =>
 /** Test tugaganda «ishlash» ro'yxati va shaxsiy natijalar yangilanadi. */
 export const useRefreshTaking = () => {
     const qc = useQueryClient();
-    return () => {
+    // Barqaror funksiya: u `useCallback`/`useEffect` bog'liqliklariga tushadi.
+    // Har renderda yangisi qaytsa, test sahifasidagi taymer har soniyada
+    // qaytadan boshlanib, 29:58 da qotib qolardi.
+    return useCallback(() => {
         qc.invalidateQueries({ queryKey: KEYS.available });
         qc.invalidateQueries({ queryKey: KEYS.mine });
-    };
+    }, [qc]);
 };

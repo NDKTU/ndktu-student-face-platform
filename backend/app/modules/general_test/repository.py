@@ -637,6 +637,8 @@ class GeneralTestRepository:
         """Вопросы в банке fan'а, завершённые попытки и назначенные группы по каждому тесту."""
         if not test_ids:
             return {}, {}, {}
+        # Иначе в «попытках» не учитывались бы просроченные, но не закрытые.
+        await self._close_expired(session, test_ids=test_ids)
         questions = dict(
             (
                 await session.execute(
@@ -963,34 +965,58 @@ class GeneralTestRepository:
         attempt.status = COMPLETED
         attempt.finished_at = min(utcnow_naive(), _deadline(attempt, attempt.test))
 
-    async def _close_expired(self, session: AsyncSession, user_id: int) -> None:
-        """Закрывает попытки, время которых вышло, а «Yakunlash» никто не нажал."""
-        attempts = (
-            (
-                await session.execute(
-                    select(GeneralTestAttempt)
-                    .options(selectinload(GeneralTestAttempt.test))
-                    .where(GeneralTestAttempt.user_id == user_id, GeneralTestAttempt.status == IN_PROGRESS)
-                )
-            )
-            .scalars()
-            .all()
+    async def _close_expired(
+        self, session: AsyncSession, user_id: int | None = None, test_ids: list[int] | None = None
+    ) -> None:
+        """Закрывает попытки, время которых вышло, а «Yakunlash» никто не нажал.
+
+        Фоновой задачи нет, поэтому закрываем при чтении — и не только по
+        запросам самого студента. Раньше так и было: студент, закрывший
+        браузер, навсегда оставался «в процессе» и не попадал ни в результаты,
+        ни в статистику, пока сам не вернётся. Теперь то же делают экраны
+        преподавателя (результаты, экспорт, список и карточка теста).
+        Без фильтров — все незавершённые попытки; их немного.
+        """
+        stmt = (
+            select(GeneralTestAttempt)
+            .options(selectinload(GeneralTestAttempt.test))
+            .where(GeneralTestAttempt.status == IN_PROGRESS)
         )
-        changed = False
+        if user_id is not None:
+            stmt = stmt.where(GeneralTestAttempt.user_id == user_id)
+        if test_ids is not None:
+            if not test_ids:
+                return
+            stmt = stmt.where(GeneralTestAttempt.test_id.in_(test_ids))
+        # SKIP LOCKED: попытку, которую прямо сейчас завершает сам студент
+        # (`_own_attempt` берёт FOR UPDATE), не трогаем и не ждём.
+        attempts = (await session.execute(stmt.with_for_update(skip_locked=True, of=GeneralTestAttempt))).scalars().all()
         for attempt in attempts:
             if _is_expired(attempt, attempt.test):
                 await self._finalize(session, attempt)
-                changed = True
-        if changed:
+        if attempts:
+            # Коммит и без изменений: он снимает блокировки, иначе ответы
+            # студентов ждали бы конца этого (читающего) запроса.
             await session.commit()
 
     async def list_available(self, session: AsyncSession, user: User) -> AvailableTestListResponse:
         await self._close_expired(session, user.id)
 
+        # Начатая попытка остаётся в списке, даже если тест успели выключить
+        # или скрыть группу: иначе студент, у которого обновилась страница,
+        # не нашёл бы, куда вернуться («Davom ettirish»).
+        open_attempt = select(GeneralTestAttempt.test_id).where(
+            GeneralTestAttempt.user_id == user.id, GeneralTestAttempt.status == IN_PROGRESS
+        )
         active = (
             select(GeneralTest)
             .options(selectinload(GeneralTest.subject))
-            .where(GeneralTest.is_active.is_(True), _visible_to(user.id))
+            .where(
+                or_(
+                    and_(GeneralTest.is_active.is_(True), _visible_to(user.id)),
+                    GeneralTest.id.in_(open_attempt),
+                )
+            )
             .order_by(GeneralTest.id.desc())
         )
         tests = (await session.execute(active)).scalars().all()
@@ -1076,15 +1102,6 @@ class GeneralTestRepository:
         await session.execute(text("SELECT pg_advisory_xact_lock(:a, :b)"), {"a": 7301 + test_id, "b": user.id})
 
         test = await self._get_test(session, test_id)
-        visible = (
-            await session.execute(select(GeneralTest.id).where(GeneralTest.id == test_id, _visible_to(user.id)))
-        ).scalar_one_or_none()
-        # Biriktirilmagan foydalanuvchi uchun test yo'qdek: id ni terib kirib
-        # bo'lmasin.
-        if visible is None:
-            raise _not_found()
-        if not test.is_active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
 
         own = (
             (
@@ -1098,12 +1115,28 @@ class GeneralTestRepository:
             .all()
         )
 
+        # Возвращение в начатую попытку — раньше проверок активности и
+        # видимости. Тест выключают, как только все зашли, а группу могут
+        # скрыть; студент, у которого после этого упал браузер, уже внутри
+        # и должен вернуться в собственную попытку (как в quiz_process).
         for attempt in own:
             if attempt.status != IN_PROGRESS:
                 continue
             if not _is_expired(attempt, test):
                 return await self._state(session, attempt)
             await self._finalize(session, attempt)
+
+        visible = (
+            await session.execute(select(GeneralTest.id).where(GeneralTest.id == test_id, _visible_to(user.id)))
+        ).scalar_one_or_none()
+        # Biriktirilmagan foydalanuvchi uchun test yo'qdek: id ni terib kirib
+        # bo'lmasin.
+        if visible is None:
+            await session.commit()
+            raise _not_found()
+        if not test.is_active:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
 
         if len(own) >= test.attempt_limit:
             await session.commit()
@@ -1127,6 +1160,7 @@ class GeneralTestRepository:
             user_id=user.id,
             status=IN_PROGRESS,
             started_at=utcnow_naive(),
+            duration=test.duration,
             layout=layout,
             total_questions=len(layout),
         )
@@ -1292,6 +1326,7 @@ class GeneralTestRepository:
     async def list_results(
         self, session: AsyncSession, request: ResultListRequest, user: User
     ) -> ResultListResponse:
+        await self._close_expired(session)
         stmt = self._results_stmt(request, user)
         total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
         rows = (
@@ -1314,6 +1349,7 @@ class GeneralTestRepository:
 
         from app.core.schemas import TASHKENT_TZ
 
+        await self._close_expired(session)
         rows = (
             await session.execute(
                 self._results_stmt(request, user).order_by(
