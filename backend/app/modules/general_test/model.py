@@ -114,6 +114,11 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     #: Неактивный тест не виден в списке «пройти» и не стартует. Активный
     #: виден только назначенным: см. docstring модуля.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    #: PIN для старта — по желанию составителя. NULL — тест начинается без
+    #: PIN. Код генерирует сервер (`repository._new_pin`), вручную его не
+    #: вводят. Нужен только для новой попытки: вернуться в начатую можно и
+    #: без него — так же, как после выключения теста.
+    pin: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

@@ -124,6 +124,18 @@ export default function GeneralTestsPage() {
         { key: 'attempts', header: 'Urinishlar', cell: (t) => t.attempt_limit, hideBelow: 'md' },
         { key: 'passed', header: 'Topshirganlar', cell: (t) => t.attempt_count, hideBelow: 'lg' },
         {
+            key: 'pin',
+            header: 'PIN',
+            // Testni boshlayotgan o'qituvchi PIN'ni ro'yxatdan darhol ko'rsin —
+            // har bir test sahifasini ochib o'tirmasin.
+            cell: (t) =>
+                t.pin ? (
+                    <span className="font-mono font-semibold tracking-widest text-foreground">{t.pin}</span>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
             key: 'status',
             header: 'Holati',
             cell: (t) => (

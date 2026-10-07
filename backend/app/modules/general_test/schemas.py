@@ -150,6 +150,8 @@ class GeneralTestCreateRequest(BaseModel):
     #: Bitta urinishdagi savollar soni; bo'sh — hammasi.
     question_number: int | None = Field(default=None, ge=1, le=1000)
     is_active: bool = False
+    #: PIN bilan boshlanadimi. PIN'ning o'zini server yaratadi.
+    pin_required: bool = False
 
 
 class GeneralTestUpdateRequest(BaseModel):
@@ -159,6 +161,11 @@ class GeneralTestUpdateRequest(BaseModel):
     #: `null` yuborilsa — «hammasi»; maydon umuman yuborilmasa — o'zgarmaydi.
     question_number: int | None = Field(default=None, ge=1, le=1000)
     is_active: bool | None = None
+    #: PIN'ni yoqish/o'chirish. Yoqilganda (avval yo'q bo'lsa) server yangi
+    #: PIN yaratadi; mavjudi saqlanib qoladi.
+    pin_required: bool | None = None
+    #: Yangi PIN yaratish — eskisi tarqalib ketgan bo'lsa.
+    regenerate_pin: bool = False
 
 
 class GeneralTestSummary(BaseModel):
@@ -171,6 +178,9 @@ class GeneralTestSummary(BaseModel):
     attempt_limit: int
     question_number: int | None
     is_active: bool
+    #: Faqat test egasi va admin ko'radigan javoblarda: talabaga
+    #: (`AvailableTest`) PIN'ning o'zi emas, faqat `pin_required` boradi.
+    pin: str | None = None
     #: Fan bankidagi barcha savollar (urinishga beriladigani — `question_number`).
     question_count: int = 0
     attempt_count: int = 0
@@ -264,6 +274,13 @@ class AvailableTest(BaseModel):
     #: Незавершённая попытка — «Davom ettirish» вместо «Boshlash».
     in_progress_attempt_id: int | None = None
     best_score: int | None = None
+    #: Новая попытка требует PIN (сам PIN студенту не отдаётся).
+    pin_required: bool = False
+
+
+class StartRequest(BaseModel):
+    #: Тест с PIN: код от преподавателя. Без PIN или при возврате в попытку — не нужен.
+    pin: str | None = Field(default=None, max_length=16)
 
 
 class AvailableTestListResponse(BaseModel):

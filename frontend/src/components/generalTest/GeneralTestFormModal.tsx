@@ -33,6 +33,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
     const [attempts, setAttempts] = useState(String(editing?.attempt_limit ?? 1));
     const [questionNumber, setQuestionNumber] = useState(editing?.question_number ? String(editing.question_number) : '');
     const [isActive, setIsActive] = useState(editing?.is_active ?? false);
+    const [pinRequired, setPinRequired] = useState(Boolean(editing?.pin));
     const [error, setError] = useState<string | null>(null);
     const subjectName = subjects?.subjects.find((s) => String(s.id) === subjectId)?.name ?? '';
 
@@ -59,6 +60,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
             attempt_limit: attemptsNum,
             question_number: questionNum,
             is_active: isActive,
+            pin_required: pinRequired,
         });
     };
 
@@ -119,6 +121,17 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
                         </p>
                     </div>
                     <Switch checked={isActive} onCheckedChange={setIsActive} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                    <div>
+                        <p className="text-sm font-medium text-foreground">PIN bilan boshlash</p>
+                        <p className="text-xs text-muted-foreground">
+                            {pinRequired && editing?.pin
+                                ? `Joriy PIN: ${editing.pin}. Yangisini test sahifasida yaratish mumkin`
+                                : "PIN avtomatik yaratiladi va test sahifasida ko'rinadi. Talaba testni faqat PIN bilan boshlaydi"}
+                        </p>
+                    </div>
+                    <Switch checked={pinRequired} onCheckedChange={setPinRequired} />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2 pt-2">

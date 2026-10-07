@@ -92,3 +92,59 @@ async def test_started_attempt_survives_deactivation(auth_client, async_client, 
     assert again.status_code == 400, again.text
     assert (await async_client.get("/general-test/available", headers=headers)).json()["tests"] == []
 
+
+@pytest.mark.asyncio
+async def test_optional_pin(auth_client, async_client, scene):  # noqa: F811
+    """PIN ixtiyoriy: yoqilsa server yaratadi, yangi urinish uni so'raydi,
+    boshlangan urinishga qaytish — yo'q. Talaba PIN'ning o'zini ko'rmaydi."""
+    test_url = f"/general-test/{scene['test_id']}"
+    on = await auth_client.put(test_url, json={"pin_required": True})
+    assert on.status_code == 200, on.text
+    pin = on.json()["pin"]
+    assert pin and len(pin) == 4 and pin.isdigit()
+
+    # Qayta yoqish PIN'ni almashtirmaydi; `regenerate_pin` — almashtiradi.
+    assert (await auth_client.put(test_url, json={"pin_required": True})).json()["pin"] == pin
+
+    added = await auth_client.post(
+        f"/general-test/subject/{scene['subject_id']}/users", json={"user_ids": [scene["staff"].id]}
+    )
+    assert added.status_code == 200, added.text
+    headers = await _login(async_client, "gt_staff")
+
+    available = (await async_client.get("/general-test/available", headers=headers)).json()["tests"]
+    assert available[0]["pin_required"] is True
+    assert "pin" not in available[0]
+
+    start_url = f"/general-test/{scene['test_id']}/start"
+    assert (await async_client.post(start_url, headers=headers)).status_code == 403
+    wrong = "0000" if pin != "0000" else "1111"
+    assert (await async_client.post(start_url, json={"pin": wrong}, headers=headers)).status_code == 403
+    started = await async_client.post(start_url, json={"pin": pin}, headers=headers)
+    assert started.status_code == 200, started.text
+
+    # Qaytish PIN'siz.
+    resumed = await async_client.post(start_url, headers=headers)
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["attempt_id"] == started.json()["attempt_id"]
+
+    regenerated = await auth_client.put(test_url, json={"regenerate_pin": True})
+    assert regenerated.json()["pin"] not in (None,)
+
+    off = await auth_client.put(test_url, json={"pin_required": False})
+    assert off.json()["pin"] is None
+    # PIN'siz testda `regenerate_pin` PIN yoqmaydi.
+    assert (await auth_client.put(test_url, json={"regenerate_pin": True})).json()["pin"] is None
+
+
+@pytest.mark.asyncio
+async def test_created_with_pin(auth_client):
+    subject = await auth_client.post("/general-test/subject", json={"name": "PIN fani"})
+    assert subject.status_code == 201, subject.text
+    created = await auth_client.post(
+        "/general-test/", json={"subject_id": subject.json()["id"], "pin_required": True}
+    )
+    assert created.status_code == 201, created.text
+    assert len(created.json()["pin"]) == 4
+    plain = await auth_client.post("/general-test/", json={"subject_id": subject.json()["id"]})
+    assert plain.json()["pin"] is None

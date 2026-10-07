@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, BookMarked, MessageCircleQuestion, Pencil, Plus, UsersRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookMarked, KeyRound, MessageCircleQuestion, Pencil, Plus, RefreshCw, UsersRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -58,6 +58,15 @@ export default function GeneralTestDetailPage() {
             },
         );
     };
+
+    const changePin = (data: { pin_required?: boolean; regenerate_pin?: boolean }, done: string) =>
+        updateTest.mutate(
+            { id: test.id, data },
+            {
+                onSuccess: () => toast.success(done),
+                onError: (e) => toast.error(apiErrorMessage(e, 'Saqlashda xatolik')),
+            },
+        );
 
     const toggleGroup = (groupId: number, name: string, isActive: boolean) => {
         setTogglingGroupId(groupId);
@@ -125,6 +134,52 @@ export default function GeneralTestDetailPage() {
                         </p>
                     </div>
                     <Switch checked={test.is_active} onCheckedChange={toggleActive} disabled={!canEdit || updateTest.isPending} />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <KeyRound className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                            <p className="font-medium text-foreground">
+                                {test.pin ? (
+                                    <>
+                                        PIN: <span className="font-mono text-lg tracking-widest">{test.pin}</span>
+                                    </>
+                                ) : (
+                                    "PIN yo'q"
+                                )}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {test.pin
+                                    ? "Talaba yangi urinishni faqat shu PIN bilan boshlaydi. Boshlangan urinishga PIN'siz qaytadi"
+                                    : 'Test PIN so\'ramasdan boshlanadi'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {test.pin && canEdit && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={updateTest.isPending}
+                                onClick={() => changePin({ regenerate_pin: true }, 'Yangi PIN yaratildi')}
+                            >
+                                <RefreshCw className="h-4 w-4" /> Yangi PIN
+                            </Button>
+                        )}
+                        <Switch
+                            checked={Boolean(test.pin)}
+                            onCheckedChange={(value) =>
+                                changePin({ pin_required: value }, value ? 'PIN yoqildi' : "PIN o'chirildi")
+                            }
+                            disabled={!canEdit || updateTest.isPending}
+                            aria-label="PIN bilan boshlash"
+                        />
+                    </div>
                 </CardContent>
             </Card>
 

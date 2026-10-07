@@ -97,6 +97,8 @@ export interface GeneralTestSummary {
     /** Bitta urinishda beriladigan savollar; `null` — hammasi. */
     question_number: number | null;
     is_active: boolean;
+    /** Boshlash PIN'i; `null` — test PIN'siz. Faqat test egasi/admin ko'radi. */
+    pin: string | null;
     /** Testdagi barcha savollar. */
     question_count: number;
     attempt_count: number;
@@ -141,6 +143,10 @@ export interface GeneralTestPayload {
     attempt_limit: number;
     question_number: number | null;
     is_active: boolean;
+    /** PIN bilan boshlansinmi — PIN'ni server yaratadi. */
+    pin_required?: boolean;
+    /** Faqat tahrirlashda: yangi PIN yaratish. */
+    regenerate_pin?: boolean;
 }
 
 export interface QuestionPayload {
@@ -167,6 +173,8 @@ export interface AvailableTest {
     attempts_used: number;
     in_progress_attempt_id: number | null;
     best_score: number | null;
+    /** Yangi urinish PIN so'raydi (PIN'ning o'zi kelmaydi). */
+    pin_required: boolean;
 }
 
 export interface TakeQuestion {
@@ -329,7 +337,8 @@ export const generalTestService = {
     // ── Ishlash ──────────────────────────────────────────────────────────
     available: async () => (await api.get<{ tests: AvailableTest[] }>('/general-test/available')).data.tests,
     myResults: async () => (await api.get<{ results: AttemptResult[] }>('/general-test/my-results')).data.results,
-    start: async (testId: number) => (await api.post<AttemptState>(`/general-test/${testId}/start`)).data,
+    start: async (testId: number, pin?: string) =>
+        (await api.post<AttemptState>(`/general-test/${testId}/start`, pin ? { pin } : undefined)).data,
     getAttempt: async (attemptId: number) => (await api.get<AttemptState>(`/general-test/attempt/${attemptId}`)).data,
     answer: async (attemptId: number, questionId: number, option: OptionLetter) => {
         await api.post(`/general-test/attempt/${attemptId}/answer`, { question_id: questionId, option });

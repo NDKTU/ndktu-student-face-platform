@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { ClipboardCheck, Clock, ListOrdered, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -20,18 +22,44 @@ export default function GeneralTestTakeListPage() {
     const { data: tests, isLoading, isError, refetch } = useAvailableGeneralTests();
     const { data: results } = useMyGeneralTestResults();
     const [startingId, setStartingId] = useState<number | null>(null);
+    // PIN so'raydigan test: oyna shu test uchun ochiq.
+    const [pinTest, setPinTest] = useState<AvailableTest | null>(null);
+    const [pin, setPin] = useState('');
+    const [pinError, setPinError] = useState<string | null>(null);
 
-    const start = async (test: AvailableTest) => {
+    const start = async (test: AvailableTest, withPin?: string) => {
+        if (test.pin_required && withPin === undefined) {
+            setPin('');
+            setPinError(null);
+            setPinTest(test);
+            return;
+        }
         setStartingId(test.id);
         try {
-            const state = await generalTestService.start(test.id);
+            const state = await generalTestService.start(test.id, withPin);
+            setPinTest(null);
             navigate(`/elementar-tests/attempt/${state.attempt_id}`);
         } catch (e) {
-            toast.error(apiErrorMessage(e, 'Testni boshlab bo\'lmadi'));
+            const message = apiErrorMessage(e, 'Testni boshlab bo\'lmadi');
+            // Noto'g'ri PIN — oyna ochiq qoladi, talaba qayta yozadi.
+            if (withPin !== undefined) {
+                setPinError(message);
+            } else {
+                toast.error(message);
+            }
             refetch();
         } finally {
             setStartingId(null);
         }
+    };
+
+    const submitPin = () => {
+        if (!pinTest) return;
+        if (!pin.trim()) {
+            setPinError('PIN kodni kiriting');
+            return;
+        }
+        start(pinTest, pin.trim());
     };
 
     return (
@@ -131,6 +159,36 @@ export default function GeneralTestTakeListPage() {
                     </CardContent>
                 </Card>
             )}
+            <Modal isOpen={pinTest !== null} onClose={() => setPinTest(null)} title={`Testni boshlash: ${pinTest?.title ?? ''}`}>
+                <form
+                    className="space-y-4"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        submitPin();
+                    }}
+                >
+                    <Input
+                        label="PIN kod"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value)}
+                        placeholder="O'qituvchi bergan PIN"
+                        autoFocus
+                    />
+                    {pinError && (
+                        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{pinError}</p>
+                    )}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setPinTest(null)}>
+                            Bekor qilish
+                        </Button>
+                        <Button type="submit" isLoading={startingId === pinTest?.id}>
+                            Boshlash
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import random
+import secrets
 from datetime import timedelta
 
 from fastapi import HTTPException, UploadFile, status
@@ -81,8 +82,13 @@ def _not_found(what: str = "Test") -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} topilmadi")
 
 
+def _new_pin() -> str:
+    """4 xonali PIN — talaba doskadan ko'chirib yozadi, shuning uchun qisqa."""
+    return f"{secrets.randbelow(10000):04d}"
+
+
 def _deadline(attempt: GeneralTestAttempt, test: GeneralTest):
-    return attempt.started_at + timedelta(minutes=test.duration)
+    return attempt.started_at + timedelta(minutes=attempt.duration or test.duration)
 
 
 def _remaining_seconds(attempt: GeneralTestAttempt, test: GeneralTest) -> int:
@@ -747,7 +753,10 @@ class GeneralTestRepository:
         # bankka oʻz testini ulab, uning savollarini tarqatib yuborardi.
         subject = await self._get_subject(session, data.subject_id, user)
         test = GeneralTest(
-            **data.model_dump(exclude={"group_ids"}), title=subject.name, created_by_user_id=user.id
+            **data.model_dump(exclude={"group_ids", "pin_required"}),
+            title=subject.name,
+            pin=_new_pin() if data.pin_required else None,
+            created_by_user_id=user.id,
         )
         session.add(test)
         await session.flush()
@@ -769,7 +778,14 @@ class GeneralTestRepository:
     ) -> GeneralTestDetail:
         test = await self._get_test(session, test_id, user)
         subject_changed = False
-        for field, value in data.model_dump(exclude_unset=True).items():
+        changes = data.model_dump(exclude_unset=True)
+        pin_required = changes.pop("pin_required", None)
+        regenerate_pin = changes.pop("regenerate_pin", False)
+        if pin_required is False:
+            test.pin = None
+        elif (pin_required and test.pin is None) or (regenerate_pin and (pin_required or test.pin)):
+            test.pin = _new_pin()
+        for field, value in changes.items():
             if field == "subject_id":
                 if value is None or value == test.subject_id:
                     continue
@@ -1053,6 +1069,7 @@ class GeneralTestRepository:
                     attempts_used=len(own),
                     in_progress_attempt_id=in_progress,
                     best_score=max(scores) if scores else None,
+                    pin_required=test.pin is not None,
                 )
             )
         return AvailableTestListResponse(tests=result)
@@ -1095,7 +1112,7 @@ class GeneralTestRepository:
             questions=items,
         )
 
-    async def start(self, session: AsyncSession, test_id: int, user: User) -> AttemptState:
+    async def start(self, session: AsyncSession, test_id: int, user: User, pin: str | None = None) -> AttemptState:
         # Двойной клик по «Boshlash» или две вкладки не должны создать две
         # попытки и съесть лимит: старт одного пользователя на один тест
         # выполняется строго по очереди.
@@ -1137,6 +1154,10 @@ class GeneralTestRepository:
         if not test.is_active:
             await session.commit()
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
+        # PIN — только для новой попытки: вернуться в начатую можно без него.
+        if test.pin is not None and (pin or "").strip() != test.pin:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PIN kod noto'g'ri")
 
         if len(own) >= test.attempt_limit:
             await session.commit()

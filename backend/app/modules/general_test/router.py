@@ -35,6 +35,7 @@ from .schemas import (
     AnswerRequest,
     AttemptResult,
     AttemptState,
+    StartRequest,
     AvailableTestListResponse,
     FilterOptionsResponse,
     GeneralTestCreateRequest,
@@ -100,10 +101,12 @@ async def my_results(
 )
 async def start(
     test_id: int,
+    # Тело необязательно: тест без PIN стартует пустым запросом, как раньше.
+    data: StartRequest | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: "User" = Depends(_take),
 ):
-    return await repo.start(session=session, test_id=test_id, user=user)
+    return await repo.start(session=session, test_id=test_id, user=user, pin=data.pin if data else None)
 
 
 @router.get("/attempt/{attempt_id}", response_model=AttemptState)
