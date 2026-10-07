@@ -71,14 +71,14 @@ export const QuestionAccordionList = ({
                             key={question.id}
                             className="overflow-hidden rounded-xl border border-border/60 transition-colors hover:border-primary/30"
                         >
-                            <div className="flex items-start gap-2 px-3.5 py-2.5">
+                            <div className="flex items-center gap-2 px-3.5 py-2.5">
                                 <button
                                     type="button"
                                     onClick={() => setOpenId(isOpen ? null : question.id)}
                                     aria-expanded={isOpen}
-                                    className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
-                                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">
                                         {index + 1}
                                     </span>
                                     <span
@@ -87,9 +87,9 @@ export const QuestionAccordionList = ({
                                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.text || '') }}
                                     />
                                     {isOpen ? (
-                                        <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     ) : (
-                                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     )}
                                 </button>
 

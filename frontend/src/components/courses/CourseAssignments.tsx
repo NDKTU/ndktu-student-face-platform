@@ -377,17 +377,17 @@ const MidtermQuizzes = ({
                                 key={quiz.id}
                                 className="group/item overflow-hidden rounded-xl border border-border/60 transition-colors duration-200 hover:border-primary/40"
                             >
-                                <div className="flex flex-wrap items-start gap-3 p-3.5">
+                                <div className="flex flex-wrap items-center gap-3 p-3.5">
                                     <button
                                         type="button"
                                         onClick={() => setOpenId(isOpen ? null : quiz.id)}
                                         aria-expanded={isOpen}
-                                        className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         {isOpen ? (
-                                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                                         ) : (
-                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                                         )}
                                         <span className="min-w-0 flex-1">
                                             <span className="block truncate text-sm font-semibold">{quiz.title}</span>
