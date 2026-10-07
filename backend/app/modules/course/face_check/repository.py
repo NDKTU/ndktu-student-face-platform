@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.face_service import classify, verify_face
 from app.core.utils.face_absence import (
     FAILED_STATUSES,
     build_absence_spans,
@@ -82,15 +83,7 @@ class FaceCheckRepository:
 
     async def _verify_with_service(self, image_base64: str, reference_url: str) -> dict:
         """Kadrni yuz xizmatiga yuboradi. Xizmat javob bermasa — tekshiruvsiz qolamiz."""
-        url = f"{settings.face_service.url.rstrip('/')}/v1/face/verify"
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(
-                url,
-                json={"image_base64": image_base64, "reference_url": reference_url},
-                headers={"X-Internal-Token": settings.face_service.internal_token},
-            )
-            response.raise_for_status()
-            return response.json()
+        return await verify_face(image_base64, reference_url)
 
     async def _should_save_image(self, session: AsyncSession, lesson_id: int, user_id: int) -> bool:
         """Joriy «yo'q» davridan yetarlicha surat olinganmi.
@@ -179,17 +172,7 @@ class FaceCheckRepository:
                         detail="Yuz tekshiruvi xizmati javob bermadi",
                     ) from cause
 
-                face_count = int(result.get("face_count") or 0)
-                if not result.get("reference_ready") and face_count == 1:
-                    check_status = "no_reference"
-                elif face_count == 0:
-                    check_status = "no_face"
-                elif face_count > 1:
-                    check_status = "multiple_faces"
-                elif result.get("is_match"):
-                    check_status = "ok"
-                else:
-                    check_status = "different_person"
+                check_status = classify(result)
 
             if check_status in _FAILED_STATUSES and await self._should_save_image(
                 session, lesson_id, current_user.id

@@ -26,6 +26,20 @@ export interface StartQuizRequest {
     pin: string;
 }
 
+export interface VerifyEntryFaceRequest {
+    quiz_id: number;
+    pin: string;
+    /** Veb-kamera kadri, `data:image/jpeg;base64,...`. */
+    image_base64: string;
+}
+
+export interface VerifyEntryFaceResponse {
+    /** true — `startQuiz` endi ruxsat beradi (tasdiq bir necha daqiqa amal qiladi). */
+    verified: boolean;
+    status: 'ok' | 'no_face' | 'multiple_faces' | 'different_person' | 'no_reference';
+    message: string;
+}
+
 export interface SubmittedAnswerDTO {
     question_id: number;
     answer_index: number;
@@ -89,6 +103,12 @@ export interface EndQuizResponse {
 export const quizProcessService = {
     startQuiz: async (data: StartQuizRequest) => {
         const response = await api.post<StartQuizResponse>('/quiz_process/start_quiz', data);
+        return response.data;
+    },
+
+    /** `face_entry` testiga kirishdagi yuz tekshiruvi — qarorni server qiladi. */
+    verifyEntryFace: async (data: VerifyEntryFaceRequest) => {
+        const response = await api.post<VerifyEntryFaceResponse>('/quiz_process/verify_entry_face', data);
         return response.data;
     },
 

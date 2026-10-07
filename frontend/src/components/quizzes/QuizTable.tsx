@@ -6,7 +6,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { tileFor, initialsOf } from '@/lib/avatarTiles';
 import { BookOpen, Camera, Link as LinkIcon, Pencil, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
-import type { ProctoringMode, Quiz } from '@/services/quizService';
+import { PROCTORING_LABELS, type ProctoringMode, type Quiz } from '@/services/quizService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -264,7 +264,7 @@ export const QuizTable = ({
                 header: 'Rejim',
                 hideBelow: 'lg',
                 className: 'text-sm text-muted-foreground',
-                cell: (quiz) => (quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'),
+                cell: (quiz) => PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart',
             },
             {
                 key: 'is_active',
@@ -324,7 +324,7 @@ export const QuizTable = ({
                             <span className="shrink-0 rounded bg-muted px-2 py-1 font-mono text-xs">{quiz.pin}</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {quiz.question_number} savol · {quiz.duration} daqiqa · {quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'}
+                            {quiz.question_number} savol · {quiz.duration} daqiqa · {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}
                         </p>
                         <div className="flex items-center justify-between gap-2" onClick={(event) => event.stopPropagation()}>
                             <div className="flex items-center gap-2">
@@ -399,7 +399,7 @@ export const QuizTable = ({
                                     {quiz.is_active ? t('Faol') : t('Yopiq')}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {quiz.proctoring_mode === 'face' ? 'Kamera' : 'Standart'}
+                                    {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}
                                 </p>
                             </div>
                         </div>

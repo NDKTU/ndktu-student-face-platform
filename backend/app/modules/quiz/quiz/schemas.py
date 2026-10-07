@@ -5,7 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 from app.core.enums import ControlType, QuizType
 from app.core.schemas import TashkentDatetime
 
-ProctoringMode = Literal["face", "standard"]
+#: `face` — butun test davomida kamera kuzatadi; `face_entry` — yuz faqat
+#: kirishda bir marta tekshiriladi; `standard` — kamerasiz.
+ProctoringMode = Literal["face", "face_entry", "standard"]
 
 
 class QuizCreateRequest(BaseModel):

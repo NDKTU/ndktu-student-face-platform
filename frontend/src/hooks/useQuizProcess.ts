@@ -4,11 +4,18 @@ import {
     type StartQuizRequest,
     type SubmitAnswerRequest,
     type EndQuizRequest,
+    type VerifyEntryFaceRequest,
 } from '@/services/quizProcessService';
 
 export const useStartQuiz = () => {
     return useMutation({
         mutationFn: (data: StartQuizRequest) => quizProcessService.startQuiz(data),
+    });
+};
+
+export const useVerifyEntryFace = () => {
+    return useMutation({
+        mutationFn: (data: VerifyEntryFaceRequest) => quizProcessService.verifyEntryFace(data),
     });
 };
 

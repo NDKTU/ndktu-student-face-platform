@@ -49,6 +49,8 @@ from .quiz_process.schemas import (
     SubmitAnswerResponse,
     UploadCheatingImageRequest,
     UploadCheatingImageResponse,
+    VerifyEntryFaceRequest,
+    VerifyEntryFaceResponse,
 )
 from .result.repository import get_result_repository
 from .result.schemas import (
@@ -586,6 +588,21 @@ async def start_quiz(
     current_user: User = Depends(PermissionRequired("quiz_process:start_quiz")),
 ):
     return await get_quiz_process_repository.start_quiz(session=session, data=data, user=current_user)
+
+
+@quiz_process_router.post(
+    "/verify_entry_face",
+    response_model=VerifyEntryFaceResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def verify_entry_face(
+    data: VerifyEntryFaceRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("quiz_process:start_quiz")),
+):
+    """Kirishda yuz tekshiruvi (`face_entry`): mos kelsa, `start_quiz` ruxsat beradi."""
+    return await get_quiz_process_repository.verify_entry_face(session=session, data=data, user=current_user)
 
 
 @quiz_process_router.post(

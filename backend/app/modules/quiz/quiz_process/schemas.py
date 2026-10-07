@@ -1,13 +1,30 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-ProctoringMode = Literal["face", "standard"]
+ProctoringMode = Literal["face", "face_entry", "standard"]
 
 
 class StartQuizRequest(BaseModel):
     quiz_id: int
     pin: str
+
+
+class VerifyEntryFaceRequest(BaseModel):
+    """`face_entry` testiga kirishdagi yuz tekshiruvi: PIN va kamera kadri."""
+
+    quiz_id: int
+    pin: str
+    #: Veb-kamera kadri, base64 JPEG (`data:` prefiksi bilan ham bo'ladi).
+    image_base64: str = Field(min_length=1, max_length=4_000_000)
+
+
+class VerifyEntryFaceResponse(BaseModel):
+    #: True — `start_quiz` ruxsat beradi (tasdiq bir necha daqiqa amal qiladi).
+    verified: bool
+    #: ok, no_face, multiple_faces, different_person, no_reference.
+    status: str
+    message: str
 
 
 class QuestionDTO(BaseModel):

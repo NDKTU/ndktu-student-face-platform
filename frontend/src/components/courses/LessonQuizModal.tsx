@@ -157,7 +157,8 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
                             onChange={(e) => setProctoringMode(e.target.value as ProctoringMode)}
                         >
                             <option value="standard">Oddiy</option>
-                            <option value="face">Yuz nazorati</option>
+                            <option value="face">Yuz nazorati (butun test davomida)</option>
+                            <option value="face_entry">Kirishda yuz tekshiruvi</option>
                         </select>
                     </div>
                 )}

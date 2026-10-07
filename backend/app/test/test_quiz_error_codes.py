@@ -26,6 +26,9 @@ ALL_ERRORS = [
     ("question_not_in_attempt", errors.question_not_in_attempt, 400),
     ("question_not_found", errors.question_not_found, 404),
     ("invalid_option_index", errors.invalid_option_index, 400),
+    ("face_verification_required", errors.face_verification_required, 403),
+    ("face_entry_not_required", errors.face_entry_not_required, 409),
+    ("face_service_unavailable", errors.face_service_unavailable, 503),
 ]
 
 

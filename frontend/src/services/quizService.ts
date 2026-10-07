@@ -1,7 +1,17 @@
 import api from './api';
 import type { ControlType } from './questionService';
 
-export type ProctoringMode = 'face' | 'standard';
+/**
+ * `face` — butun test davomida kamera kuzatadi; `face_entry` — yuz faqat
+ * kirishda bir marta tekshiriladi; `standard` — kamerasiz.
+ */
+export type ProctoringMode = 'face' | 'face_entry' | 'standard';
+
+export const PROCTORING_LABELS: Record<ProctoringMode, string> = {
+    standard: 'Standart',
+    face: 'Kamera',
+    face_entry: 'Kirishda yuz',
+};
 
 /** Nazorat turi — bekenddagi `QuizType` bilan bir xil. */
 export type QuizType = 'LESSON_QUIZ' | 'MIDTERM' | 'SEMESTER_FINAL' | 'YEAR_PROMOTION' | 'PUBLIC_FREE';

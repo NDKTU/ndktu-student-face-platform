@@ -3,13 +3,16 @@ import logging
 import random
 from datetime import datetime
 
+import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
+from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
+from app.core.utils.face_service import classify, verify_face
 from app.core.utils.lesson_scope import covers_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import CourseGroup, Lesson
@@ -29,9 +32,28 @@ from .schemas import (
     SubmittedAnswerDTO,
     UploadCheatingImageRequest,
     UploadCheatingImageResponse,
+    VerifyEntryFaceRequest,
+    VerifyEntryFaceResponse,
 )
 
 logger = logging.getLogger(__name__)
+
+#: Kirishdagi yuz tasdig'i shuncha soniya amal qiladi: talaba «Boshlash» ni
+#: shu orada bosishi kerak. Uzoq qilinsa, tasdiqlangan talaba o'rniga
+#: boshqasi o'tirib olishi mumkin bo'lardi.
+FACE_ENTRY_TTL_SECONDS = 5 * 60
+
+_FACE_ENTRY_MESSAGES = {
+    "ok": "Shaxsingiz tasdiqlandi",
+    "no_face": "Kadrda yuz ko'rinmadi — kameraga to'g'ri qarang va qayta urinib ko'ring",
+    "multiple_faces": "Kadrda bir nechta odam bor — yolg'iz qolib, qayta urinib ko'ring",
+    "different_person": "Yuz profil surati bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
+    "no_reference": "Profil suratingizdan yuz aniqlanmadi — o'qituvchiga murojaat qiling",
+}
+
+
+def face_entry_key(user_id: int, quiz_id: int) -> str:
+    return f"quiz:face-entry:{user_id}:{quiz_id}"
 
 
 class QuizProcessRepository:
@@ -76,53 +98,20 @@ class QuizProcessRepository:
                 await self._finalize_attempt(session, existing, reason="Vaqt tugadi")
                 raise errors.attempt_expired(ask_teacher=True)
 
-            return await self._resume_attempt(session, existing, quiz, user)
+            # Kirishda yuz tekshiruvi har bir kirishda — urinishga qaytishda
+            # ham. Aks holda talaba bir marta tasdiqlanib, sahifani yangilagach
+            # o'rniga boshqasi o'tirib davom ettirishi mumkin bo'lardi.
+            entry_key = await self._require_entry_face(session, quiz, user)
+            response = await self._resume_attempt(session, existing, quiz, user)
+            if entry_key is not None:
+                await redis_client.delete(entry_key)
+            return response
 
-        if not quiz.is_active:
-            raise errors.quiz_not_active()
+        student = await self._admit(session, quiz, data.pin, user)
+        # Bug#1 fix: only set image_url when it actually exists (avoid sending "None" string to WebSocket)
+        student_image_url = student.image_path if student and student.image_path else None
 
-        if quiz.pin != data.pin:
-            raise errors.invalid_pin()
-
-        # Check if user is a student and restrict access based on group
-        stmt_student = select(Student).where(Student.user_id == user.id)
-        result_student = await session.execute(stmt_student)
-        student = result_student.scalar_one_or_none()
-
-        is_admin = any(role.name.lower() == "admin" for role in user.roles)
-        student_image_url = None
-
-        if student:
-            # Mandate student image for quiz (Admins take it anyway)
-            if not student.image_path and not is_admin:
-                raise errors.student_photo_missing()
-
-            # Bug#1 fix: only set image_url when it actually exists (avoid sending "None" string to WebSocket)
-            if student.image_path:
-                student_image_url = student.image_path
-
-            if quiz.group_id is not None:
-                if student.group_id != quiz.group_id:
-                    raise errors.quiz_not_for_your_group()
-            elif quiz.lesson_id is not None:
-                # Guruhsiz test darsdan tuzilgan: dars butun kursniki
-                # boʻlsa, testda ham guruh boʻlmaydi. Bu «hammaga ochiq»
-                # degani emas — u kursning guruhlariga tegishli. Shartsiz
-                # qoldirilsa, PIN bilgan istalgan talaba begona kursning
-                # testini ishlab, natijasi oʻsha guruh jurnaliga tushardi.
-                lesson = await session.get(Lesson, quiz.lesson_id)
-                if lesson is not None and not await covers_group(session, lesson, student.group_id):
-                    raise errors.quiz_not_for_your_group()
-            elif quiz.course_id is not None:
-                # Guruhsiz oraliq nazorat — kursning barcha guruhlariniki.
-                in_course = await session.scalar(
-                    select(CourseGroup.id).where(
-                        CourseGroup.course_id == quiz.course_id,
-                        CourseGroup.group_id == student.group_id,
-                    )
-                )
-                if in_course is None:
-                    raise errors.quiz_not_for_your_group()
+        entry_key = await self._require_entry_face(session, quiz, user)
 
         # Prepare questions with shuffled options — only ever serve active questions;
         # a question can be soft-deleted after being linked to this quiz without a
@@ -185,6 +174,9 @@ class QuizProcessRepository:
 
         await session.commit()
         await session.refresh(new_result)
+        # Tasdiq bir martalik: keyingi urinishga yana yuz ko'rsatiladi.
+        if entry_key is not None:
+            await redis_client.delete(entry_key)
 
         return StartQuizResponse(
             result_id=new_result.id,
@@ -198,6 +190,143 @@ class QuizProcessRepository:
             remaining_seconds=remaining_seconds(new_result, quiz),
             resumed=False,
         )
+
+    async def _require_entry_face(self, session: AsyncSession, quiz: Quiz, user: User) -> str | None:
+        """`face_entry` testida yuz tasdig'ini talab qiladi; tasdiq kalitini qaytaradi.
+
+        Tasdiq `verify_entry_face` da, serverda qo'yiladi. Brauzerga
+        ishonilmaydi — aks holda rejimni manzil yoki JS orqali o'chirib qo'yish
+        mumkin bo'lardi. Kalit kirish muvaffaqiyatli bo'lgach o'chiriladi:
+        keyingi har bir kirish (yangi urinish ham, qaytish ham) yangi yuz
+        talab qiladi. Suratsiz foydalanuvchi (admin testni ko'rib chiqyapti)
+        tekshirilmaydi: solishtiradigan etalon yo'q. Suratsiz talaba bu
+        yerga yetmaydi — `_admit` uni to'xtatadi.
+        """
+        if quiz.proctoring_mode != "face_entry":
+            return None
+        student = await self._student(session, user)
+        if student is None or not student.image_path:
+            return None
+        key = face_entry_key(user.id, quiz.id)
+        if not await redis_client.exists(key):
+            raise errors.face_verification_required()
+        return key
+
+    @staticmethod
+    async def _student(session: AsyncSession, user: User) -> Student | None:
+        return (await session.execute(select(Student).where(Student.user_id == user.id))).scalar_one_or_none()
+
+    async def _has_open_attempt(self, session: AsyncSession, quiz: Quiz, user: User) -> bool:
+        """Talabaning shu testda tugamagan (va muddati o'tmagan) urinishi bormi."""
+        existing = (
+            (
+                await session.execute(
+                    select(Result).where(
+                        Result.user_id == user.id,
+                        Result.quiz_id == quiz.id,
+                        Result.status == "in_progress",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return any(not is_expired(result, quiz) for result in existing)
+
+    async def verify_entry_face(
+        self, session: AsyncSession, data: VerifyEntryFaceRequest, user: User
+    ) -> VerifyEntryFaceResponse:
+        """`face_entry` testiga kirishdan oldin yuzni profil surati bilan solishtiradi.
+
+        Mos kelsa, Redis'ga qisqa muddatli tasdiq yoziladi va `start_quiz` uni
+        talab qiladi. Mos kelmasa, talaba qayta urinadi — urinishlar soni
+        cheklanmaydi (faqat so'rov tezligi), chunki yomon yorug'lik yoki
+        kamera burchagi talabaning aybi emas.
+        """
+        quiz = await session.get(Quiz, data.quiz_id)
+        if quiz is None:
+            raise errors.quiz_not_found()
+        if quiz.proctoring_mode != "face_entry":
+            raise errors.face_entry_not_required()
+
+        if await self._has_open_attempt(session, quiz, user):
+            # Urinishga qaytish: `start_quiz` bu yo'lda faollik va PIN'ni
+            # so'ramaydi (test yopilgandan keyin brauzeri yiqilgan talaba
+            # qaytishi kerak) — tekshiruv ham so'ramasligi kerak.
+            student = await self._student(session, user)
+        else:
+            student = await self._admit(session, quiz, data.pin, user)
+        key = face_entry_key(user.id, quiz.id)
+        if student is None or not student.image_path:
+            # Talaba emas (admin ko'rib chiqyapti) — solishtiradigan etalon yo'q.
+            await redis_client.set(key, "1", ex=FACE_ENTRY_TTL_SECONDS)
+            return VerifyEntryFaceResponse(verified=True, status="ok", message=_FACE_ENTRY_MESSAGES["ok"])
+
+        try:
+            result = await verify_face(data.image_base64, student.image_path)
+        except (httpx.HTTPError, ValueError) as cause:
+            logger.warning("Face service unavailable for quiz %s entry: %s", quiz.id, cause)
+            raise errors.face_service_unavailable() from cause
+
+        check_status = classify(result)
+        verified = check_status == "ok"
+        if verified:
+            await redis_client.set(key, "1", ex=FACE_ENTRY_TTL_SECONDS)
+        else:
+            logger.info("Face entry rejected: user=%s quiz=%s status=%s", user.id, quiz.id, check_status)
+        return VerifyEntryFaceResponse(
+            verified=verified, status=check_status, message=_FACE_ENTRY_MESSAGES[check_status]
+        )
+
+    async def _admit(self, session: AsyncSession, quiz: Quiz, pin: str, user: User) -> Student | None:
+        """Yangi urinishga kirish huquqi: test faol, PIN to'g'ri, guruh mos.
+
+        `start_quiz` va kirishdagi yuz tekshiruvi bir xil shartlarni
+        tekshiradi — aks holda begona guruh talabasi yuz xizmatini bekorga
+        band qilardi. Talaba yozuvini qaytaradi (admin uchun `None`).
+        """
+        if not quiz.is_active:
+            raise errors.quiz_not_active()
+
+        if quiz.pin != pin:
+            raise errors.invalid_pin()
+
+        # Check if user is a student and restrict access based on group
+        stmt_student = select(Student).where(Student.user_id == user.id)
+        result_student = await session.execute(stmt_student)
+        student = result_student.scalar_one_or_none()
+
+        is_admin = any(role.name.lower() == "admin" for role in user.roles)
+
+        if student:
+            # Mandate student image for quiz (Admins take it anyway)
+            if not student.image_path and not is_admin:
+                raise errors.student_photo_missing()
+
+            if quiz.group_id is not None:
+                if student.group_id != quiz.group_id:
+                    raise errors.quiz_not_for_your_group()
+            elif quiz.lesson_id is not None:
+                # Guruhsiz test darsdan tuzilgan: dars butun kursniki
+                # boʻlsa, testda ham guruh boʻlmaydi. Bu «hammaga ochiq»
+                # degani emas — u kursning guruhlariga tegishli. Shartsiz
+                # qoldirilsa, PIN bilgan istalgan talaba begona kursning
+                # testini ishlab, natijasi oʻsha guruh jurnaliga tushardi.
+                lesson = await session.get(Lesson, quiz.lesson_id)
+                if lesson is not None and not await covers_group(session, lesson, student.group_id):
+                    raise errors.quiz_not_for_your_group()
+            elif quiz.course_id is not None:
+                # Guruhsiz oraliq nazorat — kursning barcha guruhlariniki.
+                in_course = await session.scalar(
+                    select(CourseGroup.id).where(
+                        CourseGroup.course_id == quiz.course_id,
+                        CourseGroup.group_id == student.group_id,
+                    )
+                )
+                if in_course is None:
+                    raise errors.quiz_not_for_your_group()
+
+        return student
 
     async def _resume_attempt(
         self, session: AsyncSession, result_obj: Result, quiz: Quiz, user: User

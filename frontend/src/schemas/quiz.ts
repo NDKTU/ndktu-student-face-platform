@@ -23,7 +23,7 @@ export const quizSchema = z.object({
     // Nazorat turi: dars testi, semestr yakuni, kursdan kursga yoki ochiq test.
     quiz_type: z.enum(['LESSON_QUIZ', 'MIDTERM', 'SEMESTER_FINAL', 'YEAR_PROMOTION', 'PUBLIC_FREE']),
     is_active: z.boolean(),
-    proctoring_mode: z.enum(['face', 'standard']),
+    proctoring_mode: z.enum(['face', 'face_entry', 'standard']),
 }).superRefine((values, ctx) => {
     if (values.quiz_type === 'PUBLIC_FREE') return;
     if (!values.group_id) {

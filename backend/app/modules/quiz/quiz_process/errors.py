@@ -112,3 +112,27 @@ def question_not_found() -> HTTPException:
 
 def invalid_option_index() -> HTTPException:
     return quiz_error(status.HTTP_400_BAD_REQUEST, "invalid_option_index", "Variant raqami noto'g'ri")
+
+
+def face_verification_required() -> HTTPException:
+    return quiz_error(
+        status.HTTP_403_FORBIDDEN,
+        "face_verification_required",
+        "Testga kirish uchun avval yuzingizni tasdiqlang",
+    )
+
+
+def face_entry_not_required() -> HTTPException:
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "face_entry_not_required",
+        "Bu testga kirishda yuz tekshirilmaydi",
+    )
+
+
+def face_service_unavailable() -> HTTPException:
+    return quiz_error(
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        "face_service_unavailable",
+        "Yuz tekshiruvi xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
+    )

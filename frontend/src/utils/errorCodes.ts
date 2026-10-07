@@ -35,4 +35,7 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     question_not_in_attempt: 'Bu savol sizning urinishingizga kirmaydi',
     question_not_found: 'Savol topilmadi',
     invalid_option_index: "Variant raqami noto'g'ri",
+    face_verification_required: 'Testga kirish uchun avval yuzingizni tasdiqlang',
+    face_entry_not_required: 'Bu testga kirishda yuz tekshirilmaydi',
+    face_service_unavailable: "Yuz tekshiruvi xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
 };

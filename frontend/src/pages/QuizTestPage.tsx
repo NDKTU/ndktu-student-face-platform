@@ -21,7 +21,8 @@ import {
     ArrowLeft,
     AlertTriangle
 } from 'lucide-react';
-import { useStartQuiz, useSubmitAnswer, useEndQuiz } from '@/hooks/useQuizProcess';
+import { useStartQuiz, useSubmitAnswer, useEndQuiz, useVerifyEntryFace } from '@/hooks/useQuizProcess';
+import { FaceEntryCamera } from '@/components/FaceEntryCamera';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
@@ -97,6 +98,12 @@ const QuizTestPage = () => {
     const isAdmin = user?.roles?.some(role => role.name.toLowerCase() === 'admin');
 
     const startQuizMutation = useStartQuiz();
+    const verifyFaceMutation = useVerifyEntryFace();
+    // Kirishda yuz tekshiruvi (`face_entry`): server `start_quiz` da talab
+    // qilgach kamera bosqichi ochiladi. Rejim brauzerda emas, serverda hal
+    // bo'ladi — manzildagi `mode=` uni chetlab o'tolmaydi.
+    const [faceStep, setFaceStep] = useState(false);
+    const [faceResult, setFaceResult] = useState<{ ok: boolean; text: string } | null>(null);
     const submitAnswerMutation = useSubmitAnswer();
     const endQuizMutation = useEndQuiz();
 
@@ -125,7 +132,9 @@ const QuizTestPage = () => {
         quizzesData?.quizzes.find((q) => q.id === selectedQuiz?.id)
         ?? (stateQuiz?.id === selectedQuiz?.id ? stateQuiz : undefined)
     )?.proctoring_mode;
-    const startNeedsCamera = ENABLE_QUIZ_PROCTORING && (proctoringOverride ?? selectedQuizMode) === 'face';
+    const startNeedsCamera =
+        (ENABLE_QUIZ_PROCTORING && (proctoringOverride ?? selectedQuizMode) === 'face')
+        || selectedQuizMode === 'face_entry';
     const { status: cameraStatus } = useCameraAvailability(isModalOpen && startNeedsCamera);
 
     const autoOpenedRef = useRef(false);
@@ -151,6 +160,8 @@ const QuizTestPage = () => {
         setSelectedQuiz(null);
         setPin('');
         setStartError('');
+        setFaceStep(false);
+        setFaceResult(null);
     };
 
     const handleStartQuiz = () => {
@@ -194,9 +205,35 @@ const QuizTestPage = () => {
                 // (`{code, message}`), tarjima kod bo'yicha topiladi. Ilgari
                 // bu yerda `detail` to'g'ridan-to'g'ri o'qilardi va obyekt
                 // kelganda foydalanuvchi umumiy «xatolik» matnini ko'rardi.
+                const code = (error as { response?: { data?: { detail?: { code?: string } } } })
+                    ?.response?.data?.detail?.code;
+                if (code === 'face_verification_required') {
+                    // PIN to'g'ri, guruh mos — endi yuz.
+                    setFaceStep(true);
+                    setFaceResult(null);
+                    return;
+                }
                 setStartError(apiErrorMessage(error, "Testni boshlashda xatolik yuz berdi. PIN kodni tekshiring."));
             }
         });
+    };
+
+    const handleFaceCapture = (image: string) => {
+        if (!selectedQuiz) return;
+        setStartError('');
+        verifyFaceMutation.mutate(
+            { quiz_id: selectedQuiz.id, pin, image_base64: image },
+            {
+                onSuccess: (response) => {
+                    setFaceResult({ ok: response.verified, text: response.message });
+                    // Mos keldi — test darhol boshlanadi; aks holda talaba qayta urinadi.
+                    if (response.verified) handleStartQuiz();
+                },
+                onError: (error: unknown) => {
+                    setFaceResult({ ok: false, text: apiErrorMessage(error, 'Yuzni tekshirib bo‘lmadi. Qayta urinib ko‘ring.') });
+                },
+            },
+        );
     };
 
     // Matn yozilgach avtomatik yuboriladi: talaba javobni yozib, darhol
@@ -535,15 +572,28 @@ const QuizTestPage = () => {
                                 </span>
                             </div>
                         )}
-                        <Input
-                            label="PIN Kod"
-                            type="text"
-                            value={pin}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPin(e.target.value)}
-                            placeholder="PIN kodni kiriting"
-                            onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleStartQuiz()}
-                            autoFocus
-                        />
+                        {selectedQuizMode === 'face_entry' && !faceStep && (
+                            <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                                Bu testga kirishda yuzingiz profil suratingiz bilan solishtiriladi. Test davomida kamera ishlamaydi.
+                            </p>
+                        )}
+                        {faceStep ? (
+                            <FaceEntryCamera
+                                onCapture={handleFaceCapture}
+                                busy={verifyFaceMutation.isPending || startQuizMutation.isPending}
+                                result={faceResult}
+                            />
+                        ) : (
+                            <Input
+                                label="PIN Kod"
+                                type="text"
+                                value={pin}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPin(e.target.value)}
+                                placeholder="PIN kodni kiriting"
+                                onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleStartQuiz()}
+                                autoFocus
+                            />
+                        )}
                         {startError && (
                             <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                                 {startError}
@@ -553,12 +603,14 @@ const QuizTestPage = () => {
                             <Button variant="outline" onClick={handleCloseStartModal}>
                                 Bekor qilish
                             </Button>
-                            <Button
-                                onClick={handleStartQuiz}
-                                isLoading={startQuizMutation.isPending}
-                            >
-                                Boshlash
-                            </Button>
+                            {!faceStep && (
+                                <Button
+                                    onClick={handleStartQuiz}
+                                    isLoading={startQuizMutation.isPending}
+                                >
+                                    Boshlash
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </Modal>
