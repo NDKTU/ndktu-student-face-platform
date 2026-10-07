@@ -16,7 +16,7 @@ from app.modules.file.storage import public_url, store_upload
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Subject, UserAnswers
 from app.modules.quiz.quiz.repository import get_quiz_repository
 
-from .excel_format import parse_correct_option, resolve_columns
+from .excel_format import parse_correct_option, read_question_sheet
 from .schemas import (
     ControlQuestionCountsResponse,
     LessonQuestionCountsResponse,
@@ -601,10 +601,6 @@ class QuestionRepository:
         control_type: ControlType | None = None,
         current_user: User | None = None,
     ) -> list[Question]:
-        import io
-
-        import pandas as pd
-
         if (course_id is None) != (control_type is None):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -617,10 +613,15 @@ class QuestionRepository:
             lesson_id = None
 
         contents = await file.read()
-        df = pd.read_excel(io.BytesIO(contents))
+        try:
+            # Sarlavha qatorini o'zi topadi: birinchi qator har doim sarlavha
+            # deb olinmaydi (excel_format.read_question_sheet).
+            sheet = read_question_sheet(contents)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Excel faylni o'qib bo'lmadi")
 
         # Verify there are at least 5 columns
-        if len(df.columns) < 5:
+        if sheet.width < 5:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Excel file must contain at least 5 columns (question, option A, option B, option C, option D)",
@@ -630,18 +631,21 @@ class QuestionRepository:
         # bo'yicha o'qish. Nomi bo'yicha o'qish eksport qilingan faylni
         # qaytadan yuklash imkonini beradi: undagi «№», «Fan» va
         # «Foydalanuvchi» ustunlari endi xalaqit bermaydi (excel_format.py).
-        mapping = resolve_columns(df.columns)
+        mapping = sheet.mapping
+        # Eski fayllar: sarlavha tanilmagan, lekin `subject_id` /
+        # `correct_option` ustunlari nomi bilan turibdi.
+        subject_column = sheet.column("subject_id")
+        legacy_correct_column = sheet.column("correct_option")
 
-        def cell(row, field: str, position: int):
+        def cell(row: list, field: str, position: int) -> str:
             index = mapping[field] if mapping is not None else position
-            if index >= len(row):
+            if index >= len(row) or row[index] is None:
                 return ""
-            value = row.iloc[index]
-            return "" if pd.isna(value) else str(value)
+            return str(row[index])
 
         questions = []
-        warnings = []
-        for index, row in df.iterrows():
+        warnings = list(sheet.notes)
+        for _line, row in sheet.rows:
             text = cell(row, "text", 0)
             opt_a = cell(row, "option_a", 1)
             opt_b = cell(row, "option_b", 2)
@@ -655,9 +659,14 @@ class QuestionRepository:
                 continue
 
             q_subject_id = subject_id
-            if course_id is None and "subject_id" in df.columns and not pd.isna(row["subject_id"]):
+            if (
+                course_id is None
+                and subject_column is not None
+                and subject_column < len(row)
+                and row[subject_column] is not None
+            ):
                 try:
-                    q_subject_id = int(row["subject_id"])
+                    q_subject_id = int(row[subject_column])
                 except (ValueError, TypeError):
                     pass
 
@@ -670,8 +679,8 @@ class QuestionRepository:
             # yuklagan zahoti barcha javoblari «a» bo'lib qolardi.
             if mapping is not None:
                 raw_correct = cell(row, "correct_option", 5) if "correct_option" in mapping else ""
-            elif "correct_option" in df.columns and not pd.isna(row["correct_option"]):
-                raw_correct = str(row["correct_option"])
+            elif legacy_correct_column is not None and legacy_correct_column < len(row):
+                raw_correct = "" if row[legacy_correct_column] is None else str(row[legacy_correct_column])
             else:
                 raw_correct = ""
 

@@ -319,15 +319,56 @@ export function buildTemplateWorkbook(): XLSX.WorkBook {
     return wb;
 }
 
-export function readSheet(buf: ArrayBuffer): { rows: RawRow[]; error?: string } {
+/** Sarlavha qatori shu qatorlar ichidan qidiriladi (ustida nom yoki bo'sh qator bo'lishi mumkin). */
+const HEADER_SEARCH_ROWS = 10;
+
+const isHeaderRow = (cells: string[]) =>
+    (cells.includes('savol_turi') || cells.includes('question_type'))
+    && (cells.includes('matn') || cells.includes('text'));
+
+/**
+ * Varaqni o'qiydi va sarlavha qatorini o'zi topadi.
+ *
+ * Ilgari `sheet_to_json` birinchi qatorni har doim sarlavha deb olardi:
+ * sarlavha ustida nom yoki bo'sh qator bo'lsa, har bir qator «matn ustuni
+ * bo'sh» degan tushunarsiz xato berardi. Endi sarlavha birinchi o'n qator
+ * ichidan qidiriladi; topilmasa — aniq xabar. `lines` — har bir qatorning
+ * Excel'dagi haqiqiy raqami (xato xabarlari uchun).
+ */
+export function readSheet(buf: ArrayBuffer): { rows: RawRow[]; lines: number[]; error?: string } {
     const wb = XLSX.read(buf, { type: 'array' });
     const sheetName = wb.SheetNames.includes(SHEET_NAME) ? SHEET_NAME : wb.SheetNames[0];
     const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
     if (!sheet) {
-        return { rows: [], error: 'Excel ichida hech qanday list topilmadi.' };
+        return { rows: [], lines: [], error: 'Excel ichida hech qanday list topilmadi.' };
     }
-    const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: '' });
-    return { rows };
+    // `blankrows: true` — indekslar varaq qatorlari bilan mos qolsin.
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', blankrows: true });
+    const firstRow = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).s.r : 0;
+    const normalized = (row: unknown[]) => row.map((cell) => asString(cell).toLowerCase());
+
+    const headerAt = matrix.slice(0, HEADER_SEARCH_ROWS).findIndex((row) => isHeaderRow(normalized(row)));
+    if (headerAt < 0) {
+        return {
+            rows: [],
+            lines: [],
+            error: "Sarlavha qatori topilmadi: faylda «savol_turi» va «matn» ustunlari bo'lishi kerak. Shablonni yuklab olib, shu bo'yicha to'ldiring.",
+        };
+    }
+
+    const header = normalized(matrix[headerAt]);
+    const rows: RawRow[] = [];
+    const lines: number[] = [];
+    matrix.slice(headerAt + 1).forEach((cells, offset) => {
+        if (!cells.some((cell) => asString(cell) !== '')) return;
+        const row: RawRow = {};
+        header.forEach((key, index) => {
+            if (key) row[key] = cells[index] ?? '';
+        });
+        rows.push(row);
+        lines.push(firstRow + headerAt + offset + 2);
+    });
+    return { rows, lines };
 }
 
 export function sanitizeFilename(name: string): string {

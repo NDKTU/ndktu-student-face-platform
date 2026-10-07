@@ -16,6 +16,7 @@ from app.modules.quiz.question.excel_format import (
     TEMPLATE_HEADERS,
     normalize_header,
     parse_correct_option,
+    read_question_sheet,
     resolve_columns,
 )
 
@@ -308,3 +309,90 @@ def test_parse_correct_option_understands_common_mistakes():
     assert parse_correct_option("bilmadim") is None
     # Ikki xil harf ko'rsatilgan — taxmin qilmaymiz.
     assert parse_correct_option("a yoki b") is None
+
+
+
+# ─── Sarlavha qatori qayerda ─────────────────────────────────────────────────
+#
+# Ilgari `pd.read_excel` birinchi qatorni HAR DOIM sarlavha deb olardi:
+# sarlavhasiz faylda birinchi savol jimgina yo'qolardi, sarlavha ustida nom
+# yoki bo'sh qator bo'lsa — sarlavhaning o'zi savol bo'lib bankka tushardi.
+
+_H = ["Savol", "A variant", "B variant", "C variant", "D variant"]
+_Q1 = ["2+2?", "4", "3", "5", "6"]
+_Q2 = ["3+3?", "6", "5", "7", "8"]
+
+
+def _texts(sheet, position: int = 0) -> list[str]:
+    index = sheet.mapping["text"] if sheet.mapping else position
+    return [str(cells[index]) for _, cells in sheet.rows if any(v is not None for v in cells)]
+
+
+@pytest.mark.parametrize(
+    ("name", "rows", "expected_lines"),
+    [
+        ("sarlavha bilan", [_H, _Q1, _Q2], [2, 3]),
+        ("sarlavhasiz", [_Q1, _Q2], [1, 2]),
+        ("sarlavha ustida nom", [["Matematika savollari"], _H, _Q1, _Q2], [3, 4]),
+        ("birinchi qator bo'sh", [[], _H, _Q1, _Q2], [3, 4]),
+    ],
+)
+def test_header_row_is_found_wherever_it_is(name, rows, expected_lines):
+    sheet = read_question_sheet(_xlsx(rows))
+
+    assert _texts(sheet) == ["2+2?", "3+3?"], name
+    assert [line for line, cells in sheet.rows if any(v is not None for v in cells)] == expected_lines, name
+
+
+def test_unknown_but_header_like_first_row_is_skipped_with_note():
+    sheet = read_question_sheet(_xlsx([["Savollar", "1-variant", "2-variant", "3-variant", "4-variant"], _Q1, _Q2]))
+
+    assert sheet.mapping is None
+    assert _texts(sheet) == ["2+2?", "3+3?"]
+    assert sheet.notes == ["1-qator sarlavha deb hisoblandi va savol sifatida yuklanmadi"]
+
+
+def test_question_mentioning_variant_is_not_mistaken_for_header():
+    """Bitta katakda «variant» so'zi — bu savol, sarlavha emas."""
+    question = ["Qaysi variant to'g'ri?", "Birinchi", "Ikkinchi", "Uchinchi", "To'rtinchi"]
+    sheet = read_question_sheet(_xlsx([question, _Q1]))
+
+    assert _texts(sheet) == ["Qaysi variant to'g'ri?", "2+2?"]
+    assert sheet.notes == []
+
+
+@pytest.mark.asyncio
+async def test_upload_without_header_keeps_first_question(auth_client, test_subject):
+    response = await _upload(auth_client, test_subject.id, _xlsx([_Q1, _Q2]))
+
+    assert response.status_code == 201, response.json()
+    assert [q["text"] for q in response.json()["questions"]] == ["2+2?", "3+3?"]
+
+
+@pytest.mark.asyncio
+async def test_upload_with_title_row_does_not_import_header(auth_client, test_subject):
+    content = _xlsx([["Matematika savollari"], [], _H, _Q1, _Q2])
+
+    response = await _upload(auth_client, test_subject.id, content)
+
+    assert response.status_code == 201, response.json()
+    assert [q["text"] for q in response.json()["questions"]] == ["2+2?", "3+3?"]
+
+
+@pytest.mark.asyncio
+async def test_general_test_upload_finds_header_and_real_line_numbers(auth_client):
+    """Elementar test ham xuddi shu o'quvchidan foydalanadi; ogohlantirishdagi
+    qator raqami — Excel'dagi haqiqiy raqam."""
+    subject = await auth_client.post("/general-test/subject", json={"name": "Excel sarlavha fani"})
+    assert subject.status_code == 201, subject.text
+    content = _xlsx([["Sarlavha ustidagi nom"], _H, _Q1, ["Chala savol", "4", "", "5", "6"], _Q2])
+
+    response = await auth_client.post(
+        f"/general-test/subject/{subject.json()['id']}/upload_excel",
+        files={"file": ("savollar.xlsx", content, XLSX_MIME)},
+    )
+
+    assert response.status_code in (200, 201), response.text
+    body = response.json()
+    assert body["created"] == 2
+    assert any(w.startswith("4-qator") for w in body["warnings"]), body["warnings"]

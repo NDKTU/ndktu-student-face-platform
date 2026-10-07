@@ -73,7 +73,7 @@ export function ExcelImportModal({
         setFileName(file.name);
         try {
             const buf = await file.arrayBuffer();
-            const { rows: raw, error } = readSheet(buf);
+            const { rows: raw, lines, error } = readSheet(buf);
             if (error) {
                 setParseError(error);
                 return;
@@ -81,7 +81,7 @@ export function ExcelImportModal({
             const parsed = raw.map((r, i) =>
                 buildPayload(r, {
                     methodId,
-                    rowNumber: i + 2,
+                    rowNumber: lines[i],
                     order: nextOrder + i,
                     category,
                 }),

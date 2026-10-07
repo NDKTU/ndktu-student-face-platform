@@ -10,7 +10,9 @@ eksport ham, shablon ham shu modulga qaraydi.
 
 from __future__ import annotations
 
+import io
 import re
+from dataclasses import dataclass, field
 
 #: Maydonlar tartibi — shablon ustunlari aynan shunday joylashadi.
 #:
@@ -149,3 +151,117 @@ def resolve_columns(columns) -> dict[str, int] | None:
     if any(field not in found for field in REQUIRED_FIELDS):
         return None
     return found
+
+
+#: Sarlavha qatori shu qatorlar ichidan qidiriladi: undan yuqorida fayl
+#: nomi, fan nomi yoki bo'sh qatorlar turishi odatiy hol.
+HEADER_SEARCH_ROWS = 10
+
+#: Sarlavhaga xos so'zlar. Tanilmagan sarlavhani («Savollar», «1-variant»)
+#: savoldan ajratish uchun: bitta savol qatorida bunday so'z ikki katakda
+#: kamdan-kam uchraydi, sarlavhada esa deyarli har katakda.
+_HEADER_WORDS = ("savol", "variant", "javob", "question", "option", "answer", "вопрос", "вариант", "ответ")
+
+
+@dataclass
+class QuestionSheet:
+    """O'qilgan varaq: ma'lumot qatorlari va ularning Excel'dagi raqami."""
+
+    #: (Excel qator raqami, kataklar) — sarlavhadan keyingi qatorlar.
+    rows: list[tuple[int, list[object]]]
+    #: Sarlavha bo'yicha ustunlar; `None` — ustunlar o'rni bo'yicha o'qiladi.
+    mapping: dict[str, int] | None
+    #: Sarlavha qatori (normallashtirilgan) — eski fayllardagi
+    #: `subject_id`/`correct_option` kabi ustunlarni topish uchun.
+    header: list[str] = field(default_factory=list)
+    #: Foydalanuvchiga ko'rsatiladigan izohlar (qaysi qator sarlavha bo'ldi).
+    notes: list[str] = field(default_factory=list)
+    width: int = 0
+
+    def column(self, name: str) -> int | None:
+        """Sarlavhadagi ustun o'rni (masalan, eski fayldagi `subject_id`)."""
+        target = normalize_header(name)
+        return self.header.index(target) if target in self.header else None
+
+
+def _is_blank(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, float) and value != value:  # NaN
+        return True
+    return not str(value).strip()
+
+
+#: Bittasining o'zi qatorni sarlavha qiladigan nomlar: texnik ustunlar
+#: (eski eksport va qo'lda yasalgan fayllar) va tanish sarlavhalar.
+#: Bir harfli «a»/«b» bu yerga kirmaydi — ular savol variantlari ham bo'ladi.
+_TECHNICAL_HEADERS = frozenset(
+    {"subject_id", "correct_option", "№", "#", "n"}
+    | {alias for alias in _BY_ALIAS if len(alias) > 2}
+)
+
+#: «Ustun 1», «Column2», «Столбец 3» — umumiy ustun nomlari.
+_GENERIC_COLUMN = re.compile(r"^(ustun|column|col|колонка|столбец)\s*\d+$")
+
+
+def _looks_like_header(cells: list[object]) -> bool:
+    """Tanilmagan, lekin sarlavhaga o'xshash qator.
+
+    Belgilar: texnik/tanish ustun nomi (bittasi yetadi) yoki kamida ikki
+    katakda sarlavha so'zi / «Ustun 1» kabi umumiy nom. Savol qatorida
+    bular deyarli uchramaydi.
+    """
+    hits = 0
+    for value in cells:
+        text = normalize_header(value)
+        if not text:
+            continue
+        if text in _TECHNICAL_HEADERS:
+            return True
+        if _GENERIC_COLUMN.match(text) or any(word in text for word in _HEADER_WORDS):
+            hits += 1
+    return hits >= 2
+
+
+def read_question_sheet(contents: bytes) -> QuestionSheet:
+    """Savollar faylining birinchi varag'ini o'qiydi va sarlavhani o'zi topadi.
+
+    Ilgari `pd.read_excel` standart holatda ishlatilardi — u BIRINCHI qatorni
+    har doim sarlavha deb oladi. Natijada sarlavhasiz faylda birinchi savol
+    jimgina yo'qolardi, sarlavha ustida nom yoki bo'sh qator bo'lsa esa
+    sarlavhaning o'zi «Savol / A variant ...» degan savol bo'lib bankka
+    tushardi. Endi:
+
+    1. sarlavha birinchi `HEADER_SEARCH_ROWS` qator ichidan qidiriladi;
+       undan yuqoridagi qatorlar tashlab yuboriladi;
+    2. topilmasa — hamma qator savol (ustunlar o'rni bo'yicha); faqat
+       birinchi to'la qator sarlavhaga o'xshasa, u tashlanadi va bu
+       haqda izoh qaytadi.
+
+    Qator raqamlari — Excel'dagi haqiqiy raqamlar (1 dan).
+    """
+    import pandas as pd
+
+    frame = pd.read_excel(io.BytesIO(contents), header=None, dtype=object)
+    raw = [[None if _is_blank(v) else v for v in row] for row in frame.itertuples(index=False, name=None)]
+    width = max((len(row) for row in raw), default=0)
+
+    header_at: int | None = None
+    mapping: dict[str, int] | None = None
+    for index, cells in enumerate(raw[:HEADER_SEARCH_ROWS]):
+        found = resolve_columns(cells)
+        if found is not None:
+            header_at, mapping = index, found
+            break
+
+    notes: list[str] = []
+    if header_at is None:
+        first = next((i for i, cells in enumerate(raw) if any(v is not None for v in cells)), None)
+        if first is not None and _looks_like_header(raw[first]):
+            header_at = first
+            notes.append(f"{first + 1}-qator sarlavha deb hisoblandi va savol sifatida yuklanmadi")
+
+    start = header_at + 1 if header_at is not None else 0
+    header = [normalize_header(v) for v in raw[header_at]] if header_at is not None else []
+    rows = [(index + 1, cells) for index, cells in enumerate(raw) if index >= start]
+    return QuestionSheet(rows=rows, mapping=mapping, header=header, notes=notes, width=width)

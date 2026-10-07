@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.organization_structure.model import Faculty, Group, Kafedra
-from app.modules.quiz.question.excel_format import parse_correct_option, resolve_columns
+from app.modules.quiz.question.excel_format import parse_correct_option, read_question_sheet
 
 from .model import (
     GeneralTest,
@@ -883,35 +883,34 @@ class GeneralTestRepository:
         Колонки ищутся по заголовкам (`quiz/question/excel_format.py`), так что
         шаблон и уже готовые файлы преподавателей подходят без переделки.
         """
-        import pandas as pd
-
         await self._get_subject(session, subject_id, user, member=True)
         try:
-            df = pd.read_excel(io.BytesIO(await file.read()))
+            # Sarlavha qatorini o'zi topadi: birinchi qator har doim sarlavha
+            # deb olinmaydi (excel_format.read_question_sheet).
+            sheet = read_question_sheet(await file.read())
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Excel faylni o'qib bo'lmadi")
 
-        if len(df.columns) < 5:
+        if sheet.width < 5:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Faylda kamida 5 ustun bo'lishi kerak: savol, A, B, C, D variantlar",
             )
 
         # Заголовки не узнаны — читаем по позиции, как и банк вопросов.
-        mapping = resolve_columns(df.columns)
+        mapping = sheet.mapping
 
-        def cell(row, field: str, position: int) -> str:
+        def cell(row: list, field: str, position: int) -> str:
             index = mapping.get(field, -1) if mapping is not None else position
-            if index < 0 or index >= len(row):
+            if index < 0 or index >= len(row) or row[index] is None:
                 return ""
-            value = row.iloc[index]
-            return "" if pd.isna(value) else str(value).strip()
+            return str(row[index]).strip()
 
         order = await self._next_order(session, subject_id)
         questions: list[GeneralTestQuestion] = []
-        warnings: list[str] = []
-        for index, row in df.iterrows():
-            line = index + 2  # +1 заголовок, +1 нумерация Excel с единицы
+        warnings: list[str] = list(sheet.notes)
+        # Номер строки — настоящий, из Excel: заголовок может стоять не в первой строке.
+        for line, row in sheet.rows:
             values = [cell(row, f, i) for i, f in enumerate(("text", "option_a", "option_b", "option_c", "option_d"))]
             if not any(values):
                 continue
