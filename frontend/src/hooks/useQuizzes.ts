@@ -38,6 +38,14 @@ export const useActiveLessonQuizzes = (lessonId?: number, enabled = true) => {
     });
 };
 
+export const useActiveCourseQuizzes = (courseId: number, enabled = true) => {
+    return useQuery({
+        queryKey: ['active-quizzes', 'course', courseId],
+        queryFn: () => quizService.getActiveCourseQuizzes(courseId),
+        enabled,
+    });
+};
+
 export const useQuiz = (id: number) => {
     return useQuery({
         queryKey: ['quiz', id],

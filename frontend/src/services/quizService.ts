@@ -209,6 +209,14 @@ export const quizService = {
         return response.data;
     },
 
+    /** Kursning faol nazoratlari — talaba kurs sahifasida ko'radi (guruhi bo'yicha cheklangan). */
+    getActiveCourseQuizzes: async (course_id: number) => {
+        const response = await api.get<QuizListResponse>('/quiz/active', {
+            params: { course_id, quiz_type: 'MIDTERM', page: 1, limit: 50, sort_dir: 'asc' },
+        });
+        return response.data;
+    },
+
     getQuizById: async (id: number): Promise<Quiz> => {
         const response = await api.get<Quiz>(`/quiz/${id}`);
         return response.data;

@@ -343,6 +343,13 @@ export default function CourseDetailPage() {
                     canManageQuizzes={
                         hasPermission('create:quiz') && hasPermission('read:question') && !isArchived
                     }
+                    // Talaba (dars sahifasidagi kabi): testlar ro'yxatini emas,
+                    // faqat o'ziga ochiq faol testlarni ko'radi va boshlaydi.
+                    canTakeQuizzes={
+                        !hasPermission('read:quiz')
+                        && hasPermission('read:active_quiz')
+                        && hasPermission('quiz_process:start_quiz')
+                    }
                     canSeeResults={hasPermission('read:result')}
                     canManageTopics={canCreateLessons}
                 />

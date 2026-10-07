@@ -10,6 +10,7 @@ import {
     ListChecks,
     Paperclip,
     Pencil,
+    PlayCircle,
     Plus,
     Trash2,
 } from 'lucide-react';
@@ -24,7 +25,13 @@ import { Switch } from '@/components/ui/Switch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { useControlQuestionCounts, useControlQuestions, useMidtermExtraQuestions } from '@/hooks/useQuestions';
-import { useDeleteQuiz, useQuizzes, useRemoveMidtermQuestion, useUpdateQuiz } from '@/hooks/useQuizzes';
+import {
+    useActiveCourseQuizzes,
+    useDeleteQuiz,
+    useQuizzes,
+    useRemoveMidtermQuestion,
+    useUpdateQuiz,
+} from '@/hooks/useQuizzes';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import {
@@ -37,7 +44,7 @@ import type { CourseGroupInfo } from '@/services/courseService';
 import type { IndependentTopic } from '@/services/independentTopicService';
 import type { Lesson } from '@/services/lessonService';
 import { CONTROL_TYPES, type ControlType, type Question } from '@/services/questionService';
-import type { Quiz, QuizCreateRequest } from '@/services/quizService';
+import { PROCTORING_LABELS, type Quiz, type QuizCreateRequest } from '@/services/quizService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { IndependentTopicModal } from './IndependentTopicModal';
 import { MidtermQuizModal } from './MidtermQuizModal';
@@ -52,6 +59,8 @@ interface Props {
     groups: CourseGroupInfo[];
     /** Nazorat bloki — test va savollarni boshqara oladiganlarga. */
     canManageQuizzes: boolean;
+    /** Talaba: kursning faol nazoratlarini ko'radi va shu yerdan boshlaydi. */
+    canTakeQuizzes: boolean;
     /** Natijalar sahifasiga havola. */
     canSeeResults: boolean;
     /** Mavzu qo'shish/tahrirlash/o'chirish. */
@@ -544,6 +553,75 @@ const MidtermQuizzes = ({
 };
 
 /**
+ * Talaba uchun «Nazorat» — kursning faol nazoratlari va «Boshlash».
+ *
+ * Ro'yxat `/quiz/active` dan: server uni talabaning guruhi bo'yicha
+ * cheklaydi (guruhsiz nazorat — kursning barcha guruhlariga). Savollar va
+ * PIN bu yerda ko'rinmaydi — PIN'ni o'qituvchi aytadi, test sahifasida
+ * so'raladi.
+ */
+const StudentCourseQuizzes = ({ courseId }: { courseId: number }) => {
+    const navigate = useNavigate();
+    const { data, isLoading, isError } = useActiveCourseQuizzes(courseId);
+    const quizzes = data?.quizzes ?? [];
+
+    return (
+        <SectionCard
+            icon={<ClipboardCheck className="h-[18px] w-[18px]" />}
+            tone="blue"
+            title="Nazorat"
+            description={quizzes.length > 0 ? `${quizzes.length} ta faol test` : undefined}
+        >
+            {isLoading ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-16 w-full rounded-xl" />
+                </div>
+            ) : isError ? (
+                <p className="text-sm text-destructive">Testlarni yuklab bo'lmadi.</p>
+            ) : quizzes.length === 0 ? (
+                <EmptyState
+                    icon={<ClipboardCheck className="h-6 w-6" />}
+                    title="Faol nazorat yo'q"
+                    description="O'qituvchi nazoratni faollashtirganda shu yerda ko'rinadi."
+                    className="py-8"
+                />
+            ) : (
+                <ul className="space-y-3">
+                    {quizzes.map((quiz) => (
+                        <li
+                            key={quiz.id}
+                            className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 p-3.5 transition-colors duration-200 hover:border-primary/40"
+                        >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <ClipboardCheck className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold">{quiz.title}</p>
+                                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                                    {quiz.question_number} savol · {quiz.duration} daqiqa
+                                    {quiz.proctoring_mode !== 'standard' && ` · ${PROCTORING_LABELS[quiz.proctoring_mode]}`}
+                                </p>
+                            </div>
+                            {/* Test sahifasi testni o'z ro'yxatidan qidiradi, u esa
+                                sahifalangan — shuning uchun test `state` da uzatiladi
+                                (dars sahifasidagidek). */}
+                            <Button
+                                size="sm"
+                                className="shrink-0 gap-1.5"
+                                onClick={() => navigate(`/quiz-test?quizId=${quiz.id}`, { state: { quiz } })}
+                            >
+                                <PlayCircle className="h-4 w-4" />
+                                <span>Boshlash</span>
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </SectionCard>
+    );
+};
+
+/**
  * «Test savollari» — kursning savollar banki nazorat turlari bo'yicha.
  *
  * O'qituvchi savollarni oldindan ON1, ON2, JN1, JN2, YN va boshqa
@@ -688,6 +766,7 @@ export const CourseAssignments = ({
     lessons,
     groups,
     canManageQuizzes,
+    canTakeQuizzes,
     canSeeResults,
     canManageTopics,
 }: Props) => {
@@ -703,6 +782,8 @@ export const CourseAssignments = ({
 
     return (
         <div className="space-y-6">
+            {!canManageQuizzes && canTakeQuizzes && <StudentCourseQuizzes courseId={courseId} />}
+
             {canManageQuizzes && (
                 <MidtermQuizzes
                     courseId={courseId}
