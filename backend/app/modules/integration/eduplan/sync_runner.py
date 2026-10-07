@@ -57,6 +57,7 @@ class EduPlanSyncRunner:
         session: AsyncSession,
         triggered_by: str = "schedule",
         allow_bulk_create: bool = False,
+        skip_workloads: bool = False,
     ) -> dict:
         acquired = await redis_client.set(LOCK_KEY, triggered_by, nx=True, ex=LOCK_TTL_SECONDS)
         if not acquired:
@@ -96,10 +97,18 @@ class EduPlanSyncRunner:
                 ),
             )
 
+            # Yuklama — progondagi eng ogʻir qism: 27 000 dan ortiq qator,
+            # 15-30 soniya. Maʼlumotnomalar esa 11 soniyada oʻqiladi.
+            # Shuning uchun tez-tez takrorlanadigan progon uni tashlab
+            # ketadi: yuklama kun davomida oʻzgarmaydi, uni sutkada bir
+            # marta tortish yetarli.
             workloads = None
             workload_error = None
+            if skip_workloads:
+                logger.info("EduPlan: yuklama oʻtkazib yuborildi (--skip-workloads)")
             try:
-                workloads = await eduplan_workload_service.sync(session)
+                if not skip_workloads:
+                    workloads = await eduplan_workload_service.sync(session)
             except HTTPException as e:
                 # Нагрузка может быть недоступна сервисному аккаунту или в
                 # EduPlan может не быть активного учебного года — справочники
@@ -114,6 +123,7 @@ class EduPlanSyncRunner:
                 "directories": [r.model_dump() for r in applied.results],
                 "workloads": workloads,
                 "workloads_error": workload_error,
+                "workloads_skipped": skip_workloads,
             }
             logger.info(
                 "EduPlan: прогон %s завершён, требуют решения администратора: %d",

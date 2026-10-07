@@ -20,6 +20,7 @@ from core.mixins.time_stamp_mixin import utcnow_naive
 from core.redis_client import redis_client
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.auth.model import Teacher
 from app.modules.organization_structure.model import (
@@ -54,6 +55,7 @@ from .schemas import (
     PreviewResponse,
     Proposal,
     ProposalAction,
+    SyncFailure,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,16 +230,54 @@ class EduPlanSyncService:
         target = normalize_name(name)
         return [row for row in unclaimed if normalize_name(name_of(row)) == target]
 
-    #: Поля, которые нельзя сравнить по имени колонки, поэтому в решении
-    #: «что-то изменилось?» они не участвуют.
-    #:
-    #: * ``hemis_group_id`` — ``upsert_group`` пишет его условно: пустое
-    #:   значение из EduPlan не затирает известную связку, а разобранную
-    #:   вручную не трогает вовсе. Сравнение «в лоб» держало бы такие группы
-    #:   в вечном ``update``.
-    #: * ``username`` — лежит не в строке сущности, а в связанном ``users``,
-    #:   и при создании проходит через ``_unique_username``.
-    _INCOMPARABLE_FIELDS = frozenset({"hemis_group_id", "username"})
+    #: Поля, которые нельзя сравнить «в лоб» по имени колонки: они пишутся
+    #: УСЛОВНО, и прямое сравнение держало бы строку в вечном ``update``.
+    #: Для каждого — своя проверка в ``_is_up_to_date``, повторяющая правило
+    #: записи. Раньше они просто исключались из сравнения, и это давало
+    #: слепое пятно: если в EPMOS менялось ТОЛЬКО такое поле, строка
+    #: считалась ``unchanged`` и новое значение не записывалось никогда.
+    _CONDITIONAL_FIELDS = frozenset({"hemis_group_id", "username"})
+
+    @staticmethod
+    def _hemis_group_id_changed(row: Any, value: Any) -> bool:
+        """Повторяет правило ``upsert_group``.
+
+        Пустое значение из EPMOS не затирает известную связку, а связку,
+        разобранную вручную, не трогает и непустое. Записью считается
+        только то, что действительно будет записано, — иначе такие группы
+        попадали бы в ``update`` на каждом прогоне.
+
+        Слепое пятно, которое это закрывает: в EPOS у группы проставили
+        ``hemis_id`` и больше ничего не меняли. Без этой проверки связка
+        не доезжала, а по ней импорт студентов раскладывает людей по
+        группам — вся группа оставалась без студентов.
+        """
+        incoming = str(value).strip() if value else ""
+        if not incoming:
+            return False
+        if incoming == str(getattr(row, "hemis_group_id", None) or ""):
+            return False
+        return getattr(row, "hemis_group_id_source", None) != "manual"
+
+    @staticmethod
+    def _username_changed(row: Any, value: Any) -> bool:
+        """Логин лежит в связанной строке ``users``, а не в ``teachers``.
+
+        Занятый чужим аккаунтом логин ``upsert_teacher`` не записывает, то
+        есть такая строка будет в ``update`` каждый прогон. Это осознанно:
+        два человека с одним логином — настоящий конфликт, который должен
+        быть виден, и теперь он приезжает в ``failures`` с причиной
+        ``username_taken``.
+
+        Слепое пятно, которое это закрывает: в EPMOS сменили логин, ФИО
+        прежнее — преподаватель не мог войти, потому что у нас оставался
+        старый.
+        """
+        incoming = str(value).strip() if value else ""
+        if not incoming:
+            return False
+        current = getattr(getattr(row, "user", None), "username", None) or ""
+        return incoming != current
 
     @classmethod
     def _is_up_to_date(
@@ -259,7 +299,14 @@ class EduPlanSyncService:
             return False
 
         for field, value in changes.items():
-            if field in cls._INCOMPARABLE_FIELDS:
+            if field in cls._CONDITIONAL_FIELDS:
+                checker = (
+                    cls._hemis_group_id_changed
+                    if field == "hemis_group_id"
+                    else cls._username_changed
+                )
+                if checker(row, value):
+                    return False
                 continue
 
             if field.endswith("_external_id"):
@@ -361,7 +408,14 @@ class EduPlanSyncService:
 
         for entity in entities:
             model = ENTITY_MODEL[entity]
-            linked = await eduplan_repository.index_by_external(session, model)
+            linked = await eduplan_repository.index_by_external(
+                session,
+                model,
+                # Логин сравнивается с `row.user.username`: он лежит в
+                # связанной строке. Без этого загрузчика ленивая подгрузка
+                # в async-сессии падает `MissingGreenlet`.
+                options=(selectinload(Teacher.user),) if entity == EduPlanEntity.teacher else (),
+            )
 
             if entity == EduPlanEntity.teacher:
                 local_rows = await eduplan_repository.load_teachers(session)
@@ -656,6 +710,30 @@ class EduPlanSyncService:
                 ),
             )
 
+    @staticmethod
+    def _fail(
+        result: ApplyResult,
+        entity: EduPlanEntity,
+        proposal: Proposal,
+        reason: str,
+        detail: str,
+    ) -> None:
+        """Qoʻllab boʻlmagan yozuvni kod shaklida qayd etadi.
+
+        `errors` bilan yonma-yon yuritiladi: biri odam uchun, bu esa
+        EPMOS hisoboti uchun. `detail` ni 1000 belgida kesamiz — qabul
+        qiluvchi tomonning cheklovi shunday, va 422 olib qolmaslik
+        uchun chegara shu yerda qoʻyiladi.
+        """
+        result.failures.append(
+            SyncFailure(
+                entity=entity,
+                external_id=proposal.external_id,
+                reason=reason,
+                detail=detail[:1000],
+            )
+        )
+
     async def _apply_one(
         self,
         *,
@@ -683,6 +761,13 @@ class EduPlanSyncService:
             # Неразобранный конфликт применять нельзя: связать вслепую значит
             # оторвать студентов и историю результатов от нужной строки.
             result.skipped += 1
+            self._fail(
+                result,
+                entity,
+                proposal,
+                "ambiguous_match",
+                "Nomi boʻyicha bir nechta mahalliy satr mos keldi — qaysi biri ekani aniq emas",
+            )
             return
 
         if action == ProposalAction.deactivate:
@@ -739,6 +824,7 @@ class EduPlanSyncService:
                     faculty_id = parents(EduPlanEntity.faculty).get(changes["faculty_external_id"])
                     if faculty_id is None:
                         result.errors.append(f"Кафедра {proposal.external_name}: факультет не разрешён, пропущена")
+                        self._fail(result, entity, proposal, "parent_missing", "Fakultet hali bogʻlanmagan")
                         result.skipped += 1
                         return
                     row = await eduplan_repository.upsert_kafedra(
@@ -750,6 +836,7 @@ class EduPlanSyncService:
                     kafedra_id = parents(EduPlanEntity.kafedra).get(changes["kafedra_external_id"])
                     if kafedra_id is None:
                         result.errors.append(f"Специальность {proposal.external_name}: кафедра не разрешена, пропущена")
+                        self._fail(result, entity, proposal, "parent_missing", "Kafedra hali bogʻlanmagan")
                         result.skipped += 1
                         return
                     row = await eduplan_repository.upsert_speciality(
@@ -772,6 +859,7 @@ class EduPlanSyncService:
                         faculty_id = kafedra_faculty.get(kafedra_id) if kafedra_id else None
                     if faculty_id is None:
                         result.errors.append(f"Группа {proposal.external_name}: не удалось вывести факультет, пропущена")
+                        self._fail(result, entity, proposal, "parent_missing", "Fakultetni aniqlab boʻlmadi: mutaxassislik yoki kafedra bogʻlanmagan")
                         result.skipped += 1
                         return
                     row = await eduplan_repository.upsert_group(
@@ -850,6 +938,11 @@ class EduPlanSyncService:
                 elif entity == EduPlanEntity.teacher:
                     kafedra_ext = changes.get("kafedra_external_id")
                     kafedra_id = parents(EduPlanEntity.kafedra).get(kafedra_ext) if kafedra_ext else None
+                    # Qator yoziladi, lekin ayrim maydonlar yozilmasligi
+                    # mumkin (band `hemis_id`, band login). Bu xatolik emas,
+                    # lekin jimgina qolmasligi kerak — repozitoriy sabablarni
+                    # shu roʻyxatga soladi.
+                    refused: list[dict] = []
                     row = await eduplan_repository.upsert_teacher(
                         session,
                         external_id=proposal.external_id,
@@ -861,12 +954,17 @@ class EduPlanSyncService:
                         full_name=changes["full_name"] or changes["username"],
                         kafedra_id=kafedra_id,
                         existing=existing,
+                        failures=refused,
                     )
+                    for item in refused:
+                        result.errors.append(f"{proposal.external_name}: {item['detail']}")
+                        self._fail(result, entity, proposal, item["reason"], item["detail"])
                 else:
                     return
         except Exception as e:  # noqa: BLE001 — одна битая строка не должна валить прогон
             logger.warning("EduPlan: %s %r не применена: %s", entity.value, proposal.external_name, e)
             result.errors.append(f"{proposal.external_name}: {e}")
+            self._fail(result, entity, proposal, "apply_failed", str(e))
             result.skipped += 1
             return
 

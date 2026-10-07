@@ -126,6 +126,15 @@ eduplan-cron:
 	@echo "# EduPlan sync — nightly at 00:00 (server must be Asia/Tashkent)"
 	@echo "0 0 * * * $(CURDIR)/scripts/eduplan_sync.sh >> /dev/null 2>&1"
 
+# Two crontab lines instead of one: directories every 15 minutes (~11s per run)
+# and the heavy workload import once a night. A new group or teacher created in
+# EPMOS reaches the platform within 15 minutes instead of next morning.
+eduplan-cron-fast:
+	@echo "# EduPlan directories — every 15 minutes (~11s per run)"
+	@echo "*/15 * * * * $(CURDIR)/scripts/eduplan_sync.sh --skip-workloads >> /dev/null 2>&1"
+	@echo "# EduPlan workloads — once a night (27k rows, 15-30s)"
+	@echo "0 1 * * * $(CURDIR)/scripts/eduplan_sync.sh >> /dev/null 2>&1"
+
 # Import students from HEMIS. Incremental by default; --full walks all pages.
 hemis-students:
 	@./scripts/hemis_student_sync.sh $(ARGS)

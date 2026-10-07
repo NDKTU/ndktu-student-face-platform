@@ -79,6 +79,7 @@ async def _run(args: argparse.Namespace) -> int:
                     session,
                     triggered_by=args.triggered_by,
                     allow_bulk_create=args.allow_bulk_create,
+                    skip_workloads=args.skip_workloads,
                 )
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else json.dumps(e.detail, ensure_ascii=False)
@@ -110,6 +111,12 @@ def main() -> int:
         help="Только нагрузка, без справочников. Требует уже связанных преподавателей, предметов и групп.",
     )
     parser.add_argument(
+        "--skip-workloads",
+        action="store_true",
+        help="Только справочники, без нагрузки. Для частого прогона по cron: справочники "
+        "читаются за ~11 секунд, нагрузка — 15-30, и за день она не меняется.",
+    )
+    parser.add_argument(
         "--academic-year-id",
         type=int,
         default=None,
@@ -130,6 +137,9 @@ def main() -> int:
     parser.add_argument("-v", "--verbose", action="store_true", help="Подробный вывод.")
 
     args = parser.parse_args()
+
+    if args.workloads_only and args.skip_workloads:
+        parser.error("--workloads-only и --skip-workloads исключают друг друга")
     _configure_logging(args.verbose)
     return asyncio.run(_run(args))
 

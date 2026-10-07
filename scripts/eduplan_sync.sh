@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EduPlan (EPOS) Sync
-# Usage: ./scripts/eduplan_sync.sh [--workloads-only] [--allow-bulk-create]
+# Usage: ./scripts/eduplan_sync.sh [--workloads-only|--skip-workloads] [--allow-bulk-create]
 #
 # Обёртка для системного cron: запускает синхронизацию внутри контейнера
 # бэкенда и пишет вывод в отдельный лог. Все аргументы пробрасываются в
@@ -9,6 +9,11 @@
 #
 # Пример строки crontab — каждый день в 00:00 по времени сервера:
 #   0 0 * * * /path/to/project/scripts/eduplan_sync.sh >> /dev/null 2>&1
+#
+# Частый прогон: справочники читаются за ~11 секунд, нагрузка — 15-30, и за
+# день она не меняется. Поэтому их разводят на две строки (`make
+# eduplan-cron-fast` печатает обе):
+#   */15 * * * * /path/to/project/scripts/eduplan_sync.sh --skip-workloads >> /dev/null 2>&1
 #
 # Сервер должен стоять в Asia/Tashkent, иначе «полночь» окажется чужой:
 #   timedatectl set-timezone Asia/Tashkent

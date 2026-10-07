@@ -281,6 +281,33 @@ class ApplyRequest(BaseModel):
     allow_bulk_delete: bool = False
 
 
+class SyncFailure(BaseModel):
+    """Qoʻllab boʻlmagan bitta yozuv va sababi.
+
+    `errors` dagi erkin matndan farqi — bu MASHINA oʻqiydigan shakl.
+    EPMOS ning `POST /data/changes/report` endpointi aynan shunday
+    kutadi: `entity`, `entity_id`, `reason` kodi va ixtiyoriy izoh.
+    Matnni ajratib olishga urinmaslik uchun sabab darhol kod sifatida
+    yoziladi.
+
+    `reason` qiymatlari (EPMOS `^[a-z][a-z0-9_]*$` ni talab qiladi):
+
+    * `ambiguous_match` — nomi boʻyicha bir nechta mahalliy satr mos
+      keldi, qaysi biriga bogʻlashni avtomatika hal qila olmaydi;
+    * `parent_missing` — ota-ona hali bogʻlanmagan (fakultetsiz
+      kafedra, mutaxassisliksiz guruh);
+    * `hemis_id_taken` — `hemis_id` boshqa qatorda band;
+    * `username_taken` — login begona hisobda band;
+    * `apply_failed` — kutilmagan xatolik.
+    """
+
+    entity: EduPlanEntity
+    #: EPMOS dagi identifikator. Hisobotda `entity_id` boʻlib ketadi.
+    external_id: str
+    reason: str
+    detail: Optional[str] = None
+
+
 class ApplyResult(BaseModel):
     entity: EduPlanEntity
     created: int = 0
@@ -292,7 +319,10 @@ class ApplyResult(BaseModel):
     #: Ular bilan birga ketgan bogʻliq maʼlumot: kurs, savol, test, natija.
     deleted_related: dict[str, int] = Field(default_factory=dict)
     skipped: int = 0
+    #: Odam oʻqiydigan xabarlar — admin ekrani uchun.
     errors: list[str] = Field(default_factory=list)
+    #: Oʻsha narsa kod shaklida — EPMOS hisoboti uchun.
+    failures: list[SyncFailure] = Field(default_factory=list)
 
 
 class ApplyResponse(BaseModel):
@@ -319,6 +349,8 @@ class EntitySyncResponse(BaseModel):
     deleted: int = 0
     deleted_related: dict[str, int] = Field(default_factory=dict)
     skipped: int = 0
+    #: Qoʻllab boʻlmaganlar, kod shaklida (EPMOS hisoboti uchun ham shu).
+    failures: list[SyncFailure] = Field(default_factory=list)
     #: Неоднозначные совпадения. Автоматически не применяются — их разбирают
     #: на общем экране сопоставления.
     requires_decision: int = 0

@@ -50,12 +50,20 @@ class EduPlanRepository:
     async def load_all(self, session: AsyncSession, model) -> list:
         return list((await session.execute(select(model))).scalars().all())
 
-    async def index_by_external(self, session: AsyncSession, model) -> dict[str, object]:
-        """Уже связанные строки: external_id -> объект."""
+    async def index_by_external(self, session: AsyncSession, model, *, options=()) -> dict[str, object]:
+        """Уже связанные строки: external_id -> объект.
+
+        ``options`` — загрузчики связей для вызывающего. Нужны там, где
+        сравнение читает поле СВЯЗАННОЙ строки (логин преподавателя лежит
+        в ``users``): ленивая подгрузка в async-сессии падает
+        ``MissingGreenlet``.
+        """
         stmt = select(model).where(
             model.external_source == SOURCE_EDUPLAN,
             model.external_id.is_not(None),
         )
+        if options:
+            stmt = stmt.options(*options)
         rows = (await session.execute(stmt)).scalars().all()
         return {row.external_id: row for row in rows}
 
@@ -282,7 +290,13 @@ class EduPlanRepository:
         logger.info("EduPlan: роль teacher выдана %d пользователям", len(user_ids))
         return len(user_ids)
 
-    async def _free_hemis_id(self, session: AsyncSession, hemis_id: str | None, row: Teacher) -> str | None:
+    async def _free_hemis_id(
+        self,
+        session: AsyncSession,
+        hemis_id: str | None,
+        row: Teacher,
+        failures: list[dict] | None = None,
+    ) -> str | None:
         """`hemis_id` ni yozish mumkinmi — yoʻq boʻlsa, eskisi qoladi.
 
         `uq_teachers_hemis_id` — qisman unikal indeks (`hemis_id IS NOT
@@ -318,6 +332,19 @@ class EduPlanRepository:
                 taken,
                 row.full_name,
             )
+            # Logda qolsa, buni faqat serverga kirgan odam koʻradi. Sabab
+            # EPMOS tomonida (bir xodimga ikki marta berilgan `hemis_id`),
+            # shuning uchun u hisobotga chiqishi kerak.
+            if failures is not None:
+                failures.append(
+                    {
+                        "reason": "hemis_id_taken",
+                        "detail": (
+                            f"hemis_id {hemis_id} allaqachon boshqa oʻqituvchida "
+                            f"(teachers.id={taken}) — {row.full_name} uchun yozilmadi"
+                        ),
+                    }
+                )
             return row.hemis_id
         return hemis_id
 
@@ -333,6 +360,7 @@ class EduPlanRepository:
         full_name: str,
         kafedra_id: int | None,
         existing: Teacher | None,
+        failures: list[dict] | None = None,
     ) -> Teacher:
         row = existing
         if row is None:
@@ -373,6 +401,16 @@ class EduPlanRepository:
                 logger.warning(
                     "EduPlan: login %r band — %r uchun yangilanmadi", username, row.full_name
                 )
+                if failures is not None:
+                    failures.append(
+                        {
+                            "reason": "username_taken",
+                            "detail": (
+                                f"login {username!r} boshqa hisobda band — "
+                                f"{row.full_name} uchun yangilanmadi"
+                            ),
+                        }
+                    )
             else:
                 user.username = username
                 session.add(user)
@@ -381,7 +419,7 @@ class EduPlanRepository:
         row.last_name = last_name
         row.third_name = third_name
         row.full_name = full_name
-        row.hemis_id = await self._free_hemis_id(session, hemis_id, row)
+        row.hemis_id = await self._free_hemis_id(session, hemis_id, row, failures)
         row.kafedra_id = kafedra_id
         self._stamp(row, external_id)
         session.add(row)
