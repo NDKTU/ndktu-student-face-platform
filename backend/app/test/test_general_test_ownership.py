@@ -58,6 +58,7 @@ SUBJECT_OWNER_PERMS = (
     "update:general_test_subject",
     "delete:general_test_subject",
     "create:general_test_question",
+    "read:general_test_question",
     "update:general_test_question",
     "delete:general_test_question",
     "read:general_test",

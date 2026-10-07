@@ -140,6 +140,20 @@ async def test_teacher_still_uploads_questions(teacher, async_db):
 
 
 @pytest.mark.asyncio
+async def test_teacher_reads_the_question_bank(teacher, async_db):
+    """Roʻyxat `read:general_test_question` bilan ochiladi, fan huquqi bilan emas."""
+    from app.modules.general_test.model import GeneralTestSubjectUser
+
+    client, subject_id = teacher["client"], teacher["subject_id"]
+    async_db.add(GeneralTestSubjectUser(subject_id=subject_id, user_id=teacher["id"]))
+    await async_db.commit()
+
+    response = await client.get(f"/general-test/subject/{subject_id}/questions")
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
 async def test_subject_rights_are_not_in_the_teacher_list():
     """Roʻyxat oʻzi ham qaror: fan huquqlari u yerga qaytib kelmasin."""
     assert "create:general_test_subject" not in TEACHER_PERMISSIONS
@@ -147,3 +161,4 @@ async def test_subject_rights_are_not_in_the_teacher_list():
     assert "delete:general_test_subject" not in TEACHER_PERMISSIONS
     assert "read:general_test_subject" in TEACHER_PERMISSIONS
     assert "create:general_test_question" in TEACHER_PERMISSIONS
+    assert "read:general_test_question" in TEACHER_PERMISSIONS

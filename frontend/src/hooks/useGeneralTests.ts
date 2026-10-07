@@ -210,10 +210,11 @@ export const useRemoveGeneralTestGroup = (testId: number) => {
 
 // ── Fan savollar banki ──────────────────────────────────────────────────────
 
-export const useSubjectQuestions = (subjectId: number) =>
+export const useSubjectQuestions = (subjectId: number, enabled = true) =>
     useQuery({
         queryKey: KEYS.subjectQuestions(subjectId),
         queryFn: () => generalTestService.subjectQuestions(subjectId),
+        enabled,
     });
 
 /**

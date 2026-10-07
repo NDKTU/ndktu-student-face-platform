@@ -37,7 +37,9 @@ export default function GeneralTestQuestionFormPage() {
     const backTo = `/elementar-tests/subjects/${subjectId}`;
 
     const { data: subject } = useGeneralTestSubject(subjectId);
-    const questionsQuery = useSubjectQuestions(subjectId);
+    // Roʻyxat faqat tahrirlashda kerak: yangi savol uchun
+    // `read:general_test_question` boʻlmasa ham forma ochilsin.
+    const questionsQuery = useSubjectQuestions(subjectId, isEditMode);
     const editing = isEditMode ? questionsQuery.data?.find((q) => q.id === questionId) : undefined;
     const save = useSaveSubjectQuestion(subjectId);
 

@@ -142,7 +142,11 @@ export default function GeneralTestSubjectDetailPage() {
                 />
             )}
 
-            {(tab === 'questions' || !canManage) && <SubjectQuestionBank subjectId={subject.id} canManage={canManage} />}
+            {(tab === 'questions' || !canManage) && (
+                <PermissionGate permission="read:general_test_question">
+                    <SubjectQuestionBank subjectId={subject.id} canManage={canManage} />
+                </PermissionGate>
+            )}
 
             {canManage && tab === 'users' && (
                 <Card>

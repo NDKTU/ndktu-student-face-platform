@@ -3,7 +3,7 @@
 Права:
 - `create/read/update/delete:general_test_subject` — сам предмет: создание,
   переименование, удаление и назначение на него пользователей;
-- `create/update/delete:general_test_question` — банк вопросов предмета.
+- `create/read/update/delete:general_test_question` — банк вопросов предмета.
   Отделено от прав на предмет намеренно: преподаватель наполняет чужой
   предмет вопросами, но не переименовывает его, не удаляет и не меняет
   список допущенных. Пока это было одним правом `update:general_test_subject`,
@@ -355,7 +355,7 @@ async def delete_question(
 async def list_subject_questions(
     subject_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: "User" = Depends(PermissionRequired("read:general_test_subject")),
+    user: "User" = Depends(PermissionRequired("read:general_test_question")),
 ):
     return await repo.list_subject_questions(session=session, subject_id=subject_id, user=user)
 

@@ -41,7 +41,7 @@ TEACHER_PERMISSIONS = (
     # qoladi. Uning ishi fan ichida: savollar banki va testlar.
     #
     # Shuning uchun savollar ruxsati fan ruxsatidan AJRATILGAN
-    # (`create/update/delete:general_test_question`). Ilgari ikkalasi
+    # (`create/read/update/delete:general_test_question`). Ilgari ikkalasi
     # bitta `update:general_test_subject` ostida edi, yaʼni savol
     # yuklashga ruxsat berish fanni tahrirlashga ham ruxsat berardi.
     #
@@ -58,6 +58,7 @@ TEACHER_PERMISSIONS = (
     "delete:general_test_question",
     "general_test:take",
     "read:general_test",
+    "read:general_test_question",
     "read:general_test_result",
     "read:general_test_subject",
     "update:general_test",
