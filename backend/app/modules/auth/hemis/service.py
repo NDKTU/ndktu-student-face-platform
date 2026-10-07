@@ -121,6 +121,7 @@ class HemisLoginService:
             password,
             settings.hemis.employee_login_url,
             settings.hemis.employee_me_url,
+            portal="сотруднический",
         )
 
     # ------------------------------------------------------------------ #
@@ -134,9 +135,40 @@ class HemisLoginService:
             settings.hemis.me_url,
         )
 
+    #: Сколько символов чужого ответа пишем в лог. Хватает, чтобы увидеть
+    #: сообщение Hemis об ошибке, и не превращает лог в свалку.
+    _LOG_BODY_LIMIT = 200
+
     @staticmethod
-    async def _fetch_from_hemis(login: str, password: str, login_url: str, me_url: str) -> dict:
-        """Логин и получение профиля. Протокол одинаков для обоих порталов Hemis."""
+    def _body_excerpt(resp: httpx.Response) -> str:
+        """Кусок ответа для лога, в одну строку.
+
+        Пароль сюда попасть не может: мы логируем ОТВЕТ, а не запрос.
+        Токен на неуспешном ответе Hemis не отдаёт, но на всякий случай
+        длина обрезана — целиком тело в лог не уходит.
+        """
+        text = (resp.text or "").strip().replace("\n", " ")
+        return text[: HemisLoginService._LOG_BODY_LIMIT] or "(пустое тело)"
+
+    @staticmethod
+    async def _fetch_from_hemis(
+        login: str,
+        password: str,
+        login_url: str,
+        me_url: str,
+        portal: str = "студенческий",
+    ) -> dict:
+        """Логин и получение профиля. Протокол одинаков для обоих порталов Hemis.
+
+        Каждый отказ пишется в лог ОТДЕЛЬНОЙ строкой с причиной. Раньше все
+        четыре ветки возвращали одинаковый голый ``400`` и молчали, и по
+        логам нельзя было отличить «студент ошибся паролем» от «Hemis не
+        отдал профиль». За сутки таких отказов набирается под семьсот, и
+        разбирать их было нечем.
+
+        Пароль не логируется нигде: в лог идут только логин, код ответа и
+        кусок ТЕЛА ответа.
+        """
         try:
             async with httpx.AsyncClient() as client:
                 login_resp = await client.post(
@@ -145,27 +177,102 @@ class HemisLoginService:
                     headers={"Accept": "application/json"},
                 )
                 if login_resp.status_code != 200:
+                    logger.warning(
+                        "Hemis (%s): вход %s отклонён, HTTP %s — %s",
+                        portal,
+                        login,
+                        login_resp.status_code,
+                        HemisLoginService._body_excerpt(login_resp),
+                    )
                     raise HTTPException(status_code=400, detail="Hemis login failed")
 
-                login_data = login_resp.json()
+                try:
+                    login_data = login_resp.json()
+                except ValueError:
+                    # Вместо JSON пришла страница — так выглядит заглушка
+                    # балансировщика или редирект на форму входа.
+                    logger.error(
+                        "Hemis (%s): вход %s вернул не JSON — %s",
+                        portal,
+                        login,
+                        HemisLoginService._body_excerpt(login_resp),
+                    )
+                    raise HTTPException(status_code=502, detail="Hemis вернул неожиданный ответ")
+
                 if not login_data.get("success"):
+                    # Самая частая ветка: Hemis не принял пару логин-пароль.
+                    logger.warning(
+                        "Hemis (%s): логин или пароль %s не приняты — %s",
+                        portal,
+                        login,
+                        HemisLoginService._body_excerpt(login_resp),
+                    )
                     raise HTTPException(status_code=400, detail="Hemis login returned unsuccessful")
 
-                token = login_data["data"]["token"]
+                token = (login_data.get("data") or {}).get("token")
+                if not token:
+                    # success=true без токена: раньше это был KeyError и
+                    # пятисотка, то есть «ошибка у нас» вместо «ошибка там».
+                    logger.error(
+                        "Hemis (%s): вход %s успешен, но токена в ответе нет. Ключи: %s",
+                        portal,
+                        login,
+                        sorted((login_data.get("data") or {}).keys()),
+                    )
+                    raise HTTPException(status_code=502, detail="Hemis не вернул токен")
 
                 me_resp = await client.get(
                     me_url,
                     headers={"Authorization": f"Bearer {token}"},
                 )
                 if me_resp.status_code != 200:
+                    # Пароль ВЕРНЫЙ (токен выдан), профиль не отдан. Для
+                    # человека это выглядит так же, как неверный пароль, —
+                    # в логе эти случаи теперь разные.
+                    logger.error(
+                        "Hemis (%s): профиль %s не отдан, HTTP %s — %s",
+                        portal,
+                        login,
+                        me_resp.status_code,
+                        HemisLoginService._body_excerpt(me_resp),
+                    )
                     raise HTTPException(status_code=400, detail="Hemis ME endpoint failed")
 
-                me_result = me_resp.json()
+                try:
+                    me_result = me_resp.json()
+                except ValueError:
+                    logger.error(
+                        "Hemis (%s): профиль %s вернулся не в JSON — %s",
+                        portal,
+                        login,
+                        HemisLoginService._body_excerpt(me_resp),
+                    )
+                    raise HTTPException(status_code=502, detail="Hemis вернул неожиданный ответ")
+
                 if not me_result.get("success"):
+                    logger.error(
+                        "Hemis (%s): профиль %s вернулся с success=false — %s",
+                        portal,
+                        login,
+                        HemisLoginService._body_excerpt(me_resp),
+                    )
                     raise HTTPException(status_code=400, detail="Hemis ME returned unsuccessful")
 
-                return me_result["data"]
+                data = me_result.get("data")
+                if not isinstance(data, dict):
+                    logger.error(
+                        "Hemis (%s): профиль %s без данных — %s",
+                        portal,
+                        login,
+                        HemisLoginService._body_excerpt(me_resp),
+                    )
+                    raise HTTPException(status_code=502, detail="Hemis не вернул данные профиля")
+
+                return data
         except httpx.RequestError as e:
+            # Сеть: Hemis не ответил вовсе. Это не вина входящего, и код
+            # другой — 503, а не 400.
+            logger.error("Hemis (%s) недоступен при входе %s: %s", portal, login, e)
             raise HTTPException(
                 status_code=503,
                 detail=f"Hemis service unavailable: {str(e)}",
