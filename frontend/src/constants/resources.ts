@@ -120,6 +120,11 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     // fanga tegishli, fanga biriktirilganlar va testga biriktirilgan guruhlar ishlaydi.
     general_test:  { label: 'Elementar testlar', href: '/elementar-tests', icon: ClipboardCheck, section: 'Baholash', tone: 'green' },
     general_test_subject: { label: 'Elementar fanlar', href: '/elementar-tests/subjects', icon: BookMarked, section: 'Baholash', tone: 'teal' },
+    // Fan ichidagi savollar banki: alohida sahifasi yoʻq, `href` — u ochiladigan
+    // joy. Menyuga chiqmaydi (`SIDEBAR_RESOURCE_ORDER` da yoʻq); bu yozuv rol
+    // ruxsatlari sahifasida nom va «Sahifa koʻrinadi» kartasi uchun — aks holda
+    // huquqlar «Tizim amallari» ichiga tushardi.
+    general_test_question: { label: 'Elementar savollar', href: '/elementar-tests/subjects', icon: MessageCircleQuestion, section: 'Baholash', tone: 'purple' },
     general_test_result: { label: 'Elementar test natijalari', href: '/elementar-tests/results', icon: ChartColumnBig, section: 'Baholash', tone: 'orange' },
     psychology_stats: { label: 'Psixologiya statistikasi', href: '/psychology/stats', icon: ChartColumnBig, section: 'Baholash', tone: 'cyan' },
 
