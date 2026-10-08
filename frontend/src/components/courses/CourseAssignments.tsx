@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     BarChart3,
     BookOpen,
@@ -48,7 +48,6 @@ import { PROCTORING_LABELS, type Quiz, type QuizCreateRequest } from '@/services
 import { apiErrorMessage } from '@/utils/apiError';
 import { IndependentTopicModal } from './IndependentTopicModal';
 import { MidtermQuizModal } from './MidtermQuizModal';
-import { NAZORAT_REOPEN_PARAM, readNazoratDraft } from './nazoratDraft';
 
 interface Props {
     courseId: number;
@@ -227,14 +226,12 @@ const MidtermExtraQuestions = ({
 const MidtermQuizzes = ({
     courseId,
     subjectId,
-    subjectName,
     lessons,
     groups,
     canSeeResults,
 }: {
     courseId: number;
     subjectId: number;
-    subjectName?: string;
     lessons: Lesson[];
     groups: CourseGroupInfo[];
     canSeeResults: boolean;
@@ -249,30 +246,9 @@ const MidtermQuizzes = ({
     const [toDelete, setToDelete] = useState<Quiz | null>(null);
     const [deleteWarnings, setDeleteWarnings] = useState<string[]>([]);
     const [togglingId, setTogglingId] = useState<number | null>(null);
-    const [restoreDraft, setRestoreDraft] = useState(false);
-    const [searchParams, setSearchParams] = useSearchParams();
-    const reopen = searchParams.get(NAZORAT_REOPEN_PARAM);
 
     const quizzes = quizzesQuery.data?.quizzes ?? [];
 
-    // Oynadan savol formasiga o'tilgan bo'lsa — qaytganda oyna qoralama
-    // bilan qayta ochiladi. Tahrirlash rejimi uchun ro'yxat kerak.
-    useEffect(() => {
-        if (!reopen || !quizzesQuery.isSuccess) return;
-        const draft = readNazoratDraft(courseId);
-        const target = draft?.quizId ? quizzesQuery.data.quizzes.find((quiz) => quiz.id === draft.quizId) : null;
-        setEditing(target ?? null);
-        setRestoreDraft(Boolean(draft) && (draft?.quizId == null || Boolean(target)));
-        setModalOpen(true);
-        setSearchParams(
-            (prev) => {
-                const next = new URLSearchParams(prev);
-                next.delete(NAZORAT_REOPEN_PARAM);
-                return next;
-            },
-            { replace: true },
-        );
-    }, [reopen, quizzesQuery.isSuccess, quizzesQuery.data, courseId, setSearchParams]);
     const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
     const groupName = (id?: number | null) => groups.find((group) => group.id === id)?.name;
     const usedControlTypes = quizzes
@@ -345,7 +321,7 @@ const MidtermQuizzes = ({
             }
             action={
                 <CardAction
-                    onClick={() => { setEditing(null); setRestoreDraft(false); setModalOpen(true); }}
+                    onClick={() => { setEditing(null); setModalOpen(true); }}
                     icon={<Plus className="h-4 w-4" />}
                     label="Nazorat"
                 />
@@ -462,7 +438,7 @@ const MidtermQuizzes = ({
                                             variant="ghost"
                                             size="icon"
                                             aria-label="Testni tahrirlash"
-                                            onClick={() => { setEditing(quiz); setRestoreDraft(false); setModalOpen(true); }}
+                                            onClick={() => { setEditing(quiz); setModalOpen(true); }}
                                         >
                                             <Pencil className="h-4 w-4" />
                                         </Button>
@@ -524,14 +500,11 @@ const MidtermQuizzes = ({
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
                 courseId={courseId}
-                subjectId={subjectId}
-                subjectName={subjectName}
                 lessons={lessons}
                 groups={groups}
                 defaultControlType={defaultControlType}
                 usedControlTypes={usedControlTypes}
                 quiz={editing}
-                restoreDraft={restoreDraft}
             />
 
             <ConfirmDialog
@@ -789,7 +762,6 @@ export const CourseAssignments = ({
                 <MidtermQuizzes
                     courseId={courseId}
                     subjectId={subjectId}
-                    subjectName={subjectName}
                     lessons={lessons}
                     groups={groups}
                     canSeeResults={canSeeResults}
