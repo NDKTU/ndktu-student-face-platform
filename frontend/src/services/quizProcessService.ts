@@ -68,6 +68,8 @@ export interface StartQuizResponse {
     submitted_answers: SubmittedAnswerDTO[];
     /** Qat'iy rejim: sahifadan chiqilsa urinish serverda yopiladi. */
     strict_mode?: boolean;
+    /** Savol matni faqat «ko'rish» tugmasi bosilib turganda ko'rinadi. */
+    hold_to_reveal?: boolean;
 }
 
 export interface SubmitAnswerRequest {

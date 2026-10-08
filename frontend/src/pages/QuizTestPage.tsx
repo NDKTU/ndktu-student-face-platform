@@ -29,6 +29,8 @@ import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
 import { QuizWatermark } from '@/components/quizzes/QuizWatermark';
 import { LEAVE_TEXT, closedReason, useStrictQuizGuard } from '@/hooks/useStrictQuizGuard';
+import { useHoldToReveal } from '@/hooks/useHoldToReveal';
+import { HoldToRevealBar } from '@/components/quizzes/HoldToRevealBar';
 import { ENABLE_QUIZ_PROCTORING, FACE_DETECTION_SERVICE_URL } from '@/config/env';
 import { useCameraAvailability } from '@/hooks/useCameraAvailability';
 import { cheatingImageService } from '@/services/cheatingImageService';
@@ -473,6 +475,11 @@ const QuizTestPage = () => {
         onLeave: handleLeave,
     });
 
+    const holdToReveal = phase === 'quiz' && Boolean(quizData?.hold_to_reveal);
+    const reveal = useHoldToReveal(holdToReveal);
+    // Tranzitsiyasiz: o'tish paytidagi yarim xira kadr skrinshotga tushmasin.
+    const veil = reveal.hidden ? 'blur-md' : '';
+
     useEffect(() => {
         if (phase !== 'quiz' || !isStrict || !quizData || cheatingDetected) return;
         const resultId = quizData.result_id;
@@ -850,7 +857,7 @@ const QuizTestPage = () => {
     return (
         <FocusOverlay>
         <div
-            className="space-y-6 max-w-4xl mx-auto select-none [-webkit-touch-callout:none]"
+            className={cn("space-y-6 max-w-4xl mx-auto select-none [-webkit-touch-callout:none]", holdToReveal && "pb-24")}
             {...noCopyHandlers}
         >
             {/* Video Monitoring Component */}
@@ -866,6 +873,7 @@ const QuizTestPage = () => {
                 />
             )}
             <QuizWatermark user={user} />
+            {holdToReveal && <HoldToRevealBar reveal={reveal} />}
 
             {/* Header with timer and progress — на мобильных складывается в колонку */}
             <div className="flex flex-col gap-3 bg-card p-4 rounded-xl shadow-sm border border-border sm:flex-row sm:items-center sm:justify-between">
@@ -932,7 +940,7 @@ const QuizTestPage = () => {
                             {currentQuestionIndex + 1}
                         </span>
                         <div
-                            className="text-lg font-medium leading-relaxed"
+                            className={cn("text-lg font-medium leading-relaxed", veil)}
                             dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.text) }}
                         />
                     </div>
@@ -982,7 +990,7 @@ const QuizTestPage = () => {
                                             : option.key}
                                     </span>
                                     <span
-                                        className="pt-0.5 text-foreground leading-relaxed"
+                                        className={cn("pt-0.5 text-foreground leading-relaxed", veil)}
                                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.value) }}
                                     />
                                 </button>

@@ -4,7 +4,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
-import { StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
+import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { useGeneralTestSubjects } from '@/hooks/useGeneralTests';
 import type { GeneralTestPayload, GeneralTestSummary } from '@/services/generalTestService';
 import { GroupChecklist } from './GroupChecklist';
@@ -36,6 +36,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
     const [isActive, setIsActive] = useState(editing?.is_active ?? false);
     const [pinRequired, setPinRequired] = useState(Boolean(editing?.pin));
     const [strictMode, setStrictMode] = useState(editing?.strict_mode ?? false);
+    const [holdToReveal, setHoldToReveal] = useState(editing?.hold_to_reveal ?? false);
     const [error, setError] = useState<string | null>(null);
     const subjectName = subjects?.subjects.find((s) => String(s.id) === subjectId)?.name ?? '';
 
@@ -64,6 +65,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
             is_active: isActive,
             pin_required: pinRequired,
             strict_mode: strictMode,
+            hold_to_reveal: holdToReveal,
         });
     };
 
@@ -137,6 +139,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
                     <Switch checked={pinRequired} onCheckedChange={setPinRequired} />
                 </div>
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
+                <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" onClick={onClose}>

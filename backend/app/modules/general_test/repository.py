@@ -796,8 +796,9 @@ class GeneralTestRepository:
         changes = data.model_dump(exclude_unset=True)
         pin_required = changes.pop("pin_required", None)
         regenerate_pin = changes.pop("regenerate_pin", False)
-        if changes.get("strict_mode", False) is None:
-            changes.pop("strict_mode")
+        for flag in ("strict_mode", "hold_to_reveal"):
+            if flag in changes and changes[flag] is None:
+                changes.pop(flag)
         if pin_required is False:
             test.pin = None
         elif (pin_required and test.pin is None) or (regenerate_pin and (pin_required or test.pin)):
@@ -1128,6 +1129,7 @@ class GeneralTestRepository:
             remaining_seconds=_remaining_seconds(attempt, attempt.test),
             questions=items,
             strict_mode=attempt.test.strict_mode,
+            hold_to_reveal=attempt.test.hold_to_reveal,
         )
 
     async def start(self, session: AsyncSession, test_id: int, user: User, pin: str | None = None) -> AttemptState:

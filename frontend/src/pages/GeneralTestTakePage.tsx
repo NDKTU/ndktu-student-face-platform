@@ -17,6 +17,8 @@ import { noCopyHandlers } from '@/utils/antiCopy';
 import { useAuth } from '@/context/AuthContext';
 import { QuizWatermark } from '@/components/quizzes/QuizWatermark';
 import { LEAVE_TEXT, closedReason, useStrictQuizGuard } from '@/hooks/useStrictQuizGuard';
+import { useHoldToReveal } from '@/hooks/useHoldToReveal';
+import { HoldToRevealBar } from '@/components/quizzes/HoldToRevealBar';
 import type { LeaveReason } from '@/services/quizProcessService';
 import { RichText } from '@/components/questions/RichText';
 import { cn } from '@/lib/utils';
@@ -145,6 +147,11 @@ export default function GeneralTestTakePage() {
 
     useStrictQuizGuard({ active: isStrict && !result && !leftReason, onLeave: handleLeave });
 
+    const holdToReveal = Boolean(state?.hold_to_reveal) && !result && !leftReason;
+    const reveal = useHoldToReveal(holdToReveal);
+    // Tranzitsiyasiz: o'tish paytidagi yarim xira kadr skrinshotga tushmasin.
+    const veil = reveal.hidden ? 'blur-md' : '';
+
     useEffect(() => {
         if (!isStrict || result || leftReason) return;
         const id = setInterval(() => {
@@ -235,8 +242,12 @@ export default function GeneralTestTakePage() {
     const unanswered = state.questions.length - answeredCount;
 
     return (
-        <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 select-none [-webkit-touch-callout:none]" {...noCopyHandlers}>
+        <div
+            className={cn('mx-auto w-full max-w-3xl space-y-5 px-4 py-6 select-none [-webkit-touch-callout:none]', holdToReveal && 'pb-24')}
+            {...noCopyHandlers}
+        >
             <QuizWatermark user={user} />
+            {holdToReveal && <HoldToRevealBar reveal={reveal} />}
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className="truncate text-lg font-semibold text-foreground">{state.title}</h1>
@@ -259,7 +270,7 @@ export default function GeneralTestTakePage() {
                     <p className="mb-1 text-xs font-medium text-muted-foreground">
                         {current + 1}-savol
                     </p>
-                    <RichText value={question.text} className="text-base font-medium text-foreground" />
+                    <RichText value={question.text} className={cn('text-base font-medium text-foreground', veil)} />
                     <div className="mt-4 space-y-2">
                         {question.options.map((option, index) => {
                             const selected = answers[question.id] === option.key;
@@ -283,7 +294,7 @@ export default function GeneralTestTakePage() {
                                     >
                                         {'ABCD'[index]}
                                     </span>
-                                    <RichText value={option.text} className="min-w-0 flex-1" />
+                                    <RichText value={option.text} className={cn('min-w-0 flex-1', veil)} />
                                 </button>
                             );
                         })}

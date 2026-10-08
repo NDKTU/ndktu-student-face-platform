@@ -100,6 +100,8 @@ export interface GeneralTestSummary {
     is_active: boolean;
     /** Qat'iy rejim: sahifadan chiqsa urinish yopiladi. */
     strict_mode?: boolean;
+    /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
+    hold_to_reveal?: boolean;
     /** Boshlash PIN'i; `null` — test PIN'siz. Faqat test egasi/admin ko'radi. */
     pin: string | null;
     /** Testdagi barcha savollar. */
@@ -151,6 +153,7 @@ export interface GeneralTestPayload {
     /** Faqat tahrirlashda: yangi PIN yaratish. */
     regenerate_pin?: boolean;
     strict_mode?: boolean;
+    hold_to_reveal?: boolean;
 }
 
 export interface QuestionPayload {
@@ -196,6 +199,7 @@ export interface AttemptState {
     remaining_seconds: number;
     questions: TakeQuestion[];
     strict_mode?: boolean;
+    hold_to_reveal?: boolean;
 }
 
 export interface AttemptResult {

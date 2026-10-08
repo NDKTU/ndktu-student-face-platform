@@ -225,3 +225,28 @@ async def test_update_without_flag_keeps_strict_mode(auth_client, test_subject, 
     payload["strict_mode"] = False
     switched_off = await auth_client.put(f"/quiz/{quiz_id}", json=payload)
     assert switched_off.json()["strict_mode"] is False
+
+
+@pytest.mark.asyncio
+async def test_hold_to_reveal_reaches_test_page_and_survives_update(auth_client, async_db, test_subject, test_group):
+    quiz = await _setup_quiz(async_db, strict_mode=False)
+    quiz.hold_to_reveal = True
+    await async_db.commit()
+    assert (await _start(auth_client, quiz))["hold_to_reveal"] is True
+
+    users_resp = await auth_client.get("/user/")
+    payload = {
+        "title": "Hidden text quiz",
+        "question_number": 5,
+        "duration": 30,
+        "pin": "9999",
+        "user_id": users_resp.json()["users"][0]["id"],
+        "group_id": test_group["id"],
+        "subject_id": test_subject.id,
+        "hold_to_reveal": True,
+    }
+    created = await auth_client.post("/quiz/", json=payload)
+    assert created.json()["hold_to_reveal"] is True
+    payload.pop("hold_to_reveal")
+    updated = await auth_client.put(f"/quiz/{created.json()['id']}", json=payload)
+    assert updated.json()["hold_to_reveal"] is True

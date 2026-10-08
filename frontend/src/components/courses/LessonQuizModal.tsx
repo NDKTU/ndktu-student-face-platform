@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
-import { StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
+import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS } from '@/services/quizService';
 import type { ProctoringMode, Quiz, QuizType } from '@/services/quizService';
@@ -43,6 +43,7 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
     const [pin, setPin] = useState('');
     const [proctoringMode, setProctoringMode] = useState<ProctoringMode>('standard');
     const [strictMode, setStrictMode] = useState(false);
+    const [holdToReveal, setHoldToReveal] = useState(false);
     const [isActive, setIsActive] = useState(false);
     const [error, setError] = useState('');
 
@@ -54,6 +55,7 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
         setPin(quiz?.pin ?? Math.random().toString().slice(2, 6));
         setProctoringMode(quiz?.proctoring_mode ?? 'standard');
         setStrictMode(quiz?.strict_mode ?? false);
+        setHoldToReveal(quiz?.hold_to_reveal ?? false);
         setIsActive(quiz?.is_active ?? false);
         setError('');
     }, [isOpen, quiz]);
@@ -84,6 +86,7 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
             is_active: isActive,
             proctoring_mode: proctoringMode,
             strict_mode: strictMode,
+            hold_to_reveal: holdToReveal,
         };
 
         const onError = (cause: unknown) => {
@@ -168,6 +171,7 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
                 )}
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
+                <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
                     <div>

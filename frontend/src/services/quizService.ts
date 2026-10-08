@@ -58,6 +58,8 @@ export interface Quiz {
     proctoring_mode: ProctoringMode;
     /** Qat'iy rejim: sahifadan chiqsa yoki ekranni bo'lsa test yopiladi. */
     strict_mode?: boolean;
+    /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
+    hold_to_reveal?: boolean;
     quiz_type?: QuizType;
     attempt?: number | null;
     created_at: string;
@@ -88,6 +90,8 @@ export interface QuizCreateRequest {
     proctoring_mode: ProctoringMode;
     /** Qat'iy rejim: sahifadan chiqsa yoki ekranni bo'lsa test yopiladi. */
     strict_mode?: boolean;
+    /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
+    hold_to_reveal?: boolean;
     quiz_type?: QuizType;
     attempt?: number | null;
 }

@@ -244,6 +244,9 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     #: Qat'iy rejim: talaba sahifadan chiqsa, boshqa ilovani ochsa yoki ekranni
     #: bo'lsa, urinish serverda darhol yopiladi (`quiz_process/strict.py`).
     strict_mode: Mapped[bool] = mapped_column(nullable=False, server_default="false")
+    #: Matnni yashirish: savol va variantlar xira, faqat barmoq «ko'rish»
+    #: tugmasida turganda ko'rinadi — oddiy skrinshot xira chiqadi.
+    hold_to_reveal: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     attempt: Mapped[int | None] = mapped_column(nullable=True, default=1)
 
     lecturer: Mapped["User"] = relationship(

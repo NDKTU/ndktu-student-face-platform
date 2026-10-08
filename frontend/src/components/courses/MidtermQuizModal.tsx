@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
-import { StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
+import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useControlQuestions, useLessonQuestionCounts } from '@/hooks/useQuestions';
@@ -87,6 +87,7 @@ export const MidtermQuizModal = ({
     const [pin, setPin] = useState('');
     const [proctoringMode, setProctoringMode] = useState<ProctoringMode>('standard');
     const [strictMode, setStrictMode] = useState(false);
+    const [holdToReveal, setHoldToReveal] = useState(false);
     const [isActive, setIsActive] = useState(false);
     const [error, setError] = useState('');
     const controlQuestionsQuery = useControlQuestions(courseId, isOpen ? controlType : '');
@@ -107,6 +108,7 @@ export const MidtermQuizModal = ({
             setPin(draft.pin);
             setProctoringMode(draft.proctoringMode);
             setStrictMode(draft.strictMode ?? false);
+            setHoldToReveal(draft.holdToReveal ?? false);
             setIsActive(draft.isActive);
             setError('');
             return;
@@ -121,6 +123,7 @@ export const MidtermQuizModal = ({
         setPin(quiz?.pin ?? Math.random().toString().slice(2, 6));
         setProctoringMode(quiz?.proctoring_mode ?? 'standard');
         setStrictMode(quiz?.strict_mode ?? false);
+        setHoldToReveal(quiz?.hold_to_reveal ?? false);
         setIsActive(quiz?.is_active ?? false);
         setError('');
         // `defaultControlType` ataylab kuzatilmaydi: ro'yxat yangilanganda
@@ -146,6 +149,7 @@ export const MidtermQuizModal = ({
             pin,
             proctoringMode,
             strictMode,
+            holdToReveal,
             isActive,
         });
         const returnTo = `/courses/${courseId}?tab=assignments&${NAZORAT_REOPEN_PARAM}=1`;
@@ -236,6 +240,7 @@ export const MidtermQuizModal = ({
             is_active: isActive,
             proctoring_mode: proctoringMode,
             strict_mode: strictMode,
+            hold_to_reveal: holdToReveal,
         };
 
         const onError = (cause: unknown) => setError(apiErrorMessage(cause, 'Testni saqlashda xatolik yuz berdi'));
@@ -473,6 +478,7 @@ export const MidtermQuizModal = ({
                 </div>
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
+                <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
                     <div>

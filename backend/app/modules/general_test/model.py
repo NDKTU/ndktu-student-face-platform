@@ -122,6 +122,9 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     #: Qat'iy rejim: talaba sahifadan chiqsa, urinish serverda yopiladi
     #: (`quiz/quiz_process/strict.py`).
     strict_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    #: Matnni yashirish: savol va variantlar xira, faqat barmoq «ko'rish»
+    #: tugmasida turganda ko'rinadi — oddiy skrinshot xira chiqadi.
+    hold_to_reveal: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

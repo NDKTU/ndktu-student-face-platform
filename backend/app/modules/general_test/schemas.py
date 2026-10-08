@@ -154,6 +154,8 @@ class GeneralTestCreateRequest(BaseModel):
     pin_required: bool = False
     #: Qat'iy rejim: sahifadan chiqsa urinish yopiladi.
     strict_mode: bool = False
+    #: Matnni yashirish: faqat «ko'rish» tugmasi bosilib turganda ko'rinadi.
+    hold_to_reveal: bool = False
 
 
 class GeneralTestUpdateRequest(BaseModel):
@@ -169,6 +171,7 @@ class GeneralTestUpdateRequest(BaseModel):
     #: Yangi PIN yaratish — eskisi tarqalib ketgan bo'lsa.
     regenerate_pin: bool = False
     strict_mode: bool | None = None
+    hold_to_reveal: bool | None = None
 
 
 class GeneralTestSummary(BaseModel):
@@ -182,6 +185,7 @@ class GeneralTestSummary(BaseModel):
     question_number: int | None
     is_active: bool
     strict_mode: bool = False
+    hold_to_reveal: bool = False
     #: Faqat test egasi va admin ko'radigan javoblarda: talabaga
     #: (`AvailableTest`) PIN'ning o'zi emas, faqat `pin_required` boradi.
     pin: str | None = None
@@ -314,6 +318,7 @@ class AttemptState(BaseModel):
     questions: list[TakeQuestion]
     #: Brauzer sahifadan chiqishni kuzatadi va heartbeat yuboradi.
     strict_mode: bool = False
+    hold_to_reveal: bool = False
 
 
 class AnswerRequest(BaseModel):

@@ -21,6 +21,7 @@ export interface NazoratDraft {
     proctoringMode: ProctoringMode;
     /** Eski qoralamada yo'q — `false` deb olinadi. */
     strictMode?: boolean;
+    holdToReveal?: boolean;
     isActive: boolean;
 }
 

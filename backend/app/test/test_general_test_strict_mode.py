@@ -145,3 +145,14 @@ async def test_update_without_flag_keeps_it(auth_client, scene):  # noqa: F811
     cleared = await auth_client.put(f"/general-test/{scene['test_id']}", json={"strict_mode": None})
     assert cleared.status_code == 200
     assert cleared.json()["strict_mode"] is True
+
+
+@pytest.mark.asyncio
+async def test_hold_to_reveal_reaches_attempt(auth_client, async_client, scene):  # noqa: F811
+    switched = await auth_client.put(f"/general-test/{scene['test_id']}", json={"hold_to_reveal": True})
+    assert switched.json()["hold_to_reveal"] is True
+    kept = await auth_client.put(f"/general-test/{scene['test_id']}", json={"duration": 40})
+    assert kept.json()["hold_to_reveal"] is True
+
+    _, state = await _start_as_staff(auth_client, async_client, scene)
+    assert state["hold_to_reveal"] is True

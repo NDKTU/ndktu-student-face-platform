@@ -44,6 +44,8 @@ class QuizCreateRequest(BaseModel):
     #: Qat'iy rejim. `None` — tahrirlashda o'zgarmaydi: maydonni yubormaydigan
     #: oynalar (dars testi, nazorat) bayroqni jimgina o'chirib qo'ymasligi uchun.
     strict_mode: Optional[bool] = None
+    #: Matnni yashirish; `None` — tahrirlashda o'zgarmaydi (yuqoridagi sabab bilan).
+    hold_to_reveal: Optional[bool] = None
     quiz_type: QuizType = QuizType.LESSON_QUIZ
 
     @field_validator("pin", mode="before")
@@ -81,6 +83,7 @@ class QuizCreateResponse(BaseModel):
     is_active: bool
     proctoring_mode: ProctoringMode
     strict_mode: bool = False
+    hold_to_reveal: bool = False
     quiz_type: QuizType
     attempt: Optional[int] = 1
     lecturer_id: Optional[int]

@@ -563,6 +563,7 @@ class QuizRepository:
             is_active=data.is_active,
             proctoring_mode=data.proctoring_mode,
             strict_mode=bool(data.strict_mode),
+            hold_to_reveal=bool(data.hold_to_reveal),
             quiz_type=data.quiz_type.value,
             lecturer_id=data.lecturer_id,
             created_by_user_id=created_by_user_id,
@@ -985,6 +986,8 @@ class QuizRepository:
         quiz.proctoring_mode = data.proctoring_mode
         if data.strict_mode is not None:
             quiz.strict_mode = data.strict_mode
+        if data.hold_to_reveal is not None:
+            quiz.hold_to_reveal = data.hold_to_reveal
         quiz.quiz_type = data.quiz_type.value
         quiz.group_id = data.group_id
         quiz.subject_id = data.subject_id
@@ -1086,6 +1089,7 @@ class QuizRepository:
             is_active=quiz.is_active,
             proctoring_mode=quiz.proctoring_mode,
             strict_mode=quiz.strict_mode,
+            hold_to_reveal=quiz.hold_to_reveal,
             quiz_type=quiz.quiz_type,
             # Банк вопросов остаётся лекторским, а пересдачу выдаёт организатор —
             # поэтому лектор наследуется, а создатель берётся текущий.

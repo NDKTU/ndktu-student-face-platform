@@ -80,6 +80,8 @@ class StartQuizResponse(BaseModel):
 
     #: Qat'iy rejim: brauzer sahifadan chiqishni kuzatadi va `heartbeat` yuboradi.
     strict_mode: bool = False
+    #: Savol matni faqat «ko'rish» tugmasi bosilib turganda ko'rinadi.
+    hold_to_reveal: bool = False
 
 
 class SubmitAnswerRequest(BaseModel):
