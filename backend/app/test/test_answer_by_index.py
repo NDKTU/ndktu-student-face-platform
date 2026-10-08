@@ -53,6 +53,18 @@ def _shown_options(question_dto: dict) -> list[str]:
     return [question_dto[f"option_{letter}"] for letter in ("a", "b", "c", "d")]
 
 
+async def _stored_verdict(async_db, result_id: int) -> bool:
+    """Server javobda to'g'riligini aytmaydi — u faqat bazada qoladi."""
+    row = (
+        await async_db.execute(
+            select(UserAnswers)
+            .where(UserAnswers.result_id == result_id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    return row.is_correct
+
+
 @pytest.mark.asyncio
 async def test_correct_answer_by_index(auth_client, async_db):
     quiz, _ = await _setup_quiz(
@@ -75,7 +87,8 @@ async def test_correct_answer_by_index(auth_client, async_db):
     )
 
     assert submit.status_code == 200
-    assert submit.json()["is_correct"] is True
+    assert "is_correct" not in submit.json()
+    assert await _stored_verdict(async_db, data["result_id"]) is True
 
     stored = (
         await async_db.execute(select(UserAnswers).where(UserAnswers.result_id == data["result_id"]))
@@ -104,7 +117,7 @@ async def test_wrong_answer_by_index(auth_client, async_db):
     )
 
     assert submit.status_code == 200
-    assert submit.json()["is_correct"] is False
+    assert await _stored_verdict(async_db, data["result_id"]) is False
 
 
 @pytest.mark.asyncio
@@ -131,7 +144,7 @@ async def test_duplicate_option_text_is_graded_by_position(auth_client, async_db
             json={"result_id": data["result_id"], "question_id": question_dto["id"], "answer_index": position},
         )
         assert submit.status_code == 200
-        verdicts.append(submit.json()["is_correct"])
+        verdicts.append(await _stored_verdict(async_db, data["result_id"]))
 
     # Один из двух одинаковых по тексту вариантов верен, другой — нет.
     assert sorted(verdicts) == [False, True]
@@ -176,7 +189,7 @@ async def test_legacy_text_answer_still_accepted(auth_client, async_db):
     )
 
     assert submit.status_code == 200
-    assert submit.json()["is_correct"] is True
+    assert await _stored_verdict(async_db, data["result_id"]) is True
 
 
 @pytest.mark.asyncio

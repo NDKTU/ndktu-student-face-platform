@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -83,6 +83,16 @@ class UserAnswersRepository:
         filters = []
         if restrict_to is not None:
             filters.append(UserAnswers.user_id == restrict_to)
+            # Tugamagan urinishning javoblari talabaga ko'rsatilmaydi: qatorda
+            # `correct_answer` va `is_correct` bor. Aks holda istalgan variantni
+            # yuborib, shu yerdan to'g'ri javobni o'qib, keyin uni qayta yuborish
+            # mumkin edi. `result_id` bo'sh qatorlar — eski, tugagan urinishlar.
+            filters.append(
+                or_(
+                    UserAnswers.result_id.is_(None),
+                    UserAnswers.result_id.not_in(select(Result.id).where(Result.status == "in_progress")),
+                )
+            )
         if data.result_id is not None:
             filters.extend(await self._attempt_filters(session, data.result_id, restrict_to))
         else:

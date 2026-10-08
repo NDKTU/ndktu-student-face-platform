@@ -80,7 +80,7 @@ export interface SubmitAnswerRequest {
 
 export interface SubmitAnswerResponse {
     question_id: number;
-    is_correct: boolean;
+    accepted: boolean;
 }
 
 export interface EndQuizRequest {

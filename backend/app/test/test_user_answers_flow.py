@@ -67,7 +67,7 @@ async def test_user_answers_flow(auth_client, async_db):
         json={"result_id": result_id, "question_id": question_dto["id"], "answer": "4"},
     )
     assert submit_response.status_code == 200
-    assert submit_response.json()["is_correct"] is True
+    assert "is_correct" not in submit_response.json()
 
     end_response = await auth_client.post("/quiz_process/end_quiz", json={"quiz_id": quiz.id, "result_id": result_id})
     assert end_response.status_code == 200

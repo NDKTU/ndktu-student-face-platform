@@ -104,7 +104,10 @@ class SubmitAnswerRequest(BaseModel):
 
 class SubmitAnswerResponse(BaseModel):
     question_id: int
-    is_correct: bool
+    #: Javob qabul qilindi. To'g'ri-noto'g'riligi test davomida aytilmaydi:
+    #: ilgari `is_correct` qaytardi va javobni qayta yuborish mumkin edi —
+    #: variantlarni birma-bir sinab, har savolda to'g'risini topish mumkin bo'lardi.
+    accepted: bool = True
 
 
 class EndQuizRequest(BaseModel):

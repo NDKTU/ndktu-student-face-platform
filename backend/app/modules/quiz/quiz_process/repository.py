@@ -532,7 +532,7 @@ class QuizProcessRepository:
             reserved.correct_answer = correct_text
             reserved.is_correct = is_correct
             await session.commit()
-            return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
+            return SubmitAnswerResponse(question_id=data.question_id)
 
         if positions:
             option_count = len(question_options(question))
@@ -543,7 +543,7 @@ class QuizProcessRepository:
             reserved.correct_answer = correct_text
             reserved.is_correct = is_correct
             await session.commit()
-            return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
+            return SubmitAnswerResponse(question_id=data.question_id)
 
         # Совместимость на время выкатки: у студента, начавшего тест до неё,
         # в браузере остаётся старый скрипт, который шлёт текст варианта.
@@ -562,7 +562,7 @@ class QuizProcessRepository:
 
         await session.commit()
 
-        return SubmitAnswerResponse(question_id=data.question_id, is_correct=is_correct)
+        return SubmitAnswerResponse(question_id=data.question_id)
 
     async def end_quiz(self, session: AsyncSession, data: EndQuizRequest, user: User) -> EndQuizResponse:
         result_obj = (await session.execute(select(Result).where(Result.id == data.result_id))).scalar_one_or_none()

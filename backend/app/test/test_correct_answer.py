@@ -47,7 +47,7 @@ async def test_end_quiz_check_correct_answer(auth_client, test_subject, test_gro
         json={"result_id": result_id, "question_id": question_id, "answer": "WrongChoice1"},
     )
     assert submit_resp.status_code == 200
-    assert submit_resp.json()["is_correct"] is False
+    assert "is_correct" not in submit_resp.json()
 
     response = await auth_client.post("/quiz_process/end_quiz", json={"quiz_id": quiz_id, "result_id": result_id})
     assert response.status_code == 200

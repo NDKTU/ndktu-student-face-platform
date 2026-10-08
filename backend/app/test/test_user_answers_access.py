@@ -13,7 +13,7 @@ import pytest
 import pytest_asyncio
 
 from app.modules.auth.model import Role, User
-from app.modules.quiz.model import Quiz, Subject, UserAnswers
+from app.modules.quiz.model import Quiz, Result, Subject, UserAnswers
 from app.modules.quiz.user_answers.repository import user_answers_repository
 from app.modules.quiz.user_answers.schemas import UserAnswersListRequest
 
@@ -86,3 +86,25 @@ async def test_teacher_sees_any_student(async_db, two_students):
     response = await user_answers_repository.get_all(async_db, request, teacher)
 
     assert response.total == 1
+
+
+@pytest.mark.asyncio
+async def test_student_cannot_read_answers_of_unfinished_attempt(async_db, two_students):
+    """Tugamagan urinishda `correct_answer` ko'rinsa, javobni o'qib qayta yuborish mumkin edi."""
+    owner, teacher, quiz = two_students["owner"], two_students["teacher"], two_students["quiz"]
+    attempt = Result(user_id=owner.id, quiz_id=quiz.id, status="in_progress")
+    async_db.add(attempt)
+    await async_db.flush()
+    async_db.add(
+        UserAnswers(user_id=owner.id, quiz_id=quiz.id, result_id=attempt.id, answer="b", correct_answer="a")
+    )
+    await async_db.flush()
+    request = UserAnswersListRequest(result_id=attempt.id, page=1, limit=50)
+
+    assert (await user_answers_repository.get_all(async_db, request, owner)).total == 0
+    # O'qituvchi tugamagan urinishni ham ko'radi.
+    assert (await user_answers_repository.get_all(async_db, request, teacher)).total == 1
+
+    attempt.status = "completed"
+    await async_db.flush()
+    assert (await user_answers_repository.get_all(async_db, request, owner)).total == 1
