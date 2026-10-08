@@ -17,7 +17,7 @@ import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
-import { QuizFilters, type LessonScope } from '@/components/quizzes/QuizFilters';
+import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
@@ -30,7 +30,7 @@ import { subjectOption } from '@/utils/subject';
 const QuizzesPage = () => {
     const { t } = useTranslation();
     const { hasPermission } = useAuth();
-    const { isAdmin, isTeacher } = useRoleView();
+    const { isTeacher } = useRoleView();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -65,23 +65,6 @@ const QuizzesPage = () => {
     const [filterGroupId, setFilterGroupId] = useUrlOptionalNumberState('group');
     const [filterUserId, setFilterUserId] = useUrlOptionalNumberState('teacher');
     const [filterIsActive, setFilterIsActive] = useUrlOptionalBoolState('active');
-    // Dars testlari standart holda bu ro'yxatda KO'RINMAYDI: ular kurs
-    // ichida, o'z darsida turadi va umumiy ro'yxatni to'ldiradi. Kerak
-    // bo'lsa — shu tanlagich orqali. «Darsi o'chirilgan» ham shu yerda:
-    // bunday testlar guruhsiz qoladi va boshqa filtrlarga tushmaydi.
-    // Standart qiymat ROLGA qarab.
-    //
-    // O'qituvchiga dars testlari bu ro'yxatda kerak emas: ular o'z darsida
-    // turadi va umumiy ro'yxatni to'ldirib, oddiy testlarni ko'rsatmay
-    // qo'yardi. Ma'muriyatga esa aksincha — unga universitet bo'yicha
-    // to'liq manzara kerak, va yashirilgan testlarni qidirib o'tirish
-    // vaqt yo'qotish bo'lardi.
-    //
-    // Filtr ikkalasida ham joyida: bu faqat boshlang'ich qiymat.
-    // `useUrlState` qiymatni har renderda URL'dan o'qiydi, shuning uchun
-    // rol kechroq yuklansa ham to'g'ri qiymatga o'tadi.
-    const defaultLessonScope: LessonScope = isAdmin ? 'all' : 'hidden';
-    const [lessonScope, setLessonScope] = useUrlState<LessonScope>('lesson_scope', defaultLessonScope);
     const [sortDir, setSortDir] = useUrlState<'desc' | 'asc'>('order', 'desc');
 
     useEffect(() => {
@@ -97,8 +80,6 @@ const QuizzesPage = () => {
         limit: pageSize,
         title: debouncedSearch || undefined,
         is_active: filterIsActive,
-        without_lesson: lessonScope === 'orphan' || undefined,
-        has_lesson: lessonScope === 'hidden' ? false : lessonScope === 'lesson' ? true : undefined,
         user_id: filterUserId,
         group_id: filterGroupId,
         subject_id: filterSubjectId,
@@ -278,7 +259,6 @@ const QuizzesPage = () => {
         setFilterGroupId(undefined);
         setFilterUserId(undefined);
         setFilterIsActive(undefined);
-        setLessonScope(defaultLessonScope);
         setSearchTerm('');
         setSortDir('desc');
         setCurrentPage(1);
@@ -290,7 +270,6 @@ const QuizzesPage = () => {
         filterGroupId !== undefined ||
         filterUserId !== undefined ||
         filterIsActive !== undefined ||
-        lessonScope !== defaultLessonScope ||
         searchTerm !== '' ||
         sortDir !== 'desc';
 
@@ -337,8 +316,6 @@ const QuizzesPage = () => {
                 onUserChange={setFilterUserId}
                 filterIsActive={filterIsActive}
                 onIsActiveChange={setFilterIsActive}
-                lessonScope={lessonScope}
-                onLessonScopeChange={(val) => { setLessonScope(val); setCurrentPage(1); }}
                 sortDir={sortDir}
                 onSortDirChange={setSortDir}
                 hasActiveFilters={hasActiveFilters}
@@ -358,7 +335,6 @@ const QuizzesPage = () => {
                 isRepeatPending={repeatQuizMutation.isPending}
                 getSubjectName={getSubjectName}
                 getGroupName={getGroupName}
-                lessonQuizzesHidden={lessonScope === 'hidden'}
                 onToggleStatus={handleToggleStatus}
                 onEdit={handleEditQuiz}
                 onDelete={handleDeleteClick}

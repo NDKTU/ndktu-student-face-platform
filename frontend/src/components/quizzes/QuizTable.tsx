@@ -52,12 +52,6 @@ interface QuizTableProps {
     onRepeat?: (quiz: Quiz) => void;
     onStart?: (quiz: Quiz, modeOverride?: ProctoringMode) => void;
     readOnly?: boolean;
-    /**
-     * Ro'yxatda dars testlari yashirilganmi. Bo'sh ro'yxatda buni aytish
-     * shart: aks holda o'qituvchi «Testlar topilmadi» ni ko'rib, testlari
-     * yo'qolgan deb o'ylardi — aslida ular kurs ichida turibdi.
-     */
-    lessonQuizzesHidden?: boolean;
     /** 'list' — таблица со списком тестов, 'cards' — карточная сетка. */
     variant?: 'cards' | 'list';
 }
@@ -85,7 +79,6 @@ export const QuizTable = ({
     onRepeat,
     onStart,
     readOnly,
-    lessonQuizzesHidden = false,
     variant = 'cards',
 }: QuizTableProps) => {
     const { t } = useTranslation();
@@ -111,13 +104,11 @@ export const QuizTable = ({
                 icon={<BookOpen className="h-6 w-6" />}
                 title="Testlar topilmadi"
                 description={
-                    lessonQuizzesHidden
-                        ? "Dars testlari bu ro'yxatda ko'rsatilmaydi — ular o'z darsida, kurs ichida. Ko'rish uchun «Darsga bog'liqlik» filtrini o'zgartiring."
-                        : hasActiveFilters
-                            ? "Filtrlarni o'zgartirib ko'ring."
-                            : readOnly
-                                ? "Hozircha faol testlar yo'q."
-                                : 'Boshlash uchun yangi test yarating.'
+                    hasActiveFilters
+                        ? "Filtrlarni o'zgartirib ko'ring."
+                        : readOnly
+                            ? "Hozircha faol testlar yo'q."
+                            : 'Boshlash uchun yangi test yarating.'
                 }
             />
         );
