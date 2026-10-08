@@ -1,4 +1,5 @@
 import api from './api';
+import { keepaliveLeave, type LeaveReason } from './quizProcessService';
 
 /**
  * Elementar test (ilgari «Umumiy test») — admin ochgan fanga tegishli oddiy
@@ -97,6 +98,8 @@ export interface GeneralTestSummary {
     /** Bitta urinishda beriladigan savollar; `null` — hammasi. */
     question_number: number | null;
     is_active: boolean;
+    /** Qat'iy rejim: sahifadan chiqsa urinish yopiladi. */
+    strict_mode?: boolean;
     /** Boshlash PIN'i; `null` — test PIN'siz. Faqat test egasi/admin ko'radi. */
     pin: string | null;
     /** Testdagi barcha savollar. */
@@ -147,6 +150,7 @@ export interface GeneralTestPayload {
     pin_required?: boolean;
     /** Faqat tahrirlashda: yangi PIN yaratish. */
     regenerate_pin?: boolean;
+    strict_mode?: boolean;
 }
 
 export interface QuestionPayload {
@@ -175,6 +179,7 @@ export interface AvailableTest {
     best_score: number | null;
     /** Yangi urinish PIN so'raydi (PIN'ning o'zi kelmaydi). */
     pin_required: boolean;
+    strict_mode?: boolean;
 }
 
 export interface TakeQuestion {
@@ -190,6 +195,7 @@ export interface AttemptState {
     title: string;
     remaining_seconds: number;
     questions: TakeQuestion[];
+    strict_mode?: boolean;
 }
 
 export interface AttemptResult {
@@ -201,6 +207,8 @@ export interface AttemptResult {
     score: number;
     started_at: string;
     finished_at: string | null;
+    /** Qat'iy testda yopilish sababi; bo'sh — oddiy yakun. */
+    stop_reason?: string | null;
 }
 
 export interface ResultRow {
@@ -218,6 +226,8 @@ export interface ResultRow {
     score: number;
     started_at: string;
     finished_at: string | null;
+    /** Qat'iy testda yopilish sababi; bo'sh — oddiy yakun. */
+    stop_reason?: string | null;
 }
 
 export interface ResultListResponse {
@@ -345,4 +355,11 @@ export const generalTestService = {
     },
     finish: async (attemptId: number) =>
         (await api.post<AttemptResult>(`/general-test/attempt/${attemptId}/finish`)).data,
+    /** Qat'iy test: sahifa hali ochiq. */
+    heartbeat: async (attemptId: number) => {
+        await api.post(`/general-test/attempt/${attemptId}/heartbeat`);
+    },
+    /** Qat'iy test: sahifadan chiqildi. `keepalive` — sabab `quizProcessService.sendLeave` da. */
+    sendLeave: (attemptId: number, reason: LeaveReason) =>
+        keepaliveLeave<AttemptResult>(`/general-test/attempt/${attemptId}/leave`, { reason }),
 };

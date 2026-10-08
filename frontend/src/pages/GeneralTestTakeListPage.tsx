@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ClipboardCheck, Clock, ListOrdered, Play, RotateCcw } from 'lucide-react';
+import { ClipboardCheck, Clock, ListOrdered, Play, RotateCcw, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -107,6 +107,13 @@ export default function GeneralTestTakeListPage() {
                                             <RotateCcw className="h-3.5 w-3.5" /> Urinish: {test.attempts_used} / {test.attempt_limit}
                                         </span>
                                     </div>
+                                    {test.strict_mode && (
+                                        <p className="mt-1.5 inline-flex items-start gap-1 text-xs text-destructive">
+                                            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                            Qat'iy rejim: sahifadan chiqsangiz, boshqa ilovani ochsangiz yoki ekranni
+                                            bo'lsangiz — test darhol yopiladi. Telefonni «Bezovta qilmang» rejimiga qo'ying.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex items-center justify-between gap-3 sm:justify-end">
                                     {test.best_score !== null && (

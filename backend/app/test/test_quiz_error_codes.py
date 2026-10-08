@@ -29,6 +29,8 @@ ALL_ERRORS = [
     ("face_verification_required", errors.face_verification_required, 403),
     ("face_entry_not_required", errors.face_entry_not_required, 409),
     ("face_service_unavailable", errors.face_service_unavailable, 503),
+    ("attempt_closed_left_page", errors.attempt_closed_left_page, 409),
+    ("strict_mode_disabled", errors.strict_mode_disabled, 400),
 ]
 
 

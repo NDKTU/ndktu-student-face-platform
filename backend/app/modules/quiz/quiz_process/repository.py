@@ -5,7 +5,7 @@ from datetime import datetime
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,12 +18,15 @@ from app.modules.auth.model import Student, User
 from app.modules.course.model import CourseGroup, Lesson
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
 
-from . import errors
+from . import errors, strict
 from .attempt import grade_for, is_expired, remaining_seconds
 from .question_view import grade_answer, question_options, to_dto
 from .schemas import (
     EndQuizRequest,
     EndQuizResponse,
+    HeartbeatRequest,
+    HeartbeatResponse,
+    LeaveQuizRequest,
     QuestionDTO,
     StartQuizRequest,
     StartQuizResponse,
@@ -97,6 +100,12 @@ class QuizProcessRepository:
                 # а студент остался бы заперт в ней.
                 await self._finalize_attempt(session, existing, reason="Vaqt tugadi")
                 raise errors.attempt_expired(ask_teacher=True)
+
+            # Qat'iy testda qaytish — sahifa yopilgan yoki yangilangan degani.
+            # `leave` yetib bormagan bo'lsa ham (aviarejim, uzilish), urinish
+            # shu yerda yopiladi.
+            if quiz.strict_mode and not await self._strict_resume_allowed(session, existing):
+                await self._close_left(session, existing, "resume")
 
             # Kirishda yuz tekshiruvi har bir kirishda — urinishga qaytishda
             # ham. Aks holda talaba bir marta tasdiqlanib, sahifani yangilagach
@@ -177,6 +186,8 @@ class QuizProcessRepository:
         # Tasdiq bir martalik: keyingi urinishga yana yuz ko'rsatiladi.
         if entry_key is not None:
             await redis_client.delete(entry_key)
+        if quiz.strict_mode:
+            await strict.touch(new_result.id)
 
         return StartQuizResponse(
             result_id=new_result.id,
@@ -189,6 +200,7 @@ class QuizProcessRepository:
             face_ws_token=face_ws_token,
             remaining_seconds=remaining_seconds(new_result, quiz),
             resumed=False,
+            strict_mode=quiz.strict_mode,
         )
 
     async def _require_entry_face(self, session: AsyncSession, quiz: Quiz, user: User) -> str | None:
@@ -410,7 +422,98 @@ class QuizProcessRepository:
             remaining_seconds=remaining_seconds(result_obj, quiz),
             resumed=True,
             submitted_answers=submitted,
+            strict_mode=quiz.strict_mode,
         )
+
+    async def _strict_resume_allowed(self, session: AsyncSession, result_obj: Result) -> bool:
+        """Urinish hozirgina ochilgan va hali javobsiz — `start_quiz` javobi yo'qolgan bo'lishi mumkin."""
+        age = (utcnow_naive() - result_obj.created_at).total_seconds()
+        if age >= strict.RESUME_WINDOW_SECONDS:
+            return False
+        answered = await session.scalar(
+            select(func.count())
+            .select_from(UserAnswers)
+            .where(UserAnswers.result_id == result_obj.id, UserAnswers.answer.is_not(None))
+        )
+        return not answered
+
+    async def _close_left(self, session: AsyncSession, result_obj: Result, reason_key: str | None) -> None:
+        """Qat'iy testda urinishni «sahifadan chiqdi» deb yopadi va xato beradi."""
+        reason = strict.leave_reason_text(reason_key)
+        await self._finalize_attempt(session, result_obj, reason=reason, cheating_detected=True)
+        await strict.forget(result_obj.id)
+        raise errors.attempt_closed_left_page(reason)
+
+    async def _require_alive(self, session: AsyncSession, result_obj: Result, quiz: Quiz | None) -> None:
+        """Qat'iy testda heartbeat to'xtagan bo'lsa — sahifa yopilgan, urinish yopiladi."""
+        if quiz is None or not quiz.strict_mode:
+            return
+        if not await strict.is_alive(result_obj.id):
+            await self._close_left(session, result_obj, "heartbeat")
+
+    async def _own_open_attempt(self, session: AsyncSession, result_id: int, user: User) -> tuple[Result, Quiz | None]:
+        result_obj = (await session.execute(select(Result).where(Result.id == result_id))).scalar_one_or_none()
+        if not result_obj:
+            raise errors.attempt_not_found()
+        if result_obj.user_id != user.id:
+            raise errors.not_your_attempt()
+        quiz = (await session.execute(select(Quiz).where(Quiz.id == result_obj.quiz_id))).scalar_one_or_none()
+        return result_obj, quiz
+
+    async def leave(self, session: AsyncSession, data: LeaveQuizRequest, user: User) -> EndQuizResponse:
+        """Qat'iy testda brauzer sahifadan chiqilganini aytdi — urinish yopiladi.
+
+        Takroriy chaqiruv (`blur` dan keyin `pagehide`) xato bermaydi: urinish
+        allaqachon yopiq bo'lsa, saqlangan natija qaytadi.
+        """
+        result_obj, quiz = await self._own_open_attempt(session, data.result_id, user)
+
+        if result_obj.status != "in_progress":
+            correct = result_obj.correct_answers or 0
+            wrong = result_obj.wrong_answers or 0
+            return EndQuizResponse(
+                total_questions=correct + wrong,
+                correct_answers=correct,
+                wrong_answers=wrong,
+                grade=result_obj.grade or 0,
+                cheating_detected=result_obj.cheating_detected or False,
+                reason=result_obj.reason_for_stop,
+            )
+
+        if quiz is None or not quiz.strict_mode:
+            raise errors.strict_mode_disabled()
+
+        total, correct, wrong, grade = await self._finalize_attempt(
+            session,
+            result_obj,
+            reason=strict.leave_reason_text(data.reason),
+            cheating_detected=True,
+        )
+        await strict.forget(result_obj.id)
+        return EndQuizResponse(
+            total_questions=total,
+            correct_answers=correct,
+            wrong_answers=wrong,
+            grade=grade,
+            cheating_detected=True,
+            reason=result_obj.reason_for_stop,
+        )
+
+    async def heartbeat(self, session: AsyncSession, data: HeartbeatRequest, user: User) -> HeartbeatResponse:
+        """Sahifa ochiq. Muddati o'tgan heartbeat'ni tiriltirmaydi.
+
+        Telefon fonda JS'ni muzlatadi: talaba boshqa ilovada 30 soniyadan ko'p
+        o'tirib qaytsa, birinchi heartbeat kalitni qayta yozib, chiqishni
+        yashirib yuborardi. Shuning uchun avval tekshiriladi, keyin yangilanadi.
+        """
+        result_obj, quiz = await self._own_open_attempt(session, data.result_id, user)
+        if result_obj.status != "in_progress":
+            raise errors.attempt_already_finished()
+        if quiz is None or not quiz.strict_mode:
+            return HeartbeatResponse()
+        await self._require_alive(session, result_obj, quiz)
+        await strict.touch(result_obj.id)
+        return HeartbeatResponse()
 
     async def finalize_attempt(
         self,
@@ -496,6 +599,8 @@ class QuizProcessRepository:
             await self._finalize_attempt(session, result_obj, reason="Vaqt tugadi")
             raise errors.attempt_expired()
 
+        await self._require_alive(session, result_obj, quiz)
+
         # Only a reserved row (created at start_quiz for a question actually
         # served to this student) may be answered — anything else means the
         # client is submitting for a question that was never shown.
@@ -578,6 +683,9 @@ class QuizProcessRepository:
 
         if result_obj.status != "in_progress":
             raise errors.attempt_already_finished()
+
+        quiz = (await session.execute(select(Quiz).where(Quiz.id == result_obj.quiz_id))).scalar_one_or_none()
+        await self._require_alive(session, result_obj, quiz)
 
         # Reserved rows at start_quiz time define the real denominator — anything
         # still unanswered here counts as wrong (student ran out of time / never got to it).

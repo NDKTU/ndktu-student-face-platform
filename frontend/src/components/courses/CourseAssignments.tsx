@@ -600,6 +600,7 @@ const StudentCourseQuizzes = ({ courseId }: { courseId: number }) => {
                                 <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                                     {quiz.question_number} savol · {quiz.duration} daqiqa
                                     {quiz.proctoring_mode !== 'standard' && ` · ${PROCTORING_LABELS[quiz.proctoring_mode]}`}
+                                    {quiz.strict_mode && " · Qat'iy rejim"}
                                 </p>
                             </div>
                             {/* Test sahifasi testni o'z ro'yxatidan qidiradi, u esa

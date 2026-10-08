@@ -41,6 +41,9 @@ class QuizCreateRequest(BaseModel):
     semester_number: Optional[int] = Field(default=None, ge=1, le=2)
     is_active: bool = False
     proctoring_mode: ProctoringMode = "standard"
+    #: Qat'iy rejim. `None` — tahrirlashda o'zgarmaydi: maydonni yubormaydigan
+    #: oynalar (dars testi, nazorat) bayroqni jimgina o'chirib qo'ymasligi uchun.
+    strict_mode: Optional[bool] = None
     quiz_type: QuizType = QuizType.LESSON_QUIZ
 
     @field_validator("pin", mode="before")
@@ -77,6 +80,7 @@ class QuizCreateResponse(BaseModel):
     pin: str
     is_active: bool
     proctoring_mode: ProctoringMode
+    strict_mode: bool = False
     quiz_type: QuizType
     attempt: Optional[int] = 1
     lecturer_id: Optional[int]

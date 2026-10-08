@@ -98,6 +98,24 @@ def attempt_already_finished() -> HTTPException:
     )
 
 
+def attempt_closed_left_page(reason: str = "Sahifadan chiqdi") -> HTTPException:
+    """Qat'iy testda talaba sahifadan chiqqani uchun urinish yopildi."""
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "attempt_closed_left_page",
+        f"Test yopildi: {reason.lower()}",
+        reason=reason,
+    )
+
+
+def strict_mode_disabled() -> HTTPException:
+    return quiz_error(
+        status.HTTP_400_BAD_REQUEST,
+        "strict_mode_disabled",
+        "Bu testda qat'iy rejim yoqilmagan",
+    )
+
+
 def question_not_in_attempt() -> HTTPException:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,

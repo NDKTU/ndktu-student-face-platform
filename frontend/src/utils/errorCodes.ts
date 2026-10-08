@@ -38,4 +38,6 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     face_verification_required: 'Testga kirish uchun avval yuzingizni tasdiqlang',
     face_entry_not_required: 'Bu testga kirishda yuz tekshirilmaydi',
     face_service_unavailable: "Yuz tekshiruvi xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
+    attempt_closed_left_page: 'Test yopildi: siz sahifadan chiqdingiz',
+    strict_mode_disabled: "Bu testda qat'iy rejim yoqilmagan",
 };

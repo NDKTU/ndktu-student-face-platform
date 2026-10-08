@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { scoreClass } from '@/components/generalTest/score';
@@ -13,6 +13,11 @@ import {
     type OptionLetter,
 } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
+import { noCopyHandlers } from '@/utils/antiCopy';
+import { useAuth } from '@/context/AuthContext';
+import { QuizWatermark } from '@/components/quizzes/QuizWatermark';
+import { LEAVE_TEXT, closedReason, useStrictQuizGuard } from '@/hooks/useStrictQuizGuard';
+import type { LeaveReason } from '@/services/quizProcessService';
 import { RichText } from '@/components/questions/RichText';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +36,7 @@ export default function GeneralTestTakePage() {
     const attemptId = Number(useParams().attemptId);
     const navigate = useNavigate();
     const refreshTaking = useRefreshTaking();
+    const { user } = useAuth();
 
     const [state, setState] = useState<AttemptState | null>(null);
     const [answers, setAnswers] = useState<Record<number, OptionLetter>>({});
@@ -40,6 +46,9 @@ export default function GeneralTestTakePage() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [confirmFinish, setConfirmFinish] = useState(false);
     const [finishing, setFinishing] = useState(false);
+    // Qat'iy testda chiqildi: urinish yopildi, server natijasi hali kelmagan
+    // (yoki aloqa yo'q — kelmaydi). Ballar o'rniga sabab ko'rsatiladi.
+    const [leftReason, setLeftReason] = useState<string | null>(null);
     const finishedRef = useRef(false);
     // Muddat bir marta — javob kelganda qotiriladi. Taymer effekti qayta
     // ishga tushsa ham hisob shu nuqtadan davom etadi, boshidan emas.
@@ -50,7 +59,11 @@ export default function GeneralTestTakePage() {
         finishedRef.current = true;
         setFinishing(true);
         try {
-            const res = await generalTestService.finish(attemptId);
+            const res = await generalTestService.finish(attemptId).catch((e: unknown) => {
+                // Qat'iy test server tomonda yopildi — endi `finish` saqlangan natijani beradi.
+                if (closedReason(e)) return generalTestService.finish(attemptId);
+                throw e;
+            });
             setResult(res);
             refreshTaking();
         } catch (e) {
@@ -116,6 +129,32 @@ export default function GeneralTestTakePage() {
         return () => clearInterval(timer);
     }, [state, result, finish]);
 
+    const isStrict = Boolean(state?.strict_mode);
+
+    const handleLeave = useCallback((reason: LeaveReason) => {
+        if (finishedRef.current) return;
+        finishedRef.current = true;
+        setLeftReason(LEAVE_TEXT[reason]);
+        void generalTestService.sendLeave(attemptId, reason).then((res) => {
+            if (res) {
+                setResult(res);
+                refreshTaking();
+            }
+        });
+    }, [attemptId, refreshTaking]);
+
+    useStrictQuizGuard({ active: isStrict && !result && !leftReason, onLeave: handleLeave });
+
+    useEffect(() => {
+        if (!isStrict || result || leftReason) return;
+        const id = setInterval(() => {
+            generalTestService.heartbeat(attemptId).catch((e: unknown) => {
+                if (closedReason(e) || statusOf(e) === 409) finish();
+            });
+        }, 5000);
+        return () => clearInterval(id);
+    }, [isStrict, result, leftReason, attemptId, finish]);
+
     const choose = async (questionId: number, option: OptionLetter) => {
         const previous = answers[questionId];
         setAnswers((prev) => ({ ...prev, [questionId]: option }));
@@ -139,15 +178,34 @@ export default function GeneralTestTakePage() {
     if (result) {
         return (
             <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-4 py-12 text-center">
-                <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                {result.stop_reason ? (
+                    <AlertTriangle className="h-12 w-12 text-destructive" />
+                ) : (
+                    <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                )}
                 <h1 className="text-xl font-semibold text-foreground">{result.title}</h1>
-                <p className="text-sm text-muted-foreground">Test yakunlandi</p>
+                {result.stop_reason ? (
+                    <p className="text-sm font-medium text-destructive">Test to'xtatildi: {result.stop_reason}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">Test yakunlandi</p>
+                )}
                 <div className={cn('rounded-2xl px-8 py-5', scoreClass(result.score))}>
                     <p className="text-4xl font-bold">{result.score}%</p>
                     <p className="mt-1 text-sm">
                         {result.correct_answers} / {result.total_questions} to'g'ri javob
                     </p>
                 </div>
+                <Button onClick={() => navigate('/elementar-tests/take')}>Testlar ro'yxatiga qaytish</Button>
+            </div>
+        );
+    }
+
+    if (leftReason) {
+        return (
+            <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-4 py-12 text-center">
+                <AlertTriangle className="h-12 w-12 text-destructive" />
+                <p className="text-sm font-medium text-destructive">Test to'xtatildi: {leftReason}</p>
+                <p className="text-sm text-muted-foreground">Urinish yopildi. Natija va sabab o'qituvchingizda ko'rinadi.</p>
                 <Button onClick={() => navigate('/elementar-tests/take')}>Testlar ro'yxatiga qaytish</Button>
             </div>
         );
@@ -177,7 +235,8 @@ export default function GeneralTestTakePage() {
     const unanswered = state.questions.length - answeredCount;
 
     return (
-        <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
+        <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 select-none [-webkit-touch-callout:none]" {...noCopyHandlers}>
+            <QuizWatermark user={user} />
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className="truncate text-lg font-semibold text-foreground">{state.title}</h1>

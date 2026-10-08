@@ -56,6 +56,8 @@ export interface Quiz {
     linked_question_count?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
+    /** Qat'iy rejim: sahifadan chiqsa yoki ekranni bo'lsa test yopiladi. */
+    strict_mode?: boolean;
     quiz_type?: QuizType;
     attempt?: number | null;
     created_at: string;
@@ -84,6 +86,8 @@ export interface QuizCreateRequest {
     semester_number?: number | null;
     is_active: boolean;
     proctoring_mode: ProctoringMode;
+    /** Qat'iy rejim: sahifadan chiqsa yoki ekranni bo'lsa test yopiladi. */
+    strict_mode?: boolean;
     quiz_type?: QuizType;
     attempt?: number | null;
 }

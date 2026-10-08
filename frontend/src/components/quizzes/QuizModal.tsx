@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
+import { StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
@@ -74,7 +75,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         formState: { errors },
     } = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
-        defaultValues: { is_active: false, proctoring_mode: 'standard', quiz_type: 'LESSON_QUIZ' },
+        defaultValues: { is_active: false, proctoring_mode: 'standard', strict_mode: false, quiz_type: 'LESSON_QUIZ' },
     });
 
     const createMutation = useCreateQuiz();
@@ -83,6 +84,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const isActive = watch('is_active');
     const proctoringMode = watch('proctoring_mode');
+    const strictMode = watch('strict_mode');
     const selectedLecturerId = watch('lecturer_id');
     const selectedSubjectId = watch('subject_id');
     const selectedGroupId = watch('group_id');
@@ -162,6 +164,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 quiz_type: quiz.quiz_type ?? 'LESSON_QUIZ',
                 is_active: quiz.is_active,
                 proctoring_mode: quiz.proctoring_mode ?? 'standard',
+                strict_mode: quiz.strict_mode ?? false,
             });
         } else {
             reset({
@@ -175,6 +178,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 quiz_type: 'LESSON_QUIZ',
                 is_active: false,
                 proctoring_mode: 'standard',
+                strict_mode: false,
             });
         }
     }, [quiz, reset, isOpen, isTeacher, user]);
@@ -238,6 +242,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             quiz_type: data.quiz_type,
             is_active: data.is_active,
             proctoring_mode: data.proctoring_mode,
+            strict_mode: data.strict_mode,
         };
 
         if (quiz) {
@@ -462,6 +467,8 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                         <p className="text-sm text-destructive">{errors.proctoring_mode.message}</p>
                     )}
                 </div>
+
+                <StrictModeSwitch checked={strictMode} onCheckedChange={(checked) => setValue('strict_mode', checked)} />
 
                 <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={onClose}>Bekor qilish</Button>

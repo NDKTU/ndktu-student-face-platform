@@ -241,6 +241,9 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     pin: Mapped[str] = mapped_column(nullable=False)
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     proctoring_mode: Mapped[str] = mapped_column(nullable=False, server_default="standard")
+    #: Qat'iy rejim: talaba sahifadan chiqsa, boshqa ilovani ochsa yoki ekranni
+    #: bo'lsa, urinish serverda darhol yopiladi (`quiz_process/strict.py`).
+    strict_mode: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     attempt: Mapped[int | None] = mapped_column(nullable=True, default=1)
 
     lecturer: Mapped["User"] = relationship(

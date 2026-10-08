@@ -264,7 +264,7 @@ export const QuizTable = ({
                 header: 'Rejim',
                 hideBelow: 'lg',
                 className: 'text-sm text-muted-foreground',
-                cell: (quiz) => PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart',
+                cell: (quiz) => `${PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}${quiz.strict_mode ? " · Qat'iy" : ''}`,
             },
             {
                 key: 'is_active',
@@ -324,7 +324,7 @@ export const QuizTable = ({
                             <span className="shrink-0 rounded bg-muted px-2 py-1 font-mono text-xs">{quiz.pin}</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {quiz.question_number} savol · {quiz.duration} daqiqa · {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}
+                            {quiz.question_number} savol · {quiz.duration} daqiqa · {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}{quiz.strict_mode && " · Qat'iy"}
                         </p>
                         <div className="flex items-center justify-between gap-2" onClick={(event) => event.stopPropagation()}>
                             <div className="flex items-center gap-2">
@@ -400,6 +400,7 @@ export const QuizTable = ({
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}
+                                    {quiz.strict_mode && " · Qat'iy"}
                                 </p>
                             </div>
                         </div>

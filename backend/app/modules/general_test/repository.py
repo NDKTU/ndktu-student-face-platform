@@ -16,6 +16,7 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.organization_structure.model import Faculty, Group, Kafedra
 from app.modules.quiz.question.excel_format import parse_correct_option, read_question_sheet
+from app.modules.quiz.quiz_process import strict
 
 from .model import (
     GeneralTest,
@@ -41,6 +42,8 @@ from .schemas import (
     GeneralTestUpdateRequest,
     GroupOption,
     GroupOptionListResponse,
+    HeartbeatResponse,
+    LeaveRequest,
     MyResultListResponse,
     QuestionCreateRequest,
     QuestionUpdateRequest,
@@ -80,6 +83,18 @@ COMPLETED = "completed"
 
 def _not_found(what: str = "Test") -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} topilmadi")
+
+
+#: Redis kalitlari prefiksi: `Result` id lari bilan to'qnashmasin.
+STRICT_KIND = "gtest"
+
+
+def _closed_left_page(reason: str) -> HTTPException:
+    """Qat'iy testda urinish yopildi — kod `quiz_process/errors.py` dagi bilan bir xil."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": "attempt_closed_left_page", "message": f"Test yopildi: {reason.lower()}", "reason": reason},
+    )
 
 
 def _new_pin() -> str:
@@ -781,6 +796,8 @@ class GeneralTestRepository:
         changes = data.model_dump(exclude_unset=True)
         pin_required = changes.pop("pin_required", None)
         regenerate_pin = changes.pop("regenerate_pin", False)
+        if changes.get("strict_mode", False) is None:
+            changes.pop("strict_mode")
         if pin_required is False:
             test.pin = None
         elif (pin_required and test.pin is None) or (regenerate_pin and (pin_required or test.pin)):
@@ -1069,6 +1086,7 @@ class GeneralTestRepository:
                     in_progress_attempt_id=in_progress,
                     best_score=max(scores) if scores else None,
                     pin_required=test.pin is not None,
+                    strict_mode=test.strict_mode,
                 )
             )
         return AvailableTestListResponse(tests=result)
@@ -1109,6 +1127,7 @@ class GeneralTestRepository:
             title=attempt.test.title,
             remaining_seconds=_remaining_seconds(attempt, attempt.test),
             questions=items,
+            strict_mode=attempt.test.strict_mode,
         )
 
     async def start(self, session: AsyncSession, test_id: int, user: User, pin: str | None = None) -> AttemptState:
@@ -1139,6 +1158,9 @@ class GeneralTestRepository:
             if attempt.status != IN_PROGRESS:
                 continue
             if not _is_expired(attempt, test):
+                # Qat'iy testga qaytish — sahifadan chiqqan degani.
+                if test.strict_mode and not await self._strict_young(session, attempt):
+                    await self._close_left(session, attempt, "resume")
                 return await self._state(session, attempt)
             await self._finalize(session, attempt)
 
@@ -1187,7 +1209,31 @@ class GeneralTestRepository:
         session.add(attempt)
         await session.commit()
         await session.refresh(attempt, ["test"])
+        if test.strict_mode:
+            await strict.touch(attempt.id, STRICT_KIND)
         return await self._state(session, attempt)
+
+    async def _strict_young(self, session: AsyncSession, attempt: GeneralTestAttempt) -> bool:
+        """Urinish hozirgina boshlangan va javobsiz — boshlash javobi yo'qolgan bo'lishi mumkin."""
+        if (utcnow_naive() - attempt.started_at).total_seconds() >= strict.RESUME_WINDOW_SECONDS:
+            return False
+        answered = await session.scalar(
+            select(func.count()).select_from(GeneralTestAnswer).where(GeneralTestAnswer.attempt_id == attempt.id)
+        )
+        return not answered
+
+    async def _close_left(self, session: AsyncSession, attempt: GeneralTestAttempt, reason_key: str | None) -> None:
+        """Qat'iy testda urinishni «sahifadan chiqdi» deb yopadi va 409 beradi."""
+        attempt.stop_reason = strict.leave_reason_text(reason_key)
+        await self._finalize(session, attempt)
+        await session.commit()
+        await strict.forget(attempt.id, STRICT_KIND)
+        raise _closed_left_page(attempt.stop_reason)
+
+    async def _require_alive(self, session: AsyncSession, attempt: GeneralTestAttempt) -> None:
+        """Heartbeat to'xtagan — sahifa yopilgan yoki fonda muzlagan."""
+        if attempt.test.strict_mode and not await strict.is_alive(attempt.id, STRICT_KIND):
+            await self._close_left(session, attempt, "heartbeat")
 
     async def _own_attempt(self, session: AsyncSession, attempt_id: int, user: User) -> GeneralTestAttempt:
         attempt = (
@@ -1210,6 +1256,15 @@ class GeneralTestRepository:
             await self._finalize(session, attempt)
             await session.commit()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vaqt tugagan")
+        # Test sahifasi urinishni shu yerdan oladi: ikkinchi ochilish — sahifa
+        # yangilangan yoki «Davom ettirish» bosilgan, ya'ni talaba chiqqan.
+        if attempt.test.strict_mode:
+            ttl = _remaining_seconds(attempt, attempt.test) + 3600
+            if not await strict.first_open(attempt.id, STRICT_KIND, ttl) and not await self._strict_young(
+                session, attempt
+            ):
+                await self._close_left(session, attempt, "resume")
+            await self._require_alive(session, attempt)
         return await self._state(session, attempt)
 
     async def answer(self, session: AsyncSession, attempt_id: int, data: AnswerRequest, user: User) -> None:
@@ -1220,6 +1275,7 @@ class GeneralTestRepository:
             await self._finalize(session, attempt)
             await session.commit()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vaqt tugagan")
+        await self._require_alive(session, attempt)
         if data.question_id not in {item["q"] for item in attempt.layout}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Savol bu urinishga tegishli emas")
 
@@ -1249,15 +1305,45 @@ class GeneralTestRepository:
             score=attempt.score or 0,
             started_at=attempt.started_at,
             finished_at=attempt.finished_at,
+            stop_reason=attempt.stop_reason,
         )
 
     async def finish(self, session: AsyncSession, attempt_id: int, user: User) -> AttemptResult:
         attempt = await self._own_attempt(session, attempt_id, user)
         # Повторное «Yakunlash» (двойной клик, ретрай сети) просто отдаёт итог.
         if attempt.status == IN_PROGRESS:
+            await self._require_alive(session, attempt)
             await self._finalize(session, attempt)
             await session.commit()
         return self._result(attempt)
+
+    async def leave(self, session: AsyncSession, attempt_id: int, data: LeaveRequest, user: User) -> AttemptResult:
+        """Qat'iy test: brauzer sahifadan chiqilganini aytdi. Takroriy chaqiruv natijani qaytaradi."""
+        attempt = await self._own_attempt(session, attempt_id, user)
+        if attempt.status != IN_PROGRESS:
+            return self._result(attempt)
+        if not attempt.test.strict_mode:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "strict_mode_disabled", "message": "Bu testda qat'iy rejim yoqilmagan"},
+            )
+        attempt.stop_reason = strict.leave_reason_text(data.reason)
+        await self._finalize(session, attempt)
+        await session.commit()
+        await strict.forget(attempt.id, STRICT_KIND)
+        return self._result(attempt)
+
+    async def heartbeat(self, session: AsyncSession, attempt_id: int, user: User) -> HeartbeatResponse:
+        """Sahifa ochiq. Muddati o'tgan heartbeat'ni tiriltirmaydi (`quiz_process` dagi kabi)."""
+        attempt = await self._own_attempt(session, attempt_id, user)
+        if attempt.status != IN_PROGRESS:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Urinish yakunlangan")
+        if attempt.test.strict_mode:
+            await self._require_alive(session, attempt)
+            await strict.touch(attempt.id, STRICT_KIND)
+        # FOR UPDATE qulfini bo'shatadi.
+        await session.commit()
+        return HeartbeatResponse()
 
     async def my_results(self, session: AsyncSession, user: User) -> MyResultListResponse:
         await self._close_expired(session, user.id)
@@ -1341,6 +1427,7 @@ class GeneralTestRepository:
             score=attempt.score or 0,
             started_at=attempt.started_at,
             finished_at=attempt.finished_at,
+            stop_reason=attempt.stop_reason,
         )
 
     async def list_results(
@@ -1386,7 +1473,7 @@ class GeneralTestRepository:
         wb = Workbook()
         sheet = wb.active
         sheet.title = "Natijalar"
-        headers = ["№", "Fan", "Test", "F.I.SH", "Login", "Guruh", "Savollar", "To'g'ri", "Foiz", "Yakunlangan"]
+        headers = ["№", "Fan", "Test", "F.I.SH", "Login", "Guruh", "Savollar", "To'g'ri", "Foiz", "Yakunlangan", "To'xtatilgan"]
         sheet.append(headers)
         for cell in sheet[1]:
             cell.font = Font(bold=True)
@@ -1404,9 +1491,10 @@ class GeneralTestRepository:
                     r.correct_answers,
                     r.score,
                     local(raw[0].finished_at),
+                    r.stop_reason or "",
                 ]
             )
-        for column, width in zip("ABCDEFGHIJ", (6, 25, 35, 35, 16, 18, 10, 10, 8, 18)):
+        for column, width in zip("ABCDEFGHIJK", (6, 25, 35, 35, 16, 18, 10, 10, 8, 18, 22)):
             sheet.column_dimensions[column].width = width
 
         buffer = io.BytesIO()

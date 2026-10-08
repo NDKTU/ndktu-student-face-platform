@@ -10,6 +10,10 @@ export interface QuizVideoMonitoringProps {
     faceDetectionServiceUrl: string;
     token?: string;
     imageUrl?: string;
+    /** Kamera ishga tushdi yoki ishga tushmadi — ruxsat oynasi yopildi.
+     *  Qat'iy test sahifadan chiqishni shundan keyin kuzatadi: ruxsat oynasi
+     *  ham sahifadan fokusni oladi. */
+    onCameraSettled?: () => void;
 }
 
 export function QuizVideoMonitoring({
@@ -19,6 +23,7 @@ export function QuizVideoMonitoring({
     faceDetectionServiceUrl,
     token,
     imageUrl,
+    onCameraSettled,
 }: QuizVideoMonitoringProps) {
     const [warnings, setWarnings] = useState(0);
     const warningsRef = useRef(0);
@@ -70,6 +75,11 @@ export function QuizVideoMonitoring({
             if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
         };
     }, []);
+
+    const settled = state.isActive || Boolean(state.error);
+    useEffect(() => {
+        if (settled) onCameraSettled?.();
+    }, [settled, onCameraSettled]);
 
     if (!active) return null;
 

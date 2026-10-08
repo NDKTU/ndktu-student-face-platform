@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
+import { StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { QuestionAccordionList } from '@/components/questions/QuestionAccordionList';
 import { QuestionExcelUploadModal } from '@/components/questions/QuestionExcelUploadModal';
 import { useControlQuestions, useLessonQuestionCounts } from '@/hooks/useQuestions';
@@ -85,6 +86,7 @@ export const MidtermQuizModal = ({
     const [duration, setDuration] = useState('40');
     const [pin, setPin] = useState('');
     const [proctoringMode, setProctoringMode] = useState<ProctoringMode>('standard');
+    const [strictMode, setStrictMode] = useState(false);
     const [isActive, setIsActive] = useState(false);
     const [error, setError] = useState('');
     const controlQuestionsQuery = useControlQuestions(courseId, isOpen ? controlType : '');
@@ -104,6 +106,7 @@ export const MidtermQuizModal = ({
             setDuration(draft.duration);
             setPin(draft.pin);
             setProctoringMode(draft.proctoringMode);
+            setStrictMode(draft.strictMode ?? false);
             setIsActive(draft.isActive);
             setError('');
             return;
@@ -117,6 +120,7 @@ export const MidtermQuizModal = ({
         setDuration(String(quiz?.duration ?? 40));
         setPin(quiz?.pin ?? Math.random().toString().slice(2, 6));
         setProctoringMode(quiz?.proctoring_mode ?? 'standard');
+        setStrictMode(quiz?.strict_mode ?? false);
         setIsActive(quiz?.is_active ?? false);
         setError('');
         // `defaultControlType` ataylab kuzatilmaydi: ro'yxat yangilanganda
@@ -141,6 +145,7 @@ export const MidtermQuizModal = ({
             duration,
             pin,
             proctoringMode,
+            strictMode,
             isActive,
         });
         const returnTo = `/courses/${courseId}?tab=assignments&${NAZORAT_REOPEN_PARAM}=1`;
@@ -230,6 +235,7 @@ export const MidtermQuizModal = ({
             pin: pin.trim(),
             is_active: isActive,
             proctoring_mode: proctoringMode,
+            strict_mode: strictMode,
         };
 
         const onError = (cause: unknown) => setError(apiErrorMessage(cause, 'Testni saqlashda xatolik yuz berdi'));
@@ -465,6 +471,8 @@ export const MidtermQuizModal = ({
                             <option value="face_entry">Kirishda yuz tekshiruvi</option>
                     </select>
                 </div>
+
+                <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
                     <div>

@@ -119,6 +119,9 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     #: вводят. Нужен только для новой попытки: вернуться в начатую можно и
     #: без него — так же, как после выключения теста.
     pin: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: Qat'iy rejim: talaba sahifadan chiqsa, urinish serverda yopiladi
+    #: (`quiz/quiz_process/strict.py`).
+    strict_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -189,6 +192,9 @@ class GeneralTestAttempt(Base, IdIntPk, TimestampMixin):
     correct_answers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Процент правильных ответов, 0–100.
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Qat'iy testda urinish nima uchun yopildi («Sahifadan chiqdi» va h.k.).
+    #: Bo'sh — oddiy yakunlangan yoki vaqti tugagan.
+    stop_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     test: Mapped[GeneralTest] = relationship("GeneralTest")
     user: Mapped[User | None] = relationship("User")

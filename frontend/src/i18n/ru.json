@@ -60,6 +60,8 @@
   "Bu test sizning guruhingiz uchun mo'ljallanmagan": "Этот тест предназначен не для вашей группы",
   "Bu testda savollar yo'q. Iltimos administratorga murojaat qiling.": "В этом тесте нет вопросов. Обратитесь к администратору.",
   "Bu urinish allaqachon yakunlangan": "Эта попытка уже завершена",
+  "Bu testda qat'iy rejim yoqilmagan": "В этом тесте строгий режим не включён",
+  "Test yopildi: siz sahifadan chiqdingiz": "Тест закрыт: вы покинули страницу",
   "Chiqdi": "Вышел",
   "Chiqish": "Выйти",
   "Daqiqa": "Минут",

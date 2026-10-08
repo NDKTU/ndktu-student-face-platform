@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
+from core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
@@ -43,6 +44,8 @@ from .schemas import (
     GeneralTestListResponse,
     GeneralTestUpdateRequest,
     GroupOptionListResponse,
+    HeartbeatResponse,
+    LeaveRequest,
     MyResultListResponse,
     QuestionCreateRequest,
     QuestionResponse,
@@ -130,6 +133,35 @@ async def answer(
     user: "User" = Depends(_take),
 ):
     await repo.answer(session=session, attempt_id=attempt_id, data=data, user=user)
+
+
+@router.post(
+    "/attempt/{attempt_id}/leave",
+    response_model=AttemptResult,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
+)
+async def leave(
+    attempt_id: int,
+    data: LeaveRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(_take),
+):
+    """Qat'iy test: talaba sahifadan chiqdi — urinish yopiladi."""
+    return await repo.leave(session=session, attempt_id=attempt_id, data=data, user=user)
+
+
+@router.post(
+    "/attempt/{attempt_id}/heartbeat",
+    response_model=HeartbeatResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=user_identifier))],
+)
+async def heartbeat(
+    attempt_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(_take),
+):
+    """Qat'iy test: sahifa hali ochiq."""
+    return await repo.heartbeat(session=session, attempt_id=attempt_id, user=user)
 
 
 @router.post("/attempt/{attempt_id}/finish", response_model=AttemptResult)

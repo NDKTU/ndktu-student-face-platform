@@ -24,6 +24,7 @@ export const quizSchema = z.object({
     quiz_type: z.enum(['LESSON_QUIZ', 'MIDTERM', 'SEMESTER_FINAL', 'YEAR_PROMOTION', 'PUBLIC_FREE']),
     is_active: z.boolean(),
     proctoring_mode: z.enum(['face', 'face_entry', 'standard']),
+    strict_mode: z.boolean(),
 }).superRefine((values, ctx) => {
     if (values.quiz_type === 'PUBLIC_FREE') return;
     if (!values.group_id) {

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
 import { useAuth } from '@/context/AuthContext';
-import { type StartQuizResponse, type EndQuizResponse } from '@/services/quizProcessService';
+import { quizProcessService, type StartQuizResponse, type EndQuizResponse, type LeaveReason } from '@/services/quizProcessService';
 import type { ProctoringMode, Quiz } from '@/services/quizService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -19,13 +19,16 @@ import {
     Trophy,
     Clock,
     ArrowLeft,
-    AlertTriangle
+    AlertTriangle,
+    ShieldAlert
 } from 'lucide-react';
 import { useStartQuiz, useSubmitAnswer, useEndQuiz, useVerifyEntryFace } from '@/hooks/useQuizProcess';
 import { FaceEntryCamera } from '@/components/FaceEntryCamera';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { Modal } from '@/components/ui/Modal';
 import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
+import { QuizWatermark } from '@/components/quizzes/QuizWatermark';
+import { LEAVE_TEXT, closedReason, useStrictQuizGuard } from '@/hooks/useStrictQuizGuard';
 import { ENABLE_QUIZ_PROCTORING, FACE_DETECTION_SERVICE_URL } from '@/config/env';
 import { useCameraAvailability } from '@/hooks/useCameraAvailability';
 import { cheatingImageService } from '@/services/cheatingImageService';
@@ -43,6 +46,7 @@ import { cn } from '@/lib/utils';
 // Общая реализация в utils/sanitize — список вывода HTML шире одной страницы.
 import { sanitizeHtml } from '@/utils/sanitize';
 import { apiErrorMessage } from '@/utils/apiError';
+import { noCopyHandlers } from '@/utils/antiCopy';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
@@ -94,6 +98,28 @@ const QuizTestPage = () => {
 
     // Results phase
     const [results, setResults] = useState<EndQuizResponse | null>(null);
+    // Qat'iy testda chiqish: urinish yopildi, lekin serverdagi natija hali
+    // kelmagan (yoki kelmaydi — aloqa yo'q). Ballar o'rniga izoh ko'rsatiladi.
+    const [resultsPending, setResultsPending] = useState(false);
+    // Kamera ruxsat oynasi yopildi — qat'iy kuzatuv shundan keyin boshlanadi.
+    const [cameraSettled, setCameraSettled] = useState(false);
+    const handleCameraSettled = useCallback(() => setCameraSettled(true), []);
+
+    /** Qat'iy test yopildi: natija ekraniga o'tamiz, javoblar endi yuborilmaydi. */
+    const showClosed = useCallback((reason: string, server?: EndQuizResponse | null) => {
+        const total = quizData?.questions.length ?? 0;
+        setCheatingDetected(true);
+        setResultsPending(!server);
+        setResults(server ?? {
+            total_questions: total,
+            correct_answers: 0,
+            wrong_answers: total,
+            grade: 0,
+            cheating_detected: true,
+            reason,
+        });
+        setPhase('results');
+    }, [quizData]);
 
     const isAdmin = user?.roles?.some(role => role.name.toLowerCase() === 'admin');
 
@@ -128,10 +154,12 @@ const QuizTestPage = () => {
 
     // Наличие камеры проверяется до начала теста: раньше тест с режимом `face`
     // просто шёл без надзора, и ни студент, ни преподаватель об этом не знали.
-    const selectedQuizMode = (
+    const selectedQuizInfo = (
         quizzesData?.quizzes.find((q) => q.id === selectedQuiz?.id)
         ?? (stateQuiz?.id === selectedQuiz?.id ? stateQuiz : undefined)
-    )?.proctoring_mode;
+    );
+    const selectedQuizMode = selectedQuizInfo?.proctoring_mode;
+    const selectedQuizStrict = Boolean(selectedQuizInfo?.strict_mode);
     const startNeedsCamera =
         (ENABLE_QUIZ_PROCTORING && (proctoringOverride ?? selectedQuizMode) === 'face')
         || selectedQuizMode === 'face_entry';
@@ -258,6 +286,8 @@ const QuizTestPage = () => {
         }, {
             onError: (error) => {
                 logger.error('Failed to submit answer', error);
+                const closed = closedReason(error);
+                if (closed) showClosed(closed);
             },
         });
     };
@@ -297,6 +327,8 @@ const QuizTestPage = () => {
         }, {
             onError: (error) => {
                 logger.error('Failed to submit answer', error);
+                const closed = closedReason(error);
+                if (closed) showClosed(closed);
             },
         });
     };
@@ -331,6 +363,11 @@ const QuizTestPage = () => {
             },
             onError: (error: any) => {
                 logger.error('Failed to submit quiz', error);
+                const closed = closedReason(error);
+                if (closed) {
+                    showClosed(closed);
+                    return;
+                }
 
                 // If it was a cheating submission, we still want to show the results phase
                 // even if the backend call failed (e.g., due to duplicate submission)
@@ -350,7 +387,7 @@ const QuizTestPage = () => {
             }
         });
         // Bug#4 fix: added cheatingImageUrl to dependency list to avoid stale closure
-    }, [quizData, endQuizMutation, cheatingDetected, cheatingReason, cheatingImageUrl]);
+    }, [quizData, endQuizMutation, cheatingDetected, cheatingReason, cheatingImageUrl, showClosed]);
 
     // Timer — Bug#12 fix: use a ref to prevent duplicate submit on cheating race condition
     const isSubmittingRef = useRef(false);
@@ -413,6 +450,43 @@ const QuizTestPage = () => {
             handleSubmit(true, reason);
         }
     }, [quizData, user, handleSubmit, cheatingDetected]);
+
+    // ================================
+    // QAT'IY REJIM
+    // ================================
+    const isStrict = Boolean(quizData?.strict_mode);
+    const usesCamera = (proctoringOverride ?? quizData?.proctoring_mode) === 'face';
+
+    const handleLeave = useCallback((reason: LeaveReason) => {
+        if (!quizData || isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
+        // Kutayotgan matnli javoblar yuborilmaydi: urinish yopilmoqda.
+        for (const timer of Object.values(textTimers.current)) clearTimeout(timer);
+        showClosed(LEAVE_TEXT[reason]);
+        void quizProcessService.sendLeave(quizData.result_id, reason).then((server) => {
+            if (server) showClosed(server.reason || LEAVE_TEXT[reason], server);
+        });
+    }, [quizData, showClosed]);
+
+    useStrictQuizGuard({
+        active: phase === 'quiz' && isStrict && !cheatingDetected && (!usesCamera || cameraSettled),
+        onLeave: handleLeave,
+    });
+
+    useEffect(() => {
+        if (phase !== 'quiz' || !isStrict || !quizData || cheatingDetected) return;
+        const resultId = quizData.result_id;
+        const id = setInterval(() => {
+            quizProcessService.heartbeat(resultId).catch((error: unknown) => {
+                const closed = closedReason(error);
+                if (closed && !isSubmittingRef.current) {
+                    isSubmittingRef.current = true;
+                    showClosed(closed);
+                }
+            });
+        }, 5000);
+        return () => clearInterval(id);
+    }, [phase, isStrict, quizData, cheatingDetected, showClosed]);
 
     // ================================
     // START PHASE
@@ -559,6 +633,16 @@ const QuizTestPage = () => {
                     title={`Testni boshlash: ${selectedQuiz?.title}`}
                 >
                     <div className="space-y-4">
+                        {selectedQuizStrict && (
+                            <div className="flex gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                                <span>
+                                    <b>Qat'iy rejim.</b> Sahifadan chiqsangiz, boshqa ilova yoki oynani ochsangiz,
+                                    ekranni bo'lsangiz — test darhol yopiladi. Boshlashdan oldin telefonni
+                                    «Bezovta qilmang» rejimiga qo'ying: kiruvchi qo'ng'iroq ham testni yopadi.
+                                </span>
+                            </div>
+                        )}
                         {startNeedsCamera && cameraStatus !== 'checking' && cameraStatus !== 'available' && (
                             <div className="flex gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
                                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -665,6 +749,11 @@ const QuizTestPage = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-6">
+                            {resultsPending ? (
+                                <p className="text-center text-sm text-muted-foreground">
+                                    Urinish yopildi. Natija va sabab o'qituvchingizda ko'rinadi.
+                                </p>
+                            ) : (<>
                             {/* Grade Circle */}
                             <div className="flex justify-center">
                                 <div className={`font-display text-6xl font-bold ${showCheatingAlert ? 'text-destructive' : gradeColor}`}>
@@ -693,6 +782,7 @@ const QuizTestPage = () => {
                                     <div className="text-xs text-muted-foreground mt-1">Noto'g'ri</div>
                                 </div>
                             </div>
+                            </>)}
 
                             {/* Progress bar */}
                             {!showCheatingAlert && (
@@ -759,7 +849,10 @@ const QuizTestPage = () => {
 
     return (
         <FocusOverlay>
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div
+            className="space-y-6 max-w-4xl mx-auto select-none [-webkit-touch-callout:none]"
+            {...noCopyHandlers}
+        >
             {/* Video Monitoring Component */}
             {shouldProctor && (
                 <QuizVideoMonitoring
@@ -769,8 +862,10 @@ const QuizTestPage = () => {
                     faceDetectionServiceUrl={FACE_DETECTION_SERVICE_URL}
                     token={quizData.face_ws_token}
                     imageUrl={quizData.image_url}
+                    onCameraSettled={handleCameraSettled}
                 />
             )}
+            <QuizWatermark user={user} />
 
             {/* Header with timer and progress — на мобильных складывается в колонку */}
             <div className="flex flex-col gap-3 bg-card p-4 rounded-xl shadow-sm border border-border sm:flex-row sm:items-center sm:justify-between">
@@ -860,7 +955,7 @@ const QuizTestPage = () => {
                                 onChange={(event) => handleTextAnswer(currentQuestion.id, event.target.value)}
                                 onBlur={(event) => submitTextAnswer(currentQuestion.id, event.target.value)}
                                 placeholder="Javobingizni yozing"
-                                className="h-12 w-full rounded-xl border border-border/60 bg-background px-4 text-base outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring md:h-11 md:text-sm"
+                                className="select-text h-12 w-full rounded-xl border border-border/60 bg-background px-4 text-base outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring md:h-11 md:text-sm"
                             />
                         )}
                         {!isFreeText && options.map((option) => {

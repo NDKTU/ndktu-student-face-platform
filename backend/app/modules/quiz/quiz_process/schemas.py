@@ -78,6 +78,9 @@ class StartQuizResponse(BaseModel):
     #: свои отметки, а не пустой бланк.
     submitted_answers: list[SubmittedAnswerDTO] = []
 
+    #: Qat'iy rejim: brauzer sahifadan chiqishni kuzatadi va `heartbeat` yuboradi.
+    strict_mode: bool = False
+
 
 class SubmitAnswerRequest(BaseModel):
     result_id: int
@@ -108,6 +111,23 @@ class SubmitAnswerResponse(BaseModel):
     #: ilgari `is_correct` qaytardi va javobni qayta yuborish mumkin edi —
     #: variantlarni birma-bir sinab, har savolda to'g'risini topish mumkin bo'lardi.
     accepted: bool = True
+
+
+class LeaveQuizRequest(BaseModel):
+    """Qat'iy testda brauzer sahifadan chiqilganini xabar qiladi."""
+
+    result_id: int
+    #: hidden, pagehide, blur, split — sabab matnini server tanlaydi
+    #: (`strict.LEAVE_REASONS`); notanish kalit `hidden` deb olinadi.
+    reason: Optional[str] = Field(default=None, max_length=32)
+
+
+class HeartbeatRequest(BaseModel):
+    result_id: int
+
+
+class HeartbeatResponse(BaseModel):
+    alive: bool = True
 
 
 class EndQuizRequest(BaseModel):

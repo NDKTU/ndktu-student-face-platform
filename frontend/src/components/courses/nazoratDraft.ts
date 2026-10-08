@@ -19,6 +19,8 @@ export interface NazoratDraft {
     duration: string;
     pin: string;
     proctoringMode: ProctoringMode;
+    /** Eski qoralamada yo'q — `false` deb olinadi. */
+    strictMode?: boolean;
     isActive: boolean;
 }
 

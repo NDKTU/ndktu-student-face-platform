@@ -152,6 +152,8 @@ class GeneralTestCreateRequest(BaseModel):
     is_active: bool = False
     #: PIN bilan boshlanadimi. PIN'ning o'zini server yaratadi.
     pin_required: bool = False
+    #: Qat'iy rejim: sahifadan chiqsa urinish yopiladi.
+    strict_mode: bool = False
 
 
 class GeneralTestUpdateRequest(BaseModel):
@@ -166,6 +168,7 @@ class GeneralTestUpdateRequest(BaseModel):
     pin_required: bool | None = None
     #: Yangi PIN yaratish — eskisi tarqalib ketgan bo'lsa.
     regenerate_pin: bool = False
+    strict_mode: bool | None = None
 
 
 class GeneralTestSummary(BaseModel):
@@ -178,6 +181,7 @@ class GeneralTestSummary(BaseModel):
     attempt_limit: int
     question_number: int | None
     is_active: bool
+    strict_mode: bool = False
     #: Faqat test egasi va admin ko'radigan javoblarda: talabaga
     #: (`AvailableTest`) PIN'ning o'zi emas, faqat `pin_required` boradi.
     pin: str | None = None
@@ -276,6 +280,7 @@ class AvailableTest(BaseModel):
     best_score: int | None = None
     #: Новая попытка требует PIN (сам PIN студенту не отдаётся).
     pin_required: bool = False
+    strict_mode: bool = False
 
 
 class StartRequest(BaseModel):
@@ -307,6 +312,8 @@ class AttemptState(BaseModel):
     title: str
     remaining_seconds: int
     questions: list[TakeQuestion]
+    #: Brauzer sahifadan chiqishni kuzatadi va heartbeat yuboradi.
+    strict_mode: bool = False
 
 
 class AnswerRequest(BaseModel):
@@ -328,6 +335,17 @@ class AttemptResult(BaseModel):
     score: int
     started_at: TashkentDatetime
     finished_at: TashkentDatetime | None
+    #: Qat'iy testda yopilish sababi; bo'sh — oddiy yakun.
+    stop_reason: str | None = None
+
+
+class LeaveRequest(BaseModel):
+    #: hidden, pagehide, blur, split — matnni server tanlaydi.
+    reason: str | None = Field(default=None, max_length=32)
+
+
+class HeartbeatResponse(BaseModel):
+    alive: bool = True
 
 
 class MyResultListResponse(BaseModel):
@@ -361,6 +379,7 @@ class ResultRow(BaseModel):
     score: int
     started_at: TashkentDatetime
     finished_at: TashkentDatetime | None
+    stop_reason: str | None = None
 
 
 class ResultListResponse(BaseModel):

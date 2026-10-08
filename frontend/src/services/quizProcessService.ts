@@ -1,4 +1,6 @@
 import api from './api';
+import { getToken } from './tokenStorage';
+import { API_BASE_URL } from '@/config/env';
 import type { ProctoringMode } from './quizService';
 
 export interface QuestionDTO {
@@ -64,6 +66,8 @@ export interface StartQuizResponse {
     resumed: boolean;
     /** Ответы, уже данные в этой попытке (при возобновлении). */
     submitted_answers: SubmittedAnswerDTO[];
+    /** Qat'iy rejim: sahifadan chiqilsa urinish serverda yopiladi. */
+    strict_mode?: boolean;
 }
 
 export interface SubmitAnswerRequest {
@@ -100,6 +104,35 @@ export interface EndQuizResponse {
     reason?: string;
 }
 
+/** Brauzer sezgan chiqish turi; sabab matnini server tanlaydi (`strict.py`). */
+export type LeaveReason = 'hidden' | 'pagehide' | 'blur' | 'split';
+
+/**
+ * Qat'iy test: «sahifadan chiqdi» so'rovi.
+ *
+ * Axios emas, `fetch` + `keepalive`: sahifa fonga ketayotganda yoki
+ * yopilayotganda oddiy so'rov uziladi, `keepalive` esa brauzer uni
+ * sahifa yo'qolgandan keyin ham yetkazadi. Xato yutiladi — yetib
+ * bormasa, serverdagi heartbeat tekshiruvi baribir urinishni yopadi.
+ */
+export async function keepaliveLeave<T>(path: string, body: object): Promise<T | null> {
+    try {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+            method: 'POST',
+            keepalive: true,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(body),
+        });
+        return response.ok ? ((await response.json()) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
 export const quizProcessService = {
     startQuiz: async (data: StartQuizRequest) => {
         const response = await api.post<StartQuizResponse>('/quiz_process/start_quiz', data);
@@ -121,4 +154,14 @@ export const quizProcessService = {
         const response = await api.post<EndQuizResponse>('/quiz_process/end_quiz', data);
         return response.data;
     },
+
+    /** Qat'iy test: sahifa hali ochiq. To'xtasa, server urinishni yopadi. */
+    heartbeat: async (result_id: number) => {
+        const response = await api.post<{ alive: boolean }>('/quiz_process/heartbeat', { result_id });
+        return response.data;
+    },
+
+    /** Qat'iy test: talaba sahifadan chiqdi. */
+    sendLeave: (result_id: number, reason: LeaveReason) =>
+        keepaliveLeave<EndQuizResponse>('/quiz_process/leave', { result_id, reason }),
 };

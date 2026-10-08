@@ -2,6 +2,7 @@ import logging
 
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired, PermissionRequiredExceptStudent
+from core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
@@ -43,6 +44,9 @@ from .quiz_process.repository import get_quiz_process_repository
 from .quiz_process.schemas import (
     EndQuizRequest,
     EndQuizResponse,
+    HeartbeatRequest,
+    HeartbeatResponse,
+    LeaveQuizRequest,
     StartQuizRequest,
     StartQuizResponse,
     SubmitAnswerRequest,
@@ -631,6 +635,36 @@ async def end_quiz(
     current_user: User = Depends(PermissionRequired("quiz_process:end_quiz")),
 ):
     return await get_quiz_process_repository.end_quiz(session=session, data=data, user=current_user)
+
+
+@quiz_process_router.post(
+    "/leave",
+    response_model=EndQuizResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
+)
+async def leave_quiz(
+    data: LeaveQuizRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("quiz_process:end_quiz")),
+):
+    """Qat'iy test: talaba sahifadan chiqdi — urinish yopiladi."""
+    return await get_quiz_process_repository.leave(session=session, data=data, user=current_user)
+
+
+@quiz_process_router.post(
+    "/heartbeat",
+    response_model=HeartbeatResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=user_identifier))],
+)
+async def quiz_heartbeat(
+    data: HeartbeatRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("quiz_process:end_quiz")),
+):
+    """Qat'iy test: sahifa hali ochiq."""
+    return await get_quiz_process_repository.heartbeat(session=session, data=data, user=current_user)
 
 
 @quiz_process_router.post(
