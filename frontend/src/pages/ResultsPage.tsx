@@ -6,6 +6,7 @@ import { useResults, useDeleteResult } from '@/hooks/useResults';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { StudentTestTabs } from '@/components/generalTest/StudentTestTabs';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -555,6 +556,8 @@ const ResultsPage = () => {
                     </Button>
                 }
             />
+
+            <StudentTestTabs section="results" />
 
             {/* Student stats hero */}
             {isStudent && resultsData && (

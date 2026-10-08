@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { scoreClass } from '@/components/generalTest/score';
+import { STUDENT_ELEMENTAR_RESULTS, STUDENT_ELEMENTAR_TAKE } from '@/components/generalTest/studentPaths';
 import { useRefreshTaking } from '@/hooks/useGeneralTests';
 import {
     generalTestService,
@@ -39,6 +40,10 @@ export default function GeneralTestTakePage() {
     const navigate = useNavigate();
     const refreshTaking = useRefreshTaking();
     const { user } = useAuth();
+    // Talaba urinishni «Test ishlash» ostida ochadi (`/quiz-test/elementar/...`),
+    // xodim — elementar test bo'limida. Qaytish o'sha ro'yxatga.
+    const studentHub = useLocation().pathname.startsWith(STUDENT_ELEMENTAR_TAKE);
+    const listPath = studentHub ? STUDENT_ELEMENTAR_TAKE : '/elementar-tests/take';
 
     const [state, setState] = useState<AttemptState | null>(null);
     const [answers, setAnswers] = useState<Record<number, OptionLetter>>({});
@@ -202,7 +207,14 @@ export default function GeneralTestTakePage() {
                         {result.correct_answers} / {result.total_questions} to'g'ri javob
                     </p>
                 </div>
-                <Button onClick={() => navigate('/elementar-tests/take')}>Testlar ro'yxatiga qaytish</Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => navigate(listPath)}>Testlar ro'yxatiga qaytish</Button>
+                    {studentHub && (
+                        <Button variant="outline" onClick={() => navigate(STUDENT_ELEMENTAR_RESULTS)}>
+                            Natijalarim
+                        </Button>
+                    )}
+                </div>
             </div>
         );
     }
@@ -213,7 +225,7 @@ export default function GeneralTestTakePage() {
                 <AlertTriangle className="h-12 w-12 text-destructive" />
                 <p className="text-sm font-medium text-destructive">Test to'xtatildi: {leftReason}</p>
                 <p className="text-sm text-muted-foreground">Urinish yopildi. Natija va sabab o'qituvchingizda ko'rinadi.</p>
-                <Button onClick={() => navigate('/elementar-tests/take')}>Testlar ro'yxatiga qaytish</Button>
+                <Button onClick={() => navigate(listPath)}>Testlar ro'yxatiga qaytish</Button>
             </div>
         );
     }
@@ -222,7 +234,7 @@ export default function GeneralTestTakePage() {
         return (
             <div className="mx-auto max-w-md px-4 py-12 text-center">
                 <p className="text-sm text-destructive">{loadError}</p>
-                <Link to="/elementar-tests/take" className="mt-4 inline-block text-sm text-primary underline">
+                <Link to={listPath} className="mt-4 inline-block text-sm text-primary underline">
                     Testlar ro'yxatiga qaytish
                 </Link>
             </div>

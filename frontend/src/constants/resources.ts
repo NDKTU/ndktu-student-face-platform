@@ -327,7 +327,6 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
     // Umumiy «Psixologiya natijalari» sahifasi, lekin talabaga bekend faqat
     // o'z natijalarini beradi (`psychology/router.py`).
     { name: 'Psixologik natijalarim', href: '/psychology/results', icon: ClipboardList, tone: 'purple', permission: 'read:psychology_results' },
-    { name: 'Elementar testlar', href: '/elementar-tests/take', icon: ClipboardCheck, tone: 'teal', permission: 'general_test:take' },
     { name: "E'lonlar", href: '/announcements/student', icon: Megaphone, tone: 'pink', permission: 'announcement:feed', section: 'Umumiy' },
     // Ruxsatsiz: arizalar ROYD'da yuritiladi, bizda unga mos ruxsat yo'q.
     // Chegara rol bo'yicha — marshrutda ham (`StudentRequestsRoute`).
@@ -345,11 +344,11 @@ const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
 // qurilmasidan yuklaydi (App.tsx dagi FileLibraryRoute, bekendda
 // FileLibraryExceptStudent).
 //
-// `general_test` — testlarni TUZISH sahifasi. Talabaning yo'li boshqa:
-// `/elementar-tests/take` (STUDENT_BESPOKE_ITEMS). Toza talabada bu
-// punkt baribir chiqmasdi — unda `read:general_test` yo'q; ikkalasi ham
-// ko'rinadigan joy — ikki rolli hisob (o'qituvchi + talaba), va u yerda
-// menyuda bir xil nomli ikkita punkt chiqardi.
+// Elementar test talabada alohida bo'lim emas: ishlash «Test ishlash» ichida
+// (`/quiz-test/elementar`), natijalar «Natijalar» ichida (`/results/elementar`)
+// tab bo'lib turadi. `read:general_test*` talabaga Rollar oynasidan qo'lda
+// berilgan bo'lsa ham boshqaruv sahifalari menyuga chiqmaydi, marshrutlar
+// esa uni yangi joyga yo'naltiradi (App.tsx dagi StudentRedirectRoute).
 const STUDENT_HIDDEN_RESOURCES = new Set([
     'psychology',
     'psychology_results',
@@ -357,6 +356,8 @@ const STUDENT_HIDDEN_RESOURCES = new Set([
     'announcement',
     'file',
     'general_test',
+    'general_test_subject',
+    'general_test_result',
 ]);
 
 const buildStudentSidebar = (permissions: ReadonlySet<string>): SidebarSection[] => {

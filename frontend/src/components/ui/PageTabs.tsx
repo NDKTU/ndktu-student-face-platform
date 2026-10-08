@@ -13,11 +13,18 @@ interface PageTabsProps {
 
 export function PageTabs({ tabs, className }: PageTabsProps) {
     const location = useLocation();
+    const matches = (href: string) =>
+        location.pathname === href || location.pathname.startsWith(href + '/');
+    // Tablar bir-birining ichida bo'lishi mumkin (`/results` va
+    // `/results/elementar`): faqat eng aniq mos kelgani faol.
+    const activeHref = tabs
+        .filter((tab) => matches(tab.href))
+        .reduce<string | null>((best, tab) => (best && best.length >= tab.href.length ? best : tab.href), null);
 
     return (
         <div className={cn("flex border-b border-border mb-6 overflow-x-auto custom-scrollbar", className)}>
             {tabs.map((tab) => {
-                const isActive = location.pathname === tab.href || location.pathname.startsWith(tab.href + '/');
+                const isActive = tab.href === activeHref;
                 return (
                     <Link
                         key={tab.href}

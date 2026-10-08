@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
+import { StudentTestTabs } from '@/components/generalTest/StudentTestTabs';
 // Bug#13 fix: sanitize HTML content to prevent XSS attacks.
 // Общая реализация в utils/sanitize — список вывода HTML шире одной страницы.
 import { sanitizeHtml } from '@/utils/sanitize';
@@ -512,6 +513,8 @@ const QuizTestPage = () => {
                         </p>
                     </div>
                 </div>
+
+                <StudentTestTabs section="take" />
 
                 <Card>
                     <CardContent className="p-0">

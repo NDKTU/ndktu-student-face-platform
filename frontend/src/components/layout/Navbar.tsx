@@ -50,6 +50,9 @@ const PATH_LABELS: Record<string, string> = {
     '/homework':            'Uy vazifalari',
     '/results':             'Natijalar',
     '/results/answers':     'Javoblar tahlili',
+    // Talaba ko'rinishi: elementar test «Test ishlash» va «Natijalar» ichida.
+    '/quiz-test/elementar': 'Test ishlash',
+    '/results/elementar':   'Natijalar',
     '/elementar-tests':          'Elementar testlar',
     '/elementar-tests/take':     'Elementar testlar',
     '/elementar-tests/results':  'Elementar test natijalari',
@@ -69,6 +72,7 @@ const DYNAMIC_LABELS: Array<[RegExp, string]> = [
     [/^\/lessons\/[^/]+$/, 'Dars tafsilotlari'],
     [/^\/homework\/[^/]+\/submissions$/, 'Ishlarni tekshirish'],
     [/^\/psychology\/test\/[^/]+$/, 'Psixologik test'],
+    [/^\/quiz-test\/elementar\/attempt\/[^/]+$/, 'Elementar test'],
     [/^\/elementar-tests\/subjects\/[^/]+$/, 'Elementar fan'],
     [/^\/elementar-tests\/[^/]+$/, 'Elementar test'],
 ];

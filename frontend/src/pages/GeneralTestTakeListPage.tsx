@@ -11,21 +11,47 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { scoreClass } from '@/components/generalTest/score';
+import { MyGeneralTestResultList } from '@/components/generalTest/MyGeneralTestResultList';
+import { StudentTestTabs } from '@/components/generalTest/StudentTestTabs';
+import { studentElementarAttempt } from '@/components/generalTest/studentPaths';
 import { useAvailableGeneralTests, useMyGeneralTestResults } from '@/hooks/useGeneralTests';
 import { generalTestService, type AvailableTest } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { cn } from '@/lib/utils';
-import { formatDateTime } from '@/utils/date';
 
-export default function GeneralTestTakeListPage() {
+/** Xodimning shaxsiy natijalari — talabada ular «Natijalar» ichida. */
+function MyResultsCard() {
+    const { data: results } = useMyGeneralTestResults();
+    if (!results?.length) return null;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Mening natijalarim</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <MyGeneralTestResultList results={results} />
+            </CardContent>
+        </Card>
+    );
+}
+
+/**
+ * Elementar testni ishlash ro'yxati.
+ *
+ * `studentHub` — talaba ko'rinishi: sahifa «Test ishlash» ichidagi tab
+ * (`/quiz-test/elementar`), urinish ham o'sha manzil ostida ochiladi,
+ * natijalar esa «Natijalar» bo'limida.
+ */
+export default function GeneralTestTakeListPage({ studentHub = false }: { studentHub?: boolean }) {
     const navigate = useNavigate();
     const { data: tests, isLoading, isError, refetch } = useAvailableGeneralTests();
-    const { data: results } = useMyGeneralTestResults();
     const [startingId, setStartingId] = useState<number | null>(null);
     // PIN so'raydigan test: oyna shu test uchun ochiq.
     const [pinTest, setPinTest] = useState<AvailableTest | null>(null);
     const [pin, setPin] = useState('');
     const [pinError, setPinError] = useState<string | null>(null);
+    const attemptPath = (attemptId: number) =>
+        studentHub ? studentElementarAttempt(attemptId) : `/elementar-tests/attempt/${attemptId}`;
 
     const start = async (test: AvailableTest, withPin?: string) => {
         if (test.pin_required && withPin === undefined) {
@@ -38,7 +64,7 @@ export default function GeneralTestTakeListPage() {
         try {
             const state = await generalTestService.start(test.id, withPin);
             setPinTest(null);
-            navigate(`/elementar-tests/attempt/${state.attempt_id}`);
+            navigate(attemptPath(state.attempt_id));
         } catch (e) {
             const message = apiErrorMessage(e, 'Testni boshlab bo\'lmadi');
             // Noto'g'ri PIN — oyna ochiq qoladi, talaba qayta yozadi.
@@ -64,7 +90,14 @@ export default function GeneralTestTakeListPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Elementar testlar" description="Sizga biriktirilgan faol testlar" />
+            {studentHub ? (
+                <>
+                    <PageHeader title="Test ishlash" description="Sizga biriktirilgan elementar testlar" />
+                    <StudentTestTabs section="take" />
+                </>
+            ) : (
+                <PageHeader title="Elementar testlar" description="Sizga biriktirilgan faol testlar" />
+            )}
 
             {isLoading ? (
                 <div className="space-y-2">
@@ -127,7 +160,7 @@ export default function GeneralTestTakeListPage() {
                                         isLoading={startingId === test.id}
                                         onClick={() =>
                                             resumable
-                                                ? navigate(`/elementar-tests/attempt/${test.in_progress_attempt_id}`)
+                                                ? navigate(attemptPath(test.in_progress_attempt_id!))
                                                 : start(test)
                                         }
                                     >
@@ -141,31 +174,7 @@ export default function GeneralTestTakeListPage() {
                 </div>
             )}
 
-            {results && results.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Mening natijalarim</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ul className="divide-y divide-border">
-                            {results.map((r) => (
-                                <li key={r.attempt_id} className="flex items-center justify-between gap-3 py-2.5">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium text-foreground">{r.title}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {r.correct_answers} / {r.total_questions} to'g'ri
-                                            {r.finished_at ? ` · ${formatDateTime(r.finished_at)}` : ''}
-                                        </p>
-                                    </div>
-                                    <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', scoreClass(r.score))}>
-                                        {r.score}%
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
+            {!studentHub && <MyResultsCard />}
             <Modal isOpen={pinTest !== null} onClose={() => setPinTest(null)} title={`Testni boshlash: ${pinTest?.title ?? ''}`}>
                 <form
                     className="space-y-4"
