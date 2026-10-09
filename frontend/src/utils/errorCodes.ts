@@ -40,4 +40,11 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     face_service_unavailable: "Yuz tekshiruvi xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
     attempt_closed_left_page: 'Test yopildi: siz sahifadan chiqdingiz',
     strict_mode_disabled: "Bu testda qat'iy rejim yoqilmagan",
+    zoom_session_not_found: "Seans topilmadi",
+    zoom_session_not_yours: "Bu seans sizniki emas",
+    zoom_not_your_group: "Bu seans sizning guruhingiz uchun emas",
+    zoom_session_not_open: "Seans hali boshlanmagan",
+    zoom_session_closed: "Seans vaqti tugagan — kirib bo'lmaydi",
+    zoom_face_check_disabled: "Bu seansda yuz nazorati o'chirilgan",
+    zoom_not_configured: "Zoom integratsiyasi sozlanmagan",
 };

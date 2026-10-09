@@ -153,3 +153,21 @@ async def test_update_without_mode_keeps_it(auth_client, scene):  # noqa: F811
 
     cleared = await auth_client.put(f"/general-test/{scene['test_id']}", json={"proctoring_mode": None})
     assert cleared.json()["proctoring_mode"] == "face"
+
+
+@pytest.mark.asyncio
+async def test_student_reference_is_hemis_photo_only(auth_client, async_client, async_db, scene):  # noqa: F811
+    """Talabaning o'zi yuklagan surati etalon bo'lmaydi — faqat HEMIS surati."""
+    await auth_client.put(f"/general-test/{scene['test_id']}", json={"proctoring_mode": "face"})
+    added = await auth_client.post(f"/general-test/{scene['test_id']}/groups", json={"group_ids": [scene["group_id"]]})
+    assert added.status_code == 200, added.text
+    # `scene` dagi talabaning HEMIS surati bo'sh; profilga esa surat yuklagan.
+    scene["student"].avatar_path = PHOTO
+    await async_db.commit()
+
+    started = await async_client.post(
+        f"/general-test/{scene['test_id']}/start", headers=await _login(async_client, "gt_student")
+    )
+
+    assert started.status_code == 400
+    assert started.json()["detail"]["code"] == "student_photo_missing"

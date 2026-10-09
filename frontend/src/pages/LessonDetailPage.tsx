@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, PlayCircle, Plus, Radio, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, PlayCircle, Plus, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useLesson, useUpdateLesson } from '@/hooks/useLessons';
-import { useRoleView } from '@/hooks/useRoleView';
+import { useLesson } from '@/hooks/useLessons';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import { useCreateResource, useDeleteResource, useResources, useUpdateResource } from '@/hooks/useResources';
 import { resourceService, type ResourceType } from '@/services/resourceService';
 import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
-import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
-import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePanel';
 import { LessonGradebook } from '@/components/courses/LessonGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
@@ -48,8 +45,6 @@ export default function LessonDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { hasPermission } = useAuth();
-    const { isStudent } = useRoleView();
-    const updateLesson = useUpdateLesson();
     const lessonId = id ? Number.parseInt(id, 10) : undefined;
     const lessonQuery = useLesson(lessonId);
     const resourcesQuery = useResources(lessonId);
@@ -162,9 +157,6 @@ export default function LessonDetailPage() {
 
     const resources = resourcesQuery.data?.resources ?? [];
     const video = resources.find((item) => item.resource_type === 'video');
-    // Jonli dars — Zoom havolasi. Oxirgisi olinadi: o'qituvchi havolani
-    // yangilaganda eskisi qolib ketmasin.
-    const zoom = [...resources].reverse().find((item) => item.resource_type === 'zoom');
     const extras = resources.filter((item) => item.resource_type === 'file' || item.resource_type === 'link');
     // Bir darsga — bitta uy vazifasi (bazada `uq_homework_per_lesson` bilan
     // kafolatlangan), shuning uchun ro'yxat emas, bitta yozuv ko'rsatiladi.
@@ -193,10 +185,10 @@ export default function LessonDetailPage() {
     // Ilgari sakkizta karta ketma-ket turardi va Davomat yuqoridan ikkinchi
     // bo'lib chiqardi: o'qituvchi darsga kirishi bilan jurnalni ko'rar, dars
     // mazmuni esa pastda qolardi. Endi birinchi tab — darsning o'zi.
+    // Yuz nazorati endi darsda emas — «Zoom» sahifasidagi seansda (o'z hisoboti bilan).
     const canReadAttendance = canManageContent && hasPermission('read:attendance');
-    const showFaceCheck = canReadAttendance && Boolean(zoom?.link_url) && lesson.face_check_enabled;
     // Davomat yashirilgan bo'lsa ham tab yuz nazorati hisoboti uchun qoladi.
-    const canSeeAttendance = canReadAttendance && (ATTENDANCE_ENABLED || showFaceCheck);
+    const canSeeAttendance = canReadAttendance && ATTENDANCE_ENABLED;
     // «Topshiriqlar» — talaba nima qilishi kerak: uy vazifasi, testlar va
     // savollar. «Baholash jurnali» — shularning natijasi: kim topshirdi,
     // qancha baho oldi. Jurnal faqat baho qo'yadiganlarga.
@@ -209,11 +201,7 @@ export default function LessonDetailPage() {
             ? [{ id: 'grading' as const, label: 'Baholash jurnali', icon: <ListChecks className="h-4 w-4" /> }]
             : []),
         ...(canSeeAttendance
-            ? [
-                  ATTENDANCE_ENABLED
-                      ? { id: 'attendance' as const, label: 'Davomat', icon: <ClipboardCheck className="h-4 w-4" /> }
-                      : { id: 'attendance' as const, label: 'Yuz nazorati', icon: <ScanFace className="h-4 w-4" /> },
-              ]
+            ? [{ id: 'attendance' as const, label: 'Davomat', icon: <ClipboardCheck className="h-4 w-4" /> }]
             : []),
     ];
     const activeTab = tabs.some((t) => t.id === tab) ? tab : 'info';
@@ -231,48 +219,6 @@ export default function LessonDetailPage() {
             {/* ── Dars ma'lumoti ──────────────────────────────────────── */}
             {activeTab === 'info' && (
             <div className="space-y-6">
-            {/* Jonli dars. Tablarga o'tishda (75fa2ef) karta tushib qolgan edi:
-                o'qituvchi havola qo'sha olmas, talaba esa saytda qo'shila
-                olmasdi, garchi bekend va `ZoomMeetingBox` joyida bo'lsa ham. */}
-            {(zoom?.link_url || canManageContent) && (
-                <SectionCard
-                    icon={<Radio className="h-[18px] w-[18px]" />}
-                    tone="teal"
-                    title="Jonli dars (Zoom)"
-                    description={zoom?.link_url ? 'Uchrashuv biriktirilgan' : undefined}
-                    action={canManageContent && (
-                        zoom
-                            ? <CardAction variant="ghost" className="text-destructive" onClick={() => setResourceToDelete({ id: zoom.id, title: 'Zoom havolasi' })} icon={<Trash2 className="h-4 w-4" />} label="Havolani olib tashlash" />
-                            : <CardAction onClick={() => setContentKinds(['zoom'])} icon={<Plus className="h-4 w-4" />} label="Zoom havolasi" />
-                    )}
-                >
-                    {/* Nazorat har bir darsga kerak emas — o'qituvchi o'zi hal qiladi. */}
-                    {canManageContent && zoom?.link_url && (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                            <div>
-                                <p className="flex items-center gap-2 text-sm font-medium"><ScanFace className="h-4 w-4" /> Yuz nazorati</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Talaba darsga kirishda va dars davomida tasodifiy vaqtlarda tekshiriladi.
-                                </p>
-                            </div>
-                            <Switch
-                                checked={Boolean(lesson.face_check_enabled)}
-                                disabled={updateLesson.isPending}
-                                onCheckedChange={(checked) => {
-                                    updateLesson.mutate(
-                                        { id: lesson.id, data: { face_check_enabled: checked } },
-                                        { onError: () => toast.error("Sozlamani saqlab bo'lmadi") },
-                                    );
-                                }}
-                            />
-                        </div>
-                    )}
-                    {zoom?.link_url
-                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudent && Boolean(lesson.face_check_enabled)} />
-                        : <EmptyState icon={<Radio className="h-6 w-6" />} title="Jonli uchrashuv yo'q" description="Bu darsga Zoom havolasi biriktirilmagan." className="py-8" />}
-                </SectionCard>
-            )}
-
             <SectionCard
                 icon={<Paperclip className="h-[18px] w-[18px]" />}
                 tone="orange"
@@ -308,19 +254,9 @@ export default function LessonDetailPage() {
             {/* ── Davomat ─────────────────────────────────────────────── */}
             {activeTab === 'attendance' && canSeeAttendance && (
                 <div className="space-y-6">
-                    {ATTENDANCE_ENABLED && (
-                        <SectionCard icon={<ClipboardCheck className="h-[18px] w-[18px]" />} tone="teal" title="Davomat">
-                            <LessonAttendancePanel lessonId={lesson.id} />
-                        </SectionCard>
-                    )}
-
-                    {/* Yuz nazorati jurnali — davomat bilan bir kesimda: ikkovi
-                        ham «kim darsda bo'ldi» degan savolga javob beradi. */}
-                    {showFaceCheck && (
-                        <SectionCard icon={<ScanFace className="h-[18px] w-[18px]" />} tone="purple" title="Yuz nazorati">
-                            <LessonFaceCheckReport lessonId={lesson.id} />
-                        </SectionCard>
-                    )}
+                    <SectionCard icon={<ClipboardCheck className="h-[18px] w-[18px]" />} tone="teal" title="Davomat">
+                        <LessonAttendancePanel lessonId={lesson.id} />
+                    </SectionCard>
                 </div>
             )}
 
@@ -675,7 +611,6 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
         { value: 'link', label: 'Havola' },
         { value: 'text', label: 'Skript / konspekt' },
         { value: 'video', label: 'YouTube video' },
-        { value: 'zoom', label: 'Zoom (jonli dars)' },
     ];
     const options = ALL_OPTIONS.filter((option) => (kinds ?? []).includes(option.value));
 
@@ -701,7 +636,7 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
             let fileUrl: string | undefined;
             if (kind === 'file' && file) fileUrl = (await resourceService.upload(file)).url;
             else if (kind === 'file' && libraryFile) fileUrl = libraryFile.url;
-            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || libraryFile?.title || (kind === 'text' ? 'Dars konspekti' : kind === 'zoom' ? 'Jonli dars' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: safeLink ?? (url.trim() || undefined), text_content: text.trim() || undefined });
+            await createResource.mutateAsync({ lesson_id: lessonId, resource_type: kind, title: title.trim() || file?.name || libraryFile?.title || (kind === 'text' ? 'Dars konspekti' : kind === 'video' ? 'Dars videosi' : 'Material'), file_url: fileUrl, link_url: safeLink ?? (url.trim() || undefined), text_content: text.trim() || undefined });
             setTitle(''); setUrl(''); setText(''); setFile(null); setLibraryFile(null); onClose();
         } catch (cause) { setError(apiErrorMessage(cause, 'Saqlashda xatolik')); }
         finally { setSaving(false); }
@@ -712,12 +647,11 @@ function ContentModal({ kinds, onClose, lessonId }: { kinds: ResourceType[] | nu
     return <Modal isOpen={kinds !== null} onClose={onClose} title={modalTitle}><div className="space-y-4">
         {/* Tanlov faqat bir nechta tur bo'lganda ko'rsatiladi. */}
         {options.length > 1 && <div className="flex flex-wrap gap-2">{options.map((option) => <Button key={option.value} size="sm" variant={kind === option.value ? 'primary' : 'outline'} onClick={() => { setKind(option.value); setError(''); }}>{option.label}</Button>)}</div>}
-        {/* Zoom va video nomi avtomatik qo'yiladi — ortiqcha maydon so'ralmaydi. */}
-        {kind !== 'zoom' && kind !== 'video' && <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>}
+        {/* Video nomi avtomatik qo'yiladi — ortiqcha maydon so'ralmaydi. */}
+        {kind !== 'video' && <div><label className="mb-1 block text-sm font-medium">Nomi</label><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Material nomi" /></div>}
         {kind === 'text' && <textarea className="min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="Dars skripti yoki konspekti..." />}
         {kind === 'link' && <div><Input value={url} onChange={(event) => { setUrl(event.target.value); setError(''); }} placeholder="https://..." /><p className="mt-1.5 text-xs text-muted-foreground">Faqat http:// yoki https:// havolasi qabul qilinadi.</p></div>}
         {kind === 'video' && <div><Input value={url} onChange={(event) => { setUrl(event.target.value); setError(''); }} placeholder="https://www.youtube.com/watch?v=..." /><p className="mt-1.5 text-xs text-muted-foreground">Video fayl yuklab bo'lmaydi — faqat YouTube havolasi (youtube.com yoki youtu.be).</p></div>}
-        {kind === 'zoom' && <div><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://us05web.zoom.us/j/89012345678?pwd=..." /><p className="mt-1.5 text-xs text-muted-foreground">Zoom'da «Copy Invite Link» orqali olingan havolani qo'ying. Uchrashuvni o'qituvchi Zoom ilovasida boshlaydi, talabalar shu sahifada qo'shiladi.</p></div>}
         {kind === 'file' && <FileSourceField
             label="Fayl"
             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"

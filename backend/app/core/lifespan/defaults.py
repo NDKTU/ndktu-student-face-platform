@@ -115,6 +115,11 @@ STUDENT_PERMISSIONS = (
     "read:resource",
     "read:result",
     "read:submission",
+    # Zoom sahifasi: o'z guruhining seanslari va ularga qo'shilish. Kirish
+    # baribir serverda tekshiriladi (guruh, vaqt, yuz). Seans yaratish va
+    # hisobot ruxsatlari bu ro'yxatda ataylab yo'q — ularni admin biriktiradi.
+    "read:zoom_session",
+    "join:zoom_session",
     # Bosh sahifa (`/students/me/dashboard`).
     "student:me",
     # Test ishlash — talabaning asosiy amali. Uchtasi ham shart:

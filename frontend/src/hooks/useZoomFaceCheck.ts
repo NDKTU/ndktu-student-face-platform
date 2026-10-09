@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { faceCheckService, type FaceCheckResult, type FaceCheckStage } from '@/services/faceCheckService';
+import { zoomSessionService, type FaceCheckResult, type FaceCheckStage } from '@/services/zoomSessionService';
 import { logger } from '@/utils/logger';
 
 /**
- * Jonli darsdagi yuz nazorati.
+ * Zoom seansidagi yuz nazorati: kirishdagi (`join`) va dars davomidagi (`random`).
  *
  * Kamera oqimi Zoom bilan parallel ochiladi — brauzer bitta kameradan
  * bir nechta oqim berishga ruxsat beradi (tekshirildi), shuning uchun
@@ -22,7 +22,7 @@ const MAX_INTERVAL_MS = 75 * 1000;
 
 const randomDelay = () => MIN_INTERVAL_MS + Math.random() * (MAX_INTERVAL_MS - MIN_INTERVAL_MS);
 
-export function useLessonFaceCheck(lessonId: number) {
+export function useZoomFaceCheck(sessionId: number) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -78,8 +78,8 @@ export function useLessonFaceCheck(lessonId: number) {
     }, []);
 
     /**
-     * `null` — tekshirib bo'lmadi (xizmat javob bermadi yoki foydalanuvchi
-     * bu guruhning talabasi emas). Bunday holatda dars to'xtatilmaydi.
+     * `random`: `null` — tekshirib bo'lmadi, dars to'xtamaydi.
+     * `join`: xato tashlanadi — kirish faqat `admitted` bo'lsa davom etadi.
      */
     const runCheck = useCallback(async (stage: FaceCheckStage): Promise<FaceCheckResult | null> => {
         // Sahifa fonda bo'lsa kadr olinmaydi: brauzer fon tabidagi taymerlarni
@@ -87,10 +87,11 @@ export function useLessonFaceCheck(lessonId: number) {
         // qarab «talaba yo'q» deyish halol emas — serverga holatni aytamiz.
         if (document.visibilityState === 'hidden') {
             try {
-                const result = await faceCheckService.run(lessonId, { stage, page_hidden: true });
+                const result = await zoomSessionService.faceCheck(sessionId, { stage, page_hidden: true });
                 setLastResult(result);
                 return result;
             } catch (cause) {
+                if (stage === 'join') throw cause;
                 logger.warn('Face check skipped (page hidden)', cause);
                 return null;
             }
@@ -98,10 +99,11 @@ export function useLessonFaceCheck(lessonId: number) {
         const cameraReady = await openCamera();
         if (!cameraReady) {
             try {
-                const result = await faceCheckService.run(lessonId, { stage, camera_unavailable: true });
+                const result = await zoomSessionService.faceCheck(sessionId, { stage, camera_unavailable: true });
                 setLastResult(result);
                 return result;
             } catch (cause) {
+                if (stage === 'join') throw cause;
                 logger.error('Face check failed', cause);
                 return null;
             }
@@ -110,7 +112,7 @@ export function useLessonFaceCheck(lessonId: number) {
         await new Promise((resolve) => setTimeout(resolve, 600));
         const image = capture();
         try {
-            const result = await faceCheckService.run(lessonId, {
+            const result = await zoomSessionService.faceCheck(sessionId, {
                 stage,
                 image_base64: image ?? undefined,
                 camera_unavailable: !image,
@@ -118,6 +120,9 @@ export function useLessonFaceCheck(lessonId: number) {
             setLastResult(result);
             return result;
         } catch (cause) {
+            // Kirishda xato talabaga ko'rsatiladi (guruh, vaqt, surat, xizmat) —
+            // `ZoomMeetingBox` uni ushlaydi. Tasodifiy tekshiruv esa jim o'tadi.
+            if (stage === 'join') throw cause;
             const status = (cause as { response?: { status?: number } })?.response?.status;
             // 403 — bu guruhning talabasi emas (masalan, admin yoki o'qituvchi
             // talaba ko'rinishida): tekshiruv qo'llanmaydi, xato ham emas.
@@ -134,7 +139,7 @@ export function useLessonFaceCheck(lessonId: number) {
             logger.error('Face check failed', cause);
             return null;
         }
-    }, [lessonId, openCamera, capture]);
+    }, [sessionId, openCamera, capture]);
 
     /** Dars davomida tasodifiy vaqtlarda tekshiradi. */
     const startRandomChecks = useCallback(() => {

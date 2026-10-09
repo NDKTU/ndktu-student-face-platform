@@ -1278,8 +1278,10 @@ class GeneralTestRepository:
 
     @staticmethod
     async def _reference_photo(session: AsyncSession, user_id: int | None) -> str | None:
-        """Etalon surat: o'zi yuklagani, bo'lmasa HEMIS surati (dars nazoratidagi kabi).
+        """Etalon surat: talabada — faqat HEMIS surati, xodimda — profil surati.
 
+        Talabaning o'zi yuklagan surat etalon bo'lmaydi: aks holda o'rniga
+        test yechadigan odamning suratini yuklab qo'yish mumkin edi.
         Elementar testni xodimlar ham yechadi — ularda `Student` yo'q, faqat
         profil surati bo'lishi mumkin.
         """
@@ -1287,14 +1289,18 @@ class GeneralTestRepository:
             return None
         row = (
             await session.execute(
-                select(User.avatar_path, Student.image_path)
+                select(User.avatar_path, Student.id.label("student_id"), Student.image_path)
                 .outerjoin(Student, Student.user_id == User.id)
                 .where(User.id == user_id)
+                .order_by(Student.id.desc().nulls_last())
+                .limit(1)
             )
         ).first()
         if row is None:
             return None
-        return (row.avatar_path or row.image_path or "").strip() or None
+        if row.student_id is not None:
+            return (row.image_path or "").strip() or None
+        return (row.avatar_path or "").strip() or None
 
     async def _require_face(self, session: AsyncSession, test: GeneralTest, user: User) -> str | None:
         """Kamera rejimidagi testga kirish shartlari; `face_entry` tasdiq kalitini qaytaradi.

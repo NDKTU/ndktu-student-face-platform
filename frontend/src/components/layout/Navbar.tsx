@@ -48,6 +48,7 @@ const PATH_LABELS: Record<string, string> = {
     '/active-quizzes':      'Faol testlar',
     '/quiz-test':           'Test ishlash',
     '/homework':            'Uy vazifalari',
+    '/zoom':                'Zoom',
     '/results':             'Natijalar',
     '/results/answers':     'Javoblar tahlili',
     // Talaba ko'rinishi: elementar test «Test ishlash» va «Natijalar» ichida.

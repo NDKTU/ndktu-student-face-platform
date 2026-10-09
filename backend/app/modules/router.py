@@ -13,6 +13,7 @@ from .notification.router import router as notification_router
 from .organization_structure.router import router as organization_structure_router
 from .psychology.router import router as psychology_router
 from .quiz.router import router as quiz_router
+from .zoom_session.router import router as zoom_session_router
 
 router = APIRouter()
 
@@ -26,6 +27,7 @@ router.include_router(course_router)
 router.include_router(file_quota_router)
 router.include_router(file_router)
 router.include_router(integration_router)
+router.include_router(zoom_session_router)
 router.include_router(logs_router)
 router.include_router(announcement_router)
 router.include_router(notification_router)

@@ -5,6 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.core.schemas import TashkentDatetime
 
 RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom"]
+#: Yangi resurs turlari. `zoom` faqat o'qish uchun qoldi (eski yozuvlar): jonli
+#: dars endi «Zoom» sahifasidagi seans (`modules/zoom_session`), darsning resursi emas.
+CREATABLE_RESOURCE_TYPES = Literal["file", "link", "text", "video"]
 # «Kutubxona» — kitob va qo'llanmalar, «Fan hujjatlari» — o'quv dastur,
 # sillabus kabi rasmiy hujjatlar. Ikkalasi ham kurs darajasidagi fayl.
 RESOURCE_CATEGORIES = Literal["library", "document"]
@@ -13,7 +16,7 @@ RESOURCE_CATEGORIES = Literal["library", "document"]
 class ResourceCreateRequest(BaseModel):
     lesson_id: Optional[int] = None
     course_id: Optional[int] = None
-    resource_type: RESOURCE_TYPES
+    resource_type: CREATABLE_RESOURCE_TYPES
     category: RESOURCE_CATEGORIES = "library"
     title: str = Field(min_length=1, max_length=255)
     file_url: Optional[str] = None
@@ -30,17 +33,13 @@ class ResourceCreateRequest(BaseModel):
             raise ValueError("document category is only for course-level file resources")
 
         # Видео принимается только ссылкой (YouTube): загрузка видеофайлов отключена.
-        # Формат проверяется по той же причине, что и у Zoom: из ссылки собирается
-        # embed-адрес плеера, и мусор здесь ломал бы страницу урока у студента, а
-        # не форму у преподавателя.
-        # Zoom — тоже ссылка с проверкой: по ней собирается номер встречи для
-        # Meeting SDK.
+        # Формат проверяется: из ссылки собирается embed-адрес плеера, и мусор
+        # здесь ломал бы страницу урока у студента, а не форму у преподавателя.
         field_by_type = {
             "file": self.file_url,
             "link": self.link_url,
             "text": self.text_content,
             "video": self.link_url,
-            "zoom": self.link_url,
         }
         if not field_by_type[self.resource_type]:
             raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
@@ -48,12 +47,8 @@ class ResourceCreateRequest(BaseModel):
             from app.core.utils.youtube_link import parse_youtube_link
 
             parse_youtube_link(self.link_url or "")
-        if self.resource_type == "zoom":
-            from app.core.utils.zoom_link import parse_zoom_link
-
-            parse_zoom_link(self.link_url or "")
         if self.resource_type == "link":
-            # `video` va `zoom` havolasini o'z parserlari tekshiradi, `link` esa
+            # `video` havolasini o'z parseri tekshiradi, `link` esa
             # ixtiyoriy manzil — shuning uchun hech bo'lmasa sxemasi tekshiriladi.
             # `javascript:` shu yerda to'xtatilmasa, bazaga tushadi va uni faqat
             # React render paytida to'sadi; eksport yoki pochta xabarida esa

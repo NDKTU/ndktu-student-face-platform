@@ -38,6 +38,9 @@ __all__ = [
     "TeacherGroup",
     "PsychologyMethod",
     "GeneralTest",
+    "ZoomSession",
+    "ZoomSessionGroup",
+    "ZoomFaceCheck",
     "Lesson",
     "Homework",
     "HomeworkSubmission",
@@ -124,4 +127,9 @@ from app.modules.quiz.model import (
     Result,
     Subject,
     UserAnswers,
+)
+from app.modules.zoom_session.model import (
+    ZoomFaceCheck,
+    ZoomSession,
+    ZoomSessionGroup,
 )

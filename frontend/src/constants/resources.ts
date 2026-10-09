@@ -32,6 +32,7 @@ import {
     UserCog,
     Users,
     UsersRound,
+    Video,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -114,6 +115,12 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     file:          { label: 'Fayl kutubxonasi', href: '/files',       icon: FolderOpen,    section: "O'quv jarayoni", tone: 'yellow' },
     teacher_assignment: { label: 'Oʻquv yuklamasi', href: '/teacher-assignments', icon: ClipboardList, section: "O'quv jarayoni", tone: 'orange' },
     homework:      { label: 'Uy vazifalari',    href: '/homework',    icon: ClipboardCheck, section: "O'quv jarayoni", tone: 'green' },
+    // Jonli darslar: seans — Zoom havolasi + guruhlar + vaqt. Talaba ham shu
+    // punkt orqali kiradi (`read:zoom_session`), lekin faqat o'z guruhining seansini ko'radi.
+    zoom_session:  { label: 'Zoom',             href: '/zoom',        icon: Video,         section: "O'quv jarayoni", tone: 'blue' },
+    // Hisobot alohida sahifa emas — seans ichidagi tab. Menyuga chiqmaydi; bu
+    // yozuv rol ruxsatlari sahifasida nom chiqishi uchun.
+    zoom_report:   { label: 'Zoom hisoboti',    href: '/zoom',        icon: Video,         section: "O'quv jarayoni", tone: 'blue' },
     psychology:    { label: 'Psixologiya',      href: '/psychology',  icon: Brain,         section: 'Baholash', tone: 'pink' },
     psychology_results: { label: 'Psixologiya natijalari', href: '/psychology/results', icon: ClipboardList, section: 'Baholash', tone: 'purple' },
     // Elementar test (ilgari «Umumiy test», `general_test` moduli): admin ochgan
@@ -206,6 +213,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'course_stats',
     'teacher_assignment',
     'homework',
+    'zoom_session',
     'lesson',
     'file',
 

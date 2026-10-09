@@ -7,7 +7,6 @@ from core.database.db_helper import db_helper
 from core.dependencies.role_checker import DeviceUploadExceptTeacher, PermissionRequired
 from core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,8 +45,6 @@ from .attendance.schemas import (
 )
 from .gradebook.repository import get_gradebook_repository
 from .gradebook.schemas import CourseGradebookResponse, GradebookResponse, MyGradesResponse
-from .face_check.repository import get_face_check_repository
-from .face_check.schemas import FaceCheckReportResponse, FaceCheckRequest, FaceCheckResponse
 from .homework.repository import get_homework_repository
 from .homework.schemas import (
     HomeworkCreateRequest,
@@ -304,36 +301,6 @@ async def delete_lesson(
     )
 
 
-@lesson_router.post(
-    "/{lesson_id}/face-check",
-    response_model=FaceCheckResponse,
-    # Kalit foydalanuvchi bo'yicha: bitta auditoriyadagi talabalar umumiy NAT
-    # IP orqasida bo'ladi va IP bo'yicha cheklov ularni bir-birining limitini
-    # yeyishga majbur qilardi. Daqiqada bir tekshiruv + qayta urinishlar uchun
-    # 10 ta zaxira bilan yetarli.
-    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
-)
-async def lesson_face_check(
-    lesson_id: int,
-    data: FaceCheckRequest,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    """Jonli darsda talabaning yuzini tekshiradi va natijani jurnalga yozadi."""
-    return await get_face_check_repository.run_check(
-        session=session, lesson_id=lesson_id, data=data, current_user=current_user
-    )
-
-
-@lesson_router.get("/{lesson_id}/face-checks", response_model=FaceCheckReportResponse)
-async def lesson_face_check_report(
-    lesson_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    return await get_face_check_repository.report(session=session, lesson_id=lesson_id, current_user=current_user)
-
-
 @lesson_router.get("/{lesson_id}/attendance", response_model=AttendanceListResponse)
 async def lesson_attendance(
     lesson_id: int,
@@ -382,19 +349,6 @@ async def save_lesson_attendance(
     return await get_attendance_repository.save_attendance(
         session=session, lesson_id=lesson_id, data=data, current_user=current_user
     )
-
-
-@lesson_router.get("/face-check/{check_id}/image")
-async def lesson_face_check_image(
-    check_id: int,
-    session: AsyncSession = Depends(db_helper.session_getter),
-    current_user: "User" = Depends(PermissionRequired("read:lesson")),
-):
-    """Muammoli kadr. Ochiq statikada emas — har so'rovda ruxsat tekshiriladi."""
-    path = await get_face_check_repository.image_path(
-        session=session, check_id=check_id, current_user=current_user
-    )
-    return FileResponse(path, media_type="image/jpeg")
 
 
 # ============================================================================

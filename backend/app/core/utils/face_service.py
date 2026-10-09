@@ -1,6 +1,6 @@
 """Yuz xizmatiga (`face-detection`) bitta kadrni solishtirish so'rovi.
 
-Zoom-darsdagi davriy tekshiruv (`course/face_check`) va testga kirishdagi
+Zoom seansidagi tekshiruvlar (`zoom_session`: kirishda va davriy) va testga kirishdagi
 tekshiruv (`face_entry` rejimi: `quiz_process` va `general_test`). Hammasida
 qarorni server qiladi — natija jurnal va testga ruxsatga tushadi, brauzerga
 ishonib bo'lmaydi.

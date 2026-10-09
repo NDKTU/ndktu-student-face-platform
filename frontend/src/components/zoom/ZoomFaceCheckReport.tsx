@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace } from 'lucide-react';
 import { useState } from 'react';
-import { faceCheckService, type AbsencePeriod, type FaceCheckStudentSummary } from '@/services/faceCheckService';
+import { zoomSessionService, type AbsencePeriod, type FaceCheckStudentSummary } from '@/services/zoomSessionService';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatTime } from '@/utils/date';
 
@@ -64,25 +64,44 @@ const Timeline = ({ student }: { student: FaceCheckStudentSummary }) => {
 };
 
 /**
- * Yuz nazorati hisoboti — faqat dars o'qituvchisi va adminga ochiq.
+ * Seans hisoboti — yaratuvchi va adminga ochiq. Guruhdagi har bir talaba:
+ * kirganmi, qancha vaqt kadrda bo'lgan, muammoli kadrlar.
  * Qaror avtomatik qabul qilinmaydi: hisobot o'qituvchi ko'rib chiqishi uchun.
  */
-export const LessonFaceCheckReport = ({ lessonId }: { lessonId: number }) => {
+export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
     const [expanded, setExpanded] = useState<number | null>(null);
     const query = useQuery({
-        queryKey: ['lesson-face-checks', lessonId],
-        queryFn: () => faceCheckService.report(lessonId),
+        queryKey: ['zoom-session-report', sessionId],
+        queryFn: () => zoomSessionService.report(sessionId),
+        // Dars davomida o'qituvchi kim kirganini kuzatib turadi.
+        refetchInterval: 60_000,
     });
 
     if (query.isLoading) return <Skeleton className="h-20 w-full rounded-xl" />;
     const students = query.data?.students ?? [];
     if (students.length === 0) {
-        return <p className="text-sm text-muted-foreground">Hozircha tekshiruvlar yo'q.</p>;
+        return <p className="text-sm text-muted-foreground">Seansga guruh talabalari biriktirilmagan.</p>;
     }
 
     return (
         <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+                Kirgan: {students.filter((s) => s.joined).length} / {students.length}
+            </p>
             {students.map((student) => {
+                if (!student.joined) {
+                    return (
+                        <div key={student.user_id} className="flex items-center gap-3 rounded-xl border border-dashed border-border/80 px-4 py-3">
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                                {student.user_name || `#${student.user_id}`}
+                                {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                Kirmagan
+                            </span>
+                        </div>
+                    );
+                }
                 const isOpen = expanded === student.user_id;
                 const presentRatio = student.tracked_seconds > 0
                     ? Math.round(((student.tracked_seconds - student.absent_seconds) / student.tracked_seconds) * 100)
@@ -97,6 +116,7 @@ export const LessonFaceCheckReport = ({ lessonId }: { lessonId: number }) => {
                             {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                             <span className="min-w-0 flex-1 truncate font-medium">
                                 {student.user_name || `#${student.user_id}`}
+                                {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
                             </span>
                             {student.absent_seconds > 0 ? (
                                 <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
@@ -136,16 +156,15 @@ export const LessonFaceCheckReport = ({ lessonId }: { lessonId: number }) => {
                                                 {/* Dalil: davr boshidan olingan 1-2 kadr. Surat
                                                     himoyalangan endpoint orqali beriladi. */}
                                                 {period.image_check_ids.map((checkId, position) => (
-                                                    <a
+                                                    <button
                                                         key={checkId}
-                                                        href={faceCheckService.imageUrl(checkId)}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                        type="button"
+                                                        onClick={() => void zoomSessionService.openImage(checkId)}
                                                         className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
                                                     >
                                                         <ImageIcon className="h-3 w-3" />
                                                         {position === 0 ? 'Surat' : `Surat ${position + 1}`}
-                                                    </a>
+                                                    </button>
                                                 ))}
                                             </li>
                                         ))}

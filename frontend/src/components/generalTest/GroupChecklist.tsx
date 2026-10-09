@@ -1,16 +1,30 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search, UsersRound } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useGroupOptions, useSubjectFilterOptions } from '@/hooks/useGeneralTests';
-import type { GroupOption } from '@/services/generalTestService';
+import { generalTestService, type GroupOption, type GroupOptionFilter } from '@/services/generalTestService';
 import { cn } from '@/lib/utils';
 import { selectClassName } from './labels';
 
 const COURSES = [1, 2, 3, 4, 5, 6];
+
+/** Guruhlar qayerdan olinadi. Elementar test va Zoom seansi — har biri o'z
+ *  ruxsati ostidagi endpoint orqali (bir-birining ruxsatini talab qilmasin). */
+export interface GroupSource {
+    key: string;
+    groupOptions: (filter: GroupOptionFilter) => Promise<GroupOption[]>;
+    filterOptions: () => Promise<{ faculties: { id: number; name: string }[] }>;
+}
+
+const GENERAL_TEST_SOURCE: GroupSource = {
+    key: 'general-test',
+    groupOptions: generalTestService.groupOptions,
+    filterOptions: generalTestService.filterOptions,
+};
 
 interface Props {
     /** Tanlanganlar: id → nom (nom test nomini oldindan ko'rsatish uchun kerak). */
@@ -19,21 +33,31 @@ interface Props {
     /** Allaqachon biriktirilganlar — belgilangan va o'chirilgan holda. */
     assignedIds?: number[];
     className?: string;
+    source?: GroupSource;
 }
 
 /** Guruhlarni nomi, fakulteti va kursi bo'yicha qidirib belgilash ro'yxati. */
-export function GroupChecklist({ selected, onToggle, assignedIds = [], className }: Props) {
+export function GroupChecklist({ selected, onToggle, assignedIds = [], className, source = GENERAL_TEST_SOURCE }: Props) {
     const [search, setSearch] = useState('');
     const [facultyId, setFacultyId] = useState('');
     const [course, setCourse] = useState('');
     const debounced = useDebouncedValue(search);
 
-    const { data: options } = useSubjectFilterOptions();
-    const { data: groups, isLoading, isError, refetch } = useGroupOptions({
+    const { data: options } = useQuery({
+        queryKey: [source.key, 'filter-options'],
+        queryFn: source.filterOptions,
+        staleTime: 5 * 60 * 1000,
+    });
+    const filter: GroupOptionFilter = {
         search: debounced || undefined,
         faculty_id: facultyId ? Number(facultyId) : undefined,
         course: course ? Number(course) : undefined,
         limit: 100,
+    };
+    const { data: groups, isLoading, isError, refetch } = useQuery({
+        queryKey: [source.key, 'group-options', filter],
+        queryFn: () => source.groupOptions(filter),
+        placeholderData: (prev) => prev,
     });
     const assigned = new Set(assignedIds);
 

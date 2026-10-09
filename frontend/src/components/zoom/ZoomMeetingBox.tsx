@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
-import { zoomService } from '@/services/zoomService';
-import { useLessonFaceCheck } from '@/hooks/useLessonFaceCheck';
-import type { FaceCheckResult } from '@/services/faceCheckService';
+import { zoomSessionService } from '@/services/zoomSessionService';
+import { useZoomFaceCheck } from '@/hooks/useZoomFaceCheck';
+import { apiErrorMessage } from '@/utils/apiError';
+import type { FaceCheckResult } from '@/services/zoomSessionService';
 import { logger } from '@/utils/logger';
 import './ZoomMeetingBox.css';
 
@@ -76,19 +77,15 @@ function loadZoomSdk(): Promise<void> {
 }
 
 interface Props {
-    lessonId: number;
-    /** Dars sahifasida saqlangan havola — SDK ishlamasa shu ochiladi. */
-    joinUrl: string;
-    /** Yuz nazorati faqat talabalar uchun yoqiladi. */
+    sessionId: number;
+    /** Kirishdan oldin yuz tekshiruvi (server talab qiladi) va dars davomida tasodifiy. */
     faceCheckEnabled?: boolean;
 }
 
-// Shaxs tasdiqlanmasa ham dars to'xtamaydi: uch urinishdan keyin talaba
-// darsga kiradi, jurnalda esa «tasdiqlanmadi» yozuvi qoladi. Qaror
-// o'qituvchida — yorug'lik yoki burilib turish begona odam degani emas.
-const MAX_JOIN_ATTEMPTS = 3;
-
-export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: Props) => {
+// Shaxs tasdiqlanmaguncha imzo berilmaydi — buni server hal qiladi
+// (`zoom_session/repository.py::join`). Urinishlar cheklanmaydi: yomon yorug'lik
+// talabaning aybi emas. Ilgari uch urinishdan keyin talaba baribir kirardi.
+export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) => {
     const { user } = useAuth();
     const shellRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
@@ -99,7 +96,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
     const [faceResult, setFaceResult] = useState<FaceCheckResult | null>(null);
     const [attempts, setAttempts] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const faceCheck = useLessonFaceCheck(lessonId);
+    const faceCheck = useZoomFaceCheck(sessionId);
 
     useEffect(() => {
         const onChange = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
@@ -136,16 +133,21 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
         setState('idle');
     };
 
-    /** Darsga kirishdan oldingi tekshiruv. `true` — ulanamiz. */
+    /** Kirishdan oldingi tekshiruv. `true` — server tasdiqladi, imzo olish mumkin. */
     const verifyBeforeJoin = async (): Promise<boolean> => {
         setState('verifying');
-        const result = await faceCheck.runCheck('join');
-        setFaceResult(result);
-        const nextAttempt = attempts + 1;
-        setAttempts(nextAttempt);
-        if (result?.status === 'ok') return true;
-        // Xizmat javob bermasa ham (result === null) darsni to'sib qo'ymaymiz.
-        return result === null || nextAttempt >= MAX_JOIN_ATTEMPTS;
+        setError('');
+        setAttempts((n) => n + 1);
+        try {
+            const result = await faceCheck.runCheck('join');
+            setFaceResult(result);
+            return Boolean(result?.admitted);
+        } catch (cause) {
+            // Guruh, vaqt, HEMIS surati yoki xizmat — sababni aytamiz.
+            setFaceResult(null);
+            setError(apiErrorMessage(cause, "Shaxsni tekshirib bo'lmadi. Qayta urinib ko'ring."));
+            return false;
+        }
     };
 
     const join = async () => {
@@ -159,7 +161,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
         setState('joining');
         setError('');
         try {
-            const payload = await zoomService.join(lessonId);
+            const payload = await zoomSessionService.join(sessionId);
             await loadZoomSdk();
             if (!window.ZoomMtgEmbedded || !containerRef.current) throw new Error('Zoom SDK topilmadi');
 
@@ -199,7 +201,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 sdkKey: payload.sdk_key,
                 meetingNumber: payload.meeting_number,
                 password: payload.passcode ?? '',
-                userName: user?.username ?? 'Talaba',
+                userName: payload.user_name || user?.username || 'Talaba',
             });
             setState('joined');
             // Uchrashuv sahifaning o'rtasida ochiladi — o'sha joyga olib
@@ -213,13 +215,14 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
             // Bekend xatosi o'zbekcha keladi; Zoom SDK esa inglizcha sabab
             // qaytaradi (masalan «The meeting number is not found») — uni
             // yo'qotmaymiz, chunki muammoni aynan shu ochib beradi.
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
             const sdkReason = (cause as { reason?: string })?.reason;
+            const isApiError = Boolean((cause as { response?: unknown })?.response);
             setError(
-                detail
-                    || (sdkReason
-                        ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}. Zoom ilovasida ochib ko'ring.`
-                        : "Uchrashuvga qo'shilib bo'lmadi. Zoom ilovasida ochib ko'ring."),
+                isApiError
+                    ? apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi.")
+                    : (sdkReason
+                        ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}.`
+                        : "Uchrashuvga qo'shilib bo'lmadi. Qayta urinib ko'ring."),
             );
             await clientRef.current?.leaveMeeting().catch(() => undefined);
             clientRef.current = null;
@@ -256,10 +259,7 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                     {/* Tekshiruv natijasi: nima bo'lgani va nechanchi urinish. */}
                     {faceResult && faceResult.status !== 'ok' && state !== 'verifying' && (
                         <p className="text-xs text-amber-600">
-                            {faceResult.message}
-                            {attempts < MAX_JOIN_ATTEMPTS
-                                ? `. Qayta urinib ko'ring (${attempts}/${MAX_JOIN_ATTEMPTS})`
-                                : '. Darsga kirasiz, lekin jurnalda qayd qilindi'}
+                            {faceResult.message}. Qayta urinib ko'ring — tasdiqlanmaguncha darsga kirib bo'lmaydi.
                         </p>
                     )}
                     <div className="flex flex-wrap items-center justify-center gap-3">
@@ -271,21 +271,6 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                                 ? 'Tekshirilmoqda...'
                                 : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
                         </Button>
-                        {/* Zaxira yo'l faqat SDK ishlamaganda ochiladi. Doim
-                            ko'rinib tursa, u nazoratdan chiqishning eng oson
-                            yo'li bo'lib qolardi: Zoom ilovasida o'tirgan
-                            talabani kuzatib bo'lmaydi va jurnalda u umuman
-                            kirmagandek ko'rinardi. */}
-                        {error && (
-                            <a
-                                href={joinUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                            >
-                                Zoom ilovasida ochish
-                            </a>
-                        )}
                     </div>
                 </div>
             ) : (
@@ -333,9 +318,8 @@ export const ZoomMeetingBox = ({ lessonId, joinUrl, faceCheckEnabled = false }: 
                 <div ref={containerRef} className="zoom-meeting-root" />
             </div>
             {(state === 'joined' || state === 'joining') && (
-                /* Bu yerda «Zoom ilovasida ochish» ataylab yo'q: SDK allaqachon
-                   ishlayapti va kuzatuv boshlangan. Havola faqat nazoratdan
-                   chiqish yo'li bo'lib qolardi. */
+                /* «Zoom ilovasida ochish» yo'q: havola talabaga berilmaydi —
+                   u nazoratdan chiqish yo'li bo'lib qolardi. */
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
                     <span>Ovoz va kamerani Zoom panelidan boshqaring</span>
                 </div>

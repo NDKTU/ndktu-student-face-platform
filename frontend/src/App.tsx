@@ -79,6 +79,8 @@ const LessonsPage = lazy(() => import('@/pages/LessonsPage'));
 const LessonDetailPage = lazy(() => import('@/pages/LessonDetailPage'));
 const PublicQuizPage = lazy(() => import('@/pages/PublicQuizPage'));
 const HomeworksPage = lazy(() => import('@/pages/HomeworksPage'));
+const ZoomSessionsPage = lazy(() => import('@/pages/ZoomSessionsPage'));
+const ZoomSessionDetailPage = lazy(() => import('@/pages/ZoomSessionDetailPage'));
 const HomeworkSubmissionsPage = lazy(() => import('@/pages/HomeworkSubmissionsPage'));
 const RolesPage = lazy(() => import('@/pages/RolesPage'));
 const RolePermissionsPage = lazy(() => import('@/pages/RolePermissionsPage'));
@@ -400,6 +402,8 @@ function App() {
                                         <Route path="/lessons" element={<PermissionRoute permission="read:lesson"><LessonsPage /></PermissionRoute>} />
                                         <Route path="/lessons/:id" element={<PermissionRoute permission="read:lesson"><LessonDetailPage /></PermissionRoute>} />
                                         <Route path="/homework" element={<PermissionRoute permission="read:homework"><HomeworksPage /></PermissionRoute>} />
+                                        <Route path="/zoom" element={<PermissionRoute permission="read:zoom_session"><ZoomSessionsPage /></PermissionRoute>} />
+                                        <Route path="/zoom/:sessionId" element={<PermissionRoute permission="read:zoom_session"><ZoomSessionDetailPage /></PermissionRoute>} />
                                         {/* Ishlarni tekshirish — `update:submission` faqat o'qituvchi/adminda:
                                             talabada `read:submission` bor, lekin bu sahifa unga emas. */}
                                         <Route path="/homework/:id/submissions" element={<PermissionRoute permission="update:submission"><HomeworkSubmissionsPage /></PermissionRoute>} />
