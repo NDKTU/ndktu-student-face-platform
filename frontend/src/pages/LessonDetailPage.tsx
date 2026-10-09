@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, PlayCircle, Plus, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, BookOpen, ClipboardCheck, ClipboardList, ExternalLink, FileText, FileQuestion, Link as LinkIcon, ListChecks, Loader2, Paperclip, Pencil, PlayCircle, Plus, Radio, ScanFace, Trash2, Upload, Video as VideoIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useLesson } from '@/hooks/useLessons';
+import { useLesson, useUpdateLesson } from '@/hooks/useLessons';
+import { useRoleView } from '@/hooks/useRoleView';
 import { useAssignments, useDeleteAssignment } from '@/hooks/useAssignments';
 import { useCreateResource, useDeleteResource, useResources, useUpdateResource } from '@/hooks/useResources';
 import { resourceService, type ResourceType } from '@/services/resourceService';
@@ -10,6 +11,7 @@ import type { Assignment } from '@/services/assignmentService';
 import { AssignmentFormModal } from '@/components/AssignmentFormModal';
 import { LessonQuizModal } from '@/components/courses/LessonQuizModal';
 import { LessonFaceCheckReport } from '@/components/courses/LessonFaceCheckReport';
+import { ZoomMeetingBox } from '@/components/courses/ZoomMeetingBox';
 import { LessonAttendancePanel } from '@/components/courses/LessonAttendancePanel';
 import { LessonGradebook } from '@/components/courses/LessonGradebook';
 import { ATTENDANCE_ENABLED } from '@/constants/features';
@@ -46,6 +48,8 @@ export default function LessonDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { hasPermission } = useAuth();
+    const { isStudent } = useRoleView();
+    const updateLesson = useUpdateLesson();
     const lessonId = id ? Number.parseInt(id, 10) : undefined;
     const lessonQuery = useLesson(lessonId);
     const resourcesQuery = useResources(lessonId);
@@ -227,6 +231,48 @@ export default function LessonDetailPage() {
             {/* ── Dars ma'lumoti ──────────────────────────────────────── */}
             {activeTab === 'info' && (
             <div className="space-y-6">
+            {/* Jonli dars. Tablarga o'tishda (75fa2ef) karta tushib qolgan edi:
+                o'qituvchi havola qo'sha olmas, talaba esa saytda qo'shila
+                olmasdi, garchi bekend va `ZoomMeetingBox` joyida bo'lsa ham. */}
+            {(zoom?.link_url || canManageContent) && (
+                <SectionCard
+                    icon={<Radio className="h-[18px] w-[18px]" />}
+                    tone="teal"
+                    title="Jonli dars (Zoom)"
+                    description={zoom?.link_url ? 'Uchrashuv biriktirilgan' : undefined}
+                    action={canManageContent && (
+                        zoom
+                            ? <CardAction variant="ghost" className="text-destructive" onClick={() => setResourceToDelete({ id: zoom.id, title: 'Zoom havolasi' })} icon={<Trash2 className="h-4 w-4" />} label="Havolani olib tashlash" />
+                            : <CardAction onClick={() => setContentKinds(['zoom'])} icon={<Plus className="h-4 w-4" />} label="Zoom havolasi" />
+                    )}
+                >
+                    {/* Nazorat har bir darsga kerak emas — o'qituvchi o'zi hal qiladi. */}
+                    {canManageContent && zoom?.link_url && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
+                            <div>
+                                <p className="flex items-center gap-2 text-sm font-medium"><ScanFace className="h-4 w-4" /> Yuz nazorati</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Talaba darsga kirishda va dars davomida tasodifiy vaqtlarda tekshiriladi.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={Boolean(lesson.face_check_enabled)}
+                                disabled={updateLesson.isPending}
+                                onCheckedChange={(checked) => {
+                                    updateLesson.mutate(
+                                        { id: lesson.id, data: { face_check_enabled: checked } },
+                                        { onError: () => toast.error("Sozlamani saqlab bo'lmadi") },
+                                    );
+                                }}
+                            />
+                        </div>
+                    )}
+                    {zoom?.link_url
+                        ? <ZoomMeetingBox lessonId={lesson.id} joinUrl={zoom.link_url} faceCheckEnabled={isStudent && Boolean(lesson.face_check_enabled)} />
+                        : <EmptyState icon={<Radio className="h-6 w-6" />} title="Jonli uchrashuv yo'q" description="Bu darsga Zoom havolasi biriktirilmagan." className="py-8" />}
+                </SectionCard>
+            )}
+
             <SectionCard
                 icon={<Paperclip className="h-[18px] w-[18px]" />}
                 tone="orange"
