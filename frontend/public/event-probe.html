@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Event probe</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #111; --muted: #666; --line: #ddd; --accent: #242CBB; --warn: #c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #999; --line: #333; --warn: #ef5350; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  .q { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 12px 0; }
+  .q p { margin: 0 0 8px; font-weight: 600; }
+  .q li { margin: 4px 0; }
+  .hold { display: flex; align-items: center; justify-content: center; height: 56px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .row { display: flex; gap: 8px; margin: 12px 0; }
+  button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; }
+  #log { font: 12px/1.35 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--line); padding-top: 8px; }
+  .warn { color: var(--warn); font-weight: 700; }
+  .muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Hodisalarni tekshirish</h1>
+<p class="muted">Skrinshot qiling → Visual Intelligence / «Ask» orqali so'rang → brauzerga qayting. Keyin «Nusxa olish» ni bosib, jurnalni yuboring.</p>
+
+<div class="q">
+  <p>Namuna savol: O'zbekistonning poytaxti qaysi shahar?</p>
+  <ol type="A"><li>Samarqand</li><li>Toshkent</li><li>Buxoro</li><li>Navoiy</li></ol>
+</div>
+
+<div class="hold" id="hold">Bosib turing (hold-to-reveal sinovi)</div>
+
+<div class="row">
+  <button id="copy">Nusxa olish</button>
+  <button id="clear">Tozalash</button>
+</div>
+
+<div id="log"></div>
+
+<script>
+(() => {
+  const KEY = 'event-probe-log';
+  const logEl = document.getElementById('log');
+  const t0 = performance.now();
+  let lines = [];
+  try { lines = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { lines = []; }
+
+  const stamp = () => {
+    const d = new Date();
+    return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  };
+  const state = () => 'vis=' + document.visibilityState + ' focus=' + document.hasFocus() +
+    ' w=' + document.documentElement.clientWidth + ' h=' + window.innerHeight;
+
+  const render = () => {
+    logEl.innerHTML = lines.slice().reverse().map((l) =>
+      l.warn ? '<span class="warn">' + l.text + '</span>' : l.text).join('\n');
+  };
+  const log = (text, warn) => {
+    lines.push({ text: stamp() + '  ' + text, warn: !!warn });
+    if (lines.length > 400) lines = lines.slice(-400);
+    try { localStorage.setItem(KEY, JSON.stringify(lines)); } catch (e) { /* private mode */ }
+    render();
+  };
+
+  log('--- sahifa ochildi | ' + navigator.userAgent);
+  log('start  ' + state());
+
+  // Sahifa hayot sikli va fokus
+  document.addEventListener('visibilitychange', () => log('visibilitychange  ' + state(), true));
+  window.addEventListener('pagehide', (e) => log('pagehide persisted=' + e.persisted + '  ' + state(), true));
+  window.addEventListener('pageshow', (e) => log('pageshow persisted=' + e.persisted + '  ' + state(), true));
+  window.addEventListener('blur', () => log('window blur  ' + state(), true));
+  window.addEventListener('focus', () => log('window focus  ' + state(), true));
+  document.addEventListener('freeze', () => log('freeze', true));
+  document.addEventListener('resume', () => log('resume', true));
+  window.addEventListener('resize', () => log('resize  ' + state()));
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', () =>
+      log('visualViewport resize  vw=' + Math.round(visualViewport.width) + ' vh=' + Math.round(visualViewport.height) + ' scale=' + visualViewport.scale.toFixed(2)));
+  }
+
+  // Teginishlar: tizim oynasi ochilganda iOS barmoqni «bekor qilishi» mumkin
+  ['pointerdown', 'pointerup', 'pointercancel', 'touchcancel', 'lostpointercapture'].forEach((type) => {
+    window.addEventListener(type, (e) => {
+      const id = e.pointerId != null ? ' id=' + e.pointerId : '';
+      log(type + id + ' on=' + (e.target && e.target.id || e.target.nodeName), type.indexOf('cancel') !== -1);
+    }, true);
+  });
+  const hold = document.getElementById('hold');
+  hold.addEventListener('pointerdown', (e) => { try { hold.setPointerCapture(e.pointerId); } catch (_) {} });
+
+  // hasFocus() hodisasiz o'zgarishi mumkin — har 200 ms tekshiriladi
+  let lastFocus = document.hasFocus();
+  setInterval(() => {
+    const f = document.hasFocus();
+    if (f !== lastFocus) { log('hasFocus o\'zgardi → ' + f + ' (hodisasiz)', true); lastFocus = f; }
+  }, 200);
+
+  // Taymer va kadrlar to'xtashi: oyna sahifani yopsa, JS sekinlashishi mumkin
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const gap = now - lastTick - 500;
+    if (gap > 700) log('setInterval kechikdi: ' + Math.round(gap) + ' ms', true);
+    lastTick = now;
+  }, 500);
+
+  let lastFrame = performance.now();
+  const frame = (now) => {
+    const gap = now - lastFrame;
+    if (gap > 400) log('rAF to\'xtadi: ' + Math.round(gap) + ' ms', true);
+    lastFrame = now;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  document.getElementById('copy').addEventListener('click', () => {
+    const text = lines.map((l) => l.text).join('\n');
+    const done = () => log('jurnal nusxalandi (' + lines.length + ' qator)');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => prompt('Nusxa oling:', text));
+    } else {
+      prompt('Nusxa oling:', text);
+    }
+  });
+  document.getElementById('clear').addEventListener('click', () => {
+    lines = [];
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    log('tozalandi  ' + state());
+  });
+
+  render();
+  log('tayyor (' + Math.round(performance.now() - t0) + ' ms)');
+})();
+</script>
+</body>
+</html>
