@@ -122,6 +122,9 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     #: Qat'iy rejim: talaba sahifadan chiqsa, urinish serverda yopiladi
     #: (`quiz/quiz_process/strict.py`).
     strict_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    #: Yuz nazorati: `standard` — kamerasiz, `face` — butun test davomida
+    #: kamera, `face_entry` — kirishda bir marta (oddiy testdagi kabi).
+    proctoring_mode: Mapped[str] = mapped_column(String(16), nullable=False, server_default="standard")
     #: Matnni yashirish: savol va variantlar xira, faqat barmoq «ko'rish»
     #: tugmasida turganda ko'rinadi — oddiy skrinshot xira chiqadi.
     hold_to_reveal: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
@@ -198,6 +201,8 @@ class GeneralTestAttempt(Base, IdIntPk, TimestampMixin):
     #: Qat'iy testda urinish nima uchun yopildi («Sahifadan chiqdi» va h.k.).
     #: Bo'sh — oddiy yakunlangan yoki vaqti tugagan.
     stop_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: Kamera nazoratida qoidabuzarlik kadri (`/uploads/cheating_evidence/...`).
+    cheating_image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     test: Mapped[GeneralTest] = relationship("GeneralTest")
     user: Mapped[User | None] = relationship("User")

@@ -1,5 +1,6 @@
 import api from './api';
-import { keepaliveLeave, type LeaveReason } from './quizProcessService';
+import { keepaliveLeave, type LeaveReason, type VerifyEntryFaceResponse } from './quizProcessService';
+import type { ProctoringMode } from './quizService';
 
 /**
  * Elementar test (ilgari «Umumiy test») — admin ochgan fanga tegishli oddiy
@@ -102,6 +103,8 @@ export interface GeneralTestSummary {
     strict_mode?: boolean;
     /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
     hold_to_reveal?: boolean;
+    /** Yuz nazorati — oddiy testdagi uchta rejim. */
+    proctoring_mode?: ProctoringMode;
     /** Boshlash PIN'i; `null` — test PIN'siz. Faqat test egasi/admin ko'radi. */
     pin: string | null;
     /** Testdagi barcha savollar. */
@@ -154,6 +157,7 @@ export interface GeneralTestPayload {
     regenerate_pin?: boolean;
     strict_mode?: boolean;
     hold_to_reveal?: boolean;
+    proctoring_mode?: ProctoringMode;
 }
 
 export interface QuestionPayload {
@@ -183,6 +187,7 @@ export interface AvailableTest {
     /** Yangi urinish PIN so'raydi (PIN'ning o'zi kelmaydi). */
     pin_required: boolean;
     strict_mode?: boolean;
+    proctoring_mode?: ProctoringMode;
 }
 
 export interface TakeQuestion {
@@ -200,6 +205,10 @@ export interface AttemptState {
     questions: TakeQuestion[];
     strict_mode?: boolean;
     hold_to_reveal?: boolean;
+    proctoring_mode?: ProctoringMode;
+    /** `face` rejimida — yuz xizmati tokeni va etalon surat. */
+    face_ws_token?: string | null;
+    image_url?: string | null;
 }
 
 export interface AttemptResult {
@@ -213,6 +222,8 @@ export interface AttemptResult {
     finished_at: string | null;
     /** Qat'iy testda yopilish sababi; bo'sh — oddiy yakun. */
     stop_reason?: string | null;
+    /** Kamera nazoratidagi qoidabuzarlik kadri. */
+    cheating_image_url?: string | null;
 }
 
 export interface ResultRow {
@@ -232,6 +243,8 @@ export interface ResultRow {
     finished_at: string | null;
     /** Qat'iy testda yopilish sababi; bo'sh — oddiy yakun. */
     stop_reason?: string | null;
+    /** Kamera nazoratidagi qoidabuzarlik kadri. */
+    cheating_image_url?: string | null;
 }
 
 export interface ResultListResponse {
@@ -359,6 +372,12 @@ export const generalTestService = {
     },
     finish: async (attemptId: number) =>
         (await api.post<AttemptResult>(`/general-test/attempt/${attemptId}/finish`)).data,
+    /** `face_entry`: kirishdagi yuz tekshiruvi — qarorni server qiladi. */
+    verifyEntryFace: async (testId: number, image_base64: string, pin?: string) =>
+        (await api.post<VerifyEntryFaceResponse>(`/general-test/${testId}/verify_entry_face`, { image_base64, pin })).data,
+    /** `face`: kamera qoidabuzarlikni aniqladi — urinish dalil bilan yopiladi. */
+    reportCheating: async (attemptId: number, kind: 'multiple' | 'different', image_data?: string) =>
+        (await api.post<AttemptResult>(`/general-test/attempt/${attemptId}/cheating`, { kind, image_data })).data,
     /** Qat'iy test: sahifa hali ochiq. */
     heartbeat: async (attemptId: number) => {
         await api.post(`/general-test/attempt/${attemptId}/heartbeat`);

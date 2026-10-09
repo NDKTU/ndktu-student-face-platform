@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
-from app.core.utils.face_service import classify, verify_face
+from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.core.utils.lesson_scope import covers_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import CourseGroup, Lesson
@@ -40,20 +40,6 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
-
-#: Kirishdagi yuz tasdig'i shuncha soniya amal qiladi: talaba «Boshlash» ni
-#: shu orada bosishi kerak. Uzoq qilinsa, tasdiqlangan talaba o'rniga
-#: boshqasi o'tirib olishi mumkin bo'lardi.
-FACE_ENTRY_TTL_SECONDS = 5 * 60
-
-_FACE_ENTRY_MESSAGES = {
-    "ok": "Shaxsingiz tasdiqlandi",
-    "no_face": "Kadrda yuz ko'rinmadi — kameraga to'g'ri qarang va qayta urinib ko'ring",
-    "multiple_faces": "Kadrda bir nechta odam bor — yolg'iz qolib, qayta urinib ko'ring",
-    "different_person": "Yuz profil surati bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
-    "no_reference": "Profil suratingizdan yuz aniqlanmadi — o'qituvchiga murojaat qiling",
-}
-
 
 def face_entry_key(user_id: int, quiz_id: int) -> str:
     return f"quiz:face-entry:{user_id}:{quiz_id}"
@@ -273,7 +259,7 @@ class QuizProcessRepository:
         if student is None or not student.image_path:
             # Talaba emas (admin ko'rib chiqyapti) — solishtiradigan etalon yo'q.
             await redis_client.set(key, "1", ex=FACE_ENTRY_TTL_SECONDS)
-            return VerifyEntryFaceResponse(verified=True, status="ok", message=_FACE_ENTRY_MESSAGES["ok"])
+            return VerifyEntryFaceResponse(verified=True, status="ok", message=FACE_ENTRY_MESSAGES["ok"])
 
         try:
             result = await verify_face(data.image_base64, student.image_path)
@@ -288,7 +274,7 @@ class QuizProcessRepository:
         else:
             logger.info("Face entry rejected: user=%s quiz=%s status=%s", user.id, quiz.id, check_status)
         return VerifyEntryFaceResponse(
-            verified=verified, status=check_status, message=_FACE_ENTRY_MESSAGES[check_status]
+            verified=verified, status=check_status, message=FACE_ENTRY_MESSAGES[check_status]
         )
 
     async def _admit(self, session: AsyncSession, quiz: Quiz, pin: str, user: User) -> Student | None:

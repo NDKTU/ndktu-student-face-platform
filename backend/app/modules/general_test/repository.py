@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import io
 import logging
 import random
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+import httpx
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import and_, delete, func, literal, or_, select, text, update
@@ -13,10 +17,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
+from app.core.redis_client import redis_client
+from app.core.security import create_face_ws_token
+from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.organization_structure.model import Faculty, Group, Kafedra
 from app.modules.quiz.question.excel_format import parse_correct_option, read_question_sheet
+from app.modules.quiz.quiz_process import errors as quiz_errors
 from app.modules.quiz.quiz_process import strict
+from app.modules.quiz.quiz_process.schemas import VerifyEntryFaceResponse
 
 from .model import (
     GeneralTest,
@@ -33,6 +42,7 @@ from .schemas import (
     AttemptState,
     AvailableTest,
     AvailableTestListResponse,
+    CheatingRequest,
     FilterOption,
     FilterOptionsResponse,
     GeneralTestCreateRequest,
@@ -65,6 +75,7 @@ from .schemas import (
     TestGroupsAddRequest,
     TestGroupUpdateRequest,
     UploadResponse,
+    VerifyEntryFaceRequest,
     UserFilter,
     UserListRequest,
 )
@@ -87,6 +98,24 @@ def _not_found(what: str = "Test") -> HTTPException:
 
 #: Redis kalitlari prefiksi: `Result` id lari bilan to'qnashmasin.
 STRICT_KIND = "gtest"
+
+#: Kamera nazoratida qoidabuzarlik turi → o'qituvchi ko'radigan sabab.
+CHEATING_REASONS = {
+    "multiple": "Kadrda bir nechta odam",
+    "different": "Boshqa odam aniqlandi",
+}
+
+#: `face_entry`: kirishdagi tasdiqdan keyin test sahifasi shuncha vaqt ochiladi.
+#: Sahifani shu oraliqda yangilash yangi suratsiz o'tadi; keyin — yana yuz.
+FACE_GRANT_TTL_SECONDS = 120
+
+
+def _face_entry_key(user_id: int, test_id: int) -> str:
+    return f"gtest:face-entry:{user_id}:{test_id}"
+
+
+def _face_grant_key(attempt_id: int) -> str:
+    return f"gtest:face-ok:{attempt_id}"
 
 
 def _closed_left_page(reason: str) -> HTTPException:
@@ -796,7 +825,7 @@ class GeneralTestRepository:
         changes = data.model_dump(exclude_unset=True)
         pin_required = changes.pop("pin_required", None)
         regenerate_pin = changes.pop("regenerate_pin", False)
-        for flag in ("strict_mode", "hold_to_reveal"):
+        for flag in ("strict_mode", "hold_to_reveal", "proctoring_mode"):
             if flag in changes and changes[flag] is None:
                 changes.pop(flag)
         if pin_required is False:
@@ -1088,11 +1117,22 @@ class GeneralTestRepository:
                     best_score=max(scores) if scores else None,
                     pin_required=test.pin is not None,
                     strict_mode=test.strict_mode,
+                    proctoring_mode=test.proctoring_mode,
                 )
             )
         return AvailableTestListResponse(tests=result)
 
     async def _state(self, session: AsyncSession, attempt: GeneralTestAttempt) -> AttemptState:
+        face_ws_token = image_url = None
+        if attempt.test.proctoring_mode == "face" and attempt.user_id is not None:
+            image_url = await self._reference_photo(session, attempt.user_id)
+            # Token yuz xizmatining WebSocket'i uchun; xizmat faqat imzoni
+            # tekshiradi, `quiz_id` maydoni bu yerda elementar test id si.
+            face_ws_token = create_face_ws_token(
+                user_id=attempt.user_id,
+                quiz_id=attempt.test_id,
+                ttl_minutes=max(1, _remaining_seconds(attempt, attempt.test) // 60 + 5),
+            )
         ids = [item["q"] for item in attempt.layout]
         questions = {
             q.id: q
@@ -1130,6 +1170,9 @@ class GeneralTestRepository:
             questions=items,
             strict_mode=attempt.test.strict_mode,
             hold_to_reveal=attempt.test.hold_to_reveal,
+            proctoring_mode=attempt.test.proctoring_mode,
+            face_ws_token=face_ws_token,
+            image_url=image_url,
         )
 
     async def start(self, session: AsyncSession, test_id: int, user: User, pin: str | None = None) -> AttemptState:
@@ -1163,37 +1206,14 @@ class GeneralTestRepository:
                 # Qat'iy testga qaytish — sahifadan chiqqan degani.
                 if test.strict_mode and not await self._strict_young(session, attempt):
                     await self._close_left(session, attempt, "resume")
+                # Kirishda yuz — har bir kirishda, qaytishda ham (oddiy testdagi kabi).
+                entry_key = await self._require_face(session, test, user)
+                await self._grant_face(entry_key, attempt.id)
                 return await self._state(session, attempt)
             await self._finalize(session, attempt)
 
-        visible = (
-            await session.execute(select(GeneralTest.id).where(GeneralTest.id == test_id, _visible_to(user.id)))
-        ).scalar_one_or_none()
-        # Biriktirilmagan foydalanuvchi uchun test yo'qdek: id ni terib kirib
-        # bo'lmasin.
-        if visible is None:
-            await session.commit()
-            raise _not_found()
-        if not test.is_active:
-            await session.commit()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
-        # PIN — только для новой попытки: вернуться в начатую можно без него.
-        if test.pin is not None and (pin or "").strip() != test.pin:
-            await session.commit()
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PIN kod noto'g'ri")
-
-        if len(own) >= test.attempt_limit:
-            await session.commit()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinishlar soni tugagan")
-
-        # Savollar fanning bankidan — shu fanning barcha testlari uchun bitta.
-        pool = (
-            (await session.execute(select(GeneralTestQuestion.id).where(GeneralTestQuestion.subject_id == test.subject_id)))
-            .scalars()
-            .all()
-        )
-        if not pool:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu fanda savollar yo'q")
+        pool = await self._admit(session, test, user, pin, len(own))
+        entry_key = await self._require_face(session, test, user)
 
         layout = []
         for question_id in random.sample(pool, _per_attempt(test, len(pool))):
@@ -1213,7 +1233,185 @@ class GeneralTestRepository:
         await session.refresh(attempt, ["test"])
         if test.strict_mode:
             await strict.touch(attempt.id, STRICT_KIND)
+        await self._grant_face(entry_key, attempt.id)
         return await self._state(session, attempt)
+
+    async def _admit(
+        self, session: AsyncSession, test: GeneralTest, user: User, pin: str | None, used_attempts: int
+    ) -> list[int]:
+        """Yangi urinishga ruxsat: ko'rinish, faollik, PIN, urinishlar soni, savollar.
+
+        Rad etishdan oldin commit — `start` dagi advisory lock bo'shasin.
+        Savollar havzasini qaytaradi.
+        """
+        visible = (
+            await session.execute(select(GeneralTest.id).where(GeneralTest.id == test.id, _visible_to(user.id)))
+        ).scalar_one_or_none()
+        # Biriktirilmagan foydalanuvchi uchun test yo'qdek: id ni terib kirib
+        # bo'lmasin.
+        if visible is None:
+            await session.commit()
+            raise _not_found()
+        if not test.is_active:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
+        # PIN — только для новой попытки: вернуться в начатую можно без него.
+        if test.pin is not None and (pin or "").strip() != test.pin:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PIN kod noto'g'ri")
+        if used_attempts >= test.attempt_limit:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinishlar soni tugagan")
+
+        # Savollar fanning bankidan — shu fanning barcha testlari uchun bitta.
+        pool = (
+            (await session.execute(select(GeneralTestQuestion.id).where(GeneralTestQuestion.subject_id == test.subject_id)))
+            .scalars()
+            .all()
+        )
+        if not pool:
+            await session.commit()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu fanda savollar yo'q")
+        return list(pool)
+
+    # ── Yuz nazorati ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    async def _reference_photo(session: AsyncSession, user_id: int | None) -> str | None:
+        """Etalon surat: o'zi yuklagani, bo'lmasa HEMIS surati (dars nazoratidagi kabi).
+
+        Elementar testni xodimlar ham yechadi — ularda `Student` yo'q, faqat
+        profil surati bo'lishi mumkin.
+        """
+        if user_id is None:
+            return None
+        row = (
+            await session.execute(
+                select(User.avatar_path, Student.image_path)
+                .outerjoin(Student, Student.user_id == User.id)
+                .where(User.id == user_id)
+            )
+        ).first()
+        if row is None:
+            return None
+        return (row.avatar_path or row.image_path or "").strip() or None
+
+    async def _require_face(self, session: AsyncSession, test: GeneralTest, user: User) -> str | None:
+        """Kamera rejimidagi testga kirish shartlari; `face_entry` tasdiq kalitini qaytaradi.
+
+        Suratsiz foydalanuvchi qo'yilmaydi — solishtiradigan narsa yo'q, nazorat
+        esa jimgina o'chib qolardi. Istisno — admin: u testni ko'rib chiqadi.
+        Tasdiqni server qo'yadi (`verify_entry_face`), brauzerga ishonilmaydi.
+        """
+        if test.proctoring_mode == "standard":
+            return None
+        if await self._reference_photo(session, user.id) is None:
+            if self._is_admin(user):
+                return None
+            await session.commit()
+            raise quiz_errors.student_photo_missing()
+        if test.proctoring_mode != "face_entry":
+            return None
+        key = _face_entry_key(user.id, test.id)
+        if not await redis_client.exists(key):
+            await session.commit()
+            raise quiz_errors.face_verification_required()
+        return key
+
+    @staticmethod
+    async def _grant_face(entry_key: str | None, attempt_id: int) -> None:
+        """Tasdiq bir martalik: kirish kaliti o'chadi, test sahifasi qisqa vaqt ochiq."""
+        if entry_key is None:
+            return
+        await redis_client.delete(entry_key)
+        await redis_client.set(_face_grant_key(attempt_id), "1", ex=FACE_GRANT_TTL_SECONDS)
+
+    async def verify_entry_face(
+        self, session: AsyncSession, test_id: int, data: VerifyEntryFaceRequest, user: User
+    ) -> VerifyEntryFaceResponse:
+        """`face_entry` testiga kirishdan oldin yuzni etalon surat bilan solishtiradi.
+
+        Qayta urinishlar cheklanmaydi (faqat so'rov tezligi): yomon yorug'lik
+        talabaning aybi emas. Tugamagan urinishga qaytishda PIN va faollik
+        so'ralmaydi — `start` ham so'ramaydi.
+        """
+        test = await self._get_test(session, test_id)
+        if test.proctoring_mode != "face_entry":
+            raise quiz_errors.face_entry_not_required()
+
+        own = (
+            (
+                await session.execute(
+                    select(GeneralTestAttempt).where(
+                        GeneralTestAttempt.test_id == test_id, GeneralTestAttempt.user_id == user.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        resuming = any(a.status == IN_PROGRESS and not _is_expired(a, test) for a in own)
+        if not resuming:
+            await self._admit(session, test, user, data.pin, len(own))
+
+        key = _face_entry_key(user.id, test.id)
+        reference = await self._reference_photo(session, user.id)
+        if reference is None:
+            if not self._is_admin(user):
+                raise quiz_errors.student_photo_missing()
+            await redis_client.set(key, "1", ex=FACE_ENTRY_TTL_SECONDS)
+            return VerifyEntryFaceResponse(verified=True, status="ok", message=FACE_ENTRY_MESSAGES["ok"])
+
+        try:
+            result = await verify_face(data.image_base64, reference)
+        except (httpx.HTTPError, ValueError) as cause:
+            logger.warning("Face service unavailable for general test %s entry: %s", test.id, cause)
+            raise quiz_errors.face_service_unavailable() from cause
+
+        check_status = classify(result)
+        verified = check_status == "ok"
+        if verified:
+            await redis_client.set(key, "1", ex=FACE_ENTRY_TTL_SECONDS)
+        else:
+            logger.info("General test face entry rejected: user=%s test=%s status=%s", user.id, test.id, check_status)
+        return VerifyEntryFaceResponse(
+            verified=verified, status=check_status, message=FACE_ENTRY_MESSAGES[check_status]
+        )
+
+    @staticmethod
+    def _save_evidence(image_data: str | None, test_id: int, user_id: int) -> str | None:
+        """Qoidabuzarlik kadrini saqlaydi; buzuq yoki bo'sh kadr — `None` (belgi baribir qoladi)."""
+        if not image_data:
+            return None
+        from core.config import settings as app_settings
+
+        raw = image_data.split(",", 1)[1] if "," in image_data else image_data
+        try:
+            image_bytes = base64.b64decode(raw, validate=True)
+        except (binascii.Error, ValueError):
+            return None
+        evidence_dir = app_settings.evidence_dir
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"gtest_{test_id}_user_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        (evidence_dir / filename).write_bytes(image_bytes)
+        # /uploads/cheating_evidence/ — main.py dagi StaticFiles (oddiy test bilan bir joy).
+        return f"/uploads/cheating_evidence/{filename}"
+
+    async def report_cheating(
+        self, session: AsyncSession, attempt_id: int, data: CheatingRequest, user: User
+    ) -> AttemptResult:
+        """`face` rejimi: brauzer qoidabuzarlikni aytdi — urinish dalil bilan yopiladi."""
+        attempt = await self._own_attempt(session, attempt_id, user)
+        if attempt.status != IN_PROGRESS:
+            return self._result(attempt)
+        if attempt.test.proctoring_mode != "face":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda kamera nazorati yo'q")
+        attempt.cheating_image_url = self._save_evidence(data.image_data, attempt.test_id, user.id)
+        attempt.stop_reason = CHEATING_REASONS[data.kind]
+        await self._finalize(session, attempt)
+        await session.commit()
+        await strict.forget(attempt.id, STRICT_KIND)
+        return self._result(attempt)
 
     async def _strict_young(self, session: AsyncSession, attempt: GeneralTestAttempt) -> bool:
         """Urinish hozirgina boshlangan va javobsiz — boshlash javobi yo'qolgan bo'lishi mumkin."""
@@ -1267,6 +1465,12 @@ class GeneralTestRepository:
             ):
                 await self._close_left(session, attempt, "resume")
             await self._require_alive(session, attempt)
+        # Kirishda yuz: sahifa faqat yaqinda tasdiqlangan kirishdan keyin ochiladi.
+        # To'g'ridan-to'g'ri havola yoki keyinroq yangilash — yana yuz.
+        if attempt.test.proctoring_mode == "face_entry" and not await redis_client.exists(_face_grant_key(attempt.id)):
+            if await self._reference_photo(session, user.id) is not None or not self._is_admin(user):
+                await session.commit()
+                raise quiz_errors.face_verification_required()
         return await self._state(session, attempt)
 
     async def answer(self, session: AsyncSession, attempt_id: int, data: AnswerRequest, user: User) -> None:
@@ -1308,6 +1512,7 @@ class GeneralTestRepository:
             started_at=attempt.started_at,
             finished_at=attempt.finished_at,
             stop_reason=attempt.stop_reason,
+            cheating_image_url=attempt.cheating_image_url,
         )
 
     async def finish(self, session: AsyncSession, attempt_id: int, user: User) -> AttemptResult:
@@ -1430,6 +1635,7 @@ class GeneralTestRepository:
             started_at=attempt.started_at,
             finished_at=attempt.finished_at,
             stop_reason=attempt.stop_reason,
+            cheating_image_url=attempt.cheating_image_url,
         )
 
     async def list_results(

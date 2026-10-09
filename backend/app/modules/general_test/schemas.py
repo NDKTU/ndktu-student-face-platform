@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import TashkentDatetime
+from app.modules.quiz.quiz.schemas import ProctoringMode
 
 OptionLetter = Literal["a", "b", "c", "d"]
 
@@ -156,6 +157,8 @@ class GeneralTestCreateRequest(BaseModel):
     strict_mode: bool = False
     #: Matnni yashirish: faqat «ko'rish» tugmasi bosilib turganda ko'rinadi.
     hold_to_reveal: bool = False
+    #: Yuz nazorati — oddiy testdagi uchta rejim.
+    proctoring_mode: ProctoringMode = "standard"
 
 
 class GeneralTestUpdateRequest(BaseModel):
@@ -172,6 +175,7 @@ class GeneralTestUpdateRequest(BaseModel):
     regenerate_pin: bool = False
     strict_mode: bool | None = None
     hold_to_reveal: bool | None = None
+    proctoring_mode: ProctoringMode | None = None
 
 
 class GeneralTestSummary(BaseModel):
@@ -186,6 +190,7 @@ class GeneralTestSummary(BaseModel):
     is_active: bool
     strict_mode: bool = False
     hold_to_reveal: bool = False
+    proctoring_mode: ProctoringMode = "standard"
     #: Faqat test egasi va admin ko'radigan javoblarda: talabaga
     #: (`AvailableTest`) PIN'ning o'zi emas, faqat `pin_required` boradi.
     pin: str | None = None
@@ -285,6 +290,7 @@ class AvailableTest(BaseModel):
     #: Новая попытка требует PIN (сам PIN студенту не отдаётся).
     pin_required: bool = False
     strict_mode: bool = False
+    proctoring_mode: ProctoringMode = "standard"
 
 
 class StartRequest(BaseModel):
@@ -319,6 +325,26 @@ class AttemptState(BaseModel):
     #: Brauzer sahifadan chiqishni kuzatadi va heartbeat yuboradi.
     strict_mode: bool = False
     hold_to_reveal: bool = False
+    proctoring_mode: ProctoringMode = "standard"
+    #: `face` rejimida — yuz xizmatining WebSocket tokeni va etalon surat.
+    face_ws_token: str | None = None
+    image_url: str | None = None
+
+
+class VerifyEntryFaceRequest(BaseModel):
+    """`face_entry` testiga kirishdagi yuz tekshiruvi: PIN (bo'lsa) va kadr."""
+
+    pin: str | None = Field(default=None, max_length=16)
+    image_base64: str = Field(min_length=1, max_length=4_000_000)
+
+
+class CheatingRequest(BaseModel):
+    """`face` rejimida brauzer qoidabuzarlikni (3 ogohlantirishdan keyin) xabar qiladi."""
+
+    #: Qoidabuzarlik kadri, base64 JPEG (`data:` prefiksi bilan ham bo'ladi).
+    image_data: str | None = Field(default=None, max_length=4_000_000)
+    #: `multiple` — kadrda bir nechta odam, `different` — boshqa odam.
+    kind: Literal["multiple", "different"] = "different"
 
 
 class AnswerRequest(BaseModel):
@@ -342,6 +368,7 @@ class AttemptResult(BaseModel):
     finished_at: TashkentDatetime | None
     #: Qat'iy testda yopilish sababi; bo'sh — oddiy yakun.
     stop_reason: str | None = None
+    cheating_image_url: str | None = None
 
 
 class LeaveRequest(BaseModel):
@@ -385,6 +412,7 @@ class ResultRow(BaseModel):
     started_at: TashkentDatetime
     finished_at: TashkentDatetime | None
     stop_reason: str | None = None
+    cheating_image_url: str | None = None
 
 
 class ResultListResponse(BaseModel):

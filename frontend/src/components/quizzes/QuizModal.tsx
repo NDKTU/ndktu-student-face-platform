@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
+import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
 import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
@@ -427,50 +428,11 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Test rejimi</label>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        <button
-                            type="button"
-                            onClick={() => setValue('proctoring_mode', 'standard')}
-                            className={`text-left rounded-lg border px-3 py-2 transition ${
-                                proctoringMode === 'standard'
-                                    ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
-                                    : 'border-input hover:border-primary/50'
-                            }`}
-                        >
-                            <div className="text-sm font-medium">Standart</div>
-                            <div className="text-xs text-muted-foreground">Kamerasiz oddiy test</div>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setValue('proctoring_mode', 'face')}
-                            className={`text-left rounded-lg border px-3 py-2 transition ${
-                                proctoringMode === 'face'
-                                    ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
-                                    : 'border-input hover:border-primary/50'
-                            }`}
-                        >
-                            <div className="text-sm font-medium">Kamera bilan</div>
-                            <div className="text-xs text-muted-foreground">Yuz orqali kuzatuv</div>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setValue('proctoring_mode', 'face_entry')}
-                            className={`text-left rounded-lg border px-3 py-2 transition ${
-                                proctoringMode === 'face_entry'
-                                    ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
-                                    : 'border-input hover:border-primary/50'
-                            }`}
-                        >
-                            <div className="text-sm font-medium">Kirishda yuz</div>
-                            <div className="text-xs text-muted-foreground">Faqat boshlashda tekshiriladi</div>
-                        </button>
-                    </div>
-                    {errors.proctoring_mode && (
-                        <p className="text-sm text-destructive">{errors.proctoring_mode.message}</p>
-                    )}
-                </div>
+                <ProctoringModePicker
+                    value={proctoringMode}
+                    onChange={(mode) => setValue('proctoring_mode', mode)}
+                    error={errors.proctoring_mode?.message}
+                />
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={(checked) => setValue('strict_mode', checked)} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={(checked) => setValue('hold_to_reveal', checked)} />

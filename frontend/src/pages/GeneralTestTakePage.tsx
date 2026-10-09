@@ -17,6 +17,8 @@ import { apiErrorMessage } from '@/utils/apiError';
 import { noCopyHandlers } from '@/utils/antiCopy';
 import { useAuth } from '@/context/AuthContext';
 import { QuizWatermark } from '@/components/quizzes/QuizWatermark';
+import { QuizVideoMonitoring } from '@/components/QuizVideoMonitoring';
+import { FACE_DETECTION_SERVICE_URL } from '@/config/env';
 import { LEAVE_TEXT, closedReason, useStrictQuizGuard } from '@/hooks/useStrictQuizGuard';
 import { useHoldToReveal } from '@/hooks/useHoldToReveal';
 import { HoldToRevealBar } from '@/components/quizzes/HoldToRevealBar';
@@ -137,6 +139,28 @@ export default function GeneralTestTakePage() {
     }, [state, result, finish]);
 
     const isStrict = Boolean(state?.strict_mode);
+    // Kamera nazorati: ruxsat oynasi ham fokusni oladi, shuning uchun qat'iy
+    // kuzatuv kamera ishga tushgandan (yoki tushmay qolgandan) keyin boshlanadi.
+    const usesCamera = state?.proctoring_mode === 'face';
+    const [cameraSettled, setCameraSettled] = useState(false);
+    const handleCameraSettled = useCallback(() => setCameraSettled(true), []);
+
+    /** Kamera qoidabuzarlikni aniqladi (3 ogohlantirishdan keyin) — server urinishni yopadi. */
+    const handleCheating = useCallback(async (kind: 'multiple' | 'different', imageData: string) => {
+        if (finishedRef.current) return;
+        finishedRef.current = true;
+        try {
+            setResult(await generalTestService.reportCheating(attemptId, kind, imageData || undefined));
+            refreshTaking();
+        } catch (e) {
+            // Xabar yetmadi — hech bo'lmasa urinish yakunlansin.
+            finishedRef.current = false;
+            toast.error(apiErrorMessage(e, "Nazorat xabarini yuborib bo'lmadi"));
+            finish();
+        }
+    }, [attemptId, refreshTaking, finish]);
+    const onMultipleFaces = useCallback((image: string) => handleCheating('multiple', image), [handleCheating]);
+    const onDifferentPerson = useCallback((image: string) => handleCheating('different', image), [handleCheating]);
 
     const handleLeave = useCallback((reason: LeaveReason) => {
         if (finishedRef.current) return;
@@ -150,7 +174,10 @@ export default function GeneralTestTakePage() {
         });
     }, [attemptId, refreshTaking]);
 
-    useStrictQuizGuard({ active: isStrict && !result && !leftReason, onLeave: handleLeave });
+    useStrictQuizGuard({
+        active: isStrict && !result && !leftReason && (!usesCamera || cameraSettled),
+        onLeave: handleLeave,
+    });
 
     const holdToReveal = Boolean(state?.hold_to_reveal) && !result && !leftReason;
     const reveal = useHoldToReveal(holdToReveal);
@@ -259,6 +286,17 @@ export default function GeneralTestTakePage() {
             {...noCopyHandlers}
         >
             <QuizWatermark user={user} />
+            {usesCamera && (
+                <QuizVideoMonitoring
+                    active={!result && !leftReason}
+                    onCheatingDetected={onMultipleFaces}
+                    onDifferentPersonDetected={onDifferentPerson}
+                    faceDetectionServiceUrl={FACE_DETECTION_SERVICE_URL}
+                    token={state.face_ws_token ?? undefined}
+                    imageUrl={state.image_url ?? undefined}
+                    onCameraSettled={handleCameraSettled}
+                />
+            )}
             {holdToReveal && <HoldToRevealBar reveal={reveal} />}
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">

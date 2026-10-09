@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, ChartColumnBig, Download, Search, Trash2 } from 'lucide-react';
+import { ChartColumnBig, Download, Search, Trash2 } from 'lucide-react';
+import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
@@ -104,16 +105,14 @@ export default function GeneralTestResultsPage() {
             cell: (r) => (
                 <div className="flex flex-wrap items-center gap-1.5">
                     <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', scoreClass(r.score))}>{r.score}%</span>
-                    {/* Qat'iy testda yopilgan urinish: sababi bilan. */}
-                    {r.stop_reason && (
-                        <span
-                            className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
-                            title={r.stop_reason}
-                        >
-                            <AlertTriangle className="h-3 w-3" />
-                            {r.stop_reason}
-                        </span>
-                    )}
+                    {/* Qat'iy rejim yoki kamera yopgan urinish: bosilsa — sabab va kadr. */}
+                    <CheatingEvidence
+                        result={{
+                            cheating_detected: Boolean(r.stop_reason),
+                            cheating_image_url: r.cheating_image_url,
+                            reason_for_stop: r.stop_reason,
+                        }}
+                    />
                 </div>
             ),
         },

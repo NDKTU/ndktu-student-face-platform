@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
+import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
+import type { ProctoringMode } from '@/services/quizService';
 import { useGeneralTestSubjects } from '@/hooks/useGeneralTests';
 import type { GeneralTestPayload, GeneralTestSummary } from '@/services/generalTestService';
 import { GroupChecklist } from './GroupChecklist';
@@ -37,6 +39,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
     const [pinRequired, setPinRequired] = useState(Boolean(editing?.pin));
     const [strictMode, setStrictMode] = useState(editing?.strict_mode ?? false);
     const [holdToReveal, setHoldToReveal] = useState(editing?.hold_to_reveal ?? false);
+    const [proctoringMode, setProctoringMode] = useState<ProctoringMode>(editing?.proctoring_mode ?? 'standard');
     const [error, setError] = useState<string | null>(null);
     const subjectName = subjects?.subjects.find((s) => String(s.id) === subjectId)?.name ?? '';
 
@@ -66,6 +69,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
             pin_required: pinRequired,
             strict_mode: strictMode,
             hold_to_reveal: holdToReveal,
+            proctoring_mode: proctoringMode,
         });
     };
 
@@ -138,6 +142,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
                     </div>
                     <Switch checked={pinRequired} onCheckedChange={setPinRequired} />
                 </div>
+                <ProctoringModePicker value={proctoringMode} onChange={setProctoringMode} />
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
                 {error && <p className="text-sm text-destructive">{error}</p>}

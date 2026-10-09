@@ -34,3 +34,13 @@ export function apiErrorMessage(cause: unknown, fallback: string): string {
     }
     return fallback;
 }
+
+/** Kodli xatoning `code` i (`{detail: {code, message}}`); kodsiz xatoda — `undefined`. */
+export function apiErrorCode(cause: unknown): string | undefined {
+    const detail = (cause as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+        const { code } = detail as { code?: unknown };
+        if (typeof code === 'string') return code;
+    }
+    return undefined;
+}

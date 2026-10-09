@@ -23,6 +23,7 @@ import {
     useUpdateGeneralTest,
 } from '@/hooks/useGeneralTests';
 import type { GeneralTestPayload, GeneralTestSummary } from '@/services/generalTestService';
+import { PROCTORING_LABELS } from '@/services/quizService';
 import { apiErrorMessage } from '@/utils/apiError';
 
 export default function GeneralTestsPage() {
@@ -122,6 +123,13 @@ export default function GeneralTestsPage() {
         { key: 'groups', header: 'Guruhlar', cell: (t) => t.group_count, hideBelow: 'lg' },
         { key: 'duration', header: 'Vaqt', cell: (t) => `${t.duration} daq.`, hideBelow: 'md' },
         { key: 'attempts', header: 'Urinishlar', cell: (t) => t.attempt_limit, hideBelow: 'md' },
+        {
+            key: 'mode',
+            header: 'Rejim',
+            cell: (t) =>
+                `${PROCTORING_LABELS[t.proctoring_mode ?? 'standard']}${t.strict_mode ? " · Qat'iy" : ''}`,
+            hideBelow: 'lg',
+        },
         { key: 'passed', header: 'Topshirganlar', cell: (t) => t.attempt_count, hideBelow: 'lg' },
         {
             key: 'pin',

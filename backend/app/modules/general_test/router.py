@@ -30,6 +30,7 @@ from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.quiz.question.repository import get_question_repository
+from app.modules.quiz.quiz_process.schemas import VerifyEntryFaceResponse
 
 from .repository import get_general_test_repository as repo
 from .schemas import (
@@ -38,6 +39,7 @@ from .schemas import (
     AttemptState,
     StartRequest,
     AvailableTestListResponse,
+    CheatingRequest,
     FilterOptionsResponse,
     GeneralTestCreateRequest,
     GeneralTestDetail,
@@ -63,6 +65,7 @@ from .schemas import (
     TestGroupsAddRequest,
     TestGroupUpdateRequest,
     UploadResponse,
+    VerifyEntryFaceRequest,
     UserListRequest,
 )
 
@@ -112,6 +115,21 @@ async def start(
     return await repo.start(session=session, test_id=test_id, user=user, pin=data.pin if data else None)
 
 
+@router.post(
+    "/{test_id}/verify_entry_face",
+    response_model=VerifyEntryFaceResponse,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
+)
+async def verify_entry_face(
+    test_id: int,
+    data: VerifyEntryFaceRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(_take),
+):
+    """Kirishda yuz tekshiruvi (`face_entry`): mos kelsa, `start` ruxsat beradi."""
+    return await repo.verify_entry_face(session=session, test_id=test_id, data=data, user=user)
+
+
 @router.get("/attempt/{attempt_id}", response_model=AttemptState)
 async def get_attempt(
     attempt_id: int,
@@ -148,6 +166,21 @@ async def leave(
 ):
     """Qat'iy test: talaba sahifadan chiqdi — urinish yopiladi."""
     return await repo.leave(session=session, attempt_id=attempt_id, data=data, user=user)
+
+
+@router.post(
+    "/attempt/{attempt_id}/cheating",
+    response_model=AttemptResult,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, identifier=user_identifier))],
+)
+async def report_cheating(
+    attempt_id: int,
+    data: CheatingRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(_take),
+):
+    """Kamera nazorati (`face`): qoidabuzarlik — urinish dalil bilan yopiladi."""
+    return await repo.report_cheating(session=session, attempt_id=attempt_id, data=data, user=user)
 
 
 @router.post(
