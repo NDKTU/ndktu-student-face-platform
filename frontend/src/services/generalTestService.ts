@@ -105,8 +105,12 @@ export interface GeneralTestSummary {
     hold_to_reveal?: boolean;
     /** Yuz nazorati — oddiy testdagi uchta rejim. */
     proctoring_mode?: ProctoringMode;
-    /** Boshlash PIN'i; `null` — test PIN'siz. Faqat test egasi/admin ko'radi. */
+    /** Boshlash PIN'i. Faqat test egasi/admin ko'radi — boshqalarga `null`. */
     pin: string | null;
+    /** Test PIN bilan boshlanadimi (PIN'ning o'zi yashirin bo'lsa ham). */
+    pin_required?: boolean;
+    /** Tahrirlash, PIN va faollikni boshqarish mumkinmi (egasi yoki admin). */
+    can_manage?: boolean;
     /** Testdagi barcha savollar. */
     question_count: number;
     attempt_count: number;

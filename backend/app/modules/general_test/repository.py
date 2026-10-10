@@ -742,19 +742,27 @@ class GeneralTestRepository:
         )
         return questions, attempts, groups
 
-    @staticmethod
-    def _with_counts(test: GeneralTest, counts) -> GeneralTestSummary:
+    def _with_counts(self, test: GeneralTest, counts, user: User) -> GeneralTestSummary:
+        """Ro'yxat/kartochka qatori.
+
+        PIN — faqat egasi va adminga: butun universitetni koʻradigan rol
+        testni koʻradi, lekin PIN'ni talabalarga tarqatib yubora olmasligi kerak.
+        """
         questions, attempts, groups = counts
+        can_manage = self._is_admin(user) or test.created_by_user_id == user.id
         return GeneralTestSummary.model_validate(test).model_copy(
             update={
                 "question_count": questions.get(test.id, 0),
                 "attempt_count": attempts.get(test.id, 0),
                 "group_count": groups.get(test.id, 0),
+                "can_manage": can_manage,
+                "pin_required": test.pin is not None,
+                "pin": test.pin if can_manage else None,
             }
         )
 
-    async def _summary(self, session: AsyncSession, test: GeneralTest) -> GeneralTestSummary:
-        return self._with_counts(test, await self._counts(session, [test.id]))
+    async def _summary(self, session: AsyncSession, test: GeneralTest, user: User) -> GeneralTestSummary:
+        return self._with_counts(test, await self._counts(session, [test.id]), user)
 
     async def list_tests(
         self,
@@ -787,12 +795,12 @@ class GeneralTestRepository:
             total=total,
             page=page,
             limit=limit,
-            tests=[self._with_counts(t, counts) for t in tests],
+            tests=[self._with_counts(t, counts, user) for t in tests],
         )
 
     async def get_test(self, session: AsyncSession, test_id: int, user: User) -> GeneralTestDetail:
         test = await self._get_test(session, test_id, user, view=True)
-        summary = await self._summary(session, test)
+        summary = await self._summary(session, test, user)
         groups = await self._group_options(
             session,
             select(Group).join(GeneralTestGroup, GeneralTestGroup.group_id == Group.id).where(

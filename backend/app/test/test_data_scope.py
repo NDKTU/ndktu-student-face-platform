@@ -367,7 +367,7 @@ async def general_test(async_db, test_user, org):
     subject = GeneralTestSubject(name="Doira fani", created_by_user_id=test_user["id"])
     async_db.add(subject)
     await async_db.flush()
-    test = GeneralTest(subject_id=subject.id, title="Doira testi", created_by_user_id=test_user["id"])
+    test = GeneralTest(subject_id=subject.id, title="Doira testi", created_by_user_id=test_user["id"], pin="482913")
     async_db.add(test)
     await async_db.flush()
     attempts = [
@@ -401,9 +401,20 @@ async def test_all_scope_sees_foreign_general_tests_read_only(async_client, asyn
     assert row["can_manage"] is False
 
     assert (await client.get(f"/general-test/subject/{general_test['subject_id']}")).status_code == 200
-    assert (await client.get(f"/general-test/{general_test['test_id']}")).status_code == 200
+    detail = await client.get(f"/general-test/{general_test['test_id']}")
+    assert detail.status_code == 200
     tests = await client.get("/general-test/")
-    assert general_test["test_id"] in {t["id"] for t in tests.json()["tests"]}
+    row = next(t for t in tests.json()["tests"] if t["id"] == general_test["test_id"])
+
+    # PIN koʻrinmaydi — faqat borligi: aks holda kuzatuvchi uni talabalarga tarqatardi.
+    for item in (row, detail.json()):
+        assert item["pin"] is None
+        assert item["pin_required"] is True
+        assert item["can_manage"] is False
+
+    # Yangi PIN yaratish ham yopiq.
+    regen = await client.put(f"/general-test/{general_test['test_id']}", json={"regenerate_pin": True})
+    assert regen.status_code == 403
 
     results = await client.get("/general-test/results")
     assert {r["attempt_id"] for r in results.json()["results"]} >= {general_test["attempt_a"], general_test["attempt_b"]}
@@ -429,3 +440,14 @@ async def test_faculty_scope_sees_general_results_of_its_students(async_client, 
     results = await client.get("/general-test/results")
     assert results.status_code == 200, results.text
     assert {r["attempt_id"] for r in results.json()["results"]} == {general_test["attempt_a"]}
+
+
+@pytest.mark.asyncio
+async def test_owner_sees_and_regenerates_pin(auth_client, general_test):
+    before = (await auth_client.get(f"/general-test/{general_test['test_id']}")).json()
+    assert before["pin"] == "482913"
+    assert before["can_manage"] is True
+
+    regen = await auth_client.put(f"/general-test/{general_test['test_id']}", json={"regenerate_pin": True})
+    assert regen.status_code == 200, regen.text
+    assert regen.json()["pin"] not in (None, "482913")

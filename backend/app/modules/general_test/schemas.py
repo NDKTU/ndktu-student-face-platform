@@ -191,9 +191,12 @@ class GeneralTestSummary(BaseModel):
     strict_mode: bool = False
     hold_to_reveal: bool = False
     proctoring_mode: ProctoringMode = "standard"
-    #: Faqat test egasi va admin ko'radigan javoblarda: talabaga
-    #: (`AvailableTest`) PIN'ning o'zi emas, faqat `pin_required` boradi.
+    #: Faqat test egasi va adminga. Talabaga (`AvailableTest`) va testni
+    #: faqat koʻradigan rolga PIN'ning oʻzi emas, faqat `pin_required` boradi.
     pin: str | None = None
+    pin_required: bool = False
+    #: Tahrirlash, PIN va faollikni boshqarish mumkinmi (egasi yoki admin).
+    can_manage: bool = False
     #: Fan bankidagi barcha savollar (urinishga beriladigani — `question_number`).
     question_count: int = 0
     attempt_count: int = 0

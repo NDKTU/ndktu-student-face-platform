@@ -8,7 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Switch } from '@/components/ui/Switch';
-import { PermissionGate, usePermission } from '@/components/auth/PermissionGate';
+import { usePermission } from '@/components/auth/PermissionGate';
 import { GeneralTestFormModal } from '@/components/generalTest/GeneralTestFormModal';
 import { GroupPickerModal } from '@/components/generalTest/GroupPickerModal';
 import { questionsLabel } from '@/components/generalTest/labels';
@@ -24,7 +24,9 @@ export default function GeneralTestDetailPage() {
     const navigate = useNavigate();
     const testId = Number(useParams().id);
     const { data: test, isLoading, isError, refetch } = useGeneralTest(Number.isFinite(testId) ? testId : null);
-    const canEdit = usePermission('update:general_test');
+    // Ruxsat yetarli emas: butun universitetni ko'radigan rol begona testni
+    // ham ochadi, lekin uni boshqarmaydi (`can_manage`).
+    const canEdit = usePermission('update:general_test') && Boolean(test?.can_manage);
 
     const updateTest = useUpdateGeneralTest();
     const removeGroup = useRemoveGeneralTestGroup(testId);
@@ -98,11 +100,11 @@ export default function GeneralTestDetailPage() {
             <PageHeader
                 title={test.title}
                 actions={
-                    <PermissionGate permission="update:general_test">
+                    canEdit && (
                         <Button variant="outline" onClick={() => setEditTest(true)}>
                             <Pencil className="h-4 w-4" /> Tahrirlash
                         </Button>
-                    </PermissionGate>
+                    )
                 }
             />
 
@@ -149,12 +151,14 @@ export default function GeneralTestDetailPage() {
                                     <>
                                         PIN: <span className="font-mono text-lg tracking-widest">{test.pin}</span>
                                     </>
+                                ) : test.pin_required ? (
+                                    "PIN o'rnatilgan"
                                 ) : (
                                     "PIN yo'q"
                                 )}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                {test.pin
+                                {test.pin || test.pin_required
                                     ? "Talaba yangi urinishni faqat shu PIN bilan boshlaydi. Boshlangan urinishga PIN'siz qaytadi"
                                     : 'Test PIN so\'ramasdan boshlanadi'}
                             </p>
@@ -172,7 +176,7 @@ export default function GeneralTestDetailPage() {
                             </Button>
                         )}
                         <Switch
-                            checked={Boolean(test.pin)}
+                            checked={Boolean(test.pin || test.pin_required)}
                             onCheckedChange={(value) =>
                                 changePin({ pin_required: value }, value ? 'PIN yoqildi' : "PIN o'chirildi")
                             }
@@ -200,11 +204,11 @@ export default function GeneralTestDetailPage() {
                                 O'chirilgan guruh biriktirilgan bo'lib qoladi, lekin testni ko'rmaydi
                             </p>
                         </div>
-                        <PermissionGate permission="update:general_test">
+                        {canEdit && (
                             <Button size="sm" variant="outline" onClick={() => setPickingGroups(true)}>
                                 <Plus className="h-4 w-4" /> Guruh biriktirish
                             </Button>
-                        </PermissionGate>
+                        )}
                     </div>
                     {test.groups.length === 0 ? (
                         <p className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BookMarked, ClipboardList, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { BookMarked, ClipboardList, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
@@ -50,6 +50,25 @@ export default function GeneralTestsPage() {
     const updateTest = useUpdateGeneralTest();
     const deleteTest = useDeleteGeneralTest();
     const [togglingId, setTogglingId] = useState<number | null>(null);
+    const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
+
+    // Butun universitetni ko'radigan rol begona testni ham ko'radi, lekin
+    // boshqarmaydi — ruxsatning o'zi yetmaydi.
+    const manages = (test: GeneralTestSummary) => canEdit && Boolean(test.can_manage);
+
+    // Har bir test sahifasini ochmasdan, ro'yxatdan turib yangi PIN —
+    // eski PIN tarqab ketganda darhol yopish uchun.
+    const regeneratePin = (test: GeneralTestSummary) => {
+        setRegeneratingId(test.id);
+        updateTest.mutate(
+            { id: test.id, data: { regenerate_pin: true } },
+            {
+                onSuccess: () => toast.success('Yangi PIN yaratildi'),
+                onError: (e) => toast.error(apiErrorMessage(e, 'Saqlashda xatolik')),
+                onSettled: () => setRegeneratingId(null),
+            },
+        );
+    };
 
     // Admin testni ro'yxatning o'zida yoqib-o'chiradi — kartochkaga kirmasdan.
     const toggleActive = (test: GeneralTestSummary, value: boolean) => {
@@ -138,7 +157,24 @@ export default function GeneralTestsPage() {
             // har bir test sahifasini ochib o'tirmasin.
             cell: (t) =>
                 t.pin ? (
-                    <span className="font-mono font-semibold tracking-widest text-foreground">{t.pin}</span>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <span className="font-mono font-semibold tracking-widest text-foreground">{t.pin}</span>
+                        {manages(t) && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Yangi PIN"
+                                aria-label="Yangi PIN"
+                                disabled={regeneratingId === t.id}
+                                onClick={() => regeneratePin(t)}
+                            >
+                                <RefreshCw className={`h-3.5 w-3.5 ${regeneratingId === t.id ? 'animate-spin' : ''}`} />
+                            </Button>
+                        )}
+                    </div>
+                ) : t.pin_required ? (
+                    <span className="text-muted-foreground">••••</span>
                 ) : (
                     <span className="text-muted-foreground">—</span>
                 ),
@@ -151,7 +187,7 @@ export default function GeneralTestsPage() {
                     <Switch
                         checked={t.is_active}
                         onCheckedChange={(value) => toggleActive(t, value)}
-                        disabled={!canEdit || togglingId === t.id}
+                        disabled={!manages(t) || togglingId === t.id}
                         aria-label={t.is_active ? "O'chirib qo'yish" : 'Faollashtirish'}
                     />
                     <span className="text-xs text-muted-foreground">{t.is_active ? 'Faol' : 'Nofaol'}</span>
@@ -164,16 +200,18 @@ export default function GeneralTestsPage() {
             headClassName: 'w-24',
             cell: (t) => (
                 <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                    <PermissionGate permission="update:general_test">
+                    {manages(t) && (
                         <Button variant="ghost" size="icon" aria-label="Tahrirlash" onClick={() => setForm({ open: true, editing: t })}>
                             <Pencil className="h-4 w-4" />
                         </Button>
-                    </PermissionGate>
-                    <PermissionGate permission="delete:general_test">
-                        <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(t)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </PermissionGate>
+                    )}
+                    {t.can_manage && (
+                        <PermissionGate permission="delete:general_test">
+                            <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(t)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </PermissionGate>
+                    )}
                 </div>
             ),
         },
