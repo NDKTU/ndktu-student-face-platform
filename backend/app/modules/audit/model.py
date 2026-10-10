@@ -34,6 +34,7 @@ class AuditEvent:
     USER_UPDATED = "user.updated"
     USER_DELETED = "user.deleted"
     ROLE_CHANGED = "user.role_changed"
+    DATA_SCOPE_CHANGED = "user.data_scope_changed"
     PASSWORD_CHANGED = "user.password_changed"
     QUESTION_DELETED = "question.deleted"
     QUESTIONS_BULK_DELETED = "question.bulk_deleted"

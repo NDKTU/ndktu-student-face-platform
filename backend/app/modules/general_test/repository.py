@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
+from app.core.utils.data_scope import DataScope, resolve_data_scope
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.organization_structure.model import Faculty, Group, Kafedra
@@ -233,9 +234,19 @@ class GeneralTestRepository:
     def _is_admin(user: User) -> bool:
         return any(role.name.lower() == "admin" for role in user.roles)
 
-    def _own_only(self, stmt, model, user: User):
-        """Roʻyxat soʻrovini egasi boʻyicha cheklaydi (admin uchun — yoʻq)."""
-        if self._is_admin(user):
+    @staticmethod
+    async def _sees_all(session: AsyncSession, user: User) -> bool:
+        """Koʻrish doirasi «Butun universitet» (`core/utils/data_scope.py`).
+
+        Bunday rol hamma fan, test va natijani KOʻRADI, lekin boshqarmaydi:
+        tahrirlash, oʻchirish va biriktirishlar egasi va adminda qoladi
+        (`_can_manage`, `_ensure_owner`).
+        """
+        return (await resolve_data_scope(session, user)).unrestricted
+
+    async def _own_only(self, session: AsyncSession, stmt, model, user: User):
+        """Roʻyxat soʻrovini egasi boʻyicha cheklaydi (butun universitetni koʻradiganga — yoʻq)."""
+        if await self._sees_all(session, user):
             return stmt
         return stmt.where(model.created_by_user_id == user.id)
 
@@ -257,15 +268,26 @@ class GeneralTestRepository:
     # ── Fan ──────────────────────────────────────────────────────────────────
 
     async def _get_subject(
-        self, session: AsyncSession, subject_id: int, user: User | None = None, *, member: bool = False
+        self,
+        session: AsyncSession,
+        subject_id: int,
+        user: User | None = None,
+        *,
+        member: bool = False,
+        view: bool = False,
     ) -> GeneralTestSubject:
-        """`member=True` — fanga biriktirilganga ham ruxsat (koʻrish, savol qoʻshish)."""
+        """`member=True` — fanga biriktirilganga ham ruxsat (koʻrish, savol qoʻshish).
+
+        `view=True` — faqat koʻrish: butun universitetni koʻradigan rolga ham ochiq.
+        """
         subject = await session.get(GeneralTestSubject, subject_id)
         if subject is None:
             raise _not_found("Fan")
         if user is None or self._can_manage(subject, user):
             return subject
         if member and await self._is_member(session, subject_id, user.id):
+            return subject
+        if view and await self._sees_all(session, user):
             return subject
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu fan sizniki emas")
 
@@ -333,7 +355,7 @@ class GeneralTestRepository:
         self, session: AsyncSession, page: int, limit: int, search: str | None, user: User
     ) -> SubjectListResponse:
         stmt = select(GeneralTestSubject)
-        if not self._is_admin(user):
+        if not await self._sees_all(session, user):
             assigned = select(GeneralTestSubjectUser.subject_id).where(GeneralTestSubjectUser.user_id == user.id)
             stmt = stmt.where(
                 or_(GeneralTestSubject.created_by_user_id == user.id, GeneralTestSubject.id.in_(assigned))
@@ -361,7 +383,7 @@ class GeneralTestRepository:
         )
 
     async def get_subject(self, session: AsyncSession, subject_id: int, user: User) -> SubjectSummary:
-        subject = await self._get_subject(session, subject_id, user, member=True)
+        subject = await self._get_subject(session, subject_id, user, member=True, view=True)
         return await self._subject_summary(session, subject, user)
 
     async def create_subject(self, session: AsyncSession, data: SubjectCreateRequest, user: User) -> SubjectSummary:
@@ -671,13 +693,14 @@ class GeneralTestRepository:
         )
 
     async def _get_test(
-        self, session: AsyncSession, test_id: int, user: User | None = None
+        self, session: AsyncSession, test_id: int, user: User | None = None, *, view: bool = False
     ) -> GeneralTest:
+        """`view=True` — faqat koʻrish: butun universitetni koʻradigan rolga ham ochiq."""
         stmt = select(GeneralTest).options(selectinload(GeneralTest.subject)).where(GeneralTest.id == test_id)
         test = (await session.execute(stmt)).scalar_one_or_none()
         if test is None:
             raise _not_found()
-        if user is not None:
+        if user is not None and not (view and await self._sees_all(session, user)):
             self._ensure_owner(test, user, "Bu test sizniki emas")
         return test
 
@@ -742,8 +765,8 @@ class GeneralTestRepository:
         user: User,
         subject_id: int | None = None,
     ) -> GeneralTestListResponse:
-        stmt = self._own_only(
-            select(GeneralTest).options(selectinload(GeneralTest.subject)), GeneralTest, user
+        stmt = await self._own_only(
+            session, select(GeneralTest).options(selectinload(GeneralTest.subject)), GeneralTest, user
         )
         if search and search.strip():
             stmt = stmt.where(GeneralTest.title.ilike(f"%{search.strip()}%"))
@@ -768,7 +791,7 @@ class GeneralTestRepository:
         )
 
     async def get_test(self, session: AsyncSession, test_id: int, user: User) -> GeneralTestDetail:
-        test = await self._get_test(session, test_id, user)
+        test = await self._get_test(session, test_id, user, view=True)
         summary = await self._summary(session, test)
         groups = await self._group_options(
             session,
@@ -867,7 +890,7 @@ class GeneralTestRepository:
     async def list_subject_questions(
         self, session: AsyncSession, subject_id: int, user: User
     ) -> SubjectQuestionListResponse:
-        await self._get_subject(session, subject_id, user, member=True)
+        await self._get_subject(session, subject_id, user, member=True, view=True)
         questions = (
             (
                 await session.execute(
@@ -1576,12 +1599,13 @@ class GeneralTestRepository:
 
     # ── Результаты (администратор) ───────────────────────────────────────────
 
-    def _results_stmt(self, request: ResultListRequest, user: User | None = None):
+    def _results_stmt(self, request: ResultListRequest, scope: DataScope | None = None):
         """Natijalar soʻrovi.
 
-        `user` berilsa va u admin boʻlmasa — faqat oʻz testlarining
-        natijalari. Aks holda oʻqituvchi begona testni yechgan odamlarning
-        roʻyxatini koʻrardi.
+        `scope` berilsa va u cheklangan boʻlsa — oʻz testlarining natijalari
+        va koʻrish doirasidagi guruhlar talabalariniki (dekan — oʻz
+        fakultetiniki). Aks holda oʻqituvchi begona testni yechgan
+        odamlarning roʻyxatini koʻrardi.
         """
         student = _latest_student()
         full_name = func.coalesce(student.c.full_name, Teacher.full_name, User.username, "—")
@@ -1604,8 +1628,11 @@ class GeneralTestRepository:
             .outerjoin(Teacher, Teacher.user_id == User.id)
             .where(GeneralTestAttempt.status == COMPLETED)
         )
-        if user is not None and not self._is_admin(user):
-            stmt = stmt.where(GeneralTest.created_by_user_id == user.id)
+        if scope is not None and not scope.unrestricted:
+            conditions = [GeneralTest.created_by_user_id == scope.user_id]
+            if scope.visible_group_ids:
+                conditions.append(student.c.group_id.in_(scope.visible_group_ids))
+            stmt = stmt.where(or_(*conditions))
         if request.subject_id:
             stmt = stmt.where(GeneralTest.subject_id == request.subject_id)
         if request.test_id:
@@ -1648,7 +1675,8 @@ class GeneralTestRepository:
         self, session: AsyncSession, request: ResultListRequest, user: User
     ) -> ResultListResponse:
         await self._close_expired(session)
-        stmt = self._results_stmt(request, user)
+        scope = await resolve_data_scope(session, user)
+        stmt = self._results_stmt(request, scope)
         total = (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
         rows = (
             await session.execute(
@@ -1673,7 +1701,7 @@ class GeneralTestRepository:
         await self._close_expired(session)
         rows = (
             await session.execute(
-                self._results_stmt(request, user).order_by(
+                self._results_stmt(request, await resolve_data_scope(session, user)).order_by(
                     GeneralTestSubject.name, GeneralTest.title, GeneralTestAttempt.score.desc()
                 )
             )

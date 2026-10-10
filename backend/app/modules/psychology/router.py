@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired, PsychologyStaffOnly, is_student_only
+from core.dependencies.role_checker import PermissionRequired, PsychologyStaffOnly
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.data_scope import resolve_data_scope, sees_user
 from app.modules.auth.model import User
 
 from . import stats
@@ -180,9 +181,14 @@ async def submit_test(
 
 
 async def _visible_result(session: AsyncSession, result_id: int, user: User):
-    """Natija — talabaga faqat oʻziniki. Begonasi 404: borligi ham bilinmasin."""
+    """Natija — koʻrish doirasida boʻlsa (`core/utils/data_scope.py`).
+
+    Talaba — faqat oʻziniki, dekan — oʻz fakultetiniki. Begonasi 404:
+    borligi ham bilinmasin.
+    """
     result = await get_psychology_service.get_result(session=session, result_id=result_id)
-    if is_student_only(user) and result.user_id != user.id:
+    scope = await resolve_data_scope(session, user)
+    if not await sees_user(session, scope, result.user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
     return result
 
@@ -193,20 +199,25 @@ async def list_results(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("read:psychology_results")),
 ):
-    # Talaba faqat oʻz natijalarini koʻradi — `user_id` parametri bilan ham
-    # boshqasinikini soʻray olmaydi. Maʼmuriyat va psixolog — hammasini.
-    if is_student_only(current_user):
+    # Koʻrish doirasi: talaba — oʻziniki (`user_id` parametri bilan ham
+    # boshqasinikini soʻray olmaydi), dekan — oʻz fakultetiniki, psixolog — hammasi.
+    scope = await resolve_data_scope(session, current_user)
+    if not scope.unrestricted and not scope.visible_group_ids:
+        # Faqat oʻziniki: parametr eʼtiborga olinmaydi, boʻsh roʻyxat emas.
         request.user_id = current_user.id
-    return await get_psychology_service.list_results(session=session, request=request, user_id=None)
+    return await get_psychology_service.list_results(session=session, request=request, user_id=None, scope=scope)
 
 
 @router.get("/test/results/filter-options", response_model=ResultFilterOptionsResponse)
 async def result_filter_options(
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: User = Depends(PsychologyStaffOnly("read:psychology_results")),
+    current_user: User = Depends(PsychologyStaffOnly("read:psychology_results")),
 ):
     """Natijalar filtri uchun fakultet va guruhlar. `/{result_id}` dan oldin turadi."""
-    return await get_psychology_service.result_filter_options(session=session)
+    scope = await resolve_data_scope(session, current_user)
+    return await get_psychology_service.result_filter_options(
+        session=session, group_ids=None if scope.unrestricted else scope.visible_group_ids
+    )
 
 
 @router.delete(
@@ -240,9 +251,26 @@ async def get_result(
 _read_results = PsychologyStaffOnly("read:psychology_results")
 
 
+async def _scoped_stats_filter(
+    f: StatsFilter = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(_read_results),
+) -> StatsFilter:
+    """Filtr + koʻrish doirasi: dekan statistikani faqat oʻz fakulteti boʻyicha koʻradi.
+
+    `_read_results` endpointda ham turadi — ruxsat startapda aynan oʻsha
+    parametrdan topiladi (`core/lifespan/discovery.py`). FastAPI bir soʻrov
+    ichida bogʻliqlikni keshlaydi, ya'ni tekshiruv ikki marta bajarilmaydi.
+    """
+    scope = await resolve_data_scope(session, user)
+    if not scope.unrestricted:
+        f._scope_group_ids = scope.visible_group_ids
+    return f
+
+
 @router.get("/stats/overview", response_model=StatsOverviewResponse)
 async def stats_overview(
-    f: StatsFilter = Depends(),
+    f: StatsFilter = Depends(_scoped_stats_filter),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: User = Depends(_read_results),
 ):
@@ -251,7 +279,7 @@ async def stats_overview(
 
 @router.get("/stats/timeline", response_model=TimelineResponse)
 async def stats_timeline(
-    f: StatsFilter = Depends(),
+    f: StatsFilter = Depends(_scoped_stats_filter),
     method_id: int | None = None,
     period: TIMELINE_PERIOD = "day",
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -263,7 +291,7 @@ async def stats_timeline(
 @router.get("/stats/methods/{method_id}", response_model=MethodStatsResponse)
 async def stats_method(
     method_id: int,
-    f: StatsFilter = Depends(),
+    f: StatsFilter = Depends(_scoped_stats_filter),
     latest_only: bool = True,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: User = Depends(_read_results),
@@ -274,7 +302,7 @@ async def stats_method(
 @router.get("/stats/methods/{method_id}/breakdown", response_model=MethodBreakdownResponse)
 async def stats_method_breakdown(
     method_id: int,
-    f: StatsFilter = Depends(),
+    f: StatsFilter = Depends(_scoped_stats_filter),
     by: BREAKDOWN_BY = "faculty",
     category: str | None = None,
     latest_only: bool = True,
@@ -289,7 +317,7 @@ async def stats_method_breakdown(
 @router.get("/stats/methods/{method_id}/risk", response_model=RiskListResponse)
 async def stats_method_risk(
     method_id: int,
-    f: StatsFilter = Depends(),
+    f: StatsFilter = Depends(_scoped_stats_filter),
     labels: list[str] | None = Query(default=None),
     category: str | None = None,
     page: int = Query(default=1, ge=1),
@@ -307,6 +335,9 @@ async def stats_user_history(
     user_id: int,
     method_id: int | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
-    _: User = Depends(_read_results),
+    current_user: User = Depends(_read_results),
 ):
+    scope = await resolve_data_scope(session, current_user)
+    if not await sees_user(session, scope, user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return await stats.user_history(session=session, user_id=user_id, method_id=method_id)

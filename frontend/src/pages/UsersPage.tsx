@@ -20,7 +20,18 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useAssignRoles } from '@/hooks/useUsers';
+import {
+    useUsers,
+    useCreateUser,
+    useUpdateUser,
+    useDeleteUser,
+    useAssignRoles,
+    useUserDataScope,
+    useSetUserDataScope,
+} from '@/hooks/useUsers';
+import { UserDataScopeFields } from '@/components/users/UserDataScopeFields';
+import type { DataScope } from '@/services/roleService';
+import type { UserDataScope } from '@/services/userService';
 import { useRoles } from '@/hooks/useReferenceData';
 import { useCatalogView } from '@/hooks/useCatalogView';
 import { ExpandableTags } from '@/components/ui/ExpandableTags';
@@ -500,6 +511,8 @@ export const UsersPage = () => {
     );
 };
 
+const EMPTY_SCOPE: UserDataScope = { faculties: [], kafedras: [], groups: [] };
+
 const UserModal = ({
     isOpen,
     onClose,
@@ -536,8 +549,22 @@ const UserModal = ({
     const createMutation = useCreateUser();
     const updateMutation = useUpdateUser();
     const assignRolesMutation = useAssignRoles();
+    const setScopeMutation = useSetUserDataScope();
     const isSubmitting =
-        createMutation.isPending || updateMutation.isPending || assignRolesMutation.isPending;
+        createMutation.isPending ||
+        updateMutation.isPending ||
+        assignRolesMutation.isPending ||
+        setScopeMutation.isPending;
+
+    // Ko'rish doirasi: saqlangani serverdan, tahrirlanayotgani — mahalliy nusxa.
+    const { data: savedScope } = useUserDataScope(isOpen ? user?.id : undefined);
+    const [scopeDraft, setScopeDraft] = useState<UserDataScope>(EMPTY_SCOPE);
+    const [scopeDirty, setScopeDirty] = useState(false);
+
+    useEffect(() => {
+        setScopeDraft(savedScope ?? EMPTY_SCOPE);
+        setScopeDirty(false);
+    }, [savedScope, user, isOpen]);
 
     useEffect(() => {
         if (user) {
@@ -566,6 +593,20 @@ const UserModal = ({
     // katakcha bo'sh chiqardi. Endi ikkala tomonda ham son.
     const selectedRoleIds = watch('role_ids') ?? [];
 
+    // Tanlangan rollar qaysi biriktirmalarni talab qiladi.
+    const selectedScopes = new Set(
+        roles
+            .filter((r) => selectedRoleIds.includes(r.id))
+            .map((r) => r.data_scope)
+            .filter((scope): scope is DataScope => !!scope),
+    );
+
+    const scopePayload = () => ({
+        faculty_ids: scopeDraft.faculties.map((f) => f.id),
+        kafedra_ids: scopeDraft.kafedras.map((k) => k.id),
+        group_ids: scopeDraft.groups.map((g) => g.id),
+    });
+
     const toggleRole = (roleId: number, checked: boolean) => {
         const next = checked
             ? [...selectedRoleIds, roleId]
@@ -573,7 +614,7 @@ const UserModal = ({
         setValue('role_ids', next, { shouldValidate: true, shouldDirty: true });
     };
 
-    const onSubmit = (data: UserFormValues) => {
+    const onSubmit = async (data: UserFormValues) => {
         if (user) {
             const payload: any = {
                 username: data.username,
@@ -588,35 +629,36 @@ const UserModal = ({
                 currentRoleIds.length !== nextRoleIds.length ||
                 currentRoleIds.some((id, index) => id !== nextRoleIds[index]);
 
-            updateMutation.mutate(
-                { id: user.id, data: payload },
-                {
-                    onSuccess: (updatedUser: any) => {
-                        if (!rolesChanged) {
-                            toast.success(t('Foydalanuvchi yangilandi'));
-                            onSuccess(updatedUser);
-                            return;
-                        }
-                        assignRolesMutation.mutate(
-                            { user_id: user.id, role_ids: data.role_ids },
-                            {
-                                onSuccess: () => {
-                                    toast.success(t('Foydalanuvchi va rollari yangilandi'));
-                                    onSuccess(updatedUser);
-                                },
-                                onError: (error) => {
-                                    logger.error('Failed to assign roles', error);
-                                    toast.error(t("Rollarni o'zgartirishda xatolik yuz berdi"));
-                                },
-                            }
-                        );
-                    },
-                    onError: (error) => {
-                        logger.error('Failed to update user', error);
-                        toast.error(t('Foydalanuvchini yangilashda xatolik yuz berdi'));
-                    },
+            let updatedUser: any;
+            try {
+                updatedUser = await updateMutation.mutateAsync({ id: user.id, data: payload });
+            } catch (error) {
+                logger.error('Failed to update user', error);
+                toast.error(t('Foydalanuvchini yangilashda xatolik yuz berdi'));
+                return;
+            }
+            if (rolesChanged) {
+                try {
+                    await assignRolesMutation.mutateAsync({ user_id: user.id, role_ids: data.role_ids });
+                } catch (error) {
+                    logger.error('Failed to assign roles', error);
+                    toast.error(t("Rollarni o'zgartirishda xatolik yuz berdi"));
+                    return;
                 }
+            }
+            if (scopeDirty) {
+                try {
+                    await setScopeMutation.mutateAsync({ user_id: user.id, data: scopePayload() });
+                } catch (error) {
+                    logger.error('Failed to save data scope', error);
+                    toast.error(t("Ko'rish doirasini saqlashda xatolik yuz berdi"));
+                    return;
+                }
+            }
+            toast.success(
+                rolesChanged ? t('Foydalanuvchi va rollari yangilandi') : t('Foydalanuvchi yangilandi'),
             );
+            onSuccess(updatedUser);
         } else {
             if (!data.password) {
                 toast.error(t('Yangi foydalanuvchilar uchun parol talab qilinadi'));
@@ -631,16 +673,26 @@ const UserModal = ({
                 })),
             };
 
-            createMutation.mutate(payload, {
-                onSuccess: (newUser: any) => {
-                    toast.success(t('Foydalanuvchi yaratildi'));
+            let newUser: any;
+            try {
+                newUser = await createMutation.mutateAsync(payload);
+            } catch (error) {
+                logger.error('Failed to create user', error);
+                toast.error(t('Foydalanuvchi yaratishda xatolik yuz berdi'));
+                return;
+            }
+            if (scopeDirty && newUser?.id) {
+                try {
+                    await setScopeMutation.mutateAsync({ user_id: newUser.id, data: scopePayload() });
+                } catch (error) {
+                    logger.error('Failed to save data scope', error);
+                    toast.error(t("Ko'rish doirasini saqlashda xatolik yuz berdi"));
                     onSuccess(newUser);
-                },
-                onError: (error: any) => {
-                    logger.error('Failed to create user', error);
-                    toast.error(t('Foydalanuvchi yaratishda xatolik yuz berdi'));
-                },
-            });
+                    return;
+                }
+            }
+            toast.success(t('Foydalanuvchi yaratildi'));
+            onSuccess(newUser);
         }
     };
 
@@ -692,6 +744,15 @@ const UserModal = ({
                         <p className="text-xs text-destructive">{errors.role_ids.message}</p>
                     )}
                 </div>
+
+                <UserDataScopeFields
+                    scopes={selectedScopes}
+                    value={scopeDraft}
+                    onChange={(next) => {
+                        setScopeDraft(next);
+                        setScopeDirty(true);
+                    }}
+                />
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-border">
                     <Button type="button" variant="outline" onClick={onClose}>

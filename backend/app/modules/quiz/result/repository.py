@@ -5,6 +5,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.data_scope import resolve_data_scope
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Quiz, Result
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResultRepository:
-    async def get_result(self, session: AsyncSession, result_id: int) -> Result:
+    async def get_result(self, session: AsyncSession, result_id: int, current_user: User | None = None) -> Result:
         stmt = (
             select(Result)
             .options(
@@ -29,6 +30,11 @@ class ResultRepository:
             )
             .where(Result.id == result_id)
         )
+        # Doiradan tashqaridagi natija — 404, 403 emas: id bo'yicha borligi ham bilinmasin.
+        if current_user is not None:
+            scope_filter = await self._scope_filter(session, current_user)
+            if scope_filter is not None:
+                stmt = stmt.where(scope_filter)
         result = await session.execute(stmt)
         obj = result.scalar_one_or_none()
 
@@ -36,6 +42,74 @@ class ResultRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
         return obj
+
+    @staticmethod
+    async def _scope_filter(session: AsyncSession, current_user: User):
+        """Natijalarning ko'rish doirasi (`core/utils/data_scope.py`); `None` — hammasi.
+
+        O'zining natijasi har doim ko'rinadi. Qolgani doira bo'yicha birlashadi:
+        fakultet/kafedra/biriktirilgan guruhlar, kafedra o'qituvchilari tuzgan
+        testlar va o'qituvchining o'z biriktirmalari.
+        """
+        scope = await resolve_data_scope(session, current_user)
+        if scope.unrestricted:
+            return None
+
+        conditions = [Result.user_id == current_user.id]
+        if scope.group_ids:
+            conditions.append(Result.group_id.in_(scope.group_ids))
+        if scope.kafedra_ids:
+            # Kafedraning o'z testlari boshqa fakultet guruhlarida ham
+            # o'tkaziladi — ular kafedra mudiriga guruh orqali ko'rinmasdi.
+            conditions.append(
+                Result.quiz_id.in_(
+                    select(Quiz.id)
+                    .join(Teacher, Teacher.user_id == Quiz.lecturer_id)
+                    .where(Teacher.kafedra_id.in_(scope.kafedra_ids))
+                )
+            )
+        if scope.teaching:
+            conditions.append(await ResultRepository._teacher_filter(session, current_user))
+        return or_(*conditions)
+
+    @staticmethod
+    async def _teacher_filter(session: AsyncSession, current_user: User):
+        """O'qituvchiga: biriktirilgan guruh VA fan, ustiga o'z testlari.
+
+        Guruhning o'zi yetmaydi — guruhda boshqa o'qituvchilarning fanlari ham
+        bor, ularning natijalari bu o'qituvchiga tegishli emas.
+        """
+        # Guruh biriktirmalari (teacher_group.teacher_id = teachers.id)
+        gt_stmt = (
+            select(TeacherGroup.group_id)
+            .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
+            .where(Teacher.user_id == current_user.id)
+        )
+        allowed_group_ids = (await session.execute(gt_stmt)).scalars().all()
+
+        # Fan biriktirmalari (teacher_subject.teacher_id = teachers.id)
+        st_stmt = (
+            select(TeacherSubject.subject_id)
+            .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
+            .where(Teacher.user_id == current_user.id)
+        )
+        allowed_subject_ids = (await session.execute(st_stmt)).scalars().all()
+
+        # Результаты по тестам, собранным из банка этого преподавателя, видны
+        # ему всегда. Раньше это обеспечивала связка TeacherGroup, которая
+        # создавалась побочным эффектом создания теста; теперь тест создаёт
+        # организатор, и такой связки не появляется.
+        own_quizzes = Result.quiz_id.in_(select(Quiz.id).where(Quiz.lecturer_id == current_user.id))
+
+        if allowed_group_ids and allowed_subject_ids:
+            assignment_filter = Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
+        elif allowed_group_ids:
+            assignment_filter = Result.group_id.in_(allowed_group_ids)
+        elif allowed_subject_ids:
+            assignment_filter = Result.subject_id.in_(allowed_subject_ids)
+        else:
+            return own_quizzes
+        return or_(own_quizzes, assignment_filter)
 
     async def list_results(
         self, session: AsyncSession, request: ResultListRequest, current_user: User
@@ -62,57 +136,9 @@ class ResultRepository:
         if request.username:
             stmt = stmt.outerjoin(User, Result.user_id == User.id).outerjoin(Student, User.id == Student.user_id)
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_student = any(role.name.lower() == "student" for role in current_user.roles)
-
-        teacher_filter = None
-
-        if is_admin:
-            # Admins see everything, no role-based filter applied
-            pass
-        elif is_teacher:
-            # Guruh biriktirmalari (teacher_group.teacher_id = teachers.id)
-            gt_stmt = (
-                select(TeacherGroup.group_id)
-                .join(Teacher, Teacher.id == TeacherGroup.teacher_id)
-                .where(Teacher.user_id == current_user.id)
-            )
-            gt_result = await session.execute(gt_stmt)
-            allowed_group_ids = gt_result.scalars().all()
-
-            # Fan biriktirmalari (teacher_subject.teacher_id = teachers.id)
-            st_stmt = (
-                select(TeacherSubject.subject_id)
-                .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
-                .where(Teacher.user_id == current_user.id)
-            )
-            st_result = await session.execute(st_stmt)
-            allowed_subject_ids = st_result.scalars().all()
-
-            # Результаты по тестам, собранным из банка этого преподавателя, видны
-            # ему всегда. Раньше это обеспечивала связка TeacherGroup, которая
-            # создавалась побочным эффектом создания теста; теперь тест создаёт
-            # организатор, и такой связки не появляется.
-            own_quizzes = Result.quiz_id.in_(select(Quiz.id).where(Quiz.lecturer_id == current_user.id))
-
-            if allowed_group_ids and allowed_subject_ids:
-                assignment_filter = Result.group_id.in_(allowed_group_ids) & Result.subject_id.in_(allowed_subject_ids)
-            elif allowed_group_ids:
-                assignment_filter = Result.group_id.in_(allowed_group_ids)
-            elif allowed_subject_ids:
-                assignment_filter = Result.subject_id.in_(allowed_subject_ids)
-            else:
-                assignment_filter = None
-
-            teacher_filter = or_(own_quizzes, assignment_filter) if assignment_filter is not None else own_quizzes
-
-            if teacher_filter is not None:
-                stmt = stmt.where(teacher_filter)
-
-        elif is_student:
-            # Students only see their own results
-            stmt = stmt.where(Result.user_id == current_user.id)
+        scope_filter = await self._scope_filter(session, current_user)
+        if scope_filter is not None:
+            stmt = stmt.where(scope_filter)
 
         # Факультет и кафедра лежат на разных концах результата, поэтому условия
         # собираем один раз и вешаем и на выборку, и на счётчик.
@@ -178,13 +204,8 @@ class ResultRepository:
                 Student, User.id == Student.user_id
             )
 
-        if is_admin:
-            # Admins see everything
-            pass
-        elif is_teacher and teacher_filter is not None:
-            count_stmt = count_stmt.where(teacher_filter)
-        elif is_student:
-            count_stmt = count_stmt.where(Result.user_id == current_user.id)
+        if scope_filter is not None:
+            count_stmt = count_stmt.where(scope_filter)
 
         for condition in org_filters:
             count_stmt = count_stmt.where(condition)

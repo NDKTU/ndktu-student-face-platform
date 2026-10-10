@@ -39,6 +39,7 @@ const EVENT_LABEL: Record<string, string> = {
     'user.updated': 'Foydalanuvchi tahrirlandi',
     'user.deleted': "Foydalanuvchi o'chirildi",
     'user.role_changed': "Rol o'zgartirildi",
+    'user.data_scope_changed': "Ko'rish doirasi o'zgartirildi",
     'user.password_changed': "Parol o'zgartirildi",
     'question.deleted': "Savol o'chirildi",
     'question.bulk_deleted': "Savollar ommaviy o'chirildi",

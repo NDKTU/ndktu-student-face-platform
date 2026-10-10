@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
 
 from app.core.schemas import TashkentDatetime
 
@@ -243,6 +243,15 @@ class StatsFilter(BaseModel):
     course: Optional[int] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None
+
+    # Ko'rish doirasidagi guruhlar; `None` — cheklov yo'q. So'rov parametri
+    # EMAS (PrivateAttr): uni router o'rnatadi (`router.py::_scoped_stats_filter`),
+    # mijoz o'zi kengaytira olmasin.
+    _scope_group_ids: frozenset[int] | None = PrivateAttr(default=None)
+
+    @property
+    def scope_group_ids(self) -> frozenset[int] | None:
+        return self._scope_group_ids
 
 
 class MethodUsage(BaseModel):

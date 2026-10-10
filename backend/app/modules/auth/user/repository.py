@@ -4,6 +4,7 @@ from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.sorting import order_by_clause
 from core.utils.password_hash import hash_password_async
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -18,11 +19,16 @@ from app.modules.auth.model import (
     Teacher,
     TeacherSubject,
     User,
+    UserDataScope,
     UserRole,
 )
+from app.modules.organization_structure.model import Faculty, Group, Kafedra
 
 from .schemas import (
+    DataScopeTarget,
     UserCreateRequest,
+    UserDataScopeResponse,
+    UserDataScopeUpdateRequest,
     UserListRequest,
     UserListResponse,
     UserRoleAssignRequest,
@@ -311,6 +317,54 @@ class UserRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error while assigning roles",
             )
+
+    async def get_data_scope(self, session: AsyncSession, user_id: int) -> UserDataScopeResponse:
+        if await session.get(User, user_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        async def targets(model, column) -> list[DataScopeTarget]:
+            rows = await session.execute(
+                select(model.id, model.name)
+                .join(UserDataScope, column == model.id)
+                .where(UserDataScope.user_id == user_id)
+                .order_by(model.name)
+            )
+            return [DataScopeTarget(id=row.id, name=row.name) for row in rows]
+
+        return UserDataScopeResponse(
+            faculties=await targets(Faculty, UserDataScope.faculty_id),
+            kafedras=await targets(Kafedra, UserDataScope.kafedra_id),
+            groups=await targets(Group, UserDataScope.group_id),
+        )
+
+    async def set_data_scope(
+        self, session: AsyncSession, user_id: int, data: UserDataScopeUpdateRequest
+    ) -> UserDataScopeResponse:
+        """Biriktirmalarni to'liq almashtiradi: so'rovda yo'q satr o'chiriladi."""
+        if await session.get(User, user_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        wanted = (
+            (Faculty, "faculty_id", set(data.faculty_ids)),
+            (Kafedra, "kafedra_id", set(data.kafedra_ids)),
+            (Group, "group_id", set(data.group_ids)),
+        )
+        for model, column, ids in wanted:
+            if not ids:
+                continue
+            found = set((await session.execute(select(model.id).where(model.id.in_(ids)))).scalars())
+            if missing := ids - found:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{column} {sorted(missing)} not found",
+                )
+
+        await session.execute(sa_delete(UserDataScope).where(UserDataScope.user_id == user_id))
+        for _, column, ids in wanted:
+            session.add_all(UserDataScope(user_id=user_id, **{column: target_id}) for target_id in ids)
+        await session.commit()
+
+        return await self.get_data_scope(session, user_id)
 
     # Tashqi tizimdan kelgan hisoblar: parol o'sha yerda saqlanadi.
     _EXTERNAL_SOURCE_LABEL = {"eduplan": "EPOS", "hemis": "HEMIS"}

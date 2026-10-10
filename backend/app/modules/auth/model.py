@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     Float,
     ForeignKey,
@@ -91,10 +92,37 @@ class UserRole(Base, IdIntPk, TimestampMixin):
     role: Mapped["Role"] = relationship("Role", lazy="selectin", overlaps="roles,users")
 
 
+# Tizim rollari yaratilganda (bo'sh baza, testlar, `get_or_create_role`) o'sha
+# doirani olsin, `d4a8e1c6b3f2` migratsiyasi mavjud bazaga qanday bergan
+# bo'lsa. Admin yaratgan yangi rol — `own`: doirani u o'zi tanlamaguncha rol
+# hech kimni ko'rmaydi. Satrlar `core/utils/data_scope.py` dagi bilan bir xil;
+# u yerdan import qilib bo'lmaydi — u shu modulni import qiladi.
+_SYSTEM_ROLE_SCOPES = {
+    "admin": "all",
+    "psixologik": "all",
+    "tutor": "all",
+    "registrator": "all",
+    "teacher": "assigned_groups",
+    "student": "own",
+}
+
+
+def _default_data_scope(context) -> str:
+    name = (context.get_current_parameters().get("name") or "").lower()
+    return _SYSTEM_ROLE_SCOPES.get(name, "own")
+
+
 class Role(Base, IdIntPk, TimestampMixin):
     __tablename__ = "roles"
 
     name: Mapped[str] = mapped_column(String(50), unique=True)
+
+    # Rol qaysi ma'lumotni ko'radi: `core/utils/data_scope.py::DATA_SCOPES`.
+    # Ruxsatlar «nima qilish mumkin»ni, bu esa «kimning ma'lumotini»
+    # belgilaydi. Standart qiymat nomdan (`_default_data_scope`).
+    data_scope: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'own'"), default=_default_data_scope
+    )
 
     users: Mapped[list["User"]] = relationship(
         "User", secondary="user_roles", back_populates="roles", overlaps="user_roles"
@@ -124,6 +152,47 @@ class RolePermission(Base, IdIntPk, TimestampMixin):
 
     def __str__(self) -> str:
         return f"{self.role} → {self.permission}"
+
+
+class UserDataScope(Base, IdIntPk, TimestampMixin):
+    """Foydalanuvchining ko'rish doirasi: qaysi fakultet, kafedra yoki guruh.
+
+    Rol faqat doira turini aytadi (`faculty`, `kafedra`, ...), aynan qaysi
+    fakultet ekanini esa shu jadval. Har bir satrda uchta ustundan
+    bittasi to'ldirilgan. Doira turiga mos kelmagan satr e'tiborga
+    olinmaydi: rol `faculty` bo'lsa, guruh satrlari hech narsa bermaydi.
+    """
+
+    __tablename__ = "user_data_scopes"
+    __table_args__ = (
+        CheckConstraint(
+            "num_nonnulls(faculty_id, kafedra_id, group_id) = 1",
+            name="ck_user_data_scopes_one_target",
+        ),
+        # NULLS NOT DISTINCT: aks holda ikkita ustun doim NULL bo'lgani
+        # uchun bir xil satr ikki marta yozilib qolardi.
+        UniqueConstraint(
+            "user_id",
+            "faculty_id",
+            "kafedra_id",
+            "group_id",
+            name="uq_user_data_scopes_target",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    faculty_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("faculties.id", ondelete="CASCADE"), nullable=True
+    )
+    kafedra_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("kafedras.id", ondelete="CASCADE"), nullable=True
+    )
+    group_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True
+    )
 
 
 class Permission(Base, IdIntPk, TimestampMixin):

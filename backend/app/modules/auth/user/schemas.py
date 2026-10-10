@@ -220,3 +220,26 @@ class UserLoginRequest(BaseModel):
 class UserLoginResponse(BaseModel):
     type: str = "Bearer"
     access_token: str
+
+
+class DataScopeTarget(BaseModel):
+    id: int
+    name: str
+
+
+class UserDataScopeResponse(BaseModel):
+    """Foydalanuvchiga biriktirilgan fakultet, kafedra va guruhlar.
+
+    Nomlari bilan: tahrirlash oynasi 690 ta guruhni yuklamasdan tanlanganlarini
+    ko'rsata olsin.
+    """
+
+    faculties: list[DataScopeTarget] = []
+    kafedras: list[DataScopeTarget] = []
+    groups: list[DataScopeTarget] = []
+
+
+class UserDataScopeUpdateRequest(BaseModel):
+    faculty_ids: list[int] = []
+    kafedra_ids: list[int] = []
+    group_ids: list[int] = []

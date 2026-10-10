@@ -315,6 +315,7 @@
   "Reyting": "Рейтинг",
   "Rol bo'yicha": "По роли",
   "Rol o'zgartirildi": "Роль изменена",
+  "Ko'rish doirasi o'zgartirildi": "Область видимости изменена",
   "Rol ruxsatlari": "Разрешения роли",
   "Rollar": "Роли",
   "Rollarni o'zgartirishda xatolik yuz berdi": "Ошибка при изменении ролей",
@@ -519,5 +520,10 @@
   "{{n}} kun qoldi": "осталось дней: {{n}}",
   "Hali test topshirmagansiz.": "Вы ещё не сдавали тесты.",
   "So'nggi natijalar": "Последние результаты",
-  "{{c}} to'g'ri / {{w}} xato": "{{c}} верно / {{w}} неверно"
+  "{{c}} to'g'ri / {{w}} xato": "{{c}} верно / {{w}} неверно",
+  "Qo'shish...": "Добавить...",
+  "Ko'rish doirasi": "Область видимости",
+  "Foydalanuvchi faqat shu bo'linmalarning talabalari va natijalarini ko'radi.": "Пользователь видит студентов и результаты только этих подразделений.",
+  "Tanlanmagan — hech kim ko'rinmaydi": "Не выбрано — никто не виден",
+  "Ko'rish doirasini saqlashda xatolik yuz berdi": "Не удалось сохранить область видимости"
 }

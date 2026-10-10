@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils.data_scope import DataScope
 from app.modules.psychology.model import (
     PsychologyMethod,
     PsychologyQuestion,
@@ -75,12 +76,17 @@ class PsychologyService:
         session: AsyncSession,
         request: TestResultListRequest,
         user_id: int | None = None,
+        scope: DataScope | None = None,
     ) -> TestResultListResponse:
-        return await get_psychology_repository.list_results(session=session, request=request, user_id=user_id)
+        return await get_psychology_repository.list_results(
+            session=session, request=request, user_id=user_id, scope=scope
+        )
 
 
-    async def result_filter_options(self, session: AsyncSession) -> ResultFilterOptionsResponse:
-        return await get_psychology_repository.result_filter_options(session=session)
+    async def result_filter_options(
+        self, session: AsyncSession, group_ids: frozenset[int] | None = None
+    ) -> ResultFilterOptionsResponse:
+        return await get_psychology_repository.result_filter_options(session=session, group_ids=group_ids)
 
 
 get_psychology_service = PsychologyService()

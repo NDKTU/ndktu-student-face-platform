@@ -15,6 +15,18 @@ export interface UserListParams {
     order?: 'asc' | 'desc';
 }
 
+export interface DataScopeTarget {
+    id: number;
+    name: string;
+}
+
+/** Foydalanuvchiga biriktirilgan fakultet, kafedra va guruhlar (nomlari bilan). */
+export interface UserDataScope {
+    faculties: DataScopeTarget[];
+    kafedras: DataScopeTarget[];
+    groups: DataScopeTarget[];
+}
+
 export const userService = {
     /** Profil surati: yuz nazoratida etalon sifatida shu ishlatiladi. */
     uploadAvatar: async (file: File) => {
@@ -78,6 +90,19 @@ export const userService = {
 
     assignRoles: async (user_id: number, role_ids: number[]) => {
         const response = await api.post('/user/assign_role', { user_id, role_ids });
+        return response.data;
+    },
+
+    getDataScope: async (user_id: number) => {
+        const response = await api.get<UserDataScope>(`/user/${user_id}/data-scope`);
+        return response.data;
+    },
+
+    setDataScope: async (
+        user_id: number,
+        data: { faculty_ids: number[]; kafedra_ids: number[]; group_ids: number[] },
+    ) => {
+        const response = await api.put<UserDataScope>(`/user/${user_id}/data-scope`, data);
         return response.data;
     },
 

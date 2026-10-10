@@ -82,6 +82,8 @@ from .user.schemas import (
     UserChangeCredentialsRequest,
     UserCreateRequest,
     UserCreateResponse,
+    UserDataScopeResponse,
+    UserDataScopeUpdateRequest,
     UserListRequest,
     UserListResponse,
     UserLoginRequest,
@@ -288,6 +290,48 @@ async def assign_role(
 ):
     await get_user_repository.assign_roles(session=session, data=data)
     return {"message": "Roles assigned successfully"}
+
+
+@user_router.get("/{user_id}/data-scope", response_model=UserDataScopeResponse)
+async def get_user_data_scope(
+    user_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:user")),
+):
+    """Foydalanuvchining ko'rish doirasi: biriktirilgan fakultet, kafedra va guruhlar.
+
+    Doira turi rolda (`roles.data_scope`), bu yerda esa aynan qaysilari
+    (`core/utils/data_scope.py`).
+    """
+    return await get_user_repository.get_data_scope(session=session, user_id=user_id)
+
+
+@user_router.put(
+    "/{user_id}/data-scope",
+    response_model=UserDataScopeResponse,
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def set_user_data_scope(
+    user_id: int,
+    data: UserDataScopeUpdateRequest,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("update:user")),
+):
+    result = await get_user_repository.set_data_scope(session=session, user_id=user_id, data=data)
+    await audit_service.record_standalone(
+        event=AuditEvent.DATA_SCOPE_CHANGED,
+        user_id=current_user.id,
+        username=current_user.username,
+        object_type="user",
+        object_id=user_id,
+        summary=(
+            f"Ko'rish doirasi o'zgartirildi (foydalanuvchi #{user_id}): "
+            f"{len(result.faculties)} fakultet, {len(result.kafedras)} kafedra, {len(result.groups)} guruh"
+        ),
+        request=request,
+    )
+    return result
 
 
 # ============================================================================

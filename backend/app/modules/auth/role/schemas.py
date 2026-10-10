@@ -1,10 +1,17 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 from app.core.schemas import TashkentDatetime
 
+# `core/utils/data_scope.py::DATA_SCOPES` bilan bir xil.
+DataScopeName = Literal["all", "faculty", "kafedra", "assigned_groups", "own"]
+
 
 class RoleCreateRequest(BaseModel):
     name: str
+    # Bo'sh — yaratishda `own`, tahrirlashda o'zgarmaydi.
+    data_scope: DataScopeName | None = None
 
 
 class RolePermissionAssignRequest(BaseModel):
@@ -26,6 +33,7 @@ class RolePermissionInfo(BaseModel):
 class RoleCreateResponse(BaseModel):
     id: int
     name: str
+    data_scope: DataScopeName
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
     permissions: list[RolePermissionInfo] = []

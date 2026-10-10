@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { Pagination } from '@/components/ui/Pagination';
-import { roleService, type Role } from '@/services/roleService';
+import { roleService, dataScopeLabel, DATA_SCOPE_OPTIONS, type DataScope, type Role } from '@/services/roleService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Search, ShieldCheck } from 'lucide-react';
@@ -10,7 +10,8 @@ import { Plus, Pencil, Trash2, Search, ShieldCheck } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
-import { useForm } from 'react-hook-form';
+import { Combobox } from '@/components/ui/Combobox';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +22,7 @@ import { formatDate } from '@/utils/date';
 
 const roleSchema = z.object({
     name: z.string().min(1, 'Rol nomi kiritilishi shart'),
+    data_scope: z.enum(['all', 'faculty', 'kafedra', 'assigned_groups', 'own']),
 });
 
 type RoleFormValues = z.infer<typeof roleSchema>;
@@ -143,6 +145,15 @@ const RolesPage = () => {
         { key: 'name', header: 'Nomi', cell: (role) => role.name, className: 'font-medium' },
         { key: 'permissions', header: 'Ruxsatlar', cell: renderPermissions },
         {
+            key: 'data_scope',
+            header: "Ko'rish doirasi",
+            cell: (role) => (
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                    {dataScopeLabel(role.data_scope)}
+                </span>
+            ),
+        },
+        {
             key: 'created_at',
             header: 'Yaratilgan sana',
             cell: (role) => formatDate(role.created_at),
@@ -207,6 +218,9 @@ const RolesPage = () => {
                                     {renderRowActions(role)}
                                 </div>
                                 <div className="mt-2">{renderPermissions(role)}</div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    Ko'rish doirasi: <span className="font-medium text-foreground">{dataScopeLabel(role.data_scope)}</span>
+                                </p>
                             </div>
                         )}
                     />
@@ -242,20 +256,24 @@ const RoleModal = ({ isOpen, onClose, role, onSuccess }: {
     isOpen: boolean; onClose: () => void; role: Role | null; onSuccess: (role?: Role) => void;
 }) => {
     const navigate = useNavigate();
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RoleFormValues>({
+    const { register, control, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<RoleFormValues>({
         resolver: zodResolver(roleSchema),
-        defaultValues: { name: '' },
+        // Yangi rol standart bo'yicha hech kimni ko'rmaydi — doirani admin ataylab tanlaydi.
+        defaultValues: { name: '', data_scope: 'own' },
     });
 
     useEffect(() => {
-        reset({ name: role?.name || '' });
+        reset({ name: role?.name || '', data_scope: role?.data_scope ?? 'own' });
     }, [role, reset]);
+
+    const selectedScope = watch('data_scope');
+    const needsBinding = selectedScope === 'faculty' || selectedScope === 'kafedra' || selectedScope === 'assigned_groups';
 
     const onSubmit = async (data: RoleFormValues) => {
         try {
             const result = role
-                ? await roleService.updateRole(role.id, { name: data.name })
-                : await roleService.createRole({ name: data.name });
+                ? await roleService.updateRole(role.id, { name: data.name, data_scope: data.data_scope })
+                : await roleService.createRole({ name: data.name, data_scope: data.data_scope });
 
             toast.success(role ? 'Rol yangilandi' : 'Rol yaratildi');
 
@@ -276,6 +294,25 @@ const RoleModal = ({ isOpen, onClose, role, onSuccess }: {
         <Modal isOpen={isOpen} onClose={onClose} title={role ? "Rolni tahrirlash" : "Yangi rol"}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <Input label="Rol nomi" {...register('name')} error={errors.name?.message} placeholder="masalan: teacher, student" />
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Ko'rish doirasi</label>
+                    <Controller
+                        control={control}
+                        name="data_scope"
+                        render={({ field }) => (
+                            <Combobox
+                                options={DATA_SCOPE_OPTIONS.map((o) => ({ value: o.value, label: o.label, hint: o.hint }))}
+                                value={field.value}
+                                onChange={(value) => field.onChange(value as DataScope)}
+                                placeholder="Doirani tanlang"
+                            />
+                        )}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Ruxsatlar qaysi sahifalar ochilishini, doira esa ularda kimning ma'lumoti ko'rinishini belgilaydi.
+                        {needsBinding && " Aniq fakultet, kafedra yoki guruhni «Foydalanuvchilar» sahifasida har bir foydalanuvchiga biriktiring."}
+                    </p>
+                </div>
                 <p className="text-xs text-muted-foreground">
                     Saqlagandan so'ng ruxsatlarni rolning sahifasida tahrirlang.
                 </p>

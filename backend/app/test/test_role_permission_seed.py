@@ -231,7 +231,7 @@ def test_student_has_no_dangerous_permissions():
     so'rovdagi `user_id` orqali BOSHQA talabaning natijalarini olish
     mumkin edi. 2026-10-02 dan beri endpoint talabaga parametrdan
     qat'i nazar faqat o'zinikini beradi
-    (`psychology/router.py::list_results` + `is_student_only`), shuning
+    (`psychology/router.py::list_results` + `core/utils/data_scope.py`), shuning
     uchun ruxsat berildi — usiz talaba o'zi topshirgan testning
     natijasini ham ko'ra olmasdi. Chegara endi shu yerda emas,
     `test_psychology_student_results.py` da tekshiriladi.

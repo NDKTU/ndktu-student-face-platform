@@ -77,6 +77,7 @@ from app.modules.auth.model import (
     TeacherAssignment,
     TeacherSubject,
     User,
+    UserDataScope,
     UserRole,
 )
 from app.modules.auth.hemis.model import (

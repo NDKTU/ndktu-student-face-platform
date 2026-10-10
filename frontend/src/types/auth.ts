@@ -1,3 +1,5 @@
+import type { DataScope } from '@/services/roleService';
+
 export interface Kafedra {
     id: number;
     name: string;
@@ -96,6 +98,7 @@ export interface UserCreateRequest {
 export interface Role {
     id: number;
     name: string;
+    data_scope?: DataScope;
 }
 
 export interface LoginResponse {

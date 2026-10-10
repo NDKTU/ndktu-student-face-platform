@@ -70,3 +70,27 @@ export const useAssignRoles = () => {
         },
     });
 };
+
+export const useUserDataScope = (userId: number | undefined) => {
+    return useQuery({
+        queryKey: ['user-data-scope', userId],
+        queryFn: () => userService.getDataScope(userId!),
+        enabled: !!userId,
+    });
+};
+
+export const useSetUserDataScope = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            user_id,
+            data,
+        }: {
+            user_id: number;
+            data: { faculty_ids: number[]; kafedra_ids: number[]; group_ids: number[] };
+        }) => userService.setDataScope(user_id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['user-data-scope', variables.user_id] });
+        },
+    });
+};

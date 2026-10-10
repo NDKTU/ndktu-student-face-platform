@@ -5,6 +5,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.data_scope import ADMIN_ROLE, SCOPE_ALL
 from app.modules.auth.model import Permission, Role, RolePermission
 
 from .schemas import (
@@ -29,6 +30,8 @@ class RoleRepository:
             )
 
         new_role = Role(name=data.name)
+        if data.data_scope is not None:
+            new_role.data_scope = data.data_scope
         session.add(new_role)
 
         # Auto-assign 'user:me' permission
@@ -108,6 +111,16 @@ class RoleRepository:
                     detail="Role name already taken",
                 )
             role.name = data.name
+
+        if data.data_scope is not None and data.data_scope != role.data_scope:
+            # Admin hamma narsani ko'radi — `resolve_data_scope` uni nomidan
+            # taniydi. Ustunni o'zgartirish natija bermasdi, faqat chalg'itardi.
+            if role.name.lower() == ADMIN_ROLE and data.data_scope != SCOPE_ALL:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Admin role always sees all data",
+                )
+            role.data_scope = data.data_scope
 
         await session.commit()
         result = await session.execute(select(Role).options(selectinload(Role.permissions)).where(Role.id == role_id))

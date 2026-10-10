@@ -234,17 +234,6 @@ class PsychologyStaffOnly(PermissionRequiredExceptRole):
     DENIAL_DETAIL = "Access denied: psychology statistics are not available for students"
 
 
-def is_student_only(user: User) -> bool:
-    """Faqat talaba: boshqa natijalarni emas, oʻzinikini koʻradi.
-
-    Faol rol tanlanganda `user.roles` shu rolga toraytirilgan
-    (`apply_active_role`), ya'ni talaba koʻrinishidagi admin ham talaba
-    sifatida koʻradi.
-    """
-    names = {role.name.lower() for role in (user.roles or [])}
-    return "student" in names and not (names & PsychologyStaffOnly.EXEMPT_ROLES)
-
-
 class DeviceUploadExceptTeacher(PermissionRequiredExceptRole):
     """Kurs materialini qurilmadan yuklash — o'qituvchiga yopiq.
 

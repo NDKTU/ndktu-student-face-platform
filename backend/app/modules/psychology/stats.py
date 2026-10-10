@@ -118,11 +118,14 @@ def _apply_org(stmt: Select, f: StatsFilter) -> Select:
         stmt = stmt.where(Group.id == f.group_id)
     if f.course:
         stmt = stmt.where(Group.course == f.course)
+    if f.scope_group_ids is not None:
+        stmt = stmt.where(Group.id.in_(f.scope_group_ids))
     return stmt
 
 
 def _has_org(f: StatsFilter) -> bool:
-    return bool(f.faculty_id or f.group_id or f.course)
+    # Doira ham guruh orqali ishlaydi — u bor bo'lsa, Group birlashtirilishi shart.
+    return bool(f.faculty_id or f.group_id or f.course or f.scope_group_ids is not None)
 
 
 def _latest_ids(f: StatsFilter, method_id: int | None) -> Select:

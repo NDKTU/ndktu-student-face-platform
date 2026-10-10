@@ -7,7 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.group_scope import teacher_group_ids
+from app.core.utils.data_scope import resolve_data_scope
 from app.modules.auth.model import Student, User
 
 from .schemas import (
@@ -39,30 +39,21 @@ class StudentRepository:
 
     @staticmethod
     async def visible_group_ids(session: AsyncSession, current_user: User | None) -> list[int] | None:
-        """O'qituvchi ko'ra oladigan guruhlar; `None` — cheklov yo'q.
+        """Foydalanuvchi ko'ra oladigan guruhlar; `None` — cheklov yo'q.
 
-        `read:student` o'qituvchida ham uchraydi (qo'lda berilgan yoki eski
-        migratsiyadan qolgan) va uni roldan olib tashlash bilan hal qilib
-        bo'lmaydi: seed ruxsat OLIB TASHLAMAYDI
-        (`core/lifespan/defaults.py`). Ruxsat o'z holicha qolgani uchun
-        chegara shu yerda: o'qituvchi universitetning 20 mingta talabasini
-        emas, o'zi dars o'tadigan guruhlarnikini ko'radi.
-
-        Qoida `teacher_group_ids` dan olinadi — guruh talabalari sahifasi va
-        davomat ham shu manbadan ishlaydi, ikkita ta'rif bo'lsa ular vaqt
-        o'tib ajralib ketardi.
-
-        Boshqa rollarga (admin, psixolog, tutor) tegilmaydi: ularga ruxsat
-        ataylab berilgan va butun ro'yxat kerak.
+        Doira rolda sozlanadi (`core/utils/data_scope.py`): o'qituvchi —
+        o'zi dars o'tadigan guruhlar, dekan — o'z fakulteti va hokazo.
+        `read:student` ni roldan olib tashlash bilan bu hal bo'lmasdi: seed
+        ruxsat OLIB TASHLAMAYDI (`core/lifespan/defaults.py`), shuning uchun
+        chegara shu yerda.
         """
         if current_user is None:
             return None
 
-        roles = {role.name.lower() for role in (current_user.roles or [])}
-        if "admin" in roles or "teacher" not in roles:
+        scope = await resolve_data_scope(session, current_user)
+        if scope.unrestricted:
             return None
-
-        return sorted(await teacher_group_ids(session, current_user.id))
+        return sorted(scope.visible_group_ids)
 
     async def get_student(
         self, session: AsyncSession, student_id: int, current_user: User | None = None

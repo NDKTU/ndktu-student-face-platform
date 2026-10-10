@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.utils.data_scope import DataScope
 from app.modules.auth.model import Student, User
 from app.modules.organization_structure.model import Faculty, Group
 from app.modules.psychology.model import (
@@ -268,6 +269,7 @@ class PsychologyRepository:
         session: AsyncSession,
         request: TestResultListRequest,
         user_id: int | None = None,
+        scope: DataScope | None = None,
     ) -> TestResultListResponse:
         stmt = (
             select(PsychologyResult)
@@ -286,6 +288,17 @@ class PsychologyRepository:
                 query = query.where(PsychologyResult.user_id == request.user_id)
             elif user_id:
                 query = query.where(PsychologyResult.user_id == user_id)
+            if scope is not None and not scope.unrestricted:
+                # Oʻziniki + doiradagi guruhlar talabalariniki. Subquery orqali:
+                # quyidagi qidiruv va filtr birlashmalariga bogʻliq emas.
+                query = query.where(
+                    or_(
+                        PsychologyResult.user_id == scope.user_id,
+                        PsychologyResult.user_id.in_(
+                            select(Student.user_id).where(Student.group_id.in_(scope.visible_group_ids))
+                        ),
+                    )
+                )
 
             search = (request.search or "").strip()
             if search:
@@ -333,7 +346,9 @@ class PsychologyRepository:
             results=list(results),
         )
 
-    async def result_filter_options(self, session: AsyncSession) -> ResultFilterOptionsResponse:
+    async def result_filter_options(
+        self, session: AsyncSession, group_ids: frozenset[int] | None = None
+    ) -> ResultFilterOptionsResponse:
         """Natijasi bor fakultet va guruhlar.
 
         Fakultet va guruh roʻyxatlari `read:faculty` / `read:group` ruxsatini
@@ -341,20 +356,22 @@ class PsychologyRepository:
         boʻlmasligi mumkin — filtr umuman koʻrinmay qolardi. Bundan tashqari
         bu yerda faqat natija topshirgan guruhlar: boʻsh variantlar keraksiz.
         """
-        rows = (
-            await session.execute(
-                select(Group.id, Group.name, Group.course, Faculty.id, Faculty.name)
-                .join(Faculty, Faculty.id == Group.faculty_id)
-                .where(
-                    Group.id.in_(
-                        select(Student.group_id)
-                        .join(PsychologyResult, PsychologyResult.user_id == Student.user_id)
-                        .where(Student.group_id.is_not(None))
-                    )
+        stmt = (
+            select(Group.id, Group.name, Group.course, Faculty.id, Faculty.name)
+            .join(Faculty, Faculty.id == Group.faculty_id)
+            .where(
+                Group.id.in_(
+                    select(Student.group_id)
+                    .join(PsychologyResult, PsychologyResult.user_id == Student.user_id)
+                    .where(Student.group_id.is_not(None))
                 )
-                .order_by(Faculty.name, Group.name)
             )
-        ).all()
+            .order_by(Faculty.name, Group.name)
+        )
+        # Koʻrish doirasi: dekanga boshqa fakultetlar variant sifatida ham chiqmasin.
+        if group_ids is not None:
+            stmt = stmt.where(Group.id.in_(group_ids))
+        rows = (await session.execute(stmt)).all()
         faculties: dict[int, ResultFilterFaculty] = {}
         groups = []
         for group_id, group_name, course, faculty_id, faculty_name in rows:
