@@ -17,10 +17,12 @@ from .schemas import (
     FaceCheckReportResponse,
     FaceCheckRequest,
     FaceCheckResponse,
+    ZoomCapabilitiesResponse,
     ZoomJoinResponse,
     ZoomSessionListResponse,
     ZoomSessionRequest,
     ZoomSessionResponse,
+    ZoomStartResponse,
 )
 
 # Ruxsatlar `PermissionRequired` dan topiladi (discovery) va Admin'ga
@@ -55,6 +57,15 @@ async def filter_options(
 ):
     """Guruh tanlashdagi fakultet filtri uchun."""
     return await get_general_test_repository.filter_options(session=session)
+
+
+@router.get("/capabilities", response_model=ZoomCapabilitiesResponse)
+async def capabilities(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """Formada: «Zoom'da avtomatik yaratish» va akkauntlar ro'yxati (sirlarsiz)."""
+    return await repo.capabilities(session)
 
 
 @router.get("/face-check/{check_id}/image")
@@ -143,6 +154,16 @@ async def join(
 ):
     """Meeting SDK imzosi: guruh, vaqt va yuz tasdig'idan keyin. Sir brauzerga chiqmaydi."""
     return await repo.join(session=session, session_id=session_id, user=user)
+
+
+@router.post("/{session_id}/start", response_model=ZoomStartResponse)
+async def start(
+    session_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """Host sifatida boshlash havolasi — faqat yaratuvchi va adminga."""
+    return await repo.start(session=session, session_id=session_id, user=user)
 
 
 @router.get("/{session_id}/report", response_model=FaceCheckReportResponse)

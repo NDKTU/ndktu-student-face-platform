@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
+import { Hourglass, Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { zoomSessionService } from '@/services/zoomSessionService';
 import { useZoomFaceCheck } from '@/hooks/useZoomFaceCheck';
 import { apiErrorMessage } from '@/utils/apiError';
-import type { FaceCheckResult } from '@/services/zoomSessionService';
+import type { FaceCheckResult, ZoomJoinResponse } from '@/services/zoomSessionService';
 import { logger } from '@/utils/logger';
 import './ZoomMeetingBox.css';
 
@@ -44,6 +44,23 @@ declare global {
 }
 
 let sdkPromise: Promise<void> | null = null;
+
+/** Zoom SDK: «Meeting has not started» — host hali boshlamagan. */
+const MEETING_NOT_STARTED = 3008;
+/** O'qituvchini kutganda shuncha soniyada bir qayta urinamiz. */
+const HOST_RETRY_MS = 15_000;
+
+/**
+ * Zoom SDK: «cross account join error». Nashr etilmagan Meeting SDK ilovasi
+ * faqat o'z akkauntidagi uchrashuvlarga kira oladi — SDK ilovasi va
+ * uchrashuv egasi (Zoom API host) turli akkauntlarda. Talabaning aybi emas.
+ */
+const CROSS_ACCOUNT_JOIN = 4011;
+
+const isMeetingNotStarted = (cause: unknown) => {
+    const sdk = cause as { errorCode?: number; reason?: string } | null;
+    return sdk?.errorCode === MEETING_NOT_STARTED || /not started/i.test(sdk?.reason ?? '');
+};
 
 function loadScript(src: string): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
@@ -91,7 +108,10 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
     const viewportRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const clientRef = useRef<ZoomClient | null>(null);
-    const [state, setState] = useState<'idle' | 'verifying' | 'joining' | 'joined'>('idle');
+    const [state, setState] = useState<'idle' | 'verifying' | 'joining' | 'waiting' | 'joined'>('idle');
+    const retryRef = useRef<number | null>(null);
+    // «Bekor qilish» yo'lda turgan urinishni ham to'xtatsin.
+    const cancelledRef = useRef(false);
     const [error, setError] = useState('');
     const [faceResult, setFaceResult] = useState<FaceCheckResult | null>(null);
     const [attempts, setAttempts] = useState(0);
@@ -120,10 +140,18 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
     // va kamera ochiq qolib ketardi.
     useEffect(() => {
         return () => {
+            if (retryRef.current) window.clearTimeout(retryRef.current);
             clientRef.current?.leaveMeeting().catch(() => { /* uchrashuv allaqachon yopilgan */ });
             clientRef.current = null;
         };
     }, []);
+
+    const cancelWaiting = () => {
+        cancelledRef.current = true;
+        if (retryRef.current) window.clearTimeout(retryRef.current);
+        retryRef.current = null;
+        setState('idle');
+    };
 
     const leave = async () => {
         await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
@@ -160,8 +188,28 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
         }
         setState('joining');
         setError('');
+        cancelledRef.current = false;
+        let payload: ZoomJoinResponse;
         try {
-            const payload = await zoomSessionService.join(sessionId);
+            payload = await zoomSessionService.join(sessionId);
+        } catch (cause) {
+            logger.error('Zoom join failed', cause);
+            setError(apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi."));
+            setState('idle');
+            return;
+        }
+        await connect(payload);
+    };
+
+    /**
+     * SDK orqali ulanish. O'qituvchi uchrashuvni hali boshlamagan bo'lsa,
+     * shu imzo va token bilan vaqti-vaqti bilan qayta urinamiz: serverdan
+     * yangi imzo so'ralmaydi — yuz tasdig'i bor-yo'g'i 3 daqiqa amal qiladi,
+     * imzo esa seans oxirigacha.
+     */
+    const connect = async (payload: ZoomJoinResponse) => {
+        retryRef.current = null;
+        try {
             await loadZoomSdk();
             if (!window.ZoomMtgEmbedded || !containerRef.current) throw new Error('Zoom SDK topilmadi');
 
@@ -202,7 +250,17 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                 meetingNumber: payload.meeting_number,
                 password: payload.passcode ?? '',
                 userName: payload.user_name || user?.username || 'Talaba',
+                // LMS yaratgan uchrashuv ro'yxatdan o'tishni talab qiladi:
+                // talaba faqat server bergan shaxsiy token bilan kira oladi.
+                ...(payload.registrant_token ? { tk: payload.registrant_token } : {}),
+                // Webhook hodisasida ishtirokchini LMS foydalanuvchisiga bog'laydi.
+                customerKey: payload.customer_key,
             });
+            if (cancelledRef.current) {
+                await client.leaveMeeting().catch(() => undefined);
+                clientRef.current = null;
+                return;
+            }
             setState('joined');
             // Uchrashuv sahifaning o'rtasida ochiladi — o'sha joyga olib
             // boramiz, aks holda talaba uni qidirib skroll qilishi kerak edi.
@@ -211,28 +269,52 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
             });
             if (faceCheckEnabled) faceCheck.startRandomChecks();
         } catch (cause) {
-            logger.error('Zoom join failed', cause);
-            // Bekend xatosi o'zbekcha keladi; Zoom SDK esa inglizcha sabab
-            // qaytaradi (masalan «The meeting number is not found») — uni
-            // yo'qotmaymiz, chunki muammoni aynan shu ochib beradi.
-            const sdkReason = (cause as { reason?: string })?.reason;
-            const isApiError = Boolean((cause as { response?: unknown })?.response);
-            setError(
-                isApiError
-                    ? apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi.")
-                    : (sdkReason
-                        ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}.`
-                        : "Uchrashuvga qo'shilib bo'lmadi. Qayta urinib ko'ring."),
-            );
             await clientRef.current?.leaveMeeting().catch(() => undefined);
             clientRef.current = null;
+            if (cancelledRef.current) return;
+            if (isMeetingNotStarted(cause)) {
+                setError('');
+                setState('waiting');
+                retryRef.current = window.setTimeout(() => void connect(payload), HOST_RETRY_MS);
+                return;
+            }
+            logger.error('Zoom join failed', cause);
+            // Zoom SDK inglizcha sabab qaytaradi (masalan «The meeting number
+            // is not found») — uni yo'qotmaymiz, muammoni aynan shu ochib beradi.
+            const sdkReason = (cause as { reason?: string })?.reason;
+            const sdkCode = (cause as { errorCode?: number })?.errorCode;
+            setError(
+                sdkCode === CROSS_ACCOUNT_JOIN
+                    ? "Zoom sozlamasida xato: SDK ilovasi uchrashuv egasi bilan bir akkauntda emas. Administratorga murojaat qiling."
+                    : sdkReason
+                    ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}.`
+                    : "Uchrashuvga qo'shilib bo'lmadi. Qayta urinib ko'ring.",
+            );
             setState('idle');
         }
     };
 
     return (
         <div ref={shellRef} className="zoom-meeting-shell min-w-0 rounded-2xl border border-border/60 bg-card shadow-sm">
-            {state === 'idle' || state === 'verifying' ? (
+            {state === 'waiting' ? (
+                <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-card to-primary/10 px-4 py-10 text-center sm:px-8 sm:py-14">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-600 shadow-sm">
+                        <Hourglass className="h-5 w-5" />
+                    </span>
+                    <div className="space-y-1">
+                        <p className="text-lg font-semibold tracking-tight">O'qituvchi darsni hali boshlamagan — kuting</p>
+                        <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
+                            Dars boshlanishi bilan avtomatik ulanasiz. Sahifani yopmang.
+                        </p>
+                    </div>
+                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Har 15 soniyada tekshirilmoqda
+                    </span>
+                    <Button variant="outline" size="sm" onClick={cancelWaiting}>
+                        Bekor qilish
+                    </Button>
+                </div>
+            ) : state === 'idle' || state === 'verifying' ? (
                 <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 px-4 py-10 text-center sm:px-8 sm:py-14">
                     <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
                         {state === 'verifying' ? <ScanFace className="h-5 w-5" /> : <Video className="h-5 w-5" />}
@@ -311,8 +393,8 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                 need more room than a small screen can provide. */}
             <div
                 ref={viewportRef}
-                className="zoom-meeting-viewport"
-                hidden={state !== 'joined' && state !== 'joining'}
+                className={state === 'waiting' ? 'zoom-meeting-viewport zoom-meeting-viewport--parked' : 'zoom-meeting-viewport'}
+                hidden={state !== 'joined' && state !== 'joining' && state !== 'waiting'}
                 aria-label="Zoom jonli dars oynasi"
             >
                 <div ref={containerRef} className="zoom-meeting-root" />

@@ -30,11 +30,27 @@ export interface ZoomSession {
     /** Faqat yaratuvchi va adminga keladi. */
     link_url?: string | null;
     created_by_name?: string | null;
+    /** Uchrashuvni LMS Zoom API orqali yaratgan — talaba shaxsiy token bilan kiradi. */
+    zoom_managed: boolean;
+    /** Faqat yaratuvchi va adminga. `0` — serverdagi `.env` akkaunti. */
+    zoom_account_id?: number | null;
+    zoom_account_name?: string | null;
+}
+
+export interface ZoomAccountOption {
+    /** `0` — serverdagi `.env` akkaunti. */
+    id: number;
+    name: string;
+    /** Shu akkauntda uchrashuvni LMS o'zi yarata oladi. */
+    auto_create: boolean;
 }
 
 export interface ZoomSessionPayload {
     title: string;
-    link_url: string;
+    /** `null` — uchrashuvni server Zoom API orqali o'zi yaratadi. */
+    link_url: string | null;
+    /** `null` — avtomatik: bo'sh akkaunt yoki havoladan aniqlanadi. */
+    zoom_account_id?: number | null;
     /** ISO, zona bilan (Toshkent vaqti). */
     starts_at: string;
     ends_at: string;
@@ -52,6 +68,10 @@ export interface ZoomJoinResponse {
     topic: string;
     /** Zoom'dagi ism — LMS'dan: «Familiya Ism · Guruh». */
     user_name: string;
+    /** Ro'yxatdan o'tish talab qilingan uchrashuvda shaxsiy kirish tokeni (SDK `tk`). */
+    registrant_token?: string | null;
+    /** SDK `customerKey` — webhook hodisasini foydalanuvchiga bog'laydi. */
+    customer_key: string;
 }
 
 export type FaceCheckStage = 'join' | 'random';
@@ -111,11 +131,24 @@ export interface FaceCheckStudentSummary {
     ended_absent: boolean;
     /** Tekshiruvlar erta to'xtagan — brauzer yopilgan bo'lishi mumkin. */
     left_early: boolean;
+    /** Zoom webhook bo'yicha uchrashuvda o'tirgan vaqt; `null` — hodisa yo'q. */
+    zoom_seconds?: number | null;
+    zoom_first_join?: string | null;
+}
+
+/** Uchrashuvda bo'lgan, lekin LMS orqali kirmagan ishtirokchi. */
+export interface ZoomOutsider {
+    name?: string | null;
+    first_join: string;
+    seconds: number;
 }
 
 export interface FaceCheckReport {
     session_id: number;
     students: FaceCheckStudentSummary[];
+    /** Zoom webhook hodisalari kelganmi. */
+    zoom_tracked: boolean;
+    outsiders: ZoomOutsider[];
 }
 
 export const zoomSessionService = {
@@ -128,6 +161,12 @@ export const zoomSessionService = {
     remove: async (id: number) => {
         await api.delete(`/zoom-sessions/${id}`);
     },
+    /** Zoom API sozlanganmi — havolasiz seans yaratsa bo'ladimi. */
+    capabilities: async () =>
+        (await api.get<{ auto_create: boolean; accounts: ZoomAccountOption[] }>('/zoom-sessions/capabilities')).data,
+    /** Host sifatida boshlash havolasi — faqat LMS yaratgan uchrashuvda. */
+    start: async (id: number) =>
+        (await api.post<{ start_url: string }>(`/zoom-sessions/${id}/start`)).data,
     /** Guruh tanlashdagi fakultet filtri. */
     filterOptions: async () =>
         (await api.get<{ faculties: { id: number; name: string }[] }>('/zoom-sessions/filter-options')).data,

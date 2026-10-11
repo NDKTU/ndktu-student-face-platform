@@ -231,9 +231,30 @@ class ZoomConfig(BaseModel):
     # qo'shilish uchun qisqa muddat yetarli.
     signature_ttl_seconds: int = 60 * 60 * 2
 
+    # ── Zoom API (Server-to-Server OAuth — SDK'dan alohida ilova) ──────────
+    # Bular bilan bekend uchrashuvni o'zi yaratadi, talabani registrant
+    # qilib shaxsiy kirish tokeni oladi (`modules/zoom_session/zoom_api.py`).
+    api_account_id: str = ""
+    api_client_id: str = ""
+    api_client_secret: str = ""
+    #: Uchrashuv kim nomidan ochiladi — akkauntdagi litsenziyali foydalanuvchi
+    #: email'i yoki Zoom user id. Bitta litsenziya bir vaqtda bitta uchrashuv.
+    api_host_user: str = ""
+    api_timeout_seconds: float = 20.0
+    #: Zoom registrant uchun email talab qiladi, talabalarda esa email yo'q.
+    #: Manzil `lms-<user_id>@<domen>` ko'rinishida yasaladi; Zoom unga xat
+    #: yubormaydi (uchrashuv sozlamalarida bildirishnomalar o'chiq).
+    registrant_email_domain: str = "lms.nsumt.uz"
+    #: Feature → Token → Secret Token: webhook imzosini tekshirish uchun.
+    webhook_secret_token: str = ""
+
     @property
     def enabled(self) -> bool:
         return bool(self.client_id and self.client_secret)
+
+    @property
+    def api_enabled(self) -> bool:
+        return bool(self.api_account_id and self.api_client_id and self.api_client_secret and self.api_host_user)
 
 
 class AttendanceConfig(BaseModel):

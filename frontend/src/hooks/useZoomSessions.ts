@@ -28,6 +28,14 @@ export const useZoomSession = (id: number) =>
         refetchInterval: 60_000,
     });
 
+export const useZoomCapabilities = (enabled: boolean) =>
+    useQuery({
+        queryKey: ['zoom-session-capabilities'],
+        queryFn: zoomSessionService.capabilities,
+        enabled,
+        staleTime: 5 * 60_000,
+    });
+
 export const useZoomGroupOptions = (filter: GroupOptionFilter, enabled: boolean) =>
     useQuery({
         queryKey: ['zoom-session-group-options', filter],

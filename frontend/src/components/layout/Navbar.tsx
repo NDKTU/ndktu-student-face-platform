@@ -33,6 +33,7 @@ const PATH_LABELS: Record<string, string> = {
     '/admin/hemis-sync':    'HEMIS sinxronizatsiyasi',
     '/admin/eduplan-sync':  'EPMOS sinxronizatsiyasi',
     '/admin/file-quotas':   'Fayl yuklash limitlari',
+    '/admin/zoom-accounts': 'Zoom akkauntlar',
     '/lessons':             'Darslar',
     '/psychology':          'Psixologiya',
     '/psychology/results':  'Psixologiya natijalari',

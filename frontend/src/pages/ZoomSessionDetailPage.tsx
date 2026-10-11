@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, ClipboardList, ScanFace, UsersRound, Video } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, CalendarClock, ClipboardList, ExternalLink, ScanFace, UsersRound, Video } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -12,6 +14,8 @@ import { ZoomFaceCheckReport } from '@/components/zoom/ZoomFaceCheckReport';
 import { ZoomMeetingBox } from '@/components/zoom/ZoomMeetingBox';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSession } from '@/hooks/useZoomSessions';
+import { zoomSessionService } from '@/services/zoomSessionService';
+import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate, formatTime } from '@/utils/date';
 
 type Tab = 'meeting' | 'report';
@@ -25,6 +29,7 @@ export default function ZoomSessionDetailPage() {
     const { hasPermission } = useAuth();
     const { data: session, isLoading, isError, refetch } = useZoomSession(sessionId);
     const [tab, setTab] = useState<Tab>('meeting');
+    const [starting, setStarting] = useState(false);
 
     if (isLoading) return <Skeleton className="h-64 w-full rounded-2xl" />;
     if (isError || !session) {
@@ -47,12 +52,41 @@ export default function ZoomSessionDetailPage() {
     // server ham ularga vaqt va guruh shartini qo'ymaydi.
     const studentView = !session.can_manage;
 
+    // Host havolasi har safar yangidan olinadi: ichidagi ZAK ~2 soatda eskiradi.
+    // Oyna avval ochiladi — `await` dan keyin brauzer popup'ni bloklardi.
+    const startAsHost = async () => {
+        const popup = window.open('', '_blank');
+        setStarting(true);
+        try {
+            const { start_url } = await zoomSessionService.start(session.id);
+            if (popup) popup.location.href = start_url;
+            else window.location.href = start_url;
+        } catch (cause) {
+            popup?.close();
+            toast.error(apiErrorMessage(cause, "Uchrashuvni boshlab bo'lmadi"));
+        } finally {
+            setStarting(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <Link to="/zoom" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
                 <ArrowLeft className="h-4 w-4" /> Seanslar
             </Link>
-            <PageHeader title={session.title} actions={<SessionStatusBadge session={session} />} />
+            <PageHeader
+                title={session.title}
+                actions={
+                    <div className="flex flex-wrap items-center gap-2">
+                        <SessionStatusBadge session={session} />
+                        {session.can_manage && session.zoom_managed && (
+                            <Button size="sm" isLoading={starting} onClick={() => void startAsHost()}>
+                                <ExternalLink className="h-4 w-4" /> Host sifatida boshlash
+                            </Button>
+                        )}
+                    </div>
+                }
+            />
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                     <CalendarClock className="h-4 w-4" />
@@ -65,6 +99,11 @@ export default function ZoomSessionDetailPage() {
                 {session.face_check_enabled && (
                     <span className="inline-flex items-center gap-1.5">
                         <ScanFace className="h-4 w-4" /> Yuz nazorati
+                    </span>
+                )}
+                {session.zoom_account_name && (
+                    <span className="inline-flex items-center gap-1.5">
+                        <Video className="h-4 w-4" /> {session.zoom_account_name}
                     </span>
                 )}
             </div>

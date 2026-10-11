@@ -93,6 +93,9 @@ export const RESOURCES: Record<string, ResourceMeta> = {
     // O'qituvchilarning fayl yuklash limitlari. `read:file_quota` faqat
     // adminda — o'qituvchi o'z limitini «Fayl kutubxonasi» sahifasida ko'radi.
     file_quota:    { label: 'Fayl yuklash limitlari', href: '/admin/file-quotas', icon: HardDrive, section: 'Tizim', tone: 'orange' },
+    // Universitetning Zoom akkauntlari va ularning ilova kalitlari.
+    // `read:zoom_account` faqat Admin'da (route'dan topilib beriladi).
+    zoom_account:  { label: 'Zoom akkauntlar', href: '/admin/zoom-accounts', icon: Video, section: 'Tizim', tone: 'blue' },
 
     faculty:       { label: 'Fakultetlar',      href: '/faculties',   icon: Building2,     section: "Ma'lumotnoma", tone: 'purple' },
     kafedra:       { label: 'Kafedralar',       href: '/kafedras',    icon: Layers,        section: "Ma'lumotnoma", tone: 'blue' },
@@ -245,6 +248,7 @@ export const SIDEBAR_RESOURCE_ORDER: string[] = [
     'permission',
     'eduplan',
     'file_quota',
+    'zoom_account',
 ];
 
 /**
@@ -309,7 +313,7 @@ export const SIDEBAR_GROUPS: SidebarGroupSpec[] = [
         name: 'Sozlamalar',
         icon: SlidersHorizontal,
         section: 'Tizim',
-        resources: ['role', 'permission', 'eduplan', 'file_quota'],
+        resources: ['role', 'permission', 'eduplan', 'file_quota', 'zoom_account'],
         href: '/roles',
         tone: 'yellow',
     },

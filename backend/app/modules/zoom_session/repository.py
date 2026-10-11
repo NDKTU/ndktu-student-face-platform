@@ -5,6 +5,11 @@ seansga biriktirilgan, hozir seans vaqti va HEMIS surati bor. Yuz nazorati
 yoqilgan seansda imzo faqat yaqinda `join` tekshiruvi `ok` bo'lgandan keyin
 beriladi — brauzerga ishonilmaydi. Ilgari tekshiruv brauzerda edi va uch
 urinishdan keyin (yoki xizmat javob bermasa) talaba baribir kirardi.
+
+Uchrashuvni bekend Zoom API orqali o'zi yaratgan bo'lsa (`zoom_managed`),
+talaba yana registrant qilinadi va shaxsiy `tk` token bilan kiradi:
+uchrashuv raqami va paroli brauzerga baribir tushadi, lekin ular bilan
+Zoom ilovasidan LMS'ni chetlab kirib bo'lmaydi (`zoom_api.py`).
 """
 
 import base64
@@ -17,6 +22,8 @@ import httpx
 from core.config import settings
 from fastapi import HTTPException, status
 from sqlalchemy import desc, exists, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,7 +40,15 @@ from app.modules.quiz.model import Subject
 from app.modules.quiz.quiz_process import errors as quiz_errors
 from app.modules.quiz.quiz_process.errors import quiz_error
 
-from .model import ZoomFaceCheck, ZoomSession, ZoomSessionGroup
+from .accounts import (
+    ENV_ACCOUNT_ID,
+    ENV_ACCOUNT_NAME,
+    ZoomCredentials,
+    all_credentials,
+    credentials_by_id,
+    env_credentials,
+)
+from .model import ZoomFaceCheck, ZoomParticipantEvent, ZoomRegistrant, ZoomSession, ZoomSessionGroup
 from .schemas import (
     AbsencePeriod,
     FaceCheckReportResponse,
@@ -41,11 +56,16 @@ from .schemas import (
     FaceCheckResponse,
     FaceCheckStudentSummary,
     SessionGroup,
+    ZoomAccountOption,
+    ZoomCapabilitiesResponse,
     ZoomJoinResponse,
+    ZoomOutsider,
     ZoomSessionListResponse,
     ZoomSessionRequest,
     ZoomSessionResponse,
+    ZoomStartResponse,
 )
+from .zoom_api import ZoomApiError, api_error, registrant_token, zoom_api
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +81,17 @@ MAX_IMAGES_PER_SPAN = 2
 
 #: Talabaning oxirgi tekshiruvi guruhnikidan shuncha orqada — erta chiqib ketgan.
 LEFT_EARLY_GAP_SECONDS = 5 * 60
+
+#: Webhook hodisasi seansga vaqt bo'yicha bog'lanadi: bir xonada (shaxsiy
+#: xona) bir necha seans bo'lishi mumkin. Dars cho'zilsa, chiqish hodisasi
+#: tugash vaqtidan keyin keladi — shuning uchun oxirida zaxira kattaroq.
+EVENT_MATCH_BEFORE = timedelta(minutes=30)
+EVENT_MATCH_AFTER = timedelta(hours=3)
+
+#: SDK `customerKey` — webhook'da ishtirokchini foydalanuvchiga bog'laydi.
+CUSTOMER_KEY_PREFIX = "lms-"
+
+_PARTICIPANT_EVENTS = {"meeting.participant_joined": "joined", "meeting.participant_left": "left"}
 
 _STATUS_MESSAGE = {
     "ok": "Shaxsingiz tasdiqlandi",
@@ -122,6 +153,71 @@ def _bad_link(cause: Exception) -> HTTPException:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_bad_link", str(cause))
 
 
+def _link_required() -> HTTPException:
+    return quiz_error(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "zoom_link_required",
+        "Zoom havolasini qo'ying — avtomatik yaratish sozlanmagan",
+    )
+
+
+def _account_not_found() -> HTTPException:
+    return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_account_not_found", "Zoom akkaunti topilmadi")
+
+
+def _account_cannot_create() -> HTTPException:
+    return quiz_error(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "zoom_account_cannot_create",
+        "Bu akkauntda Zoom API sozlanmagan — havolani qo'ying yoki boshqa akkauntni tanlang",
+    )
+
+
+def _account_busy() -> HTTPException:
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "zoom_account_busy",
+        "Bu akkauntda shu vaqtda boshqa seans bor — bitta litsenziya bir vaqtda bitta uchrashuv",
+    )
+
+
+def _no_free_account() -> HTTPException:
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "zoom_no_free_account",
+        "Bu vaqtda bo'sh Zoom akkaunt yo'q — boshqa vaqtni tanlang",
+    )
+
+
+def _account_required() -> HTTPException:
+    return quiz_error(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "zoom_account_required",
+        "Uchrashuv qaysi Zoom akkauntiniki ekanini aniqlab bo'lmadi — akkauntni tanlang",
+    )
+
+
+def _not_managed() -> HTTPException:
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "zoom_not_managed",
+        "Uchrashuv LMS orqali yaratilmagan — uni Zoom ilovasida o'zingiz boshlang",
+    )
+
+
+def _parse_zoom_time(value) -> datetime | None:
+    """`2026-10-10T09:00:00Z` → naiv UTC."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
 class ZoomSessionRepository:
     # ── Yordamchilar ─────────────────────────────────────────────────────────
 
@@ -154,6 +250,7 @@ class ZoomSessionRepository:
                     selectinload(ZoomSession.group_links).selectinload(ZoomSessionGroup.group),
                     selectinload(ZoomSession.subject),
                     selectinload(ZoomSession.created_by),
+                    selectinload(ZoomSession.zoom_account),
                 )
                 .where(ZoomSession.id == session_id)
             )
@@ -188,6 +285,9 @@ class ZoomSessionRepository:
             can_manage=manage,
             link_url=zs.link_url if manage else None,
             created_by_name=zs.created_by.username if zs.created_by else None,
+            zoom_managed=zs.zoom_managed,
+            zoom_account_id=(zs.zoom_account_id or ENV_ACCOUNT_ID) if manage else None,
+            zoom_account_name=(zs.zoom_account.name if zs.zoom_account else ENV_ACCOUNT_NAME) if manage else None,
         )
 
     # ── Ro'yxat ──────────────────────────────────────────────────────────────
@@ -200,6 +300,7 @@ class ZoomSessionRepository:
             selectinload(ZoomSession.group_links).selectinload(ZoomSessionGroup.group),
             selectinload(ZoomSession.subject),
             selectinload(ZoomSession.created_by),
+            selectinload(ZoomSession.zoom_account),
         )
         if not is_admin(user):
             student = await self._student(session, user.id)
@@ -238,10 +339,16 @@ class ZoomSessionRepository:
     # ── Boshqaruv ────────────────────────────────────────────────────────────
 
     async def _apply(self, session: AsyncSession, zs: ZoomSession, data: ZoomSessionRequest) -> None:
-        try:
-            parse_zoom_link(data.link_url)
-        except ZoomLinkError as cause:
-            raise _bad_link(cause) from cause
+        # API yaratgan uchrashuvning havolasi bizniki — tahrirda almashtirilmaydi.
+        if not zs.zoom_managed:
+            if data.link_url is None:
+                raise _link_required()
+            try:
+                meeting_number, _ = parse_zoom_link(data.link_url)
+            except ZoomLinkError as cause:
+                raise _bad_link(cause) from cause
+            zs.link_url = data.link_url
+            zs.zoom_meeting_id = int(meeting_number)
         group_ids = set(data.group_ids)
         found = set((await session.execute(select(Group.id).where(Group.id.in_(group_ids)))).scalars().all())
         if found != group_ids:
@@ -250,7 +357,6 @@ class ZoomSessionRepository:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fan topilmadi")
 
         zs.title = data.title
-        zs.link_url = data.link_url
         zs.starts_at = data.starts_at
         zs.ends_at = data.ends_at
         zs.subject_id = data.subject_id
@@ -263,26 +369,185 @@ class ZoomSessionRepository:
         for group_id in group_ids - set(current):
             zs.group_links.append(ZoomSessionGroup(group_id=group_id))
 
+    # ── Akkaunt tanlash ──────────────────────────────────────────────────────
+
+    async def capabilities(self, session: AsyncSession) -> ZoomCapabilitiesResponse:
+        accounts = [a for a in await all_credentials(session) if a.sdk_enabled or a.api_enabled]
+        options = [
+            ZoomAccountOption(id=a.id or ENV_ACCOUNT_ID, name=a.name, auto_create=a.api_enabled and a.sdk_enabled)
+            for a in accounts
+        ]
+        return ZoomCapabilitiesResponse(auto_create=any(o.auto_create for o in options), accounts=options)
+
+    @staticmethod
+    async def _session_credentials(session: AsyncSession, zs: ZoomSession) -> ZoomCredentials:
+        creds = await credentials_by_id(session, zs.zoom_account_id)
+        if creds is None:
+            raise _not_configured()
+        return creds
+
+    @staticmethod
+    async def _account_is_busy(
+        session: AsyncSession, creds: ZoomCredentials, starts_at: datetime, ends_at: datetime, exclude_id: int | None
+    ) -> bool:
+        """Akkaunt hostida shu vaqtga to'g'ri keladigan LMS uchrashuvi bormi.
+
+        Faqat API yaratganlari: ularning hosti aniq — akkaunt hosti. Qo'lda
+        qo'yilgan havolaning hosti boshqa foydalanuvchi bo'lishi mumkin.
+        """
+        account_filter = (
+            ZoomSession.zoom_account_id == creds.id if creds.id else ZoomSession.zoom_account_id.is_(None)
+        )
+        stmt = select(ZoomSession.id).where(
+            account_filter,
+            ZoomSession.zoom_managed.is_(True),
+            ZoomSession.is_active.is_(True),
+            ZoomSession.starts_at < ends_at,
+            ZoomSession.ends_at > starts_at,
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(ZoomSession.id != exclude_id)
+        return (await session.execute(stmt.limit(1))).first() is not None
+
+    async def _choose_for_new_meeting(
+        self, session: AsyncSession, data: ZoomSessionRequest
+    ) -> ZoomCredentials:
+        """Uchrashuvni yaratadigan akkaunt: tanlangani yoki birinchi bo'shi."""
+        accounts = await all_credentials(session)
+        if data.zoom_account_id is not None:
+            chosen = next((a for a in accounts if (a.id or ENV_ACCOUNT_ID) == data.zoom_account_id), None)
+            if chosen is None:
+                raise _account_not_found()
+            if not (chosen.api_enabled and chosen.sdk_enabled):
+                raise _account_cannot_create()
+            if await self._account_is_busy(session, chosen, data.starts_at, data.ends_at, None):
+                raise _account_busy()
+            return chosen
+        candidates = [a for a in accounts if a.api_enabled and a.sdk_enabled]
+        if not candidates:
+            raise _link_required()
+        for creds in candidates:
+            if not await self._account_is_busy(session, creds, data.starts_at, data.ends_at, None):
+                return creds
+        raise _no_free_account()
+
+    async def _choose_for_link(
+        self, session: AsyncSession, requested: int | None, meeting_id: int
+    ) -> ZoomCredentials:
+        """Qo'lda qo'yilgan havola qaysi akkauntniki.
+
+        Tanlangan bo'lsa — o'sha. Akkaunt bitta bo'lsa — u. Aks holda har
+        API'li akkauntdan uchrashuvni so'raymiz: topgani — egasi. SDK imzosi
+        boshqa akkauntniki bo'lsa, talaba kira olmaydi (4011), shuning uchun
+        taxmin qilmaymiz.
+        """
+        accounts = await all_credentials(session)
+        if requested is not None:
+            chosen = next((a for a in accounts if (a.id or ENV_ACCOUNT_ID) == requested), None)
+            if chosen is None:
+                raise _account_not_found()
+            return chosen
+        with_sdk = [a for a in accounts if a.sdk_enabled]
+        if len(with_sdk) <= 1:
+            # Akkaunt umuman yo'q bo'lsa ham seans yaratiladi (oldingidek):
+            # kirishda «Zoom sozlanmagan» deyiladi.
+            return with_sdk[0] if with_sdk else accounts[0] if accounts else env_credentials()
+        for creds in (a for a in with_sdk if a.api_enabled):
+            try:
+                await zoom_api.get_meeting(creds, meeting_id)
+                return creds
+            except ZoomApiError:
+                continue
+        raise _account_required()
+
+    # ── Boshqaruv (davomi) ───────────────────────────────────────────────────
+
     async def create_session(self, session: AsyncSession, data: ZoomSessionRequest, user: User) -> ZoomSessionResponse:
-        zs = ZoomSession(created_by_user_id=user.id, group_links=[])
+        """Havola bo'lmasa — uchrashuv Zoom API orqali yaratiladi (ro'yxatdan o'tish bilan)."""
+        managed = data.link_url is None
+        zs = ZoomSession(created_by_user_id=user.id, group_links=[], zoom_managed=managed)
         await self._apply(session, zs, data)
+        meeting_id: int | None = None
+        if managed:
+            creds = await self._choose_for_new_meeting(session, data)
+            try:
+                meeting = await zoom_api.create_meeting(creds, data.title, data.starts_at, data.ends_at)
+            except ZoomApiError as cause:
+                raise api_error(cause) from cause
+            meeting_id = int(meeting["id"])
+            zs.zoom_meeting_id = meeting_id
+            zs.link_url = meeting["join_url"]
+        else:
+            creds = await self._choose_for_link(session, data.zoom_account_id, zs.zoom_meeting_id)
+        zs.zoom_account_id = creds.id
         session.add(zs)
-        await session.commit()
+        try:
+            await session.commit()
+        except Exception:
+            # Bazaga yozilmadi — Zoom'da egasiz uchrashuv qolmasin.
+            if meeting_id is not None:
+                await self._delete_meeting_quietly(creds, meeting_id)
+            raise
         return await self.get_session(session, zs.id, user)
 
     async def update_session(
         self, session: AsyncSession, session_id: int, data: ZoomSessionRequest, user: User
     ) -> ZoomSessionResponse:
         zs = await self._get_managed(session, session_id, user)
+        before = (zs.title, zs.starts_at, zs.ends_at)
+        link_before = zs.link_url
         await self._apply(session, zs, data)
+        if zs.zoom_managed:
+            # API yaratgan uchrashuv o'z akkauntida yashaydi — akkaunt o'zgarmaydi.
+            creds = await self._session_credentials(session, zs)
+            if zs.is_active and await self._account_is_busy(session, creds, zs.starts_at, zs.ends_at, zs.id):
+                await session.rollback()
+                raise _account_busy()
+            if zs.zoom_meeting_id and before != (zs.title, zs.starts_at, zs.ends_at):
+                # Avval Zoom: u rad etsa, bazadagi seans ham o'zgarmaydi.
+                try:
+                    await zoom_api.update_meeting(creds, zs.zoom_meeting_id, zs.title, zs.starts_at, zs.ends_at)
+                except ZoomApiError as cause:
+                    await session.rollback()
+                    raise api_error(cause) from cause
+        elif data.zoom_account_id is not None or zs.link_url != link_before:
+            zs.zoom_account_id = (
+                await self._choose_for_link(session, data.zoom_account_id, zs.zoom_meeting_id)
+            ).id
         await session.commit()
         session.expire(zs)
         return await self.get_session(session, session_id, user)
 
     async def delete_session(self, session: AsyncSession, session_id: int, user: User) -> None:
         zs = await self._get_managed(session, session_id, user)
+        if zs.zoom_managed and zs.zoom_meeting_id:
+            creds = await credentials_by_id(session, zs.zoom_account_id)
+            if creds is not None:
+                await self._delete_meeting_quietly(creds, zs.zoom_meeting_id)
         await session.delete(zs)
         await session.commit()
+
+    @staticmethod
+    async def _delete_meeting_quietly(creds: ZoomCredentials, meeting_id: int) -> None:
+        """Zoom ishlamasa ham seans o'chadi: aks holda uni o'chirishning iloji qolmasdi."""
+        try:
+            await zoom_api.delete_meeting(creds, meeting_id)
+        except ZoomApiError as cause:
+            logger.warning("Zoom meeting %s was not deleted: %s", meeting_id, cause.message)
+
+    async def start(self, session: AsyncSession, session_id: int, user: User) -> ZoomStartResponse:
+        """Host havolasi — har safar yangisi: ichidagi ZAK ~2 soatda eskiradi."""
+        zs = await self._get_managed(session, session_id, user)
+        if not zs.zoom_managed or not zs.zoom_meeting_id:
+            raise _not_managed()
+        creds = await self._session_credentials(session, zs)
+        if not creds.api_enabled:
+            raise _not_configured()
+        try:
+            meeting = await zoom_api.get_meeting(creds, zs.zoom_meeting_id)
+        except ZoomApiError as cause:
+            raise api_error(cause) from cause
+        return ZoomStartResponse(start_url=meeting["start_url"])
 
     # ── Kirish ───────────────────────────────────────────────────────────────
 
@@ -382,10 +647,15 @@ class ZoomSessionRepository:
 
         Yaratuvchi va admin tekshiruvsiz kiradi: ular talaba emas, darsni
         olib boradi. Havolaning o'zi (`join_url`) talabaga berilmaydi.
+        Imzo uchrashuv egasi akkauntining SDK kaliti bilan — boshqa akkaunt
+        kaliti bilan Zoom kiritmaydi (4011).
         """
-        if not settings.zoom.enabled:
-            raise _not_configured()
         zs = await self._get(session, session_id)
+        creds = await self._session_credentials(session, zs)
+        if not creds.sdk_enabled:
+            raise _not_configured()
+        group_name: str | None = None
+        person = user.username
         if self._can_manage(zs, user):
             name = user.username
         else:
@@ -393,7 +663,16 @@ class ZoomSessionRepository:
             if zs.face_check_enabled and not await redis_client.exists(_face_ok_key(session_id, user.id)):
                 raise quiz_errors.face_verification_required()
             group = next((link.group for link in zs.group_links if link.group_id == student.group_id), None)
-            name = " · ".join(part for part in (student.full_name, group.name if group else None) if part)
+            group_name = group.name if group else None
+            person = student.full_name or user.username
+            name = " · ".join(part for part in (student.full_name, group_name) if part)
+
+        token: str | None = None
+        if zs.zoom_managed:
+            if not creds.api_enabled:
+                raise _not_configured()
+            # Registrant ismi Zoom'da «Ism Familiya Guruh» bo'lib ko'rinadi.
+            token = await self._registrant_token(session, creds, zs, user, person, group_name or "")
 
         try:
             meeting_number, passcode = parse_zoom_link(zs.link_url)
@@ -402,13 +681,150 @@ class ZoomSessionRepository:
 
         not_after = int(zs.ends_at.replace(tzinfo=timezone.utc).timestamp())
         return ZoomJoinResponse(
-            signature=sign_meeting(meeting_number, not_after=not_after),
-            sdk_key=settings.zoom.client_id,
+            signature=sign_meeting(
+                meeting_number, not_after=not_after, sdk_key=creds.sdk_key, sdk_secret=creds.sdk_secret
+            ),
+            sdk_key=creds.sdk_key,
             meeting_number=meeting_number,
             passcode=passcode,
             topic=zs.title,
             user_name=name or user.username,
+            registrant_token=token,
+            customer_key=f"{CUSTOMER_KEY_PREFIX}{user.id}",
         )
+
+    async def _registrant_token(
+        self,
+        session: AsyncSession,
+        creds: ZoomCredentials,
+        zs: ZoomSession,
+        user: User,
+        first_name: str,
+        last_name: str,
+    ) -> str:
+        """Shaxsiy kirish tokeni: birinchi kirishda Zoom'dan olinadi, keyin bazadan.
+
+        Registrant faqat shu yerda — guruh, vaqt va yuz tasdig'idan keyin —
+        qo'shiladi. Email sun'iy: talabalarda email yo'q, Zoom esa talab qiladi.
+        """
+        existing = (
+            await session.execute(
+                select(ZoomRegistrant.join_token).where(
+                    ZoomRegistrant.session_id == zs.id, ZoomRegistrant.user_id == user.id
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            return existing
+        try:
+            registrant = await zoom_api.add_registrant(
+                creds,
+                zs.zoom_meeting_id,
+                email=f"{CUSTOMER_KEY_PREFIX}{user.id}@{settings.zoom.registrant_email_domain}",
+                first_name=first_name,
+                last_name=last_name,
+            )
+        except ZoomApiError as cause:
+            raise api_error(cause) from cause
+        token = registrant_token(registrant.get("join_url") or "")
+        if not token:
+            logger.error("Zoom registrant without tk for session %s: %s", zs.id, registrant)
+            raise api_error(ZoomApiError(502, None, "registrant tokeni qaytmadi"))
+        session.add(
+            ZoomRegistrant(
+                session_id=zs.id, user_id=user.id, registrant_id=str(registrant["registrant_id"]), join_token=token
+            )
+        )
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Ikki oynadan bir vaqtda kirdi — birinchisi yozib ulgurgan; Zoom
+            # bir email uchun bir xil registrantni qaytaradi.
+            await session.rollback()
+        return token
+
+    # ── Webhook ──────────────────────────────────────────────────────────────
+
+    async def record_participant_event(self, session: AsyncSession, payload: dict) -> bool:
+        """`meeting.participant_joined/left` ni yozadi. Seans topilmasa — `False`.
+
+        Ishtirokchi foydalanuvchiga avval registrant orqali bog'lanadi (uni
+        server bergan), keyin SDK `customerKey` orqali (qo'lda havola qo'yilgan
+        seanslar uchun). Ikkalasi ham yo'q — LMS'ni chetlab kirgan odam.
+        """
+        kind = _PARTICIPANT_EVENTS.get(payload.get("event") or "")
+        obj = (payload.get("payload") or {}).get("object") or {}
+        participant = obj.get("participant") or {}
+        try:
+            meeting_id = int(obj.get("id"))
+        except (TypeError, ValueError):
+            return False
+        if kind is None:
+            return False
+
+        occurred_at = _parse_zoom_time(participant.get("join_time" if kind == "joined" else "leave_time"))
+        if occurred_at is None and payload.get("event_ts"):
+            occurred_at = datetime.fromtimestamp(int(payload["event_ts"]) / 1000, timezone.utc).replace(tzinfo=None)
+        if occurred_at is None:
+            return False
+
+        zs = (
+            await session.execute(
+                select(ZoomSession)
+                .where(
+                    ZoomSession.zoom_meeting_id == meeting_id,
+                    ZoomSession.starts_at - EARLY_JOIN - EVENT_MATCH_BEFORE <= occurred_at,
+                    ZoomSession.ends_at + EVENT_MATCH_AFTER >= occurred_at,
+                )
+                .order_by(desc(ZoomSession.starts_at))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if zs is None:
+            return False
+
+        creds = await credentials_by_id(session, zs.zoom_account_id)
+        host = (creds.host_user if creds else "").lower()
+        if host and (participant.get("email") or "").lower() == host:
+            return False  # o'qituvchi host akkaunti orqali — hisobotga kerak emas
+
+        user_id: int | None = None
+        registrant_id = participant.get("registrant_id")
+        if registrant_id:
+            user_id = (
+                await session.execute(
+                    select(ZoomRegistrant.user_id).where(
+                        ZoomRegistrant.session_id == zs.id, ZoomRegistrant.registrant_id == str(registrant_id)
+                    )
+                )
+            ).scalar_one_or_none()
+        customer_key = str(participant.get("customer_key") or "")
+        if user_id is None and customer_key.startswith(CUSTOMER_KEY_PREFIX):
+            candidate = customer_key[len(CUSTOMER_KEY_PREFIX):]
+            if candidate.isdigit() and await session.get(User, int(candidate)) is not None:
+                user_id = int(candidate)
+
+        key = str(
+            participant.get("participant_uuid")
+            or participant.get("user_id")
+            or participant.get("id")
+            or participant.get("user_name")
+            or "unknown"
+        )
+        await session.execute(
+            pg_insert(ZoomParticipantEvent)
+            .values(
+                session_id=zs.id,
+                user_id=user_id,
+                event=kind,
+                participant_key=key[:128],
+                participant_name=(participant.get("user_name") or None) and participant["user_name"][:255],
+                occurred_at=occurred_at,
+            )
+            .on_conflict_do_nothing(constraint="uq_zoom_participant_event")
+        )
+        await session.commit()
+        return True
 
     # ── Hisobot ──────────────────────────────────────────────────────────────
 
@@ -445,8 +861,10 @@ class ZoomSessionRepository:
                 if group_id in group_names:
                     roster[user_id] = (full_name, group_id)
 
-        # Tekshiruvi bor, lekin ro'yxatda yo'q (guruhi o'zgargan) — ismi bilan.
-        unknown = set(grouped) - set(roster)
+        presence, outsiders = await self._zoom_presence(session, zs)
+
+        # Tekshiruvi yoki Zoom'da bo'lgani bor, lekin ro'yxatda yo'q (guruhi o'zgargan) — ismi bilan.
+        unknown = (set(grouped) | set(presence)) - set(roster)
         if unknown:
             for user_id, username in (
                 await session.execute(select(User.id, User.username).where(User.id.in_(unknown)))
@@ -458,16 +876,72 @@ class ZoomSessionRepository:
         for user_id, (full_name, group_id) in roster.items():
             group_name = group_names.get(group_id) if group_id else None
             items = grouped.get(user_id)
-            if not items:
-                students.append(
-                    FaceCheckStudentSummary(user_id=user_id, user_name=full_name, group_name=group_name, joined=False)
+            if items:
+                summary = self._summary(user_id, full_name, group_name, items, last_check)
+            else:
+                summary = FaceCheckStudentSummary(
+                    user_id=user_id, user_name=full_name, group_name=group_name, joined=user_id in presence
                 )
-                continue
-            students.append(self._summary(user_id, full_name, group_name, items, last_check))
+            if user_id in presence:
+                summary.zoom_seconds, summary.zoom_first_join = presence[user_id]
+            students.append(summary)
 
         # Kirmaganlar va eng ko'p yo'q bo'lganlar yuqorida — o'qituvchi aynan shularni ko'radi.
         students.sort(key=lambda s: (s.joined, -s.absent_seconds, -s.failed, s.user_name or ""))
-        return FaceCheckReportResponse(session_id=session_id, students=students)
+        return FaceCheckReportResponse(
+            session_id=session_id,
+            students=students,
+            zoom_tracked=bool(presence or outsiders),
+            outsiders=outsiders,
+        )
+
+    @staticmethod
+    async def _zoom_presence(
+        session: AsyncSession, zs: ZoomSession
+    ) -> tuple[dict[int, tuple[int, datetime]], list[ZoomOutsider]]:
+        """Webhook hodisalaridan: kim qancha uchrashuvda o'tirgan.
+
+        Har bir ishtirokchi kaliti bo'yicha «kirdi → chiqdi» juftlari yig'iladi.
+        Chiqishi kelmagan kirish seans oxirigacha (yoki hozirgacha) hisoblanadi.
+        """
+        events = (
+            await session.execute(
+                select(ZoomParticipantEvent)
+                .where(ZoomParticipantEvent.session_id == zs.id)
+                .order_by(ZoomParticipantEvent.occurred_at, ZoomParticipantEvent.id)
+            )
+        ).scalars().all()
+        cutoff = min(utcnow_naive(), zs.ends_at)
+        # kalit → (user_id, ism, ochiq kirish, jami soniya, birinchi kirish)
+        tracks: dict[str, list] = {}
+        for event in events:
+            track = tracks.setdefault(event.participant_key, [None, None, None, 0, event.occurred_at])
+            track[0] = track[0] or event.user_id
+            track[1] = track[1] or event.participant_name
+            if event.event == "joined":
+                if track[2] is None:
+                    track[2] = event.occurred_at
+            elif track[2] is not None:
+                track[3] += max(0, int((event.occurred_at - track[2]).total_seconds()))
+                track[2] = None
+        presence: dict[int, tuple[int, datetime]] = {}
+        outsiders: dict[str, list] = {}
+        for user_id, name, open_since, seconds, first in tracks.values():
+            if open_since is not None:
+                seconds += max(0, int((max(cutoff, open_since) - open_since).total_seconds()))
+            if user_id is not None:
+                # Bir talaba qayta ulansa — Zoom yangi `participant_uuid` beradi.
+                total, earliest = presence.get(user_id, (0, first))
+                presence[user_id] = (total + seconds, min(earliest, first))
+            else:
+                # Begonalar ism bo'yicha birlashtiriladi: qayta ulanish ularni ko'paytirmasin.
+                slot = outsiders.setdefault(name or "?", [name, first, 0])
+                slot[1] = min(slot[1], first)
+                slot[2] += seconds
+        return presence, [
+            ZoomOutsider(name=name, first_join=first, seconds=seconds)
+            for name, first, seconds in sorted(outsiders.values(), key=lambda item: item[1])
+        ]
 
     @staticmethod
     def _summary(

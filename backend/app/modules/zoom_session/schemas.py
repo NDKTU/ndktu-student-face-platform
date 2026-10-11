@@ -20,7 +20,12 @@ class ZoomSessionRequest(BaseModel):
     """Seansni yaratish va tahrirlash (PUT — to'liq almashtirish)."""
 
     title: str = Field(min_length=1, max_length=255)
-    link_url: str = Field(min_length=1, max_length=500)
+    #: Bo'sh — uchrashuvni bekend Zoom API orqali o'zi yaratadi (`zoom_managed`).
+    #: Shunday yaratilgan seansda havola e'tiborga olinmaydi.
+    link_url: Optional[str] = Field(default=None, max_length=500)
+    #: Qaysi Zoom akkaunti. `None` — avtomatik (bo'sh akkaunt yoki havoladan
+    #: aniqlanadi), `0` — `.env` dagi kalitlar. API yaratgan seansda o'zgarmaydi.
+    zoom_account_id: Optional[int] = Field(default=None, ge=0)
     starts_at: datetime
     ends_at: datetime
     group_ids: list[int] = Field(min_length=1, max_length=200)
@@ -32,6 +37,11 @@ class ZoomSessionRequest(BaseModel):
     @classmethod
     def _strip(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("link_url")
+    @classmethod
+    def _empty_link(cls, value: Optional[str]) -> Optional[str]:
+        return value or None
 
     @field_validator("starts_at", "ends_at")
     @classmethod
@@ -69,10 +79,35 @@ class ZoomSessionResponse(BaseModel):
     #: LMS'ni chetlab kirib olardi.
     link_url: Optional[str] = None
     created_by_name: Optional[str] = None
+    #: Uchrashuvni bekend Zoom API orqali yaratgan: talaba shaxsiy token bilan
+    #: kiradi, o'qituvchi uni «Host sifatida boshlash» orqali ochadi.
+    zoom_managed: bool = False
+    #: Faqat yaratuvchi va adminga. `0` — `.env` akkaunti.
+    zoom_account_id: Optional[int] = None
+    zoom_account_name: Optional[str] = None
 
 
 class ZoomSessionListResponse(BaseModel):
     sessions: List[ZoomSessionResponse]
+
+
+class ZoomAccountOption(BaseModel):
+    #: `0` — `.env` akkaunti.
+    id: int
+    name: str
+    #: Shu akkauntda uchrashuvni LMS o'zi yarata oladi (S2S ilovasi bor).
+    auto_create: bool
+
+
+class ZoomCapabilitiesResponse(BaseModel):
+    #: Hech bo'lmasa bitta akkauntda Zoom API sozlangan — havolasiz seans yaratsa bo'ladi.
+    auto_create: bool
+    accounts: List[ZoomAccountOption] = []
+
+
+class ZoomStartResponse(BaseModel):
+    #: Host sifatida boshlash havolasi (ichida ZAK, ~2 soat amal qiladi).
+    start_url: str
 
 
 class ZoomJoinResponse(BaseModel):
@@ -83,6 +118,10 @@ class ZoomJoinResponse(BaseModel):
     topic: str
     #: Zoom'dagi ism — LMS'dan: «Familiya Ism · Guruh».
     user_name: str
+    #: Ro'yxatdan o'tish talab qilingan uchrashuvda shaxsiy kirish tokeni (SDK `tk`).
+    registrant_token: Optional[str] = None
+    #: SDK `customerKey`: webhook hodisasida ishtirokchini foydalanuvchiga bog'laydi.
+    customer_key: str
 
 
 # ── Yuz tekshiruvi (ilgari `course/face_check/schemas.py`) ────────────────────
@@ -143,10 +182,95 @@ class FaceCheckStudentSummary(BaseModel):
     periods: List[AbsencePeriod] = []
     ended_absent: bool = False
     left_early: bool = False
+    #: Zoom webhook bo'yicha uchrashuvda o'tirgan vaqt; `None` — hodisa yo'q.
+    zoom_seconds: Optional[int] = None
+    zoom_first_join: Optional[TashkentDatetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ZoomOutsider(BaseModel):
+    """Uchrashuvda bo'lgan, lekin LMS orqali kirmagan ishtirokchi."""
+
+    name: Optional[str] = None
+    first_join: TashkentDatetime
+    seconds: int
 
 
 class FaceCheckReportResponse(BaseModel):
     session_id: int
     students: List[FaceCheckStudentSummary]
+    #: Webhook hodisalari kelganmi — kelmagan bo'lsa Zoom ustunlari ko'rsatilmaydi.
+    zoom_tracked: bool = False
+    outsiders: List[ZoomOutsider] = []
+
+
+
+# ── Zoom akkauntlari (admin) ──────────────────────────────────────────────────
+
+
+class ZoomAccountRequest(BaseModel):
+    """Yaratish va tahrirlash. Sir bo'sh yuborilsa — saqlangani o'zgarmaydi."""
+
+    name: str = Field(min_length=1, max_length=100)
+    host_email: Optional[str] = Field(default=None, max_length=255)
+    api_account_id: Optional[str] = Field(default=None, max_length=64)
+    api_client_id: Optional[str] = Field(default=None, max_length=128)
+    api_client_secret: Optional[str] = Field(default=None, max_length=255)
+    sdk_key: str = Field(min_length=1, max_length=128)
+    sdk_secret: Optional[str] = Field(default=None, max_length=255)
+    webhook_secret_token: Optional[str] = Field(default=None, max_length=255)
+    is_active: bool = True
+
+    @field_validator(
+        "name",
+        "host_email",
+        "api_account_id",
+        "api_client_id",
+        "api_client_secret",
+        "sdk_key",
+        "sdk_secret",
+        "webhook_secret_token",
+        mode="before",
+    )
+    @classmethod
+    def _strip(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+
+class ZoomAccountResponse(BaseModel):
+    """Sirlarning o'zi qaytmaydi — faqat bor-yo'qligi."""
+
+    #: `0` — `.env` akkaunti (faqat ko'rish uchun, tahrirlanmaydi).
+    id: int
+    name: str
+    host_email: Optional[str] = None
+    api_account_id: Optional[str] = None
+    api_client_id: Optional[str] = None
+    sdk_key: Optional[str] = None
+    has_api_secret: bool = False
+    has_sdk_secret: bool = False
+    has_webhook_secret: bool = False
+    is_active: bool = True
+    #: `.env` dan — sahifada tahrirlab bo'lmaydi.
+    from_env: bool = False
+    api_enabled: bool = False
+    sdk_enabled: bool = False
+    sessions_count: int = 0
+
+
+class ZoomAccountListResponse(BaseModel):
+    accounts: List[ZoomAccountResponse]
+
+
+class ZoomAccountCheckResponse(BaseModel):
+    """«Tekshirish»: API kaliti ishlaydimi va host litsenziyalimi."""
+
+    api_ok: Optional[bool] = None
+    api_message: Optional[str] = None
+    host_email: Optional[str] = None
+    host_licensed: Optional[bool] = None
+    sdk_configured: bool = False

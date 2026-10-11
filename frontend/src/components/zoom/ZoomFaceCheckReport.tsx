@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace } from 'lucide-react';
+import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace, UserX, Video } from 'lucide-react';
 import { useState } from 'react';
 import { zoomSessionService, type AbsencePeriod, type FaceCheckStudentSummary } from '@/services/zoomSessionService';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -79,6 +79,8 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
 
     if (query.isLoading) return <Skeleton className="h-20 w-full rounded-xl" />;
     const students = query.data?.students ?? [];
+    const zoomTracked = Boolean(query.data?.zoom_tracked);
+    const outsiders = query.data?.outsiders ?? [];
     if (students.length === 0) {
         return <p className="text-sm text-muted-foreground">Seansga guruh talabalari biriktirilmagan.</p>;
     }
@@ -99,6 +101,27 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                             <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                                 Kirmagan
                             </span>
+                        </div>
+                    );
+                }
+                const zoomBadge = zoomTracked && (
+                    <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                        title="Zoom ma'lumoti bo'yicha uchrashuvda o'tirgan vaqt"
+                    >
+                        <Video className="h-3.5 w-3.5" />
+                        {student.zoom_seconds != null ? formatMinutes(student.zoom_seconds) : "Zoom'da yo'q"}
+                    </span>
+                );
+                // Yuz nazoratisiz seans: faqat Zoom'dagi vaqt bor, kuzatuv chizig'i yo'q.
+                if (student.total === 0) {
+                    return (
+                        <div key={student.user_id} className="flex items-center gap-3 rounded-xl border border-border/60 px-4 py-3">
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                                {student.user_name || `#${student.user_id}`}
+                                {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
+                            </span>
+                            {zoomBadge}
                         </div>
                     );
                 }
@@ -128,6 +151,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                 </span>
                             )}
                             <span className="shrink-0 text-xs text-muted-foreground">{presentRatio}%</span>
+                            {zoomBadge}
                         </button>
 
                         <div className="px-4 pb-3">
@@ -187,6 +211,28 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                     </div>
                 );
             })}
+            {/* Zoom'da bo'lgan, lekin LMS orqali kirmagan: o'qituvchi o'zi yoki
+                raqam va parolni bilib kirib olgan begona. */}
+            {outsiders.length > 0 && (
+                <div className="space-y-1.5 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-500">
+                        <UserX className="h-4 w-4" /> LMS orqali kirmagan ishtirokchilar: {outsiders.length}
+                    </p>
+                    <ul className="space-y-0.5 text-xs">
+                        {outsiders.map((outsider, index) => (
+                            <li key={index} className="flex flex-wrap gap-x-2">
+                                <span className="font-medium">{outsider.name || "Noma'lum"}</span>
+                                <span className="text-muted-foreground">
+                                    {formatTime(outsider.first_join)} dan · {formatMinutes(outsider.seconds)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                        Yuz tekshiruvidan o'tmagan. O'qituvchining o'zi ham shu ro'yxatda bo'lishi mumkin.
+                    </p>
+                </div>
+            )}
             <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
                 <ScanFace className="h-3.5 w-3.5" />
                 Tekshiruv avtomatik va taxminan daqiqada bir marta. Qisqa yo'qolishlar qayd etilmaydi —
