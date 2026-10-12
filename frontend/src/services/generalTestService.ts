@@ -251,6 +251,21 @@ export interface ResultRow {
     cheating_image_url?: string | null;
 }
 
+export interface ReviewQuestion {
+    id: number;
+    text: string;
+    /** A–D tartibida, savollar bankidagidek. */
+    options: { key: OptionLetter; text: string }[];
+    selected: OptionLetter | null;
+    correct_option: OptionLetter;
+    is_correct: boolean;
+}
+
+export interface AttemptReview {
+    result: ResultRow;
+    questions: ReviewQuestion[];
+}
+
 export interface ResultListResponse {
     total: number;
     page: number;
@@ -361,6 +376,8 @@ export const generalTestService = {
         });
         saveXlsx(response.data, 'elementar-test-natijalari.xlsx');
     },
+    result: async (attemptId: number) =>
+        (await api.get<AttemptReview>(`/general-test/results/${attemptId}`)).data,
     removeResult: async (attemptId: number) => {
         await api.delete(`/general-test/results/${attemptId}`);
     },

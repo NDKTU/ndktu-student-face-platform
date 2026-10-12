@@ -40,6 +40,7 @@ from .model import (
 from .schemas import (
     AnswerRequest,
     AttemptResult,
+    AttemptReview,
     AttemptState,
     AvailableTest,
     AvailableTestListResponse,
@@ -61,6 +62,7 @@ from .schemas import (
     ResultListRequest,
     ResultListResponse,
     ResultRow,
+    ReviewQuestion,
     SubjectCreateRequest,
     SubjectListResponse,
     SubjectQuestionListResponse,
@@ -1699,6 +1701,50 @@ class GeneralTestRepository:
             limit=request.limit,
             results=[self._row(r) for r in rows],
         )
+
+    async def get_result(self, session: AsyncSession, attempt_id: int, user: User) -> AttemptReview:
+        """Bitta urinishning savol-javoblari.
+
+        Ro'yxatdagi so'rovning o'zi ishlatiladi: ko'rish doirasidan tashqaridagi
+        urinish 404 beradi — id ni qo'lda terib begona natijani ochib bo'lmaydi.
+        """
+        stmt = self._results_stmt(ResultListRequest(), await resolve_data_scope(session, user))
+        row = (await session.execute(stmt.where(GeneralTestAttempt.id == attempt_id))).first()
+        if row is None:
+            raise _not_found("Natija")
+        attempt: GeneralTestAttempt = row[0]
+
+        ids = [item["q"] for item in attempt.layout]
+        questions = {
+            q.id: q
+            for q in (
+                await session.execute(select(GeneralTestQuestion).where(GeneralTestQuestion.id.in_(ids)))
+            ).scalars()
+        }
+        answers = {
+            a.question_id: a
+            for a in (
+                await session.execute(select(GeneralTestAnswer).where(GeneralTestAnswer.attempt_id == attempt.id))
+            ).scalars()
+        }
+        items = []
+        for entry in attempt.layout:
+            question = questions.get(entry["q"])
+            # Savol bankdan o'chirilgan — ko'rsatadigan matn qolmagan.
+            if question is None:
+                continue
+            answer = answers.get(question.id)
+            items.append(
+                ReviewQuestion(
+                    id=question.id,
+                    text=question.text,
+                    options=[TakeOption(key=letter, text=question.option(letter)) for letter in "abcd"],
+                    selected=answer.selected_option if answer else None,
+                    correct_option=question.correct_option,
+                    is_correct=bool(answer and answer.is_correct),
+                )
+            )
+        return AttemptReview(result=self._row(row), questions=items)
 
     async def export_results(self, session: AsyncSession, request: ResultListRequest, user: User) -> bytes:
         from openpyxl import Workbook

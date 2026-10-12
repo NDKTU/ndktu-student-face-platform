@@ -71,6 +71,7 @@ const StudentPsychologyPage = lazy(() => import('@/pages/StudentPsychologyPage')
 const GeneralTestsPage = lazy(() => import('@/pages/GeneralTestsPage'));
 const GeneralTestDetailPage = lazy(() => import('@/pages/GeneralTestDetailPage'));
 const GeneralTestResultsPage = lazy(() => import('@/pages/GeneralTestResultsPage'));
+const GeneralTestResultDetailPage = lazy(() => import('@/pages/GeneralTestResultDetailPage'));
 const GeneralTestTakeListPage = lazy(() => import('@/pages/GeneralTestTakeListPage'));
 const GeneralTestTakePage = lazy(() => import('@/pages/GeneralTestTakePage'));
 const StudentGeneralTestResultsPage = lazy(() => import('@/pages/StudentGeneralTestResultsPage'));
@@ -344,8 +345,8 @@ function App() {
                         <Suspense fallback={<PageSpinner />}>
                             <Routes>
                                 <Route path="/login" element={<Login />} />
-
                                 <Route path="/auth/hemis/callback" element={<HemisOAuthCallback />} />
+
                                 {/* Ochiq test: tizimga kirmasdan, PIN orqali. */}
                                 <Route path="/t" element={<PublicQuizPage />} />
                                 <Route path="/t/:pin" element={<PublicQuizPage />} />
@@ -425,6 +426,7 @@ function App() {
                                         <Route path="/elementar-tests" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_TAKE}><PermissionRoute permission="read:general_test"><GeneralTestsPage /></PermissionRoute></StudentRedirectRoute>} />
                                         <Route path="/elementar-tests/take" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_TAKE}><PermissionRoute permission="general_test:take"><GeneralTestTakeListPage /></PermissionRoute></StudentRedirectRoute>} />
                                         <Route path="/elementar-tests/results" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_RESULTS}><PermissionRoute permission="read:general_test_result"><GeneralTestResultsPage /></PermissionRoute></StudentRedirectRoute>} />
+                                        <Route path="/elementar-tests/results/:attemptId" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_RESULTS}><PermissionRoute permission="read:general_test_result"><GeneralTestResultDetailPage /></PermissionRoute></StudentRedirectRoute>} />
                                         <Route path="/elementar-tests/subjects" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_TAKE}><PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectsPage /></PermissionRoute></StudentRedirectRoute>} />
                                         <Route path="/elementar-tests/subjects/:id" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_TAKE}><PermissionRoute permission="read:general_test_subject"><GeneralTestSubjectDetailPage /></PermissionRoute></StudentRedirectRoute>} />
                                         <Route path="/elementar-tests/subjects/:subjectId/questions/new" element={<StudentRedirectRoute to={STUDENT_ELEMENTAR_TAKE}><PermissionRoute permission="create:general_test_question"><GeneralTestQuestionFormPage /></PermissionRoute></StudentRedirectRoute>} />

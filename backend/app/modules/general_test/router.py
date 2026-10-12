@@ -36,6 +36,7 @@ from .repository import get_general_test_repository as repo
 from .schemas import (
     AnswerRequest,
     AttemptResult,
+    AttemptReview,
     AttemptState,
     StartRequest,
     AvailableTestListResponse,
@@ -230,6 +231,16 @@ async def export_results(
         media_type=XLSX,
         headers={"Content-Disposition": 'attachment; filename="elementar-test-natijalari.xlsx"'},
     )
+
+
+@router.get("/results/{attempt_id}", response_model=AttemptReview)
+async def get_result(
+    attempt_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(PermissionRequired("read:general_test_result")),
+):
+    """Urinishning savol-javoblari — natijalar ro'yxatida qatorni bosganda."""
+    return await repo.get_result(session=session, attempt_id=attempt_id, user=user)
 
 
 @router.delete("/results/{attempt_id}", status_code=status.HTTP_204_NO_CONTENT)

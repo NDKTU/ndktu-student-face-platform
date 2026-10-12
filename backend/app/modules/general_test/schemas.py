@@ -424,3 +424,20 @@ class ResultListResponse(BaseModel):
     limit: int
     results: list[ResultRow]
 
+
+class ReviewQuestion(BaseModel):
+    id: int
+    text: str
+    #: A–D tartibida, savollar bankidagidek — talaba ko'rgan aralash tartibda emas.
+    options: list[TakeOption]
+    selected: str | None = None
+    correct_option: str
+    #: Javob berilgan paytda hisoblangan — ball shundan tuzilgan. Savol keyin
+    #: tahrirlangan bo'lsa, `correct_option` bilan mos kelmasligi mumkin.
+    is_correct: bool = False
+
+
+class AttemptReview(BaseModel):
+    result: ResultRow
+    questions: list[ReviewQuestion]
+

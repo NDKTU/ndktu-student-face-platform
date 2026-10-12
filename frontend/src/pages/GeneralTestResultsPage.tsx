@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ChartColumnBig, Download, Search, Trash2 } from 'lucide-react';
 import { CheatingEvidence } from '@/components/results/CheatingEvidence';
@@ -26,6 +27,7 @@ import { scoreClass } from '@/components/generalTest/score';
 import { formatDateTime } from '@/utils/date';
 
 export default function GeneralTestResultsPage() {
+    const navigate = useNavigate();
     const [subjectId, setSubjectId] = useState('');
     const [testId, setTestId] = useState('');
     const [search, setSearch] = useState('');
@@ -123,7 +125,16 @@ export default function GeneralTestResultsPage() {
             headClassName: 'w-12',
             cell: (r) => (
                 <PermissionGate permission="delete:general_test_result">
-                    <Button variant="ghost" size="icon" aria-label="O'chirish" onClick={() => setDeleting(r)}>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="O'chirish"
+                        onClick={(e) => {
+                            // Qator bosilsa javoblar ochiladi — o'chirish tugmasi uni ochmasin.
+                            e.stopPropagation();
+                            setDeleting(r);
+                        }}
+                    >
                         <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                 </PermissionGate>
@@ -186,6 +197,7 @@ export default function GeneralTestResultsPage() {
                         isLoading={isLoading}
                         isError={isError}
                         onRetry={() => refetch()}
+                        onRowClick={(r) => navigate(`/elementar-tests/results/${r.attempt_id}`)}
                         emptyIcon={<ChartColumnBig className="h-6 w-6" />}
                         emptyTitle="Natijalar yo'q"
                         emptyDescription="Hali hech kim testni yakunlamagan."

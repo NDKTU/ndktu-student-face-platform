@@ -265,6 +265,13 @@ export const useGeneralTestResults = (filter: ResultFilter) =>
         placeholderData: (prev) => prev,
     });
 
+export const useGeneralTestResult = (attemptId: number) =>
+    useQuery({
+        queryKey: [...KEYS.results, 'detail', attemptId],
+        queryFn: () => generalTestService.result(attemptId),
+        enabled: attemptId > 0,
+    });
+
 export const useDeleteGeneralTestResult = () => {
     const qc = useQueryClient();
     return useMutation({

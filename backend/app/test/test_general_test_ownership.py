@@ -379,3 +379,76 @@ async def test_assigned_teacher_cannot_manage_subject(two_teachers, async_db):
             "/general-test/", json={"subject_id": subject_id, "duration": 10, "attempt_limit": 1}
         )
     ).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_result_review_shows_answers_only_to_owner(two_teachers, async_db):
+    """Natijani bosganda — savol-javoblar; begona testniki esa 404.
+
+    Ochish roʻyxat bilan bir xil soʻrov orqali: id ni qoʻlda terib begona
+    urinishning javoblarini koʻrib boʻlmasligi kerak.
+    """
+    from app.modules.general_test.model import GeneralTestAnswer, GeneralTestAttempt
+
+    client = two_teachers["client"]
+    _as(client, two_teachers["token_first"])
+    subject_id = (
+        await client.post("/general-test/subject", json={"name": "Tafsilot fani"})
+    ).json()["id"]
+    first_q = GeneralTestQuestion(
+        subject_id=subject_id, text="Birinchi", option_a="a1", option_b="b1",
+        option_c="c1", option_d="d1", correct_option="b", order=1,
+    )
+    second_q = GeneralTestQuestion(
+        subject_id=subject_id, text="Ikkinchi", option_a="a2", option_b="b2",
+        option_c="c2", option_d="d2", correct_option="c", order=2,
+    )
+    async_db.add_all([first_q, second_q])
+    await async_db.commit()
+    first_id, second_id = first_q.id, second_q.id
+    test_id = (
+        await client.post(
+            "/general-test/", json={"subject_id": subject_id, "duration": 10, "attempt_limit": 1}
+        )
+    ).json()["id"]
+
+    attempt = GeneralTestAttempt(
+        test_id=test_id,
+        user_id=two_teachers["second"]["id"],
+        status="completed",
+        layout=[{"q": second_id, "o": "dcba"}, {"q": first_id, "o": "abcd"}],
+        total_questions=2,
+        correct_answers=1,
+        score=50,
+    )
+    async_db.add(attempt)
+    await async_db.flush()
+    async_db.add_all(
+        [
+            GeneralTestAnswer(attempt_id=attempt.id, question_id=second_id, selected_option="c", is_correct=True),
+            GeneralTestAnswer(attempt_id=attempt.id, question_id=first_id, selected_option="a", is_correct=False),
+        ]
+    )
+    await async_db.commit()
+    attempt_id = attempt.id
+    async_db.expire_all()
+
+    response = await client.get(f"/general-test/results/{attempt_id}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["result"]["score"] == 50
+    # Talaba koʻrgan savol tartibi, variantlar esa A–D.
+    assert [q["id"] for q in body["questions"]] == [second_id, first_id]
+    assert [o["key"] for o in body["questions"][0]["options"]] == ["a", "b", "c", "d"]
+    assert body["questions"][0] | {"options": None} == {
+        "id": second_id, "text": "Ikkinchi", "options": None,
+        "selected": "c", "correct_option": "c", "is_correct": True,
+    }
+    assert body["questions"][1]["selected"] == "a"
+    assert body["questions"][1]["correct_option"] == "b"
+    assert body["questions"][1]["is_correct"] is False
+
+    _as(client, two_teachers["token_second"])
+    foreign = await client.get(f"/general-test/results/{attempt_id}")
+    assert foreign.status_code == 404, foreign.text
+
