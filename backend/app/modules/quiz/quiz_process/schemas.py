@@ -82,6 +82,8 @@ class StartQuizResponse(BaseModel):
     strict_mode: bool = False
     #: Savol matni faqat «ko'rish» tugmasi bosilib turganda ko'rinadi.
     hold_to_reveal: bool = False
+    #: Kadrda yuz shuncha soniya ko'rinmasa brauzer testni yakunlaydi; `None` — o'chiq.
+    no_face_finish_seconds: int | None = None
 
 
 class SubmitAnswerRequest(BaseModel):

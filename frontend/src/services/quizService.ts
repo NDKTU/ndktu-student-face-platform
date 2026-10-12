@@ -60,6 +60,8 @@ export interface Quiz {
     strict_mode?: boolean;
     /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
     quiz_type?: QuizType;
     attempt?: number | null;
     created_at: string;
@@ -92,6 +94,8 @@ export interface QuizCreateRequest {
     strict_mode?: boolean;
     /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
     quiz_type?: QuizType;
     attempt?: number | null;
 }

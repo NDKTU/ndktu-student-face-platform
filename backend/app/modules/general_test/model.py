@@ -128,6 +128,9 @@ class GeneralTest(Base, IdIntPk, TimestampMixin):
     #: Matnni yashirish: savol va variantlar xira, faqat barmoq «ko'rish»
     #: tugmasida turganda ko'rinadi — oddiy skrinshot xira chiqadi.
     hold_to_reveal: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    #: Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `NULL` — o'chiq
+    #: (`core/utils/proctoring.py`, faqat ruxsatli rol yoqadi).
+    no_face_finish_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

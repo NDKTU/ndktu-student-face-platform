@@ -339,6 +339,7 @@
   "Savollar ommaviy o'chirildi": "Вопросы удалены массово",
   "Elementar savol tahrirlandi": "Вопрос элементарного теста изменён",
   "Barcha fanlarni boshqarish (egasidan qat'i nazar)": "Управлять всеми предметами (независимо от владельца)",
+  "Yuz ko'rinmasa testni yakunlash sozlamasi": "Настройка завершения теста, если лица нет в кадре",
   "Elementar savol o'chirildi": "Вопрос элементарного теста удалён",
   "Elementar savollar yuklandi (Excel)": "Вопросы элементарного теста загружены (Excel)",
   "Savollar topilmadi": "Вопросы не найдены",

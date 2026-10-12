@@ -70,6 +70,8 @@ export interface StartQuizResponse {
     strict_mode?: boolean;
     /** Savol matni faqat «ko'rish» tugmasi bosilib turganda ko'rinadi. */
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
 }
 
 export interface SubmitAnswerRequest {

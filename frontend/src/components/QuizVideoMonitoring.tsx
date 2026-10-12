@@ -14,7 +14,16 @@ export interface QuizVideoMonitoringProps {
      *  Qat'iy test sahifadan chiqishni shundan keyin kuzatadi: ruxsat oynasi
      *  ham sahifadan fokusni oladi. */
     onCameraSettled?: () => void;
+    /** Kadrda yuz shuncha soniya ko'rinmasa `onNoFaceTimeout` chaqiriladi; `null` — o'chiq. */
+    noFaceFinishSeconds?: number | null;
+    onNoFaceTimeout?: (imageData: string) => void;
 }
+
+/** Yuz shuncha soniya ko'rinmasa ogohlantirish — har doim, sozlamadan qat'i nazar. */
+const NO_FACE_WARN_SECONDS = 5;
+/** Xizmatdan shuncha vaqt javob kelmasa — hisob to'xtaydi: aloqa uzilishi
+ *  talabaning aybi emas, uning uchun testni yopib bo'lmaydi. */
+const STALE_FRAME_MS = 3000;
 
 export function QuizVideoMonitoring({
     active,
@@ -24,6 +33,8 @@ export function QuizVideoMonitoring({
     token,
     imageUrl,
     onCameraSettled,
+    noFaceFinishSeconds = null,
+    onNoFaceTimeout,
 }: QuizVideoMonitoringProps) {
     const [warnings, setWarnings] = useState(0);
     const warningsRef = useRef(0);
@@ -53,14 +64,61 @@ export function QuizVideoMonitoring({
         }
     }, [onCheatingDetected, onDifferentPersonDetected]);
 
-    const { state, startMonitoring, stopMonitoring, videoRef } = useVideoMonitoring({
+    // Yuz yo'qligi: qachondan beri va oxirgi javob qachon kelgani. Ref'larda —
+    // har kadrda qayta chizish kerak emas, taymer o'zi o'qiydi.
+    const noFaceSinceRef = useRef<number | null>(null);
+    const lastFrameAtRef = useRef(0);
+    const noFaceFiredRef = useRef(false);
+    const [noFaceSeconds, setNoFaceSeconds] = useState<number | null>(null);
+
+    const { state, startMonitoring, stopMonitoring, videoRef, captureFrame } = useVideoMonitoring({
         faceDetectionServiceUrl,
         token,
         onMultipleFacesDetected: (img) => handleViolation(img, 'multiple'),
         onDifferentPersonDetected: (img) => handleViolation(img, 'different'),
+        onFaceCount: (count) => {
+            lastFrameAtRef.current = Date.now();
+            if (count === 0) {
+                noFaceSinceRef.current ??= Date.now();
+            } else {
+                noFaceSinceRef.current = null;
+                noFaceFiredRef.current = false;
+            }
+        },
         frameInterval: 500,
         imageUrl,
     });
+
+    // Taymer bitta, prop'lar esa o'zgarishi mumkin — ref orqali o'qiladi.
+    const isConnectedRef = useRef(false);
+    const noFaceLimitRef = useRef(noFaceFinishSeconds);
+    const onNoFaceTimeoutRef = useRef(onNoFaceTimeout);
+    useEffect(() => {
+        isConnectedRef.current = state.isConnected;
+        noFaceLimitRef.current = noFaceFinishSeconds;
+        onNoFaceTimeoutRef.current = onNoFaceTimeout;
+    }, [state.isConnected, noFaceFinishSeconds, onNoFaceTimeout]);
+
+    useEffect(() => {
+        if (!active) return;
+        const id = setInterval(() => {
+            const now = Date.now();
+            if (!isConnectedRef.current || now - lastFrameAtRef.current > STALE_FRAME_MS) {
+                noFaceSinceRef.current = null;
+                setNoFaceSeconds(null);
+                return;
+            }
+            const since = noFaceSinceRef.current;
+            const elapsed = since ? (now - since) / 1000 : 0;
+            setNoFaceSeconds(elapsed >= NO_FACE_WARN_SECONDS ? Math.floor(elapsed) : null);
+            const limit = noFaceLimitRef.current;
+            if (limit && elapsed >= limit && !noFaceFiredRef.current) {
+                noFaceFiredRef.current = true;
+                onNoFaceTimeoutRef.current?.(captureFrame());
+            }
+        }, 500);
+        return () => clearInterval(id);
+    }, [active, captureFrame]);
 
     useEffect(() => {
         if (active && !state.isActive) {
@@ -88,10 +146,24 @@ export function QuizVideoMonitoring({
     const hasError = !!state.error;
 
     return (
-        // `bottom-6` telefonda home-indikator chizig'i ustiga tushardi —
-        // `mb-safe` uni ko'taradi. `onClick` esa holat panelini ochadi: u
-        // ilgari faqat hoverga bog'langan edi va sensorli ekranda umuman
-        // ochilmasdi.
+        <>
+        {noFaceSeconds != null && (
+            <div
+                role="alert"
+                className="fixed inset-x-0 top-4 z-[60] mx-auto w-fit max-w-[92vw] rounded-xl border border-amber-500/50 bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-800 shadow-lg dark:bg-amber-950 dark:text-amber-200"
+            >
+                Yuzingiz kadrda ko'rinmayapti — kameraga qarang
+                {noFaceFinishSeconds ? (
+                    <div className="mt-0.5 text-xs font-medium">
+                        {Math.max(0, noFaceFinishSeconds - noFaceSeconds)} soniyadan keyin test yakunlanadi
+                    </div>
+                ) : null}
+            </div>
+        )}
+        {/* `bottom-6` telefonda home-indikator chizig'i ustiga tushardi —
+            `mb-safe` uni ko'taradi. `onClick` esa holat panelini ochadi: u
+            ilgari faqat hoverga bog'langan edi va sensorli ekranda umuman
+            ochilmasdi. */}
         <div
             className="group fixed bottom-6 right-6 z-50 mb-safe"
             onClick={() => setStatusOpen((v) => !v)}
@@ -193,5 +265,6 @@ export function QuizVideoMonitoring({
                 </div>
             </div>
         </div>
+        </>
     );
 }

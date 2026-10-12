@@ -247,6 +247,9 @@ class Quiz(Base, IdIntPk, TimestampMixin):
     #: Matnni yashirish: savol va variantlar xira, faqat barmoq «ko'rish»
     #: tugmasida turganda ko'rinadi — oddiy skrinshot xira chiqadi.
     hold_to_reveal: Mapped[bool] = mapped_column(nullable=False, server_default="false")
+    #: Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `NULL` — o'chiq
+    #: (`core/utils/proctoring.py`, faqat ruxsatli rol yoqadi).
+    no_face_finish_seconds: Mapped[int | None] = mapped_column(nullable=True)
     attempt: Mapped[int | None] = mapped_column(nullable=True, default=1)
 
     lecturer: Mapped["User"] = relationship(

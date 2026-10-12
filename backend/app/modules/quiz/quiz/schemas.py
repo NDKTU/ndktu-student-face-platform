@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 
 from app.core.enums import ControlType, QuizType
 from app.core.schemas import TashkentDatetime
+from app.core.utils.proctoring import validate_no_face_seconds
 
 #: `face` — butun test davomida kamera kuzatadi; `face_entry` — yuz faqat
 #: kirishda bir marta tekshiriladi; `standard` — kamerasiz.
@@ -46,7 +47,15 @@ class QuizCreateRequest(BaseModel):
     strict_mode: Optional[bool] = None
     #: Matnni yashirish; `None` — tahrirlashda o'zgarmaydi (yuqoridagi sabab bilan).
     hold_to_reveal: Optional[bool] = None
+    #: Yuz ko'rinmasa yakunlash: `None` — o'zgarmaydi, `0` — o'chirish, son —
+    #: soniya. Faqat ruxsatli rol o'zgartiradi (`core/utils/proctoring.py`).
+    no_face_finish_seconds: Optional[int] = None
     quiz_type: QuizType = QuizType.LESSON_QUIZ
+
+    @field_validator("no_face_finish_seconds")
+    @classmethod
+    def _no_face(cls, value: Optional[int]) -> Optional[int]:
+        return validate_no_face_seconds(value)
 
     @field_validator("pin", mode="before")
     @classmethod
@@ -84,6 +93,7 @@ class QuizCreateResponse(BaseModel):
     proctoring_mode: ProctoringMode
     strict_mode: bool = False
     hold_to_reveal: bool = False
+    no_face_finish_seconds: Optional[int] = None
     quiz_type: QuizType
     attempt: Optional[int] = 1
     lecturer_id: Optional[int]

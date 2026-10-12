@@ -11,6 +11,7 @@ from app.core.enums import CONTROL_TYPE_TITLES, ControlType, QuizType, semester_
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.core.utils.course_access import can_manage, manageable_course_ids
+from app.core.utils.proctoring import resolve_no_face_finish
 from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
 from app.modules.course.model import Course, CourseGroup, Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
@@ -555,6 +556,13 @@ class QuizRepository:
             semester_number=data.semester_number,
         )
 
+        no_face = await resolve_no_face_finish(
+            session,
+            current_user,
+            current=None,
+            requested=data.no_face_finish_seconds,
+            proctoring_mode=data.proctoring_mode,
+        )
         new_quiz = Quiz(
             title=title,
             question_number=data.question_number,
@@ -564,6 +572,7 @@ class QuizRepository:
             proctoring_mode=data.proctoring_mode,
             strict_mode=bool(data.strict_mode),
             hold_to_reveal=bool(data.hold_to_reveal),
+            no_face_finish_seconds=no_face,
             quiz_type=data.quiz_type.value,
             lecturer_id=data.lecturer_id,
             created_by_user_id=created_by_user_id,
@@ -983,6 +992,13 @@ class QuizRepository:
         quiz.duration = data.duration
         quiz.pin = data.pin
         quiz.is_active = data.is_active
+        quiz.no_face_finish_seconds = await resolve_no_face_finish(
+            session,
+            current_user,
+            current=quiz.no_face_finish_seconds,
+            requested=data.no_face_finish_seconds,
+            proctoring_mode=data.proctoring_mode,
+        )
         quiz.proctoring_mode = data.proctoring_mode
         if data.strict_mode is not None:
             quiz.strict_mode = data.strict_mode
@@ -1090,6 +1106,8 @@ class QuizRepository:
             proctoring_mode=quiz.proctoring_mode,
             strict_mode=quiz.strict_mode,
             hold_to_reveal=quiz.hold_to_reveal,
+            # Qayta topshirish — o'sha sozlama; ruxsat asl testda tekshirilgan.
+            no_face_finish_seconds=quiz.no_face_finish_seconds,
             quiz_type=quiz.quiz_type,
             # Банк вопросов остаётся лекторским, а пересдачу выдаёт организатор —
             # поэтому лектор наследуется, а создатель берётся текущий.

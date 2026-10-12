@@ -6,6 +6,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
+import { NoFaceFinishField } from '@/components/quizzes/NoFaceFinishField';
+import { NO_FACE_FINISH_PERMISSION, noFaceFinishPayload } from '@/components/quizzes/noFaceFinish';
+import { useAuth } from '@/context/AuthContext';
 import type { ProctoringMode } from '@/services/quizService';
 import { useGeneralTestSubjects } from '@/hooks/useGeneralTests';
 import type { GeneralTestPayload, GeneralTestSummary } from '@/services/generalTestService';
@@ -40,6 +43,8 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
     const [strictMode, setStrictMode] = useState(editing?.strict_mode ?? false);
     const [holdToReveal, setHoldToReveal] = useState(editing?.hold_to_reveal ?? false);
     const [proctoringMode, setProctoringMode] = useState<ProctoringMode>(editing?.proctoring_mode ?? 'standard');
+    const [noFaceFinish, setNoFaceFinish] = useState<number | null>(editing?.no_face_finish_seconds ?? null);
+    const canSetNoFaceFinish = useAuth().hasPermission(NO_FACE_FINISH_PERMISSION);
     const [error, setError] = useState<string | null>(null);
     const subjectName = subjects?.subjects.find((s) => String(s.id) === subjectId)?.name ?? '';
 
@@ -70,6 +75,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
             strict_mode: strictMode,
             hold_to_reveal: holdToReveal,
             proctoring_mode: proctoringMode,
+            ...noFaceFinishPayload(canSetNoFaceFinish, proctoringMode, noFaceFinish),
         });
     };
 
@@ -143,6 +149,7 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
                     <Switch checked={pinRequired} onCheckedChange={setPinRequired} />
                 </div>
                 <ProctoringModePicker value={proctoringMode} onChange={setProctoringMode} />
+                {proctoringMode === 'face' && <NoFaceFinishField value={noFaceFinish} onChange={setNoFaceFinish} />}
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
                 {error && <p className="text-sm text-destructive">{error}</p>}

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import TashkentDatetime
+from app.core.utils.proctoring import validate_no_face_seconds
 from app.modules.quiz.quiz.schemas import ProctoringMode
 
 OptionLetter = Literal["a", "b", "c", "d"]
@@ -160,6 +161,14 @@ class GeneralTestCreateRequest(BaseModel):
     hold_to_reveal: bool = False
     #: Yuz nazorati — oddiy testdagi uchta rejim.
     proctoring_mode: ProctoringMode = "standard"
+    #: Yuz ko'rinmasa yakunlash: `None`/`0` — o'chiq, son — soniya. Faqat
+    #: ruxsatli rol yoqadi (`core/utils/proctoring.py`).
+    no_face_finish_seconds: int | None = None
+
+    @field_validator("no_face_finish_seconds")
+    @classmethod
+    def _no_face(cls, value: int | None) -> int | None:
+        return validate_no_face_seconds(value)
 
 
 class GeneralTestUpdateRequest(BaseModel):
@@ -177,6 +186,13 @@ class GeneralTestUpdateRequest(BaseModel):
     strict_mode: bool | None = None
     hold_to_reveal: bool | None = None
     proctoring_mode: ProctoringMode | None = None
+    #: `None` — o'zgarmaydi, `0` — o'chirish, son — soniya (ruxsat bilan).
+    no_face_finish_seconds: int | None = None
+
+    @field_validator("no_face_finish_seconds")
+    @classmethod
+    def _no_face(cls, value: int | None) -> int | None:
+        return validate_no_face_seconds(value)
 
 
 class GeneralTestSummary(BaseModel):
@@ -192,6 +208,7 @@ class GeneralTestSummary(BaseModel):
     strict_mode: bool = False
     hold_to_reveal: bool = False
     proctoring_mode: ProctoringMode = "standard"
+    no_face_finish_seconds: int | None = None
     #: Faqat test egasi va adminga. Talabaga (`AvailableTest`) va testni
     #: faqat koʻradigan rolga PIN'ning oʻzi emas, faqat `pin_required` boradi.
     pin: str | None = None
@@ -330,6 +347,8 @@ class AttemptState(BaseModel):
     strict_mode: bool = False
     hold_to_reveal: bool = False
     proctoring_mode: ProctoringMode = "standard"
+    #: Kadrda yuz shuncha soniya ko'rinmasa brauzer testni yakunlaydi; `None` — o'chiq.
+    no_face_finish_seconds: int | None = None
     #: `face` rejimida — yuz xizmatining WebSocket tokeni va etalon surat.
     face_ws_token: str | None = None
     image_url: str | None = None
@@ -347,8 +366,9 @@ class CheatingRequest(BaseModel):
 
     #: Qoidabuzarlik kadri, base64 JPEG (`data:` prefiksi bilan ham bo'ladi).
     image_data: str | None = Field(default=None, max_length=4_000_000)
-    #: `multiple` — kadrda bir nechta odam, `different` — boshqa odam.
-    kind: Literal["multiple", "different"] = "different"
+    #: `multiple` — kadrda bir nechta odam, `different` — boshqa odam,
+    #: `no_face` — yuz belgilangan vaqtdan ko'p ko'rinmadi (test sozlamasi yoqilgan bo'lsa).
+    kind: Literal["multiple", "different", "no_face"] = "different"
 
 
 class AnswerRequest(BaseModel):

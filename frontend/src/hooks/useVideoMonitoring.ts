@@ -7,6 +7,8 @@ export interface VideoMonitoringConfig {
     onMultipleFacesDetected: (imageData: string) => void;
     onDifferentPersonDetected?: (imageData: string) => void;
     onError?: (error: string) => void;
+    /** Har bir tahlil qilingan kadrdagi yuzlar soni (xato kadrlar bundan mustasno). */
+    onFaceCount?: (count: number) => void;
     frameInterval?: number;
     imageUrl?: string;
 }
@@ -139,6 +141,8 @@ export function useVideoMonitoring(config: VideoMonitoringConfig) {
                     const currentConfig = configRef.current;
                     const data = JSON.parse(event.data);
                     const faceCount = data.face_count || 0;
+                    // Buzuq kadr («invalid frame») — yuz yo'q degani emas.
+                    if (!data.error) currentConfig.onFaceCount?.(faceCount);
                     const hasTwoFaces = data.has_two_faces || false;
                     const isDifferentPerson = data.is_different_person || false;
                     const isReferenceCaptured = data.is_reference_captured || false;
@@ -244,10 +248,17 @@ export function useVideoMonitoring(config: VideoMonitoringConfig) {
         };
     }, [stopMonitoring]);
 
+    /** Dalil uchun kadr: oxirgi yuborilgani, bo'lmasa — hozirgisi. */
+    const captureFrame = useCallback(
+        () => lastImageCapture.current || captureAndEncodeFrame(),
+        [captureAndEncodeFrame],
+    );
+
     return {
         state,
         startMonitoring,
         stopMonitoring,
         videoRef,
+        captureFrame,
     };
 }

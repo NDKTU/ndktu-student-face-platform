@@ -103,6 +103,8 @@ export interface GeneralTestSummary {
     strict_mode?: boolean;
     /** Matnni yashirish: savol faqat bosib turilganda ko'rinadi. */
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
     /** Yuz nazorati — oddiy testdagi uchta rejim. */
     proctoring_mode?: ProctoringMode;
     /** Boshlash PIN'i. Faqat test egasi/admin ko'radi — boshqalarga `null`. */
@@ -161,6 +163,8 @@ export interface GeneralTestPayload {
     regenerate_pin?: boolean;
     strict_mode?: boolean;
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
     proctoring_mode?: ProctoringMode;
 }
 
@@ -209,6 +213,8 @@ export interface AttemptState {
     questions: TakeQuestion[];
     strict_mode?: boolean;
     hold_to_reveal?: boolean;
+    /** Kadrda yuz shuncha soniya ko'rinmasa test yakunlanadi; `null` — o'chiq. */
+    no_face_finish_seconds?: number | null;
     proctoring_mode?: ProctoringMode;
     /** `face` rejimida — yuz xizmati tokeni va etalon surat. */
     face_ws_token?: string | null;
@@ -416,7 +422,7 @@ export const generalTestService = {
     verifyEntryFace: async (testId: number, image_base64: string, pin?: string) =>
         (await api.post<VerifyEntryFaceResponse>(`/general-test/${testId}/verify_entry_face`, { image_base64, pin })).data,
     /** `face`: kamera qoidabuzarlikni aniqladi — urinish dalil bilan yopiladi. */
-    reportCheating: async (attemptId: number, kind: 'multiple' | 'different', image_data?: string) =>
+    reportCheating: async (attemptId: number, kind: 'multiple' | 'different' | 'no_face', image_data?: string) =>
         (await api.post<AttemptResult>(`/general-test/attempt/${attemptId}/cheating`, { kind, image_data })).data,
     /** Qat'iy test: sahifa hali ochiq. */
     heartbeat: async (attemptId: number) => {

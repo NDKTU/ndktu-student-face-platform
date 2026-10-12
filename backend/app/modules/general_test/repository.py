@@ -24,6 +24,7 @@ from app.core.utils.data_scope import DataScope, resolve_data_scope
 from core.dependencies.role_checker import _roles_have_permission
 from core.utils.permission_registry import declare_permission
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
+from app.core.utils.proctoring import resolve_no_face_finish
 from app.modules.audit import service as audit_service
 from app.modules.audit.model import AuditEvent
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
@@ -113,6 +114,7 @@ STRICT_KIND = "gtest"
 CHEATING_REASONS = {
     "multiple": "Kadrda bir nechta odam",
     "different": "Boshqa odam aniqlandi",
+    "no_face": "Kadrda yuz ko'rinmadi",
 }
 
 #: `face_entry`: kirishdagi tasdiqdan keyin test sahifasi shuncha vaqt ochiladi.
@@ -908,8 +910,12 @@ class GeneralTestRepository:
         # Fan ham oʻzinikidan boʻlishi kerak: aks holda oʻqituvchi begona
         # bankka oʻz testini ulab, uning savollarini tarqatib yuborardi.
         subject = await self._get_subject(session, data.subject_id, user)
+        no_face = await resolve_no_face_finish(
+            session, user, current=None, requested=data.no_face_finish_seconds, proctoring_mode=data.proctoring_mode
+        )
         test = GeneralTest(
-            **data.model_dump(exclude={"group_ids", "pin_required"}),
+            **data.model_dump(exclude={"group_ids", "pin_required", "no_face_finish_seconds"}),
+            no_face_finish_seconds=no_face,
             title=subject.name,
             pin=_new_pin() if data.pin_required else None,
             created_by_user_id=user.id,
@@ -940,6 +946,15 @@ class GeneralTestRepository:
         for flag in ("strict_mode", "hold_to_reveal", "proctoring_mode"):
             if flag in changes and changes[flag] is None:
                 changes.pop(flag)
+        # Ruxsat va kamera rejimiga bog'liq — oddiy maydonlardan alohida.
+        requested_no_face = changes.pop("no_face_finish_seconds", None)
+        test.no_face_finish_seconds = await resolve_no_face_finish(
+            session,
+            user,
+            current=test.no_face_finish_seconds,
+            requested=requested_no_face,
+            proctoring_mode=changes.get("proctoring_mode", test.proctoring_mode),
+        )
         if pin_required is False:
             test.pin = None
         elif (pin_required and test.pin is None) or (regenerate_pin and (pin_required or test.pin)):
@@ -1354,6 +1369,9 @@ class GeneralTestRepository:
             strict_mode=attempt.test.strict_mode,
             hold_to_reveal=attempt.test.hold_to_reveal,
             proctoring_mode=attempt.test.proctoring_mode,
+            no_face_finish_seconds=(
+                attempt.test.no_face_finish_seconds if attempt.test.proctoring_mode == "face" else None
+            ),
             face_ws_token=face_ws_token,
             image_url=image_url,
         )
@@ -1595,6 +1613,11 @@ class GeneralTestRepository:
             return self._result(attempt)
         if attempt.test.proctoring_mode != "face":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda kamera nazorati yo'q")
+        if data.kind == "no_face" and not attempt.test.no_face_finish_seconds:
+            # Sozlama o'chiq — brauzer yuz yo'qligi uchun yopmasligi kerak edi.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda yuz ko'rinmasa yakunlash yoqilmagan"
+            )
         attempt.cheating_image_url = self._save_evidence(data.image_data, attempt.test_id, user.id)
         attempt.stop_reason = CHEATING_REASONS[data.kind]
         await self._finalize(session, attempt)

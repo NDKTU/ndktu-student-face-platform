@@ -188,6 +188,7 @@ class QuizProcessRepository:
             resumed=False,
             strict_mode=quiz.strict_mode,
             hold_to_reveal=quiz.hold_to_reveal,
+            no_face_finish_seconds=quiz.no_face_finish_seconds if quiz.proctoring_mode == "face" else None,
         )
 
     async def _require_entry_face(self, session: AsyncSession, quiz: Quiz, user: User) -> str | None:
@@ -411,6 +412,7 @@ class QuizProcessRepository:
             submitted_answers=submitted,
             strict_mode=quiz.strict_mode,
             hold_to_reveal=quiz.hold_to_reveal,
+            no_face_finish_seconds=quiz.no_face_finish_seconds if quiz.proctoring_mode == "face" else None,
         )
 
     async def _strict_resume_allowed(self, session: AsyncSession, result_obj: Result) -> bool:

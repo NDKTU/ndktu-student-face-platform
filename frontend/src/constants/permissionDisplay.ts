@@ -26,6 +26,12 @@ const SPECIAL_PERMISSIONS: Record<string, { resource: string; label: string }> =
     'delete:resource': { resource: 'lesson', label: "Dars materialini o'chirish" },
     // Fan egaligidan qat'i nazar: barcha elementar fanlarni boshqarish va ularda
     // test tuzish (`general_test/repository.py::MANAGE_ALL_PERMISSION`).
+    // Kamerali testda yuz ko'rinmasa avtomatik yakunlash — jiddiy jazo, shuning
+    // uchun alohida ruxsat (`core/utils/proctoring.py`); standart — faqat Admin.
+    'manage:proctoring_auto_finish': {
+        resource: 'quiz',
+        label: "Yuz ko'rinmasa testni yakunlash sozlamasi",
+    },
     'manage:general_test_all': {
         resource: 'general_test_subject',
         label: "Barcha fanlarni boshqarish (egasidan qat'i nazar)",

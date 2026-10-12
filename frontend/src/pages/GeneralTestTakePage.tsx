@@ -240,7 +240,7 @@ export default function GeneralTestTakePage() {
     const handleCameraSettled = useCallback(() => setCameraSettled(true), []);
 
     /** Kamera qoidabuzarlikni aniqladi (3 ogohlantirishdan keyin) — server urinishni yopadi. */
-    const handleCheating = useCallback(async (kind: 'multiple' | 'different', imageData: string) => {
+    const handleCheating = useCallback(async (kind: 'multiple' | 'different' | 'no_face', imageData: string) => {
         if (finishedRef.current) return;
         finishedRef.current = true;
         try {
@@ -255,6 +255,7 @@ export default function GeneralTestTakePage() {
     }, [attemptId, refreshTaking, finish]);
     const onMultipleFaces = useCallback((image: string) => handleCheating('multiple', image), [handleCheating]);
     const onDifferentPerson = useCallback((image: string) => handleCheating('different', image), [handleCheating]);
+    const onNoFace = useCallback((image: string) => handleCheating('no_face', image), [handleCheating]);
 
     const handleLeave = useCallback((reason: LeaveReason) => {
         if (finishedRef.current) return;
@@ -410,6 +411,8 @@ export default function GeneralTestTakePage() {
                     active={!result && !leftReason}
                     onCheatingDetected={onMultipleFaces}
                     onDifferentPersonDetected={onDifferentPerson}
+                    noFaceFinishSeconds={state.no_face_finish_seconds ?? null}
+                    onNoFaceTimeout={onNoFace}
                     faceDetectionServiceUrl={FACE_DETECTION_SERVICE_URL}
                     token={state.face_ws_token ?? undefined}
                     imageUrl={state.image_url ?? undefined}

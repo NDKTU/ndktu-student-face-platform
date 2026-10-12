@@ -424,13 +424,13 @@ const QuizTestPage = () => {
         window.location.reload();
     }, []);
 
-    const handleDifferentPersonDetected = useCallback(async (imageData: string) => {
+    /** Kamera qoidabuzarligi: dalil surati yuklanadi va urinish sabab bilan yakunlanadi. */
+    const finishForViolation = useCallback(async (reason: string, imageData: string) => {
         // Bug#12 fix: guard against race condition where both timer & cheating trigger submit
         if (cheatingDetected || isSubmittingRef.current) return;
         isSubmittingRef.current = true;
 
         setCheatingDetected(true);
-        const reason = 'Different person detected';
         setCheatingReason(reason);
 
         if (quizData && user) {
@@ -454,6 +454,16 @@ const QuizTestPage = () => {
             handleSubmit(true, reason);
         }
     }, [quizData, user, handleSubmit, cheatingDetected]);
+
+    const handleDifferentPersonDetected = useCallback(
+        (imageData: string) => finishForViolation('Different person detected', imageData),
+        [finishForViolation],
+    );
+    // Test sozlamasi yoqilgan bo'lsa: yuz belgilangan vaqtdan ko'p ko'rinmadi.
+    const handleNoFaceTimeout = useCallback(
+        (imageData: string) => finishForViolation('No face detected', imageData),
+        [finishForViolation],
+    );
 
     // ================================
     // QAT'IY REJIM
@@ -872,6 +882,8 @@ const QuizTestPage = () => {
                     active={phase === 'quiz' && !cheatingDetected}
                     onCheatingDetected={handleDifferentPersonDetected}
                     onDifferentPersonDetected={handleDifferentPersonDetected}
+                    noFaceFinishSeconds={quizData.no_face_finish_seconds ?? null}
+                    onNoFaceTimeout={handleNoFaceTimeout}
                     faceDetectionServiceUrl={FACE_DETECTION_SERVICE_URL}
                     token={quizData.face_ws_token}
                     imageUrl={quizData.image_url}

@@ -22,6 +22,8 @@ import { logger } from '@/utils/logger';
 import { buildQuizTitle } from '@/utils/generatedNames';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
 import { quizSchema, type QuizFormValues } from '@/schemas/quiz';
+import { NoFaceFinishField } from '@/components/quizzes/NoFaceFinishField';
+import { NO_FACE_FINISH_PERMISSION, noFaceFinishPayload } from '@/components/quizzes/noFaceFinish';
 import { subjectHint } from '@/utils/subject';
 
 interface QuizModalProps {
@@ -76,7 +78,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         formState: { errors },
     } = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
-        defaultValues: { is_active: false, proctoring_mode: 'standard', strict_mode: false, hold_to_reveal: false, quiz_type: 'LESSON_QUIZ' },
+        defaultValues: { is_active: false, proctoring_mode: 'standard', strict_mode: false, hold_to_reveal: false, no_face_finish_seconds: null, quiz_type: 'LESSON_QUIZ' },
     });
 
     const createMutation = useCreateQuiz();
@@ -87,6 +89,8 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     const proctoringMode = watch('proctoring_mode');
     const strictMode = watch('strict_mode');
     const holdToReveal = watch('hold_to_reveal');
+    const noFaceFinish = watch('no_face_finish_seconds');
+    const canSetNoFaceFinish = hasPermission(NO_FACE_FINISH_PERMISSION);
     const selectedLecturerId = watch('lecturer_id');
     const selectedSubjectId = watch('subject_id');
     const selectedGroupId = watch('group_id');
@@ -168,6 +172,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 proctoring_mode: quiz.proctoring_mode ?? 'standard',
                 strict_mode: quiz.strict_mode ?? false,
                 hold_to_reveal: quiz.hold_to_reveal ?? false,
+                no_face_finish_seconds: quiz.no_face_finish_seconds ?? null,
             });
         } else {
             reset({
@@ -183,6 +188,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                 proctoring_mode: 'standard',
                 strict_mode: false,
                 hold_to_reveal: false,
+                no_face_finish_seconds: null,
             });
         }
     }, [quiz, reset, isOpen, isTeacher, user]);
@@ -248,6 +254,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             proctoring_mode: data.proctoring_mode,
             strict_mode: data.strict_mode,
             hold_to_reveal: data.hold_to_reveal,
+            ...noFaceFinishPayload(canSetNoFaceFinish, data.proctoring_mode, data.no_face_finish_seconds),
         };
 
         if (quiz) {
@@ -433,6 +440,13 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
                     onChange={(mode) => setValue('proctoring_mode', mode)}
                     error={errors.proctoring_mode?.message}
                 />
+
+                {proctoringMode === 'face' && (
+                    <NoFaceFinishField
+                        value={noFaceFinish}
+                        onChange={(value) => setValue('no_face_finish_seconds', value)}
+                    />
+                )}
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={(checked) => setValue('strict_mode', checked)} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={(checked) => setValue('hold_to_reveal', checked)} />
