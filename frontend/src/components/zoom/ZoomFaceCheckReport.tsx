@@ -141,11 +141,19 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                 {student.user_name || `#${student.user_id}`}
                                 {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
                             </span>
+                            {/* Chiqib ketganini «doim kadrda» yashirmasin: foiz faqat
+                                talabaning o'z oynasi bo'yicha, darsning qolgani unda yo'q. */}
+                            {student.left_early && student.last_check && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                                    <LogOut className="h-3 w-3" />
+                                    {formatTime(student.last_check)} da chiqdi
+                                </span>
+                            )}
                             {student.absent_seconds > 0 ? (
                                 <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
                                     {formatMinutes(student.absent_seconds)} yo'q
                                 </span>
-                            ) : (
+                            ) : !student.left_early && (
                                 <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">
                                     Doim kadrda
                                 </span>

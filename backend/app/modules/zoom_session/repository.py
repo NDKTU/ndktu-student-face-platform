@@ -83,7 +83,8 @@ FACE_OK_TTL_SECONDS = 180
 #: Bitta «yo'q» davridan nechta surat saqlanadi (dalil uchun boshidagilari).
 MAX_IMAGES_PER_SPAN = 2
 
-#: Talabaning oxirgi tekshiruvi guruhnikidan shuncha orqada — erta chiqib ketgan.
+#: Talabaning oxirgi tekshiruvi hozirdan (dars tugagach — guruhnikidan)
+#: shuncha orqada — erta chiqib ketgan.
 LEFT_EARLY_GAP_SECONDS = 5 * 60
 
 #: Webhook hodisasi seansga vaqt bo'yicha bog'lanadi: bir xonada (shaxsiy
@@ -1037,7 +1038,14 @@ class ZoomSessionRepository:
             ).all():
                 roster[user_id] = (username, None)
 
+        # «Erta chiqdi» nimaga nisbatan: dars ketayotganda — hozirga, aks holda
+        # tekshiruvi bo'lgan yagona talaba chiqib ketsa, u o'zi bilan solishtirilib
+        # «doim kadrda» ko'rinardi. Dars tugagach — guruhning oxirgi tekshiruviga:
+        # o'qituvchi darsni erta yopgan bo'lsa, hammani chiqib ketgan demaylik.
+        now = utcnow_naive()
         last_check = max((row.created_at for row in rows), default=None)
+        if now < zs.ends_at:
+            last_check = now
         students: list[FaceCheckStudentSummary] = []
         for user_id, (full_name, group_id) in roster.items():
             group_name = group_names.get(group_id) if group_id else None

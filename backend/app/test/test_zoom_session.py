@@ -259,6 +259,28 @@ async def test_report_lists_absent_students(auth_client, async_client, async_db,
 
 
 @pytest.mark.asyncio
+async def test_report_lone_student_who_left_is_not_always_present(
+    auth_client, async_client, async_db, zoom_scene, monkeypatch
+):
+    """Guruhda tekshiruvi bor yagona talaba: chiqib ketgani o'zi bilan solishtirilmasin."""
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-30), end=timedelta(hours=1))
+    headers = await _login(async_client, "zm_member")
+    _fake_face(monkeypatch)
+    await _check(async_client, zs["id"], headers)
+    await _check(async_client, zs["id"], headers, stage="random")
+
+    # Tekshiruvlar 20 daqiqa oldin to'xtagan — talaba darsdan chiqqan.
+    rows = (await async_db.execute(select(ZoomFaceCheck).where(ZoomFaceCheck.session_id == zs["id"]))).scalars().all()
+    for row in rows:
+        row.created_at -= timedelta(minutes=20)
+    await async_db.flush()
+
+    report = await auth_client.get(f"/zoom-sessions/{zs['id']}/report")
+    ali = next(s for s in report.json()["students"] if s["user_name"] == "Ali Talaba T")
+    assert ali["left_early"] is True
+
+
+@pytest.mark.asyncio
 async def test_validation_and_ownership(auth_client, async_client, zoom_scene):
     bad_time = await auth_client.post(
         "/zoom-sessions/",
