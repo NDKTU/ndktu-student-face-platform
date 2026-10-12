@@ -49,8 +49,9 @@ class SubjectSummary(SubjectRef):
     #: Fan savollar bankidagi savollar.
     question_count: int = 0
     created_at: TashkentDatetime
-    #: Ega yoki admin: fanni tahrirlaydi, biriktiradi, test tuzadi. Aks holda
-    #: foydalanuvchi fanga biriktirilgan — faqat savol qoʻshadi.
+    #: Ega, admin yoki `manage:general_test_all` ruxsatli rol: fanni tahrirlaydi,
+    #: biriktiradi, test tuzadi. Aks holda foydalanuvchi fanga biriktirilgan —
+    #: faqat savol qoʻshadi.
     can_manage: bool = False
 
 

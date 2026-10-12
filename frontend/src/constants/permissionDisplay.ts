@@ -24,6 +24,12 @@ const SPECIAL_PERMISSIONS: Record<string, { resource: string; label: string }> =
     'read:resource': { resource: 'lesson', label: "Dars materiallarini ko'rish" },
     'update:resource': { resource: 'lesson', label: 'Dars materialini tahrirlash' },
     'delete:resource': { resource: 'lesson', label: "Dars materialini o'chirish" },
+    // Fan egaligidan qat'i nazar: barcha elementar fanlarni boshqarish va ularda
+    // test tuzish (`general_test/repository.py::MANAGE_ALL_PERMISSION`).
+    'manage:general_test_all': {
+        resource: 'general_test_subject',
+        label: "Barcha fanlarni boshqarish (egasidan qat'i nazar)",
+    },
 };
 
 const GROUP_LABELS: Record<string, string> = {

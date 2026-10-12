@@ -2,6 +2,7 @@ import inspect
 import logging
 
 from core.dependencies.role_checker import PermissionRequired
+from core.utils.permission_registry import DECLARED_PERMISSIONS
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
@@ -39,4 +40,5 @@ def discover_permissions(app: FastAPI) -> set[str]:
                 if isinstance(dep_callable, PermissionRequired):
                     permissions.add(dep_callable.permission_name)
 
-    return permissions
+    # Kod ichida tekshiriladigan ruxsatlar (`core/utils/permission_registry.py`).
+    return permissions | DECLARED_PERMISSIONS

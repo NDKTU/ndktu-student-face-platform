@@ -452,3 +452,42 @@ async def test_result_review_shows_answers_only_to_owner(two_teachers, async_db)
     foreign = await client.get(f"/general-test/results/{attempt_id}")
     assert foreign.status_code == 404, foreign.text
 
+
+@pytest.mark.asyncio
+async def test_manage_all_permission_reaches_ownerless_subject(two_teachers, async_db):
+    """`manage:general_test_all` — egasiz fanda ham test tuzadi; boshqalar uchun chegara turadi.
+
+    2026-10-12: admin yaratgan «Umumiy» fanida (egasi yo'q) nazoratchi test tuza
+    olmadi — fan ro'yxati bo'sh edi, garchi rolda barcha fan ruxsatlari bo'lsa ham.
+    """
+    subject = GeneralTestSubject(name="Egasiz fan")  # admin yaratgan, egasi o'chirilgan
+    async_db.add(subject)
+    await async_db.commit()
+    client = two_teachers["client"]
+
+    # Oddiy fan huquqli rol — ko'rmaydi va test tuzolmaydi (egalik chegarasi).
+    _as(client, two_teachers["token_first"])
+    listed = (await client.get("/general-test/subject", params={"limit": 50})).json()["subjects"]
+    assert subject.id not in [s["id"] for s in listed]
+    denied = await client.post("/general-test/", json={"subject_id": subject.id})
+    assert denied.status_code == 403
+
+    await _make_user(async_db, "gt_watchman", "gt_watchman", SUBJECT_OWNER_PERMS + ("manage:general_test_all",))
+    login = await client.post("/user/login", json={"username": "gt_watchman", "password": "password123"})
+    _as(client, login.json()["access_token"])
+    listed = (await client.get("/general-test/subject", params={"limit": 50})).json()["subjects"]
+    assert [(s["name"], s["can_manage"]) for s in listed if s["id"] == subject.id] == [("Egasiz fan", True)]
+    created = await client.post("/general-test/", json={"subject_id": subject.id})
+    assert created.status_code == 201, created.text
+
+
+def test_manage_all_permission_is_discovered():
+    """Ruxsat route'da emas, kodda tekshiriladi — baribir bazaga tushishi kerak.
+
+    Ilgari reestr `core.*`/`app.core.*` dublikatiga tushib qolgan va ruxsat
+    jimgina yaratilmagan edi: test ruxsatni qo'lda yaratgani uchun buni sezmadi.
+    """
+    from app.core.lifespan.discovery import discover_permissions
+    from app.main import app
+
+    assert "manage:general_test_all" in discover_permissions(app)

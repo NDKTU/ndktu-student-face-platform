@@ -21,6 +21,8 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
 from app.core.utils.data_scope import DataScope, resolve_data_scope
+from core.dependencies.role_checker import _roles_have_permission
+from core.utils.permission_registry import declare_permission
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.modules.audit import service as audit_service
 from app.modules.audit.model import AuditEvent
@@ -311,8 +313,24 @@ class GeneralTestRepository:
             return
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
-    def _can_manage(self, subject: GeneralTestSubject, user: User) -> bool:
-        return self._is_admin(user) or subject.created_by_user_id == user.id
+    #: Barcha fanlarni egasidan qat'i nazar boshqarish: tahrirlash, biriktirish,
+    #: test tuzish. Alohida ruxsat — `update:general_test_subject` emas: fan
+    #: huquqli har bir rol (masalan, ikki dekanat) faqat O'Z fanini boshqarishi
+    #: kerak (`test_general_test_ownership.py`). Bu ruxsatni admin aniq bir
+    #: rolga beradi — masalan, egasiz fanda (admin yaratgan «Umumiy») test
+    #: tuzadigan nazoratchi.
+    MANAGE_ALL_PERMISSION = declare_permission("manage:general_test_all")
+
+    async def _manages_all(self, session: AsyncSession, user: User) -> bool:
+        """Admin yoki `MANAGE_ALL_PERMISSION` li rol; so'rov ichida bir marta hisoblanadi."""
+        cached = getattr(user, "_general_test_manages_all", None)
+        if cached is None:
+            cached = self._is_admin(user) or await _roles_have_permission(session, user, self.MANAGE_ALL_PERMISSION)
+            user._general_test_manages_all = cached
+        return cached
+
+    def _can_manage(self, subject: GeneralTestSubject, user: User, manages_all: bool = False) -> bool:
+        return manages_all or self._is_admin(user) or subject.created_by_user_id == user.id
 
     @staticmethod
     async def _is_member(session: AsyncSession, subject_id: int, user_id: int) -> bool:
@@ -339,7 +357,7 @@ class GeneralTestRepository:
         subject = await session.get(GeneralTestSubject, subject_id)
         if subject is None:
             raise _not_found("Fan")
-        if user is None or self._can_manage(subject, user):
+        if user is None or self._can_manage(subject, user, await self._manages_all(session, user)):
             return subject
         if member and await self._is_member(session, subject_id, user.id):
             return subject
@@ -389,10 +407,12 @@ class GeneralTestRepository:
         )
         return users, tests, questions
 
-    def _subject_row(self, subject: GeneralTestSubject, counts, user: User) -> SubjectSummary:
+    def _subject_row(
+        self, subject: GeneralTestSubject, counts, user: User, manages_all: bool = False
+    ) -> SubjectSummary:
         users, tests, questions = counts
         return SubjectSummary(
-            can_manage=self._can_manage(subject, user),
+            can_manage=self._can_manage(subject, user, manages_all),
             id=subject.id,
             name=subject.name,
             description=subject.description,
@@ -405,13 +425,16 @@ class GeneralTestRepository:
     async def _subject_summary(
         self, session: AsyncSession, subject: GeneralTestSubject, user: User
     ) -> SubjectSummary:
-        return self._subject_row(subject, await self._subject_counts(session, [subject.id]), user)
+        return self._subject_row(
+            subject, await self._subject_counts(session, [subject.id]), user, await self._manages_all(session, user)
+        )
 
     async def list_subjects(
         self, session: AsyncSession, page: int, limit: int, search: str | None, user: User
     ) -> SubjectListResponse:
         stmt = select(GeneralTestSubject)
-        if not await self._sees_all(session, user):
+        manages_all = await self._manages_all(session, user)
+        if not manages_all and not await self._sees_all(session, user):
             assigned = select(GeneralTestSubjectUser.subject_id).where(GeneralTestSubjectUser.user_id == user.id)
             stmt = stmt.where(
                 or_(GeneralTestSubject.created_by_user_id == user.id, GeneralTestSubject.id.in_(assigned))
@@ -435,7 +458,7 @@ class GeneralTestRepository:
             total=total,
             page=page,
             limit=limit,
-            subjects=[self._subject_row(s, counts, user) for s in subjects],
+            subjects=[self._subject_row(s, counts, user, manages_all) for s in subjects],
         )
 
     async def get_subject(self, session: AsyncSession, subject_id: int, user: User) -> SubjectSummary:
