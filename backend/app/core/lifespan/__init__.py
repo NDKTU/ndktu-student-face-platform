@@ -6,6 +6,7 @@ from core.config import settings
 from core.database.db_helper import db_helper
 from fastapi import FastAPI
 from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
 from sqlalchemy import text
 
 from .admin_user import ensure_admin_user
@@ -125,7 +126,18 @@ async def _seed_admin_locked(app: FastAPI) -> None:
             raise e
 
 
+async def _noop_rate_limiter(self, request, response) -> None:
+    return None
+
+
 async def _init_rate_limiter(redis_client) -> None:
+    if not settings.rate_limit.enabled:
+        # Dekoratorlarni olib tashlamasdan limitni o'chiramiz: FastAPI
+        # bog'liqlikni chaqirganda klass metodiga murojaat qiladi, shuning
+        # uchun almashtirish allaqachon e'lon qilingan endpointlarga ham ta'sir qiladi.
+        RateLimiter.__call__ = _noop_rate_limiter
+        logger.warning("Rate limiting is DISABLED (APP_CONFIG__RATE_LIMIT__ENABLED=false)")
+        return
     await FastAPILimiter.init(redis_client)
     logger.info("Initialized FastAPILimiter")
 

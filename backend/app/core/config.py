@@ -268,6 +268,17 @@ class AttendanceConfig(BaseModel):
     edit_window_days: int | None = None
 
 
+class RateLimitConfig(BaseModel):
+    """`fastapi_limiter` limitlari (endpointlardagi `RateLimiter(...)`).
+
+    Vaqtincha o'chirilgan: `enabled=False` bo'lsa barcha `RateLimiter`
+    bog'liqliklari hech narsa qilmaydi, dekoratorlar esa joyida qoladi —
+    qayta yoqish uchun `APP_CONFIG__RATE_LIMIT__ENABLED=true` kifoya.
+    """
+
+    enabled: bool = False
+
+
 class AdminConfig(BaseModel):
     """Bootstrap admin account, created once by init_db on first boot.
 
@@ -303,6 +314,7 @@ class AppConfig(BaseSettings):
     royd: RoydConfig = RoydConfig()
     zoom: ZoomConfig = ZoomConfig()
     attendance: AttendanceConfig = AttendanceConfig()
+    rate_limit: RateLimitConfig = RateLimitConfig()
 
     # Add derived absolute paths
     @property
