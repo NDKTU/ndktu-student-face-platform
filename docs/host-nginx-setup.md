@@ -74,3 +74,39 @@ The Docker stack (containers `nusmt_nginx`, `nusmt_backend`, `nusmt_frontend`, .
 If anything doesn't work after Step 3, please share:
 - Output of `sudo nginx -T 2>/dev/null | grep -A 20 'organization'`
 - Output of `sudo certbot certificates | grep -A 5 organization`
+
+## WebSocket камеры (`/v1/video/stream`) — только через `:3000`
+
+На `lms.nsumt.uz` (`/etc/nginx/sites-available/myapp`) есть отдельный блок
+`location /v1/video/stream`. Он должен вести на **фронт-контейнер**, а не на
+сервис распознавания лиц напрямую:
+
+```nginx
+location /v1/video/stream {
+    proxy_pass http://127.0.0.1:3000;   # фронт-контейнер сам ведёт в face-detection:8000
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    ...
+    proxy_read_timeout 3600s;
+}
+```
+
+Сервис `face-detection` порт на хост **не выводит** (с коммита `28da4c4`:
+`8001` конфликтовал с соседним проектом). Блок со старым
+`proxy_pass http://127.0.0.1:8001;` с 06.10.2026 (пересоздание контейнера)
+тихо ломал наблюдение камерой во всех тестах: браузер получал
+«WebSocket error: Unable to connect to face detection service», тест шёл без
+контроля. Исправлено 13.10.2026, копия старого конфига —
+`myapp.bak-20261013-ws`.
+
+Проверка с сервера (без токена сервис должен ответить именно 403 — значит,
+запрос дошёл до него; `502` — цепочка снова разорвана):
+
+```bash
+curl -s -i -N --max-time 4 -H "Host: lms.nsumt.uz" -H "Connection: Upgrade" \
+  -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  http://127.0.0.1/v1/video/stream | head -1
+# Expect: HTTP/1.1 403 Forbidden   (и в `docker logs nusmt_face_detection`: missing/invalid token)
+```
