@@ -114,9 +114,26 @@ class HemisConfig(BaseModel):
     data_url: str = "https://student.ndki.uz/rest/v1/data/student-list"
     data_token: str = ""
 
+    # OAuth: пароль вводится на странице HEMIS в браузере человека, и лимит
+    # HEMIS на попытки входа (429 CAPTCHA_REQUIRED) считается по его IP, а не
+    # по IP нашего сервера. Порталы — базовые адреса, `/oauth/...` дописывается
+    # кодом; пустой адрес выключает портал. Клиент один на оба портала.
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+    oauth_redirect_uri: str = ""
+    oauth_student_url: str = "https://student.ndki.uz"
+    oauth_employee_url: str = "https://hemis.ndki.uz"
+
     @property
     def employee_login_enabled(self) -> bool:
         return bool(self.employee_login_url and self.employee_me_url)
+
+    def oauth_portals(self) -> dict[str, str]:
+        """Включённые OAuth-порталы: `{"student": url, "employee": url}`."""
+        if not (self.oauth_client_id and self.oauth_client_secret and self.oauth_redirect_uri):
+            return {}
+        portals = {"student": self.oauth_student_url, "employee": self.oauth_employee_url}
+        return {name: url.rstrip("/") for name, url in portals.items() if url}
 
 
 class EduPlanConfig(BaseModel):

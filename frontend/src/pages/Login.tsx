@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '@/services/api';
-import { hemisService } from '@/services/hemisService';
+import { HEMIS_OAUTH_FROM_KEY, hemisService, type HemisOAuthPortal } from '@/services/hemisService';
 import { BookOpen, GraduationCap, Users, ShieldCheck, Camera } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { clearLogoutReason, readLogoutReason } from '@/services/tokenStorage';
@@ -33,6 +33,14 @@ export const Login: React.FC = () => {
     const location = useLocation();
     const [loginType, setLoginType] = useState<'staff' | 'student'>('staff');
     const [error, setError] = React.useState<string | null>(null);
+    // OAuth portallari: bo'sh bo'lsa (sozlanmagan) tugma ko'rinmaydi va eski
+    // login-parol shakli o'zgarishsiz ishlaydi.
+    const [oauthPortals, setOauthPortals] = useState<HemisOAuthPortal[]>([]);
+    const [oauthLoading, setOauthLoading] = useState<HemisOAuthPortal | null>(null);
+
+    React.useEffect(() => {
+        hemisService.getOAuthPortals().then(setOauthPortals).catch(() => setOauthPortals([]));
+    }, []);
 
     const from = location.state?.from?.pathname || '/';
 
@@ -103,6 +111,48 @@ export const Login: React.FC = () => {
             }
         }
     };
+
+    // Parol HEMIS sahifasida kiritiladi: HEMIS'ning urinishlar limiti
+    // serverimiz IP'siga emas, har bir odamning o'ziga tushadi.
+    const startOAuth = async (portal: HemisOAuthPortal) => {
+        try {
+            setError(null);
+            setOauthLoading(portal);
+            try {
+                sessionStorage.setItem(HEMIS_OAUTH_FROM_KEY, from);
+            } catch {
+                // sessionStorage yo'q — kirgandan keyin bosh sahifaga.
+            }
+            window.location.assign(await hemisService.getOAuthAuthorizeUrl(portal));
+        } catch (err) {
+            logger.error('HEMIS OAuth start failed', err);
+            setOauthLoading(null);
+            setError("HEMIS bilan bog'lanib bo'lmadi. Qaytadan urinib ko'ring.");
+        }
+    };
+
+    const oauthButton = (portal: HemisOAuthPortal, variant: 'primary' | 'outline') => (
+        <Button
+            type="button"
+            variant={variant}
+            className="w-full h-11 text-base font-medium"
+            isLoading={oauthLoading === portal}
+            onClick={() => startOAuth(portal)}
+        >
+            <ShieldCheck className="h-4 w-4" />
+            HEMIS orqali kirish
+        </Button>
+    );
+
+    const divider = (text: string) => (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            {text}
+            <span className="h-px flex-1 bg-border" />
+        </div>
+    );
+
+    const studentOAuth = oauthPortals.includes('student');
 
     const toggleLoginType = (type: 'staff' | 'student') => {
         setLoginType(type);
@@ -236,9 +286,23 @@ export const Login: React.FC = () => {
                                     Tizimga kirish
                                 </Button>
                             </div>
+
+                            {oauthPortals.includes('employee') && (
+                                <>
+                                    {divider('yoki')}
+                                    {oauthButton('employee', 'outline')}
+                                </>
+                            )}
                         </form>
                     ) : (
                         <form className="mt-8 space-y-6" onSubmit={handleSubmitStudent(onStudentSubmit)}>
+                            {studentOAuth && (
+                                <>
+                                    {oauthButton('student', 'primary')}
+                                    {divider('yoki login va parol bilan')}
+                                </>
+                            )}
+
                             <div className="space-y-4">
                                 <Input
                                     label="Talaba ID / Login"
@@ -262,10 +326,11 @@ export const Login: React.FC = () => {
                             <div className="pt-2">
                                 <Button
                                     type="submit"
+                                    variant={studentOAuth ? 'outline' : 'primary'}
                                     className="w-full h-11 text-base font-medium"
                                     isLoading={isSubmittingStudent}
                                 >
-                                    Hemis orqali kirish
+                                    {studentOAuth ? 'Tizimga kirish' : 'Hemis orqali kirish'}
                                 </Button>
                             </div>
                         </form>

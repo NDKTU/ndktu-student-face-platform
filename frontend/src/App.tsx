@@ -20,6 +20,7 @@ import {
 // Code splitting: каждая страница — отдельный чанк, тяжёлые зависимости
 // (jodit, xlsx, recharts) не попадают в начальный бандл.
 const Login = lazy(() => import('@/pages/Login'));
+const HemisOAuthCallback = lazy(() => import('@/pages/HemisOAuthCallback'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const StudentDashboardPage = lazy(() => import('@/pages/StudentDashboardPage'));
 const TeacherDashboardPage = lazy(() => import('@/pages/TeacherDashboardPage'));
@@ -344,6 +345,7 @@ function App() {
                             <Routes>
                                 <Route path="/login" element={<Login />} />
 
+                                <Route path="/auth/hemis/callback" element={<HemisOAuthCallback />} />
                                 {/* Ochiq test: tizimga kirmasdan, PIN orqali. */}
                                 <Route path="/t" element={<PublicQuizPage />} />
                                 <Route path="/t/:pin" element={<PublicQuizPage />} />

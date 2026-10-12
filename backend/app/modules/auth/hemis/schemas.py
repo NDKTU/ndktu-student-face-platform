@@ -17,6 +17,24 @@ class HemisLoginResponse(BaseModel):
     access_token: str
 
 
+HemisOAuthPortal = Literal["student", "employee"]
+
+
+class HemisOAuthPortalsResponse(BaseModel):
+    """Какие кнопки «HEMIS orqali kirish» показывать на странице входа."""
+
+    portals: list[HemisOAuthPortal]
+
+
+class HemisOAuthAuthorizeResponse(BaseModel):
+    url: str
+
+
+class HemisOAuthCallbackRequest(BaseModel):
+    code: str
+    state: str
+
+
 class HemisPreviewResponse(BaseModel):
     hemis_data: dict
     user_id: Optional[int] = None

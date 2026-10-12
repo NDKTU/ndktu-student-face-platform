@@ -14,6 +14,12 @@ export interface HemisLoginResponse {
     // Add other fields if returned by the backend
 }
 
+/** OAuth portali: talabalar (student.ndki.uz) yoki xodimlar (hemis.ndki.uz). */
+export type HemisOAuthPortal = 'student' | 'employee';
+
+/** Kirishdan oldingi sahifa (sessionStorage): HEMIS'ga ketib-qaytishda `location.state` yo'qoladi. */
+export const HEMIS_OAUTH_FROM_KEY = 'hemisOAuthFrom';
+
 // ── Ma'lumot API (token bo'yicha) ────────────────────────────────────────────
 
 export interface HemisDataSettings {
@@ -71,6 +77,20 @@ export interface StudentSyncSelection {
 export const hemisService = {
     login: async (data: HemisLoginRequest) => {
         const response = await api.post<HemisLoginResponse>('/hemis/login', data);
+        return response.data;
+    },
+
+    // OAuth: parol HEMIS sahifasida kiritiladi, bu yerda faqat kod almashinadi.
+    getOAuthPortals: async () => {
+        const response = await api.get<{ portals: HemisOAuthPortal[] }>('/hemis/oauth/portals');
+        return response.data.portals;
+    },
+    getOAuthAuthorizeUrl: async (portal: HemisOAuthPortal) => {
+        const response = await api.get<{ url: string }>('/hemis/oauth/authorize', { params: { portal } });
+        return response.data.url;
+    },
+    completeOAuth: async (code: string, state: string) => {
+        const response = await api.post<HemisLoginResponse>('/hemis/oauth/callback', { code, state });
         return response.data;
     },
     previewAdminData: async (data: HemisLoginRequest) => {

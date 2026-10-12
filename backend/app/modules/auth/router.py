@@ -1,6 +1,7 @@
 import json
 import logging
 
+from core.config import settings
 from core.database.db_helper import db_helper
 from core.dependencies.role_checker import PermissionRequired
 from app.modules.audit import service as audit_service
@@ -23,11 +24,16 @@ from .hemis.schemas import (
     StudentSyncPreviewResponse,
     HemisLoginRequest,
     HemisLoginResponse,
+    HemisOAuthAuthorizeResponse,
+    HemisOAuthCallbackRequest,
+    HemisOAuthPortal,
+    HemisOAuthPortalsResponse,
     HemisPreviewResponse,
     HemisSyncResponse,
 )
 from .hemis import data_credentials as hemis_data_credentials
 from .hemis.data_service import hemis_data_service
+from .hemis.oauth import hemis_oauth_service
 from .hemis.student_sync import hemis_student_sync
 from .hemis.student_sync_runner import student_sync_runner
 from .hemis.service import hemis_service
@@ -841,6 +847,58 @@ async def hemis_login(
         username=data.login,
         summary=f"Tizimga kirdi: {data.login}",
         meta={"method": "hemis"},
+        request=request,
+    )
+    return result
+
+
+# OAuth: parolni odam HEMIS sahifasida kiritadi, bizning server faqat kodni
+# tokenga almashtiradi. Login bo'yicha HEMIS limiti (429 CAPTCHA_REQUIRED)
+# shunda serverimiz IP'siga emas, har bir odamning o'ziga tushadi.
+@hemis_router.get("/oauth/portals", response_model=HemisOAuthPortalsResponse)
+async def hemis_oauth_portals():
+    return HemisOAuthPortalsResponse(portals=list(settings.hemis.oauth_portals()))
+
+
+@hemis_router.get(
+    "/oauth/authorize",
+    response_model=HemisOAuthAuthorizeResponse,
+    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+)
+async def hemis_oauth_authorize(portal: HemisOAuthPortal = "student"):
+    return HemisOAuthAuthorizeResponse(url=await hemis_oauth_service.authorize_url(portal))
+
+
+@hemis_router.post(
+    "/oauth/callback",
+    response_model=HemisLoginResponse,
+    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+)
+async def hemis_oauth_callback(
+    data: HemisOAuthCallbackRequest,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_getter),
+):
+    try:
+        user, result = await hemis_oauth_service.complete(session=session, code=data.code, state=data.state)
+    except Exception as exc:
+        detail = getattr(exc, "detail", None)
+        reason = detail.get("code") if isinstance(detail, dict) else detail
+        await audit_service.record_standalone(
+            event=AuditEvent.LOGIN_FAILED,
+            username=None,
+            summary="HEMIS OAuth orqali kirish muvaffaqiyatsiz",
+            meta={"method": "hemis_oauth", "reason": reason or type(exc).__name__},
+            request=request,
+        )
+        raise
+
+    await audit_service.record_standalone(
+        event=AuditEvent.LOGIN,
+        user_id=user.id,
+        username=user.username,
+        summary=f"Tizimga kirdi (HEMIS OAuth): {user.username}",
+        meta={"method": "hemis_oauth"},
         request=request,
     )
     return result
