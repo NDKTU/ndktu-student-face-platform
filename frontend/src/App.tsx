@@ -75,6 +75,7 @@ const GeneralTestResultDetailPage = lazy(() => import('@/pages/GeneralTestResult
 const GeneralTestTakeListPage = lazy(() => import('@/pages/GeneralTestTakeListPage'));
 const GeneralTestTakePage = lazy(() => import('@/pages/GeneralTestTakePage'));
 const StudentGeneralTestResultsPage = lazy(() => import('@/pages/StudentGeneralTestResultsPage'));
+const MyGeneralTestReviewPage = lazy(() => import('@/pages/MyGeneralTestReviewPage'));
 const GeneralTestSubjectsPage = lazy(() => import('@/pages/GeneralTestSubjectsPage'));
 const GeneralTestSubjectDetailPage = lazy(() => import('@/pages/GeneralTestSubjectDetailPage'));
 const GeneralTestQuestionFormPage = lazy(() => import('@/pages/GeneralTestQuestionFormPage'));
@@ -450,6 +451,8 @@ function App() {
                                         <Route path="/results" element={<PermissionRoute permission="read:result"><ResultsPage /></PermissionRoute>} />
                                         <Route path="/results/answers" element={<PermissionRoute permission="user_answers:read"><UserAnswersPage /></PermissionRoute>} />
                                         <Route path={STUDENT_ELEMENTAR_RESULTS} element={<StudentOnlyRoute to="/elementar-tests/results"><PermissionRoute permission="general_test:take"><StudentGeneralTestResultsPage /></PermissionRoute></StudentOnlyRoute>} />
+                                        {/* O'z urinishi tahlili: testni o'qituvchi ham yechadi, shuning uchun StudentOnlyRoute emas. */}
+                                        <Route path={`${STUDENT_ELEMENTAR_RESULTS}/:attemptId`} element={<PermissionRoute permission="general_test:take"><MyGeneralTestReviewPage /></PermissionRoute>} />
                                     </Route>
                                 </Route>
 

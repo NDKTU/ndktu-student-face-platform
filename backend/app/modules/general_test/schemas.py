@@ -388,6 +388,28 @@ class MyResultListResponse(BaseModel):
     results: list[AttemptResult]
 
 
+class MyReviewQuestion(BaseModel):
+    """Talabaning o'z urinishidagi savol — to'g'ri javobsiz.
+
+    Variantlar talaba ko'rgan aralash tartibda. To'g'ri variant yuborilmaydi:
+    aks holda tahlil butun savollar bankini oshkor qilardi.
+    """
+
+    id: int
+    text: str
+    options: list[TakeOption]
+    selected: str | None = None
+    is_correct: bool = False
+
+
+class MyAttemptReview(BaseModel):
+    result: AttemptResult
+    #: Testni hozir boshqalar yechayotgan bo'lsa, savollar yopiq: «to'g'ri»
+    #: belgisi javobni oshkor qiladi, uni hali yechayotganlarga yuborish mumkin.
+    locked: bool = False
+    questions: list[MyReviewQuestion] = []
+
+
 # ─── Результаты (администратор) ──────────────────────────────────────────────
 
 

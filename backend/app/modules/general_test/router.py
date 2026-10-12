@@ -38,6 +38,7 @@ from .schemas import (
     AttemptResult,
     AttemptReview,
     AttemptState,
+    MyAttemptReview,
     StartRequest,
     AvailableTestListResponse,
     CheatingRequest,
@@ -99,6 +100,16 @@ async def my_results(
     user: "User" = Depends(_take),
 ):
     return await repo.my_results(session=session, user=user)
+
+
+@router.get("/my-results/{attempt_id}", response_model=MyAttemptReview)
+async def my_result(
+    attempt_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: "User" = Depends(_take),
+):
+    """Talabaning o'z urinishi tahlili — to'g'ri javoblarsiz."""
+    return await repo.my_result(session=session, attempt_id=attempt_id, user=user)
 
 
 @router.post(

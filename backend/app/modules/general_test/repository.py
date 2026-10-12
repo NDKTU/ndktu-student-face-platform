@@ -47,6 +47,8 @@ from .schemas import (
     AttemptResult,
     AttemptReview,
     AttemptState,
+    MyAttemptReview,
+    MyReviewQuestion,
     AvailableTest,
     AvailableTestListResponse,
     CheatingRequest,
@@ -1762,6 +1764,56 @@ class GeneralTestRepository:
         )
         return MyResultListResponse(results=[self._result(a) for a in attempts])
 
+    async def my_result(self, session: AsyncSession, attempt_id: int, user: User) -> MyAttemptReview:
+        """Talabaning o'z urinishi tahlili: qayerda adashgani, to'g'ri javobsiz.
+
+        Faqat o'z va yakunlangan urinish — ketayotgan testda «to'g'ri/noto'g'ri»
+        belgisi javobni tekshirish vositasiga aylanardi. Begona yoki ketayotgan
+        urinish 404: borligini ham bildirmaymiz.
+        """
+        await self._close_expired(session, user.id)
+        attempt = (
+            await session.execute(
+                select(GeneralTestAttempt)
+                .options(selectinload(GeneralTestAttempt.test))
+                .where(
+                    GeneralTestAttempt.id == attempt_id,
+                    GeneralTestAttempt.user_id == user.id,
+                    GeneralTestAttempt.status == COMPLETED,
+                )
+            )
+        ).scalar_one_or_none()
+        if attempt is None:
+            raise _not_found("Natija")
+
+        result = self._result(attempt)
+        if await self._test_being_taken(session, attempt.test):
+            return MyAttemptReview(result=result, locked=True)
+
+        questions = [
+            MyReviewQuestion(
+                id=question.id,
+                text=question.text,
+                options=[TakeOption(key=letter, text=question.option(letter)) for letter in entry["o"]],
+                selected=answer.selected_option if answer else None,
+                is_correct=bool(answer and answer.is_correct),
+            )
+            for entry, question, answer in await self._review_rows(session, attempt)
+        ]
+        return MyAttemptReview(result=result, questions=questions)
+
+    @staticmethod
+    async def _test_being_taken(session: AsyncSession, test: GeneralTest) -> bool:
+        """Testni hozir kimdir yechyaptimi (vaqti o'tmagan `in_progress` urinish)."""
+        attempts = (
+            await session.execute(
+                select(GeneralTestAttempt).where(
+                    GeneralTestAttempt.test_id == test.id, GeneralTestAttempt.status == IN_PROGRESS
+                )
+            )
+        ).scalars().all()
+        return any(not _is_expired(attempt, test) for attempt in attempts)
+
     # ── Результаты (администратор) ───────────────────────────────────────────
 
     def _results_stmt(self, request: ResultListRequest, scope: DataScope | None = None):
@@ -1869,6 +1921,24 @@ class GeneralTestRepository:
             raise _not_found("Natija")
         attempt: GeneralTestAttempt = row[0]
 
+        items = [
+            ReviewQuestion(
+                id=question.id,
+                text=question.text,
+                options=[TakeOption(key=letter, text=question.option(letter)) for letter in "abcd"],
+                selected=answer.selected_option if answer else None,
+                correct_option=question.correct_option,
+                is_correct=bool(answer and answer.is_correct),
+            )
+            for _, question, answer in await self._review_rows(session, attempt)
+        ]
+        return AttemptReview(result=self._row(row), questions=items)
+
+    @staticmethod
+    async def _review_rows(
+        session: AsyncSession, attempt: GeneralTestAttempt
+    ) -> list[tuple[dict, GeneralTestQuestion, GeneralTestAnswer | None]]:
+        """Urinish savollari `layout` tartibida: (yozuv, savol, javob)."""
         ids = [item["q"] for item in attempt.layout]
         questions = {
             q.id: q
@@ -1882,24 +1952,12 @@ class GeneralTestRepository:
                 await session.execute(select(GeneralTestAnswer).where(GeneralTestAnswer.attempt_id == attempt.id))
             ).scalars()
         }
-        items = []
-        for entry in attempt.layout:
-            question = questions.get(entry["q"])
-            # Savol bankdan o'chirilgan — ko'rsatadigan matn qolmagan.
-            if question is None:
-                continue
-            answer = answers.get(question.id)
-            items.append(
-                ReviewQuestion(
-                    id=question.id,
-                    text=question.text,
-                    options=[TakeOption(key=letter, text=question.option(letter)) for letter in "abcd"],
-                    selected=answer.selected_option if answer else None,
-                    correct_option=question.correct_option,
-                    is_correct=bool(answer and answer.is_correct),
-                )
-            )
-        return AttemptReview(result=self._row(row), questions=items)
+        # Savol bankdan o'chirilgan — ko'rsatadigan matn qolmagan.
+        return [
+            (entry, questions[entry["q"]], answers.get(entry["q"]))
+            for entry in attempt.layout
+            if entry["q"] in questions
+        ]
 
     async def export_results(self, session: AsyncSession, request: ResultListRequest, user: User) -> bytes:
         from openpyxl import Workbook

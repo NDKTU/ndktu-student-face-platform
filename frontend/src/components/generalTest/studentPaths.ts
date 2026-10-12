@@ -6,5 +6,7 @@
  */
 export const STUDENT_ELEMENTAR_TAKE = '/quiz-test/elementar';
 export const STUDENT_ELEMENTAR_RESULTS = '/results/elementar';
+/** O'z urinishining tahlili — talaba ham, testni yechgan o'qituvchi ham ochadi. */
+export const myElementarReview = (attemptId: number | string) => `${STUDENT_ELEMENTAR_RESULTS}/${attemptId}`;
 export const studentElementarAttempt = (attemptId: number | string) =>
     `${STUDENT_ELEMENTAR_TAKE}/attempt/${attemptId}`;

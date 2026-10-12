@@ -266,6 +266,23 @@ export interface AttemptReview {
     questions: ReviewQuestion[];
 }
 
+/** Talabaning o'z urinishidagi savol — to'g'ri javobsiz. */
+export interface MyReviewQuestion {
+    id: number;
+    text: string;
+    /** Talaba testda ko'rgan aralash tartibda; `key` — bankdagi asl harf. */
+    options: { key: OptionLetter; text: string }[];
+    selected: OptionLetter | null;
+    is_correct: boolean;
+}
+
+export interface MyAttemptReview {
+    result: AttemptResult;
+    /** Testni hozir boshqalar yechyapti — savollar yopiq, ball ko'rinadi. */
+    locked: boolean;
+    questions: MyReviewQuestion[];
+}
+
 export interface ResultListResponse {
     total: number;
     page: number;
@@ -385,6 +402,8 @@ export const generalTestService = {
     // ── Ishlash ──────────────────────────────────────────────────────────
     available: async () => (await api.get<{ tests: AvailableTest[] }>('/general-test/available')).data.tests,
     myResults: async () => (await api.get<{ results: AttemptResult[] }>('/general-test/my-results')).data.results,
+    myResult: async (attemptId: number) =>
+        (await api.get<MyAttemptReview>(`/general-test/my-results/${attemptId}`)).data,
     start: async (testId: number, pin?: string) =>
         (await api.post<AttemptState>(`/general-test/${testId}/start`, pin ? { pin } : undefined)).data,
     getAttempt: async (attemptId: number) => (await api.get<AttemptState>(`/general-test/attempt/${attemptId}`)).data,

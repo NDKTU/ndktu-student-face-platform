@@ -289,6 +289,13 @@ export const useAvailableGeneralTests = () =>
 export const useMyGeneralTestResults = () =>
     useQuery({ queryKey: KEYS.mine, queryFn: generalTestService.myResults });
 
+export const useMyGeneralTestResult = (attemptId: number) =>
+    useQuery({
+        queryKey: [...KEYS.mine, 'detail', attemptId],
+        queryFn: () => generalTestService.myResult(attemptId),
+        enabled: attemptId > 0,
+    });
+
 /** Test tugaganda «ishlash» ro'yxati va shaxsiy natijalar yangilanadi. */
 export const useRefreshTaking = () => {
     const qc = useQueryClient();
