@@ -38,6 +38,26 @@ const formatTime = (seconds: number) => {
 
 const statusOf = (e: unknown) => (e as { response?: { status?: number } })?.response?.status;
 
+/** Javobni darhol qayta yuborish oraliqlari; keyin — fonda `BACKGROUND_RESEND_MS` da. */
+const ANSWER_RETRY_DELAYS_MS = [1500, 4000];
+const BACKGROUND_RESEND_MS = 10_000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Javob yuborilgandan keyingi holat.
+ *
+ * * `retry` — javob kelmadi yoki server/proksi xatosi (5xx, 408, 429):
+ *   tanlov o'chirilmaydi, «saqlanmagan» bo'lib qoladi va qayta yuboriladi.
+ *   Ilgari bunday javob jimgina bekor qilinar, talaba esa bildirishnomani
+ *   ko'rmay o'tib ketsa, javobi yo'qolardi;
+ * * `gone` (410) — savolni o'qituvchi o'chirgan: faqat shu savol chiqadi;
+ * * `closed` (409) — urinish yopilgan: butun test yakunlanadi;
+ * * `rejected` — boshqa 4xx: javob qabul qilinmaydi, tanlov qaytariladi.
+ */
+type AnswerOutcome =
+    | { kind: 'saved' | 'retry' | 'closed' }
+    | { kind: 'gone' | 'rejected'; error: unknown };
+
 export default function GeneralTestTakePage() {
     const attemptId = Number(useParams().attemptId);
     const navigate = useNavigate();
@@ -60,14 +80,87 @@ export default function GeneralTestTakePage() {
     // (yoki aloqa yo'q — kelmaydi). Ballar o'rniga sabab ko'rsatiladi.
     const [leftReason, setLeftReason] = useState<string | null>(null);
     const finishedRef = useRef(false);
+    // Saqlanmagan javoblar: ref — fon takrori va yakunlash eng so'nggisini
+    // ko'rsin, state — navigator qayta chizilsin.
+    const pendingRef = useRef<Record<number, OptionLetter>>({});
+    const [pending, setPendingState] = useState<Record<number, OptionLetter>>({});
+    // O'qituvchi o'chirgan savollar (server 410 qaytardi).
+    const [removed, setRemoved] = useState<Set<number>>(() => new Set());
     // Muddat bir marta — javob kelganda qotiriladi. Taymer effekti qayta
     // ishga tushsa ham hisob shu nuqtadan davom etadi, boshidan emas.
     const deadlineRef = useRef(0);
+
+    const updatePending = useCallback((update: (prev: Record<number, OptionLetter>) => Record<number, OptionLetter>) => {
+        pendingRef.current = update(pendingRef.current);
+        setPendingState(pendingRef.current);
+    }, []);
+
+    const sendAnswer = useCallback(
+        async (questionId: number, option: OptionLetter): Promise<AnswerOutcome> => {
+            try {
+                await generalTestService.answer(attemptId, questionId, option);
+                return { kind: 'saved' };
+            } catch (error) {
+                const code = statusOf(error);
+                if (code === 409) return { kind: 'closed' };
+                if (code === 410) return { kind: 'gone', error };
+                if (code && code >= 400 && code < 500 && code !== 408 && code !== 429) return { kind: 'rejected', error };
+                return { kind: 'retry' };
+            }
+        },
+        [attemptId],
+    );
+
+    /** Natijani holatga tushiradi. `closed` ni chaqiruvchi o'zi hal qiladi. */
+    const settle = useCallback(
+        (questionId: number, option: OptionLetter, outcome: AnswerOutcome, previous?: OptionLetter) => {
+            if (outcome.kind === 'retry' || outcome.kind === 'closed') return;
+            updatePending((prev) => {
+                // Shu orada talaba boshqa variantni tanlagan bo'lsa — yangisi kutilmoqda.
+                if (outcome.kind === 'saved' && prev[questionId] !== option) return prev;
+                const next = { ...prev };
+                delete next[questionId];
+                return next;
+            });
+            if (outcome.kind === 'gone') {
+                setRemoved((prev) => new Set(prev).add(questionId));
+                setAnswers((prev) => {
+                    const next = { ...prev };
+                    delete next[questionId];
+                    return next;
+                });
+                toast.warning(apiErrorMessage(outcome.error, "Bu savol o'chirilgan"), { id: `gone-${questionId}` });
+            } else if (outcome.kind === 'rejected') {
+                setAnswers((prev) => {
+                    const next = { ...prev };
+                    if (previous) next[questionId] = previous;
+                    else delete next[questionId];
+                    return next;
+                });
+                toast.error(apiErrorMessage(outcome.error, "Javob saqlanmadi, qayta urinib ko'ring"));
+            }
+        },
+        [updatePending],
+    );
+
+    /** Saqlanmaganlarni bir marta qayta yuboradi; `true` — urinish yopilgan. */
+    const flushPending = useCallback(async () => {
+        let closed = false;
+        for (const [id, option] of Object.entries(pendingRef.current)) {
+            const outcome = await sendAnswer(Number(id), option);
+            if (outcome.kind === 'closed') closed = true;
+            settle(Number(id), option, outcome);
+        }
+        return closed;
+    }, [sendAnswer, settle]);
 
     const finish = useCallback(async () => {
         if (finishedRef.current) return;
         finishedRef.current = true;
         setFinishing(true);
+        // Yakunlashdan oldin saqlanmaganlarni yana bir bor yuboramiz —
+        // aks holda ular natijaga kirmay qolardi.
+        await flushPending();
         try {
             const res = await generalTestService.finish(attemptId).catch((e: unknown) => {
                 // Qat'iy test server tomonda yopildi — endi `finish` saqlangan natijani beradi.
@@ -83,7 +176,7 @@ export default function GeneralTestTakePage() {
             setFinishing(false);
             setConfirmFinish(false);
         }
-    }, [attemptId, refreshTaking]);
+    }, [attemptId, refreshTaking, flushPending]);
 
     useEffect(() => {
         let cancelled = false;
@@ -198,24 +291,44 @@ export default function GeneralTestTakePage() {
         return () => clearInterval(id);
     }, [isStrict, result, leftReason, attemptId, finish]);
 
+    // Saqlanmagan javoblar fonda va aloqa tiklanganda qayta yuboriladi.
+    const hasPending = Object.keys(pending).length > 0;
+    useEffect(() => {
+        if (!hasPending || result || leftReason) return;
+        const resend = () => {
+            void flushPending().then((closed) => {
+                if (closed) finish();
+            });
+        };
+        const id = setInterval(resend, BACKGROUND_RESEND_MS);
+        window.addEventListener('online', resend);
+        return () => {
+            clearInterval(id);
+            window.removeEventListener('online', resend);
+        };
+    }, [hasPending, result, leftReason, flushPending, finish]);
+
     const choose = async (questionId: number, option: OptionLetter) => {
+        if (removed.has(questionId)) return;
         const previous = answers[questionId];
         setAnswers((prev) => ({ ...prev, [questionId]: option }));
-        try {
-            await generalTestService.answer(attemptId, questionId, option);
-        } catch (e) {
-            if (statusOf(e) === 409) {
+        updatePending((prev) => ({ ...prev, [questionId]: option }));
+        for (const delay of [0, ...ANSWER_RETRY_DELAYS_MS]) {
+            if (delay) await sleep(delay);
+            // Boshqa variant tanlangan yoki fon takrori allaqachon saqladi.
+            if (pendingRef.current[questionId] !== option) return;
+            const outcome = await sendAnswer(questionId, option);
+            if (outcome.kind === 'closed') {
                 finish();
                 return;
             }
-            setAnswers((prev) => {
-                const next = { ...prev };
-                if (previous) next[questionId] = previous;
-                else delete next[questionId];
-                return next;
-            });
-            toast.error(apiErrorMessage(e, 'Javob saqlanmadi, qayta urinib ko\'ring'));
+            if (outcome.kind !== 'retry') {
+                settle(questionId, option, outcome, previous);
+                return;
+            }
         }
+        // Tanlov o'chirilmaydi: javob saqlanmagan deb belgilanadi va fonda yuboriladi.
+        toast.error("Javob hali saqlanmadi — aloqa tiklanishi bilan avtomatik yuboriladi", { id: 'answer-unsaved' });
     };
 
     if (result) {
@@ -281,8 +394,10 @@ export default function GeneralTestTakePage() {
     }
 
     const question = state.questions[current];
-    const answeredCount = state.questions.filter((q) => answers[q.id]).length;
-    const unanswered = state.questions.length - answeredCount;
+    const activeQuestions = state.questions.filter((q) => !removed.has(q.id));
+    const answeredCount = activeQuestions.filter((q) => answers[q.id]).length;
+    const unanswered = activeQuestions.length - answeredCount;
+    const pendingCount = Object.keys(pending).length;
 
     return (
         <div
@@ -306,8 +421,20 @@ export default function GeneralTestTakePage() {
                 <div className="min-w-0">
                     <h1 className="truncate text-lg font-semibold text-foreground">{state.title}</h1>
                     <p className="text-xs text-muted-foreground">
-                        Javob berilgan: {answeredCount} / {state.questions.length}
+                        Javob berilgan: {answeredCount} / {activeQuestions.length}
                     </p>
+                    {pendingCount > 0 && (
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs font-medium text-amber-600">
+                            {pendingCount} ta javob saqlanmagan — qayta yuborilmoqda
+                            <button
+                                type="button"
+                                className="underline underline-offset-2"
+                                onClick={() => void flushPending().then((closed) => { if (closed) void finish(); })}
+                            >
+                                Hozir yuborish
+                            </button>
+                        </p>
+                    )}
                 </div>
                 <div
                     className={cn(
@@ -325,6 +452,11 @@ export default function GeneralTestTakePage() {
                         {current + 1}-savol
                     </p>
                     <RichText value={question.text} className={cn('text-base font-medium text-foreground', veil)} />
+                    {removed.has(question.id) && (
+                        <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                            Bu savol o'qituvchi tomonidan o'chirilgan — u hisobga olinmaydi, javob berish shart emas.
+                        </p>
+                    )}
                     <div className="mt-4 space-y-2">
                         {question.options.map((option, index) => {
                             const selected = answers[question.id] === option.key;
@@ -332,6 +464,7 @@ export default function GeneralTestTakePage() {
                                 <button
                                     key={option.key}
                                     type="button"
+                                    disabled={removed.has(question.id)}
                                     onClick={() => choose(question.id, option.key)}
                                     className={cn(
                                         'flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors',
@@ -379,9 +512,13 @@ export default function GeneralTestTakePage() {
                         className={cn(
                             'h-8 w-8 rounded-lg border text-xs font-medium transition-colors',
                             index === current && 'ring-2 ring-primary ring-offset-1 ring-offset-background',
-                            answers[q.id]
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border text-muted-foreground hover:bg-accent',
+                            removed.has(q.id)
+                                ? 'border-border text-muted-foreground line-through opacity-40'
+                                : pending[q.id]
+                                    ? 'border-amber-500 bg-amber-500 text-white'
+                                    : answers[q.id]
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-border text-muted-foreground hover:bg-accent',
                         )}
                     >
                         {index + 1}
@@ -401,11 +538,15 @@ export default function GeneralTestTakePage() {
                 onConfirm={finish}
                 variant="primary"
                 title="Testni yakunlaysizmi?"
-                description={
-                    unanswered > 0
-                        ? `${unanswered} ta savolga javob berilmagan. Yakunlangandan keyin javoblarni o'zgartirib bo'lmaydi.`
-                        : "Yakunlangandan keyin javoblarni o'zgartirib bo'lmaydi."
-                }
+                description={[
+                    pendingCount > 0
+                        ? `${pendingCount} ta javob hali saqlanmagan — yakunlashdan oldin yana yuboriladi, o'tmasa hisobga olinmaydi.`
+                        : '',
+                    unanswered > 0 ? `${unanswered} ta savolga javob berilmagan.` : '',
+                    "Yakunlangandan keyin javoblarni o'zgartirib bo'lmaydi.",
+                ]
+                    .filter(Boolean)
+                    .join(' ')}
                 confirmText="Yakunlash"
                 cancelText="Davom etish"
                 isLoading={finishing}

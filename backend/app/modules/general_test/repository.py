@@ -13,6 +13,7 @@ import httpx
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import and_, delete, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +22,8 @@ from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
 from app.core.utils.data_scope import DataScope, resolve_data_scope
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
+from app.modules.audit import service as audit_service
+from app.modules.audit.model import AuditEvent
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.organization_structure.model import Faculty, Group, Kafedra
 from app.modules.quiz.question.excel_format import parse_correct_option, read_question_sheet
@@ -144,6 +147,57 @@ def _remaining_seconds(attempt: GeneralTestAttempt, test: GeneralTest) -> int:
 
 def _is_expired(attempt: GeneralTestAttempt, test: GeneralTest) -> bool:
     return utcnow_naive() > _deadline(attempt, test) + timedelta(seconds=GRACE_SECONDS)
+
+
+#: Test ketayotganda o'zgartirib bo'lmaydigan maydonlar: talaba javobni harf
+#: bilan beradi, variant matni yoki to'g'ri javob almashsa, o'sha harf
+#: boshqa ma'noni bildiradi. Savol matnidagi xatoni tuzatish mumkin.
+_LOCKED_WHILE_TAKEN = ("option_a", "option_b", "option_c", "option_d", "correct_option")
+
+
+def _question_in_use(count: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "general_test_question_in_use",
+            "message": f"Bu savol hozir {count} ta talabaning testida — test tugagach o'chiring",
+            "attempts": count,
+        },
+    )
+
+
+def _question_locked(count: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "general_test_question_locked",
+            "message": (
+                f"Bu savol hozir {count} ta talabaning testida — variantlar va to'g'ri javobni "
+                "test tugagach o'zgartiring. Savol matnini tuzatish mumkin"
+            ),
+            "attempts": count,
+        },
+    )
+
+
+def _question_deleted() -> HTTPException:
+    # 410, 409 emas: frontend 409 da butun urinishni yakunlaydi, bu yerda esa
+    # faqat shu savol yo'qolgan — qolganlariga javob berishda davom etadi.
+    return HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "code": "general_test_question_deleted",
+            "message": "Bu savol o'qituvchi tomonidan o'chirilgan — u hisobga olinmaydi",
+        },
+    )
+
+
+def _question_snapshot(question: GeneralTestQuestion) -> dict:
+    return {
+        "subject_id": question.subject_id,
+        "text": (question.text or "")[:500],
+        **{f: (getattr(question, f) or "")[:200] for f in _LOCKED_WHILE_TAKEN},
+    }
 
 
 def _latest_student():
@@ -939,19 +993,80 @@ class GeneralTestRepository:
             await self._get_subject(session, question.subject_id, user)
         return question
 
+    @staticmethod
+    async def _attempts_taking(session: AsyncSession, question_id: int) -> int:
+        """Shu savol tushgan va hali ketayotgan urinishlar soni.
+
+        Vaqti o'tgan, lekin yopilmagan urinish (`in_progress` qolgan) hisobga
+        olinmaydi: aks holda talaba sahifani yopib ketgani uchun savolni hech
+        qachon o'chirib bo'lmasdi.
+        """
+        attempts = (
+            await session.execute(
+                select(GeneralTestAttempt)
+                .options(selectinload(GeneralTestAttempt.test))
+                .where(
+                    GeneralTestAttempt.status == IN_PROGRESS,
+                    GeneralTestAttempt.layout.contains([{"q": question_id}]),
+                )
+            )
+        ).scalars().all()
+        return sum(1 for attempt in attempts if not _is_expired(attempt, attempt.test))
+
     async def update_question(
         self, session: AsyncSession, question_id: int, data: QuestionUpdateRequest, user: User
     ) -> GeneralTestQuestion:
         question = await self._get_question(session, question_id, user)
-        for field, value in data.model_dump(exclude_unset=True).items():
-            if value is not None:
-                setattr(question, field, value)
+        changes = {
+            field: value
+            for field, value in data.model_dump(exclude_unset=True).items()
+            if value is not None and getattr(question, field) != value
+        }
+        if any(field in _LOCKED_WHILE_TAKEN for field in changes):
+            taking = await self._attempts_taking(session, question_id)
+            if taking:
+                raise _question_locked(taking)
+        before = {field: getattr(question, field) for field in changes}
+        for field, value in changes.items():
+            setattr(question, field, value)
+        if changes:
+            await audit_service.record(
+                session,
+                event=AuditEvent.GENERAL_TEST_QUESTION_UPDATED,
+                user_id=user.id,
+                username=user.username,
+                object_type="general_test_question",
+                object_id=question.id,
+                summary=f"Savol #{question.id}: {', '.join(sorted(changes))}",
+                meta={
+                    "subject_id": question.subject_id,
+                    "changes": {
+                        field: [str(before[field])[:200], str(value)[:200]] for field, value in changes.items()
+                    },
+                },
+            )
         await session.commit()
         await session.refresh(question)
         return question
 
     async def delete_question(self, session: AsyncSession, question_id: int, user: User) -> None:
         question = await self._get_question(session, question_id, user)
+        # Imtihon paytida o'chirilgan savol talabaning javoblarini saqlatmay
+        # qo'yardi (FK xatosi → 500) va allaqachon berilgan javoblari ham
+        # kaskad bilan o'chardi. 2026-10-12 da shunday 40 ta urinish buzilgan.
+        taking = await self._attempts_taking(session, question_id)
+        if taking:
+            raise _question_in_use(taking)
+        await audit_service.record(
+            session,
+            event=AuditEvent.GENERAL_TEST_QUESTION_DELETED,
+            user_id=user.id,
+            username=user.username,
+            object_type="general_test_question",
+            object_id=question.id,
+            summary=f"Savol #{question.id}: {(question.text or '')[:80]}",
+            meta=_question_snapshot(question),
+        )
         await session.delete(question)
         await session.commit()
 
@@ -1023,6 +1138,16 @@ class GeneralTestRepository:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Faylda savol topilmadi")
 
         session.add_all(questions)
+        await audit_service.record(
+            session,
+            event=AuditEvent.GENERAL_TEST_QUESTIONS_UPLOADED,
+            user_id=user.id,
+            username=user.username,
+            object_type="general_test_subject",
+            object_id=subject_id,
+            summary=f"Excel: {len(questions)} ta savol qo'shildi",
+            meta={"subject_id": subject_id, "created": len(questions), "file": (file.filename or "")[:200]},
+        )
         await session.commit()
         return UploadResponse(created=len(questions), warnings=warnings)
 
@@ -1523,6 +1648,8 @@ class GeneralTestRepository:
         await self._require_alive(session, attempt)
         if data.question_id not in {item["q"] for item in attempt.layout}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Savol bu urinishga tegishli emas")
+        if await session.get(GeneralTestQuestion, data.question_id) is None:
+            raise _question_deleted()
 
         stmt = pg_insert(GeneralTestAnswer).values(
             attempt_id=attempt.id,
@@ -1531,13 +1658,18 @@ class GeneralTestRepository:
             created_at=utcnow_naive(),
             updated_at=utcnow_naive(),
         )
-        await session.execute(
-            stmt.on_conflict_do_update(
-                constraint="uq_general_test_answer",
-                set_={"selected_option": stmt.excluded.selected_option, "updated_at": stmt.excluded.updated_at},
+        try:
+            await session.execute(
+                stmt.on_conflict_do_update(
+                    constraint="uq_general_test_answer",
+                    set_={"selected_option": stmt.excluded.selected_option, "updated_at": stmt.excluded.updated_at},
+                )
             )
-        )
-        await session.commit()
+            await session.commit()
+        except IntegrityError as cause:
+            # Tekshiruv bilan yozish orasida o'chirildi — 500 emas, aniq javob.
+            await session.rollback()
+            raise _question_deleted() from cause
 
     @staticmethod
     def _result(attempt: GeneralTestAttempt) -> AttemptResult:

@@ -38,6 +38,11 @@ class AuditEvent:
     PASSWORD_CHANGED = "user.password_changed"
     QUESTION_DELETED = "question.deleted"
     QUESTIONS_BULK_DELETED = "question.bulk_deleted"
+    #: Elementar test savollar banki. Ilgari bular yozilmasdi va imtihon
+    #: paytida savollarni kim o'chirgani faqat fayl jurnalidan topilgan edi.
+    GENERAL_TEST_QUESTION_UPDATED = "general_test_question.updated"
+    GENERAL_TEST_QUESTION_DELETED = "general_test_question.deleted"
+    GENERAL_TEST_QUESTIONS_UPLOADED = "general_test_question.uploaded"
     QUIZ_DELETED = "quiz.deleted"
     RESULT_DELETED = "result.deleted"
     SYNC_RUN = "sync.run"
