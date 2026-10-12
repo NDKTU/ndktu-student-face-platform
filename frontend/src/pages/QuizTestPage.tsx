@@ -50,6 +50,7 @@ import { StudentTestTabs } from '@/components/generalTest/StudentTestTabs';
 import { sanitizeHtml } from '@/utils/sanitize';
 import { apiErrorMessage } from '@/utils/apiError';
 import { noCopyHandlers } from '@/utils/antiCopy';
+import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
@@ -475,6 +476,8 @@ const QuizTestPage = () => {
         active: phase === 'quiz' && isStrict && !cheatingDetected && (!usesCamera || cameraSettled),
         onLeave: handleLeave,
     });
+    // Savolni o'ylayotgan talaba sichqonchaga tegmaydi — avtochiqish to'xtaydi.
+    useKeepSessionAlive(phase === 'quiz');
 
     const holdToReveal = phase === 'quiz' && Boolean(quizData?.hold_to_reveal);
     const reveal = useHoldToReveal(holdToReveal);

@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { getToken } from '@/services/tokenStorage';
+import { isSessionHeld } from '@/hooks/useKeepSessionAlive';
 
 // 15 минут. Должно быть <= серверного session_idle_minutes (30 мин), чтобы клиент
 // выходил первым и мягко, до того как сервер инвалидирует скользящую сессию.
@@ -27,8 +28,16 @@ export function useIdleTimeout() {
     if (idleTimer.current) {
       clearTimeout(idleTimer.current);
     }
-    // Запускаем таймер заново
-    idleTimer.current = setTimeout(handleLogout, IDLE_TIMEOUT_MS);
+    // Запускаем таймер заново. Test yoki jonli dars ketayotgan bo'lsa —
+    // chiqarmaymiz, faqat qayta kutamiz (`useKeepSessionAlive`): harakatsiz
+    // talaba ham ishlayapti.
+    const arm = () => {
+      idleTimer.current = setTimeout(() => {
+        if (isSessionHeld()) arm();
+        else handleLogout();
+      }, IDLE_TIMEOUT_MS);
+    };
+    arm();
   }, [handleLogout]);
 
   useEffect(() => {

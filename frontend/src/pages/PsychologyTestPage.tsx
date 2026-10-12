@@ -11,6 +11,7 @@ import { Loader2, CheckCircle, ChevronLeft, ChevronRight, Brain, ListOrdered, Pl
 import type { QuestionResponse, AnswerItem, Diagnosis, TestResultResponse } from '@/services/psychologyService';
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
+import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
 
 type AnswerValue = boolean | number | string | null;
 
@@ -389,6 +390,8 @@ export default function PsychologyTestPage() {
     const [current, setCurrent] = useState(0);
     const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
     const [result, setResult] = useState<TestResultResponse | null>(null);
+    // Javob ustida o'ylayotgan talaba avtochiqish bilan testdan chiqib ketmasin.
+    useKeepSessionAlive(started && !result);
 
     // Per-page-load seed so the shuffled order is stable across re-renders but
     // changes each time the test is opened. Lazy initializer keeps Math.random

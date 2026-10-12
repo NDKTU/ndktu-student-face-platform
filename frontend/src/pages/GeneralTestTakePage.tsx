@@ -25,6 +25,7 @@ import { HoldToRevealBar } from '@/components/quizzes/HoldToRevealBar';
 import type { LeaveReason } from '@/services/quizProcessService';
 import { RichText } from '@/components/questions/RichText';
 import { cn } from '@/lib/utils';
+import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
 
 /** Vaqt tugaganda yakunlash o'tmasa — shuncha vaqtdan keyin qayta urinadi. */
 const FINISH_RETRY_MS = 5000;
@@ -183,6 +184,9 @@ export default function GeneralTestTakePage() {
     const reveal = useHoldToReveal(holdToReveal);
     // Tranzitsiyasiz: o'tish paytidagi yarim xira kadr skrinshotga tushmasin.
     const veil = reveal.hidden ? 'blur-md' : '';
+
+    // Savolni o'ylayotgan talaba sichqonchaga tegmaydi — avtochiqish to'xtaydi.
+    useKeepSessionAlive(!result && !leftReason);
 
     useEffect(() => {
         if (!isStrict || result || leftReason) return;

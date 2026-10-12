@@ -8,6 +8,7 @@ import { apiErrorMessage } from '@/utils/apiError';
 import type { FaceCheckResult, ZoomJoinResponse } from '@/services/zoomSessionService';
 import { logger } from '@/utils/logger';
 import './ZoomMeetingBox.css';
+import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
 
 /**
  * Zoom Meeting SDK (Component View) — uchrashuv saytdan chiqmasdan ochiladi.
@@ -117,6 +118,9 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
     const [attempts, setAttempts] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const faceCheck = useZoomFaceCheck(sessionId);
+    // Ma'ruzani tinglayotgan talaba sichqonchaga tegmaydi — avtochiqish uni
+    // uchrashuvdan chiqarib yubormasin.
+    useKeepSessionAlive(state !== 'idle');
 
     useEffect(() => {
         const onChange = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
