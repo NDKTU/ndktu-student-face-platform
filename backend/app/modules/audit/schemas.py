@@ -1,14 +1,18 @@
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from app.core.schemas import TashkentDatetime
 
 
 class AuditLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    created_at: datetime
+    #: Bazada naiv UTC. Zonasiz yuborilsa brauzer uni mahalliy vaqt deb o'qib,
+    #: jurnalda 5 soat orqada ko'rsatardi (15:51 o'rniga 10:51).
+    created_at: TashkentDatetime
     user_id: Optional[int] = None
     username: Optional[str] = None
     #: Foydalanuvchining to'liq ismi — bo'lsa. Login ko'pincha raqam

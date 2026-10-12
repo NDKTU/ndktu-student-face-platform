@@ -74,3 +74,14 @@ export const formatDateTime = (value?: string | Date | null): string => {
     if (!date) return '—';
     return `${formatDate(date)}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+/**
+ * «27.08.2026, 11:49:07» — soniyalar bilan. Faqat jurnallar uchun: bir daqiqa
+ * ichidagi bir nechta hodisani (masalan, ketma-ket kirish urinishlari) ajratish
+ * va tartibini ko'rish kerak bo'lgan joyda.
+ */
+export const formatDateTimeSeconds = (value?: string | Date | null): string => {
+    const date = parse(value);
+    if (!date) return '—';
+    return `${formatDateTime(date)}:${pad(date.getSeconds())}`;
+};

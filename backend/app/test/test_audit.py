@@ -276,3 +276,29 @@ async def test_overlong_values_are_clipped_not_dropped(async_client, async_db, t
     assert log is not None, "uzun qiymat yozuvni yo'qotmasligi kerak"
     assert len(log.username) == 150
     assert len(log.user_agent) == 500
+
+
+@pytest.mark.asyncio
+async def test_time_is_tashkent_and_day_filter_is_tashkent_day(auth_client, async_db):
+    """Vaqt zonasi bilan keladi va kun filtri Toshkent kuni bo'yicha.
+
+    Ilgari `created_at` zonasiz (naiv UTC) yuborilardi — brauzer uni mahalliy
+    deb o'qib, jurnalda 5 soat orqada ko'rsatardi; kun filtri esa UTC yarim
+    tunidan hisoblanib, 00:00–05:00 dagi yozuvlarni oldingi kunga tashlardi.
+    """
+    night = AuditLog(event="tz.check", summary="kechasi", created_at=datetime(2026, 10, 11, 20, 30))  # 12.10 01:30
+    day = AuditLog(event="tz.check", summary="kunduzi", created_at=datetime(2026, 10, 12, 10, 51))  # 12.10 15:51
+    async_db.add_all([night, day])
+    await async_db.commit()
+
+    response = await auth_client.get(
+        "/audit/", params={"event": "tz.check", "date_from": "2026-10-12", "date_to": "2026-10-12"}
+    )
+    assert response.status_code == 200, response.text
+    rows = {row["summary"]: row["created_at"] for row in response.json()["logs"]}
+    assert rows == {"kechasi": "2026-10-12T01:30:00+05:00", "kunduzi": "2026-10-12T15:51:00+05:00"}
+
+    previous_day = await auth_client.get(
+        "/audit/", params={"event": "tz.check", "date_from": "2026-10-11", "date_to": "2026-10-11"}
+    )
+    assert previous_day.json()["logs"] == []

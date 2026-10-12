@@ -1,6 +1,6 @@
 """Audit yozuvlarini o'qish."""
 
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.audit.model import AuditEvent, AuditLog
 from app.modules.auth.model import Student, Teacher, User
 
+from app.core.mixins.time_stamp_mixin import to_naive_utc
+from app.core.schemas import TASHKENT_TZ
+
 from .schemas import AuditEventOption, AuditListRequest, AuditListResponse, AuditLogResponse
+
+
+def _tashkent_midnight(day: date) -> datetime:
+    """Toshkent kunining boshi — naiv UTC'da (`created_at` shunday saqlanadi).
+
+    Filtrdagi sana — Toshkent kuni. UTC yarim tuni olinsa, 00:00–05:00 dagi
+    yozuvlar oldingi kunga tushib qolardi.
+    """
+    return to_naive_utc(datetime.combine(day, time.min, tzinfo=TASHKENT_TZ))
 
 #: Kirish-chiqishga oid hodisalar — «faqat kirishlar» filtri uchun.
 AUTH_EVENTS = (
@@ -27,11 +39,11 @@ def _apply_filters(stmt: Select, request: AuditListRequest) -> Select:
     if request.only_auth:
         stmt = stmt.where(AuditLog.event.in_(AUTH_EVENTS))
     if request.date_from:
-        stmt = stmt.where(AuditLog.created_at >= datetime.combine(request.date_from, time.min))
+        stmt = stmt.where(AuditLog.created_at >= _tashkent_midnight(request.date_from))
     if request.date_to:
         # Kunning oxirigacha: `<= sana` bo'lsa, o'sha kunning yozuvlari
         # tushib qolardi (vaqt 00:00 dan katta).
-        stmt = stmt.where(AuditLog.created_at < datetime.combine(request.date_to + timedelta(days=1), time.min))
+        stmt = stmt.where(AuditLog.created_at < _tashkent_midnight(request.date_to + timedelta(days=1)))
     if request.search and request.search.strip():
         pattern = f"%{request.search.strip()}%"
         # Ism `students`/`teachers` da, login esa yozuvning o'zida.

@@ -21,6 +21,7 @@ import {
 import { useUrlNumberState, useUrlState } from '@/hooks/useUrlState';
 import { useAuditEvents, useAuditLogs } from '@/hooks/useAudit';
 import { apiErrorMessage } from '@/utils/apiError';
+import { formatDateTimeSeconds } from '@/utils/date';
 import type { AuditLog } from '@/services/auditService';
 
 const PAGE_SIZE = 50;
@@ -232,7 +233,7 @@ const AuditPage = () => {
                                     {logs.map((log) => (
                                         <TableRow key={log.id}>
                                             <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                                                {new Date(log.created_at).toLocaleString()}
+                                                {formatDateTimeSeconds(log.created_at)}
                                             </TableCell>
                                             <TableCell>
                                                 <Who log={log} />
