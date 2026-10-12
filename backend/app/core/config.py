@@ -288,12 +288,12 @@ class AttendanceConfig(BaseModel):
 class RateLimitConfig(BaseModel):
     """`fastapi_limiter` limitlari (endpointlardagi `RateLimiter(...)`).
 
-    Vaqtincha o'chirilgan: `enabled=False` bo'lsa barcha `RateLimiter`
-    bog'liqliklari hech narsa qilmaydi, dekoratorlar esa joyida qoladi —
-    qayta yoqish uchun `APP_CONFIG__RATE_LIMIT__ENABLED=true` kifoya.
+    `enabled=False` bo'lsa barcha `RateLimiter` bog'liqliklari hech narsa
+    qilmaydi, dekoratorlar esa joyida qoladi — vaqtincha o'chirish uchun
+    `APP_CONFIG__RATE_LIMIT__ENABLED=false` kifoya.
     """
 
-    enabled: bool = False
+    enabled: bool = True
 
 
 class AdminConfig(BaseModel):
