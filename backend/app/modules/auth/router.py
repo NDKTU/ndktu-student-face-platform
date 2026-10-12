@@ -103,17 +103,29 @@ from .user.service import auth_service
 logger = logging.getLogger(__name__)
 
 
-async def login_rate_limit_identifier(request: Request) -> str:
-    """Key the login rate limit by IP + attempted username, so unrelated
-    users behind the same NAT/reverse proxy don't share one bucket."""
-    body = await request.body()
-    try:
-        username = str(json.loads(body).get("username", "")).strip().lower()
-    except (json.JSONDecodeError, AttributeError):
-        username = ""
-    forwarded = request.headers.get("X-Forwarded-For")
-    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-    return f"{ip}:{username}:{request.scope['path']}"
+def _login_identifier(field: str):
+    """Key the login rate limit by IP + attempted login, so unrelated
+    users behind the same NAT/reverse proxy don't share one bucket.
+
+    A classroom sits behind one IP: keyed by IP alone, 5 logins/min were
+    shared by the whole group and the rest got 429 before even reaching us.
+    Per login the limit still stops password guessing on one account."""
+
+    async def identifier(request: Request) -> str:
+        body = await request.body()
+        try:
+            login = str(json.loads(body).get(field, "")).strip().lower()
+        except (json.JSONDecodeError, AttributeError):
+            login = ""
+        forwarded = request.headers.get("X-Forwarded-For")
+        ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+        return f"{ip}:{login}:{request.scope['path']}"
+
+    return identifier
+
+
+login_rate_limit_identifier = _login_identifier("username")
+hemis_login_rate_limit_identifier = _login_identifier("login")
 
 
 # ============================================================================
@@ -817,7 +829,7 @@ hemis_router = APIRouter(prefix="/hemis", tags=["Hemis"])
 @hemis_router.post(
     "/login",
     response_model=HemisLoginResponse,
-    dependencies=[Depends(RateLimiter(times=5, seconds=60))],
+    dependencies=[Depends(RateLimiter(times=60, seconds=60, identifier=hemis_login_rate_limit_identifier))],
 )
 async def hemis_login(
     data: HemisLoginRequest,
@@ -855,6 +867,8 @@ async def hemis_login(
 # OAuth: parolni odam HEMIS sahifasida kiritadi, bizning server faqat kodni
 # tokenga almashtiradi. Login bo'yicha HEMIS limiti (429 CAPTCHA_REQUIRED)
 # shunda serverimiz IP'siga emas, har bir odamning o'ziga tushadi.
+# Bizning limit IP bo'yicha va keng: auditoriya bitta NAT ortida, `state`
+# esa bir martalik — parol tanlashga bu yerda imkon yo'q.
 @hemis_router.get("/oauth/portals", response_model=HemisOAuthPortalsResponse)
 async def hemis_oauth_portals():
     return HemisOAuthPortalsResponse(portals=list(settings.hemis.oauth_portals()))
@@ -863,7 +877,7 @@ async def hemis_oauth_portals():
 @hemis_router.get(
     "/oauth/authorize",
     response_model=HemisOAuthAuthorizeResponse,
-    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+    dependencies=[Depends(RateLimiter(times=120, seconds=60))],
 )
 async def hemis_oauth_authorize(portal: HemisOAuthPortal = "student"):
     return HemisOAuthAuthorizeResponse(url=await hemis_oauth_service.authorize_url(portal))
@@ -872,7 +886,7 @@ async def hemis_oauth_authorize(portal: HemisOAuthPortal = "student"):
 @hemis_router.post(
     "/oauth/callback",
     response_model=HemisLoginResponse,
-    dependencies=[Depends(RateLimiter(times=20, seconds=60))],
+    dependencies=[Depends(RateLimiter(times=120, seconds=60))],
 )
 async def hemis_oauth_callback(
     data: HemisOAuthCallbackRequest,

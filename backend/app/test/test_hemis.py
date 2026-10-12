@@ -44,3 +44,28 @@ async def test_hemis_login_external_success(async_client):
         assert response.status_code in [400, 401, 503]
         data = response.json()
         assert "detail" in data
+
+
+@pytest.mark.asyncio
+async def test_hemis_login_limit_is_per_login_not_per_classroom(async_client, monkeypatch):
+    """Auditoriya bitta NAT IP ortida: limit butun guruhga emas, har bir loginga."""
+    from app.modules.auth.hemis.schemas import HemisLoginResponse
+    from app.modules.auth.hemis.service import hemis_service
+
+    async def fake_login(session, data):
+        return HemisLoginResponse(access_token=f"token-{data.login}")
+
+    monkeypatch.setattr(hemis_service, "hemis_login", fake_login)
+
+    # Bir IP'dan olti xil talaba — hech kim 429 olmaydi.
+    for number in range(6):
+        response = await async_client.post("/hemis/login", json={"login": f"3191{number}", "password": "x"})
+        assert response.status_code == 200, response.text
+
+    # Bitta login bo'yicha parol tanlash baribir cheklangan.
+    codes = [
+        (await async_client.post("/hemis/login", json={"login": "same", "password": "x"})).status_code
+        for _ in range(61)
+    ]
+    assert codes[:60] == [200] * 60
+    assert codes[60] == 429
