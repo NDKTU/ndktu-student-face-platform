@@ -22,6 +22,9 @@ export interface ZoomSession {
     status: ZoomSessionStatus;
     subject_id?: number | null;
     subject_name?: string | null;
+    /** Darsni olib boradigan o'qituvchi (`users.id`) — yuz tekshiruvisiz kiradi. */
+    teacher_user_id?: number | null;
+    teacher_name?: string | null;
     groups: { id: number; name: string }[];
     face_check_enabled: boolean;
     is_active: boolean;
@@ -45,8 +48,16 @@ export interface ZoomAccountOption {
     auto_create: boolean;
 }
 
+export interface ZoomTeacherOption {
+    user_id: number;
+    name: string;
+    kafedra_name?: string | null;
+}
+
 export interface ZoomSessionPayload {
-    title: string;
+    /** `null` — fan, o'qituvchi va guruhlardan server o'zi yasaydi. */
+    title: string | null;
+    teacher_user_id: number | null;
     /** `null` — uchrashuvni server Zoom API orqali o'zi yaratadi. */
     link_url: string | null;
     /** `null` — avtomatik: bo'sh akkaunt yoki havoladan aniqlanadi. */
@@ -55,7 +66,7 @@ export interface ZoomSessionPayload {
     starts_at: string;
     ends_at: string;
     group_ids: number[];
-    subject_id?: number | null;
+    subject_id: number | null;
     face_check_enabled: boolean;
     is_active: boolean;
 }
@@ -167,6 +178,20 @@ export const zoomSessionService = {
     /** Host sifatida boshlash havolasi — faqat LMS yaratgan uchrashuvda. */
     start: async (id: number) =>
         (await api.post<{ start_url: string }>(`/zoom-sessions/${id}/start`)).data,
+    /** O'qituvchi tanlash. `locked` — joriy foydalanuvchi o'qituvchi: faqat o'zi. */
+    teacherOptions: async (search?: string) =>
+        (
+            await api.get<{ teachers: ZoomTeacherOption[]; locked: boolean }>('/zoom-sessions/teacher-options', {
+                params: { search: search || undefined },
+            })
+        ).data,
+    /** Tanlangan o'qituvchining fanlari. */
+    teacherSubjects: async (teacherUserId: number) =>
+        (
+            await api.get<{ subjects: { id: number; name: string }[] }>('/zoom-sessions/teacher-subjects', {
+                params: { teacher_user_id: teacherUserId },
+            })
+        ).data.subjects,
     /** Guruh tanlashdagi fakultet filtri. */
     filterOptions: async () =>
         (await api.get<{ faculties: { id: number; name: string }[] }>('/zoom-sessions/filter-options')).data,

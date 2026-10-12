@@ -19,7 +19,10 @@ def _as_utc(value: datetime) -> datetime:
 class ZoomSessionRequest(BaseModel):
     """Seansni yaratish va tahrirlash (PUT — to'liq almashtirish)."""
 
-    title: str = Field(min_length=1, max_length=255)
+    #: Bo'sh — fan, o'qituvchi va guruhlardan yasaladi (`repository.py::_auto_title`).
+    title: Optional[str] = Field(default=None, max_length=255)
+    #: O'qituvchi (`users.id`). O'qituvchi o'zi yaratsa — doim o'zi.
+    teacher_user_id: Optional[int] = None
     #: Bo'sh — uchrashuvni bekend Zoom API orqali o'zi yaratadi (`zoom_managed`).
     #: Shunday yaratilgan seansda havola e'tiborga olinmaydi.
     link_url: Optional[str] = Field(default=None, max_length=500)
@@ -38,9 +41,9 @@ class ZoomSessionRequest(BaseModel):
     def _strip(cls, value):
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("link_url")
+    @field_validator("title", "link_url")
     @classmethod
-    def _empty_link(cls, value: Optional[str]) -> Optional[str]:
+    def _empty_to_none(cls, value: Optional[str]) -> Optional[str]:
         return value or None
 
     @field_validator("starts_at", "ends_at")
@@ -70,6 +73,8 @@ class ZoomSessionResponse(BaseModel):
     status: SessionStatus
     subject_id: Optional[int] = None
     subject_name: Optional[str] = None
+    teacher_user_id: Optional[int] = None
+    teacher_name: Optional[str] = None
     groups: List[SessionGroup] = []
     face_check_enabled: bool
     is_active: bool
@@ -89,6 +94,27 @@ class ZoomSessionResponse(BaseModel):
 
 class ZoomSessionListResponse(BaseModel):
     sessions: List[ZoomSessionResponse]
+
+
+class ZoomTeacherOption(BaseModel):
+    user_id: int
+    name: str
+    kafedra_name: Optional[str] = None
+
+
+class ZoomTeacherOptionListResponse(BaseModel):
+    teachers: List[ZoomTeacherOption]
+    #: Joriy foydalanuvchi o'qituvchi (admin emas) — faqat o'zini tanlay oladi.
+    locked: bool = False
+
+
+class ZoomSubjectOption(BaseModel):
+    id: int
+    name: str
+
+
+class ZoomSubjectOptionListResponse(BaseModel):
+    subjects: List[ZoomSubjectOption]
 
 
 class ZoomAccountOption(BaseModel):

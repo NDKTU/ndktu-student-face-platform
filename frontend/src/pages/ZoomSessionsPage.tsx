@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CalendarClock, Pencil, Plus, Radio, ScanFace, Trash2, UsersRound, Video } from 'lucide-react';
+import { BookOpen, CalendarClock, GraduationCap, Pencil, Plus, Radio, ScanFace, Trash2, UsersRound, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -100,6 +100,16 @@ export default function ZoomSessionsPage() {
                                         <CalendarClock className="h-3.5 w-3.5" />
                                         {formatDate(session.starts_at)}, {formatTime(session.starts_at)}–{formatTime(session.ends_at)}
                                     </span>
+                                    {session.subject_name && (
+                                        <span className="inline-flex items-center gap-1">
+                                            <BookOpen className="h-3.5 w-3.5" /> {session.subject_name}
+                                        </span>
+                                    )}
+                                    {session.teacher_name && (
+                                        <span className="inline-flex items-center gap-1">
+                                            <GraduationCap className="h-3.5 w-3.5" /> {session.teacher_name}
+                                        </span>
+                                    )}
                                     <span className="inline-flex items-center gap-1">
                                         <UsersRound className="h-3.5 w-3.5" />
                                         {session.groups.map((g) => g.name).join(', ')}

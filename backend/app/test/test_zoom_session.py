@@ -27,7 +27,8 @@ PHOTO = "https://example.test/hemis/student.jpg"
 
 @pytest_asyncio.fixture
 async def zoom_scene(async_db, auth_client, test_faculty, make_group, monkeypatch):
-    from app.modules.auth.model import Permission, Role, RolePermission
+    from app.modules.auth.model import Permission, Role, RolePermission, Teacher, TeacherSubject
+    from app.modules.quiz.model import Subject
 
     role = Role(name="zoom_student")
     async_db.add(role)
@@ -52,18 +53,44 @@ async def zoom_scene(async_db, auth_client, test_faculty, make_group, monkeypatc
     # Profilga o'zi yuklagan surat bor, HEMIS surati yo'q — etalon bo'lmaydi.
     no_photo.avatar_path = "https://example.test/profile/self.jpg"
     async_db.add_all([member_row, outsider_row, _student(no_photo.id, group["id"], "ZM3", "Soli")])
+
+    # O'qituvchi: seansni olib boradi, yuz tekshiruvisiz kiradi. «Fizika» unga
+    # biriktirilgan, «Kimyo» — yo'q.
+    teacher_user = await _user(async_db, role, "zm_teacher")
+    teacher = Teacher(
+        user_id=teacher_user.id,
+        last_name="ALIYEV",
+        first_name="VALI",
+        third_name="SOBIROVICH",
+        full_name="ALIYEV VALI SOBIROVICH",
+    )
+    physics, chemistry = Subject(name="Fizika"), Subject(name="Kimyo")
+    async_db.add_all([teacher, physics, chemistry])
+    await async_db.flush()
+    async_db.add(TeacherSubject(teacher_id=teacher.id, subject_id=physics.id))
     await async_db.commit()
 
     monkeypatch.setattr(settings.zoom, "client_id", "test-sdk-key")
     monkeypatch.setattr(settings.zoom, "client_secret", "test-sdk-secret")
-    return {"group_id": group["id"], "other_group_id": other_group["id"]}
+    return {
+        "group_id": group["id"],
+        "other_group_id": other_group["id"],
+        "teacher_user_id": teacher_user.id,
+        "subject_id": physics.id,
+        "foreign_subject_id": chemistry.id,
+    }
+
+
+def _teaching(scene: dict) -> dict:
+    """Seansning o'qituvchisi va fani — endi majburiy."""
+    return {"teacher_user_id": scene["teacher_user_id"], "subject_id": scene["subject_id"]}
 
 
 def _iso(delta: timedelta) -> str:
     return (datetime.now(timezone.utc) + delta).isoformat()
 
 
-async def _create(auth_client, group_id: int, *, start: timedelta, end: timedelta, face: bool = True) -> dict:
+async def _create(auth_client, scene: dict, *, start: timedelta, end: timedelta, face: bool = True) -> dict:
     created = await auth_client.post(
         "/zoom-sessions/",
         json={
@@ -71,7 +98,8 @@ async def _create(auth_client, group_id: int, *, start: timedelta, end: timedelt
             "link_url": LINK,
             "starts_at": _iso(start),
             "ends_at": _iso(end),
-            "group_ids": [group_id],
+            "group_ids": [scene["group_id"]],
+            **_teaching(scene),
             "face_check_enabled": face,
         },
     )
@@ -103,7 +131,7 @@ async def _check(async_client, session_id: int, headers: dict, stage: str = "joi
 
 @pytest.mark.asyncio
 async def test_member_joins_after_face_check(auth_client, async_client, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_member")
 
     listed = await async_client.get("/zoom-sessions/", headers=headers)
@@ -133,7 +161,7 @@ async def test_member_joins_after_face_check(auth_client, async_client, zoom_sce
 
 @pytest.mark.asyncio
 async def test_mismatch_does_not_admit(auth_client, async_client, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_member")
     _fake_face(monkeypatch, status="different_person")
 
@@ -145,7 +173,7 @@ async def test_mismatch_does_not_admit(auth_client, async_client, zoom_scene, mo
 
 @pytest.mark.asyncio
 async def test_face_service_down_blocks_entry(auth_client, async_client, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_member")
     _fake_face(monkeypatch, fail=True)
 
@@ -157,7 +185,7 @@ async def test_face_service_down_blocks_entry(auth_client, async_client, zoom_sc
 
 @pytest.mark.asyncio
 async def test_other_group_cannot_see_or_join(auth_client, async_client, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_outsider")
     _fake_face(monkeypatch)
 
@@ -175,22 +203,22 @@ async def test_time_window(auth_client, async_client, zoom_scene, monkeypatch):
     headers = await _login(async_client, "zm_member")
     _fake_face(monkeypatch)
 
-    later = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=30), end=timedelta(hours=2))
+    later = await _create(auth_client, zoom_scene, start=timedelta(minutes=30), end=timedelta(hours=2))
     early = await _check(async_client, later["id"], headers)
     assert early.json()["detail"]["code"] == "zoom_session_not_open"
 
     # 10 daqiqalik zaxira ichida — kirish ochiq.
-    soon = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=5), end=timedelta(hours=2))
+    soon = await _create(auth_client, zoom_scene, start=timedelta(minutes=5), end=timedelta(hours=2))
     assert (await _check(async_client, soon["id"], headers)).json()["admitted"] is True
 
-    past = await _create(auth_client, zoom_scene["group_id"], start=timedelta(hours=-3), end=timedelta(minutes=-1))
+    past = await _create(auth_client, zoom_scene, start=timedelta(hours=-3), end=timedelta(minutes=-1))
     closed = await async_client.post(f"/zoom-sessions/{past['id']}/join", headers=headers)
     assert closed.json()["detail"]["code"] == "zoom_session_closed"
 
 
 @pytest.mark.asyncio
 async def test_self_uploaded_photo_is_not_a_reference(auth_client, async_client, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_nophoto")
     calls = _fake_face(monkeypatch)
 
@@ -203,7 +231,7 @@ async def test_self_uploaded_photo_is_not_a_reference(auth_client, async_client,
 @pytest.mark.asyncio
 async def test_without_face_check_join_is_direct(auth_client, async_client, zoom_scene):
     zs = await _create(
-        auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1), face=False
+        auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1), face=False
     )
     headers = await _login(async_client, "zm_member")
     assert (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).status_code == 200
@@ -211,7 +239,7 @@ async def test_without_face_check_join_is_direct(auth_client, async_client, zoom
 
 @pytest.mark.asyncio
 async def test_report_lists_absent_students(auth_client, async_client, async_db, zoom_scene, monkeypatch):
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(minutes=-5), end=timedelta(hours=1))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
     headers = await _login(async_client, "zm_member")
     _fake_face(monkeypatch)
     await _check(async_client, zs["id"], headers)
@@ -240,6 +268,7 @@ async def test_validation_and_ownership(auth_client, async_client, zoom_scene):
             "starts_at": _iso(timedelta(hours=2)),
             "ends_at": _iso(timedelta(hours=1)),
             "group_ids": [zoom_scene["group_id"]],
+            **_teaching(zoom_scene),
         },
     )
     assert bad_time.status_code == 422
@@ -252,13 +281,66 @@ async def test_validation_and_ownership(auth_client, async_client, zoom_scene):
             "starts_at": _iso(timedelta(hours=1)),
             "ends_at": _iso(timedelta(hours=2)),
             "group_ids": [zoom_scene["group_id"]],
+            **_teaching(zoom_scene),
         },
     )
     assert bad_link.status_code == 422
 
-    zs = await _create(auth_client, zoom_scene["group_id"], start=timedelta(hours=1), end=timedelta(hours=2))
+    zs = await _create(auth_client, zoom_scene, start=timedelta(hours=1), end=timedelta(hours=2))
     assert zs["link_url"] == LINK  # yaratuvchi havolani ko'radi
     headers = await _login(async_client, "zm_member")
     # Talabada boshqaruv ruxsati yo'q.
     assert (await async_client.delete(f"/zoom-sessions/{zs['id']}", headers=headers)).status_code == 403
     assert (await auth_client.delete(f"/zoom-sessions/{zs['id']}")).status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_teacher_subject_and_auto_title(auth_client, zoom_scene):
+    teachers = (await auth_client.get("/zoom-sessions/teacher-options", params={"search": "aliyev"})).json()
+    assert teachers["locked"] is False
+    assert [(t["user_id"], t["name"]) for t in teachers["teachers"]] == [
+        (zoom_scene["teacher_user_id"], "Aliyev Vali Sobirovich")
+    ]
+    subjects = (
+        await auth_client.get(
+            "/zoom-sessions/teacher-subjects", params={"teacher_user_id": zoom_scene["teacher_user_id"]}
+        )
+    ).json()["subjects"]
+    assert [s["name"] for s in subjects] == ["Fizika"]
+
+    body = {
+        "starts_at": _iso(timedelta(hours=1)),
+        "ends_at": _iso(timedelta(hours=2)),
+        "link_url": LINK,
+        "group_ids": [zoom_scene["group_id"], zoom_scene["other_group_id"]],
+    }
+    # Nom bo'sh — fan, o'qituvchi va guruhlardan.
+    created = await auth_client.post("/zoom-sessions/", json={**body, **_teaching(zoom_scene)})
+    assert created.status_code == 201, created.text
+    assert created.json()["title"] == "Fizika — Aliyev V.S. (ZM-101, ZM-202)"
+    assert created.json()["teacher_name"] == "Aliyev Vali Sobirovich"
+
+    no_teacher = await auth_client.post("/zoom-sessions/", json={**body, "subject_id": zoom_scene["subject_id"]})
+    assert no_teacher.json()["detail"]["code"] == "zoom_teacher_required"
+    foreign = await auth_client.post(
+        "/zoom-sessions/",
+        json={**body, **_teaching(zoom_scene), "subject_id": zoom_scene["foreign_subject_id"]},
+    )
+    assert foreign.json()["detail"]["code"] == "zoom_subject_not_teachers"
+
+
+@pytest.mark.asyncio
+async def test_assigned_teacher_joins_without_face_check(auth_client, async_client, zoom_scene, monkeypatch):
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
+    assert zs["face_check_enabled"] is True
+    calls = _fake_face(monkeypatch)
+    headers = await _login(async_client, "zm_teacher")
+
+    # Guruhda emas, lekin biriktirilgan — ko'radi va boshqaradi.
+    listed = (await async_client.get("/zoom-sessions/", headers=headers)).json()["sessions"]
+    assert [(s["id"], s["can_manage"]) for s in listed] == [(zs["id"], True)]
+
+    joined = await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)
+    assert joined.status_code == 200, joined.text
+    assert joined.json()["user_name"] == "Aliyev Vali Sobirovich · O'qituvchi"
+    assert calls == []  # yuz tekshirilmadi

@@ -19,7 +19,7 @@ from app.core.mixins.id_int_pk import IdIntPk
 from app.core.mixins.time_stamp_mixin import TimestampMixin
 
 if TYPE_CHECKING:
-    from app.modules.auth.model import User
+    from app.modules.auth.model import Teacher, User
     from app.modules.organization_structure.model import Group
     from app.modules.quiz.model import Subject
 
@@ -81,9 +81,18 @@ class ZoomSession(Base, IdIntPk, TimestampMixin):
         ForeignKey("zoom_accounts.id", ondelete="RESTRICT"), nullable=True, index=True
     )
 
+    #: Darsni olib boradigan o'qituvchi (`users.id`, `teachers.id` emas). U
+    #: seansni boshqaradi: yuz tekshiruvisiz kiradi, host sifatida boshlaydi.
+    teacher_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     zoom_account: Mapped[ZoomAccount | None] = relationship("ZoomAccount")
+    teacher: Mapped[Teacher | None] = relationship(
+        "Teacher", primaryjoin="foreign(ZoomSession.teacher_user_id) == Teacher.user_id", viewonly=True
+    )
     subject: Mapped[Subject | None] = relationship("Subject")
-    created_by: Mapped[User | None] = relationship("User")
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_user_id])
     group_links: Mapped[list[ZoomSessionGroup]] = relationship(
         "ZoomSessionGroup", cascade="all, delete-orphan", back_populates="session"
     )

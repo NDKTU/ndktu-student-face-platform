@@ -23,6 +23,8 @@ from .schemas import (
     ZoomSessionRequest,
     ZoomSessionResponse,
     ZoomStartResponse,
+    ZoomSubjectOptionListResponse,
+    ZoomTeacherOptionListResponse,
 )
 
 # Ruxsatlar `PermissionRequired` dan topiladi (discovery) va Admin'ga
@@ -57,6 +59,31 @@ async def filter_options(
 ):
     """Guruh tanlashdagi fakultet filtri uchun."""
     return await get_general_test_repository.filter_options(session=session)
+
+
+@router.get("/teacher-options", response_model=ZoomTeacherOptionListResponse)
+async def teacher_options(
+    search: str | None = None,
+    limit: int = Query(30, ge=1, le=100),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """Seansga o'qituvchi tanlash. O'qituvchi o'zi yaratsa — faqat o'zi (`locked`).
+
+    O'z endpointi: umumiy o'qituvchilar ro'yxati `read:teacher` ni talab
+    qiladi, seans tuzuvchida esa u bo'lmasligi mumkin.
+    """
+    return await repo.teacher_options(session=session, user=user, search=search, limit=limit)
+
+
+@router.get("/teacher-subjects", response_model=ZoomSubjectOptionListResponse)
+async def teacher_subjects(
+    teacher_user_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """Tanlangan o'qituvchining fanlari — seansning fani shulardan."""
+    return await repo.teacher_subjects(session=session, user=user, teacher_user_id=teacher_user_id)
 
 
 @router.get("/capabilities", response_model=ZoomCapabilitiesResponse)
@@ -160,9 +187,13 @@ async def join(
 async def start(
     session_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
-    user: User = Depends(PermissionRequired("create:zoom_session")),
+    user: User = Depends(PermissionRequired("join:zoom_session")),
 ):
-    """Host sifatida boshlash havolasi — faqat yaratuvchi va adminga."""
+    """Host sifatida boshlash havolasi — yaratuvchi, biriktirilgan o'qituvchi va adminga.
+
+    Ruxsat `join:zoom_session`: admin seansni o'qituvchiga biriktirsa, o'qituvchida
+    `create:zoom_session` bo'lmasligi mumkin. Kimligini repozitoriy tekshiradi.
+    """
     return await repo.start(session=session, session_id=session_id, user=user)
 
 

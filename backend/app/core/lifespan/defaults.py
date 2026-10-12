@@ -22,6 +22,12 @@ ADMIN_ROLE_NAME = "Admin"
 # `read:kafedra`, `read:speciality` va `read:curriculum` `b9d6f2a41c73` da
 # o'qituvchidan olib tashlangan.
 TEACHER_PERMISSIONS = (
+    # Zoom: o'ziga biriktirilgan seanslarni ko'radi, yuz tekshiruvisiz kiradi va
+    # host sifatida boshlaydi (kimligini repozitoriy tekshiradi). Seans yaratish
+    # (`create:zoom_session`) va hisobot (`read:zoom_report`) ataylab yo'q —
+    # ularni admin rolga o'zi beradi.
+    "read:zoom_session",
+    "join:zoom_session",
     "announcement:feed",
     "announcement:register",
     "create:file",

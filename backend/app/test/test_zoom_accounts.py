@@ -19,7 +19,7 @@ from sqlalchemy import select
 from app.modules.zoom_session.model import ZoomAccount, ZoomSession
 from app.test.test_student_dashboard import _login
 from app.test.test_zoom_api import _create_managed, _participant_event, _signed, _zoom_iso, zoom_cloud  # noqa: F401
-from app.test.test_zoom_session import _iso, zoom_scene  # noqa: F401
+from app.test.test_zoom_session import _iso, _teaching, zoom_scene  # noqa: F401
 
 
 def _account(name: str, **overrides) -> dict:
@@ -88,8 +88,8 @@ async def test_meetings_spread_over_free_accounts(auth_client, async_db, two_acc
     capabilities = (await auth_client.get("/zoom-sessions/capabilities")).json()
     assert [(a["name"], a["auto_create"]) for a in capabilities["accounts"]] == [("A", True), ("B", True)]
 
-    first = await _create_managed(auth_client, two_accounts["group_id"])
-    second = await _create_managed(auth_client, two_accounts["group_id"])
+    first = await _create_managed(auth_client, two_accounts)
+    second = await _create_managed(auth_client, two_accounts)
     assert (first["zoom_account_name"], second["zoom_account_name"]) == ("A", "B")
     assert two_accounts["accounts"][:2] == ["A", "B"]
 
@@ -101,6 +101,7 @@ async def test_meetings_spread_over_free_accounts(auth_client, async_db, two_acc
             "starts_at": _iso(timedelta(minutes=30)),
             "ends_at": _iso(timedelta(hours=2)),
             "group_ids": [two_accounts["group_id"]],
+            **_teaching(two_accounts),
         },
     )
     assert third.status_code == 409
@@ -112,6 +113,7 @@ async def test_meetings_spread_over_free_accounts(auth_client, async_db, two_acc
         "starts_at": _iso(timedelta(hours=3)),
         "ends_at": _iso(timedelta(hours=4)),
         "group_ids": [two_accounts["group_id"]],
+            **_teaching(two_accounts),
         "zoom_account_id": two_accounts["b"]["id"],
     }
     later = await auth_client.post("/zoom-sessions/", json=body)
@@ -126,8 +128,8 @@ async def test_meetings_spread_over_free_accounts(auth_client, async_db, two_acc
 
 @pytest.mark.asyncio
 async def test_student_signed_with_owner_account_sdk(auth_client, async_client, two_accounts):
-    await _create_managed(auth_client, two_accounts["group_id"], face=False)
-    on_b = await _create_managed(auth_client, two_accounts["group_id"], face=False)
+    await _create_managed(auth_client, two_accounts, face=False)
+    on_b = await _create_managed(auth_client, two_accounts, face=False)
     assert on_b["zoom_account_name"] == "B"
 
     headers = await _login(async_client, "zm_member")
@@ -148,6 +150,7 @@ async def test_manual_link_owner_detected(auth_client, two_accounts):
         "starts_at": _iso(timedelta(hours=1)),
         "ends_at": _iso(timedelta(hours=2)),
         "group_ids": [two_accounts["group_id"]],
+            **_teaching(two_accounts),
     }
     created = await auth_client.post("/zoom-sessions/", json=body)
     assert created.status_code == 201, created.text
@@ -165,7 +168,7 @@ async def test_manual_link_owner_detected(auth_client, two_accounts):
 
 @pytest.mark.asyncio
 async def test_webhook_signed_by_any_account(auth_client, async_client, async_db, two_accounts):
-    zs = await _create_managed(auth_client, two_accounts["group_id"], face=False)
+    zs = await _create_managed(auth_client, two_accounts, face=False)
     event = _participant_event(
         "meeting.participant_joined",
         {"participant_uuid": "x-1", "user_name": "Begona", "join_time": _zoom_iso(timedelta(minutes=-2))},

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { GroupChecklist, type GroupSource } from '@/components/generalTest/GroupChecklist';
 import { toggleGroup } from '@/components/generalTest/labels';
-import { useZoomCapabilities } from '@/hooks/useZoomSessions';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useZoomCapabilities, useZoomTeacherOptions, useZoomTeacherSubjects } from '@/hooks/useZoomSessions';
 import { zoomSessionService, type ZoomSession, type ZoomSessionPayload } from '@/services/zoomSessionService';
 
 /** Guruhlar Zoom seansining o'z endpointidan — elementar test ruxsati talab qilinmasin. */
@@ -27,6 +29,27 @@ const splitIso = (iso?: string) => {
 
 const todayInTashkent = () => splitIso(new Date().toISOString()).date;
 
+/** «Aliyev Vali Sobirovich» → «Aliyev V.S.» — server ham shunday qisqartiradi. */
+const shortTeacherName = (fullName: string) => {
+    const [last, ...rest] = fullName.trim().split(/\s+/);
+    const initials = rest.slice(0, 2).map((part) => `${part[0]}.`).join('');
+    return [last, initials].filter(Boolean).join(' ');
+};
+
+/** Server `repository.py::auto_title` bilan bir xil: «Fan — Familiya I.O. (101-23, 102-23 +2)». */
+const TITLE_GROUPS_SHOWN = 3;
+const buildAutoTitle = (subject?: string, teacher?: string, groupNames: string[] = []) => {
+    if (!subject) return '';
+    let title = teacher ? `${subject} — ${shortTeacherName(teacher)}` : subject;
+    const names = [...groupNames].sort();
+    if (names.length) {
+        let shown = names.slice(0, TITLE_GROUPS_SHOWN).join(', ');
+        if (names.length > TITLE_GROUPS_SHOWN) shown += ` +${names.length - TITLE_GROUPS_SHOWN}`;
+        title += ` (${shown})`;
+    }
+    return title.slice(0, 255);
+};
+
 interface Props {
     editing: ZoomSession | null;
     onClose: () => void;
@@ -38,7 +61,12 @@ interface Props {
 export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, error }: Props) {
     const start = splitIso(editing?.starts_at);
     const end = splitIso(editing?.ends_at);
+    // Bo'sh nom — server fan, o'qituvchi va guruhlardan o'zi yasaydi.
     const [title, setTitle] = useState(editing?.title ?? '');
+    const [pickedTeacherId, setTeacherId] = useState<number | null>(editing?.teacher_user_id ?? null);
+    const [pickedTeacherName, setTeacherName] = useState(editing?.teacher_name ?? '');
+    const [teacherSearch, setTeacherSearch] = useState('');
+    const [subjectId, setSubjectId] = useState<number | null>(editing?.subject_id ?? null);
     const [link, setLink] = useState(editing?.link_url ?? '');
     const [date, setDate] = useState(start.date || todayInTashkent());
     const [startTime, setStartTime] = useState(start.time || '12:00');
@@ -49,6 +77,28 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
     const [faceCheck, setFaceCheck] = useState(editing?.face_check_enabled ?? true);
     const [isActive, setIsActive] = useState(editing?.is_active ?? true);
     const [localError, setLocalError] = useState<string | null>(null);
+
+    const { data: teacherData } = useZoomTeacherOptions(useDebouncedValue(teacherSearch));
+    // O'qituvchi o'zi yaratyapti — tanlov yo'q, u o'zi (server ham shuni talab qiladi).
+    const ownTeacher = teacherData?.locked ? teacherData.teachers[0] : undefined;
+    const locked = Boolean(ownTeacher);
+    const teacherId = ownTeacher?.user_id ?? pickedTeacherId;
+    const teacherName = ownTeacher?.name ?? pickedTeacherName;
+    const teacherOptions = useMemo<ComboboxOption[]>(() => {
+        const options = (teacherData?.teachers ?? []).map((t) => ({
+            value: String(t.user_id),
+            label: t.name,
+            hint: t.kafedra_name ?? undefined,
+        }));
+        // Tanlangani qidiruv natijasida bo'lmasa ham tugmada ko'rinib tursin.
+        if (teacherId != null && !options.some((o) => o.value === String(teacherId))) {
+            options.unshift({ value: String(teacherId), label: teacherName || `#${teacherId}`, hint: undefined });
+        }
+        return options;
+    }, [teacherData, teacherId, teacherName]);
+    const { data: subjects, isFetching: subjectsLoading } = useZoomTeacherSubjects(teacherId);
+    const subjectName = subjects?.find((s) => s.id === subjectId)?.name ?? editing?.subject_name ?? undefined;
+    const autoTitle = buildAutoTitle(subjectName, teacherName, [...groups.values()]);
     // Yangi seansda — server Zoom API sozlangan bo'lsa, uchrashuvni o'zi
     // yaratishi mumkin. Tahrirda tanlov yo'q: seans qanday yaratilgan bo'lsa, shunday qoladi.
     const { data: capabilities } = useZoomCapabilities(true);
@@ -66,14 +116,17 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title.trim()) return setLocalError('Nomini kiriting');
+        if (teacherId == null) return setLocalError("O'qituvchini tanlang");
+        if (subjectId == null) return setLocalError('Fanni tanlang');
         if (!managed && !link.trim()) return setLocalError("Zoom havolasini qo'ying");
         if (!date || !startTime || !endTime) return setLocalError('Sana va vaqtni kiriting');
         if (endTime <= startTime) return setLocalError("Tugash vaqti boshlanishdan keyin bo'lishi kerak");
         if (groups.size === 0) return setLocalError('Kamida bitta guruhni tanlang');
         setLocalError(null);
         onSubmit({
-            title: title.trim(),
+            title: title.trim() || null,
+            teacher_user_id: teacherId,
+            subject_id: subjectId,
             link_url: managed ? null : link.trim(),
             zoom_account_id: selectedAccount === '' || editing?.zoom_managed ? null : Number(selectedAccount),
             starts_at: `${date}T${startTime}:00${TASHKENT_OFFSET}`,
@@ -87,7 +140,68 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
     return (
         <Modal isOpen onClose={onClose} title={editing ? 'Seansni tahrirlash' : 'Yangi Zoom seans'} className="md:max-w-2xl">
             <form onSubmit={submit} className="space-y-4">
-                <Input label="Nomi" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Masalan: Ma'lumotlar bazasi — ma'ruza" />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <span className="text-sm font-medium text-foreground">O'qituvchi</span>
+                        <Combobox
+                            options={teacherOptions}
+                            value={teacherId != null ? String(teacherId) : ''}
+                            onChange={(value) => {
+                                const picked = teacherOptions.find((o) => o.value === value);
+                                setTeacherId(value ? Number(value) : null);
+                                setTeacherName(picked?.label ?? '');
+                                // Fan o'qituvchiniki bo'lishi shart — boshqa o'qituvchida u bo'lmasligi mumkin.
+                                setSubjectId(null);
+                            }}
+                            onSearchChange={setTeacherSearch}
+                            placeholder="O'qituvchini tanlang"
+                            searchPlaceholder="F.I.Sh. bo'yicha qidirish..."
+                            disabled={locked}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Darsni olib boradi: yuz tekshiruvisiz kiradi va uchrashuvni host sifatida boshlaydi
+                        </p>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label htmlFor="zoom-subject" className="text-sm font-medium text-foreground">
+                            Fan
+                        </label>
+                        <select
+                            id="zoom-subject"
+                            value={subjectId ?? ''}
+                            onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
+                            disabled={teacherId == null || subjectsLoading}
+                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60"
+                        >
+                            <option value="">
+                                {teacherId == null
+                                    ? "Avval o'qituvchini tanlang"
+                                    : subjectsLoading
+                                        ? 'Yuklanmoqda...'
+                                        : subjects?.length
+                                            ? 'Fanni tanlang'
+                                            : "O'qituvchiga fan biriktirilmagan"}
+                            </option>
+                            {subjects?.map((subject) => (
+                                <option key={subject.id} value={subject.id}>
+                                    {subject.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <Input
+                        label="Nomi"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder={autoTitle || "Fan va o'qituvchini tanlang — nom o'zi yasaladi"}
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                        Bo'sh qoldirsangiz, nom fan, o'qituvchi va guruhlardan o'zi yasaladi
+                        {editing && title ? " — o'zingiz yozgan nomni o'chirsangiz, qayta yasaladi" : ''}
+                    </p>
+                </div>
                 {!editing && capabilities?.auto_create && (
                     <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
                         <label htmlFor="zoom-auto-create" className="cursor-pointer">

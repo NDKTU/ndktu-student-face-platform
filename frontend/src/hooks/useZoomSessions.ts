@@ -36,6 +36,20 @@ export const useZoomCapabilities = (enabled: boolean) =>
         staleTime: 5 * 60_000,
     });
 
+export const useZoomTeacherOptions = (search: string) =>
+    useQuery({
+        queryKey: ['zoom-session-teacher-options', search],
+        queryFn: () => zoomSessionService.teacherOptions(search),
+        placeholderData: (prev) => prev,
+    });
+
+export const useZoomTeacherSubjects = (teacherUserId: number | null) =>
+    useQuery({
+        queryKey: ['zoom-session-teacher-subjects', teacherUserId],
+        queryFn: () => zoomSessionService.teacherSubjects(teacherUserId!),
+        enabled: teacherUserId != null,
+    });
+
 export const useZoomGroupOptions = (filter: GroupOptionFilter, enabled: boolean) =>
     useQuery({
         queryKey: ['zoom-session-group-options', filter],

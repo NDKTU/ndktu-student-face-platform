@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, CalendarClock, ClipboardList, ExternalLink, ScanFace, UsersRound, Video } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarClock, ClipboardList, ExternalLink, GraduationCap, ScanFace, UsersRound, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -92,6 +92,16 @@ export default function ZoomSessionDetailPage() {
                     <CalendarClock className="h-4 w-4" />
                     {formatDate(session.starts_at)}, {formatTime(session.starts_at)}–{formatTime(session.ends_at)}
                 </span>
+                {session.subject_name && (
+                    <span className="inline-flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4" /> {session.subject_name}
+                    </span>
+                )}
+                {session.teacher_name && (
+                    <span className="inline-flex items-center gap-1.5">
+                        <GraduationCap className="h-4 w-4" /> {session.teacher_name}
+                    </span>
+                )}
                 <span className="inline-flex items-center gap-1.5">
                     <UsersRound className="h-4 w-4" />
                     {session.groups.map((g) => g.name).join(', ')}

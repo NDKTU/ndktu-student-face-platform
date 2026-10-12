@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from core.config import settings
 from fastapi import HTTPException, status
-from sqlalchemy import desc, exists, or_, select
+from sqlalchemy import desc, exists, or_, select, union
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +34,7 @@ from app.core.utils.face_service import classify, verify_face
 from app.core.utils.lesson_access import is_admin
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.core.utils.zoom_signature import sign_meeting
-from app.modules.auth.model import Student, User
+from app.modules.auth.model import Student, Teacher, TeacherAssignment, TeacherSubject, User
 from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
 from app.modules.quiz.quiz_process import errors as quiz_errors
@@ -64,6 +64,10 @@ from .schemas import (
     ZoomSessionRequest,
     ZoomSessionResponse,
     ZoomStartResponse,
+    ZoomSubjectOption,
+    ZoomSubjectOptionListResponse,
+    ZoomTeacherOption,
+    ZoomTeacherOptionListResponse,
 )
 from .zoom_api import ZoomApiError, api_error, registrant_token, zoom_api
 
@@ -87,6 +91,9 @@ LEFT_EARLY_GAP_SECONDS = 5 * 60
 #: tugash vaqtidan keyin keladi — shuning uchun oxirida zaxira kattaroq.
 EVENT_MATCH_BEFORE = timedelta(minutes=30)
 EVENT_MATCH_AFTER = timedelta(hours=3)
+
+#: Avtomatik nomda shuncha guruh nomi yoziladi, qolgani «+N».
+TITLE_GROUPS_SHOWN = 3
 
 #: SDK `customerKey` — webhook'da ishtirokchini foydalanuvchiga bog'laydi.
 CUSTOMER_KEY_PREFIX = "lms-"
@@ -159,6 +166,65 @@ def _link_required() -> HTTPException:
         "zoom_link_required",
         "Zoom havolasini qo'ying — avtomatik yaratish sozlanmagan",
     )
+
+
+def _teacher_required() -> HTTPException:
+    return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_teacher_required", "O'qituvchini tanlang")
+
+
+def _teacher_not_found() -> HTTPException:
+    return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_teacher_not_found", "O'qituvchi topilmadi")
+
+
+def _teacher_locked() -> HTTPException:
+    return quiz_error(
+        status.HTTP_403_FORBIDDEN, "zoom_teacher_locked", "O'qituvchi faqat o'zi uchun seans yarata oladi"
+    )
+
+
+def _subject_required() -> HTTPException:
+    return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_subject_required", "Fanni tanlang")
+
+
+def _subject_not_teachers() -> HTTPException:
+    return quiz_error(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "zoom_subject_not_teachers",
+        "Bu fan tanlangan o'qituvchiga biriktirilmagan",
+    )
+
+
+def _readable_name(value: str) -> str:
+    """HEMIS/EPOS ismlarni ko'pincha KATTA harf bilan beradi: «G‘ULOMOV BEKZOD» → «G‘ulomov Bekzod».
+
+    `str.title()` yaramaydi: u «G‘Ulomov» qiladi (apostrofdan keyin ham katta harf).
+    """
+    value = (value or "").strip()
+    if not value.isupper():
+        return value
+    return " ".join(word[:1] + word[1:].lower() for word in value.split())
+
+
+def teacher_short_name(teacher: Teacher) -> str:
+    """«Familiya I.O.» — nomga sig'adigan qisqa shakl."""
+    parts = (teacher.first_name, teacher.third_name)
+    initials = "".join(f"{part.strip()[0]}." for part in parts if part and part.strip())
+    last = _readable_name(teacher.last_name)
+    return f"{last} {initials}".strip() if last else _readable_name(teacher.full_name)
+
+
+def auto_title(subject_name: str, teacher: Teacher | None, group_names: list[str]) -> str:
+    """«Fan — Familiya I.O. (101-23, 102-23 +2)»."""
+    title = subject_name.strip()
+    if teacher is not None:
+        title = f"{title} — {teacher_short_name(teacher)}"
+    names = sorted(group_names)
+    if names:
+        shown = ", ".join(names[:TITLE_GROUPS_SHOWN])
+        if len(names) > TITLE_GROUPS_SHOWN:
+            shown += f" +{len(names) - TITLE_GROUPS_SHOWN}"
+        title = f"{title} ({shown})"
+    return title[:255]
 
 
 def _account_not_found() -> HTTPException:
@@ -240,7 +306,8 @@ class ZoomSessionRepository:
 
     @staticmethod
     def _can_manage(zs: ZoomSession, user: User) -> bool:
-        return is_admin(user) or (zs.created_by_user_id is not None and zs.created_by_user_id == user.id)
+        """Admin, yaratuvchi va biriktirilgan o'qituvchi: ular darsni olib boradi."""
+        return is_admin(user) or user.id in {zs.created_by_user_id, zs.teacher_user_id} - {None}
 
     async def _get(self, session: AsyncSession, session_id: int) -> ZoomSession:
         zs = (
@@ -251,6 +318,7 @@ class ZoomSessionRepository:
                     selectinload(ZoomSession.subject),
                     selectinload(ZoomSession.created_by),
                     selectinload(ZoomSession.zoom_account),
+                    selectinload(ZoomSession.teacher),
                 )
                 .where(ZoomSession.id == session_id)
             )
@@ -276,6 +344,8 @@ class ZoomSessionRepository:
             status=self._status(zs, now),  # type: ignore[arg-type]
             subject_id=zs.subject_id,
             subject_name=zs.subject.name if zs.subject else None,
+            teacher_user_id=zs.teacher_user_id,
+            teacher_name=_readable_name(zs.teacher.full_name) if zs.teacher else None,
             groups=sorted(
                 (SessionGroup(id=link.group.id, name=link.group.name) for link in zs.group_links if link.group),
                 key=lambda g: g.name,
@@ -301,10 +371,11 @@ class ZoomSessionRepository:
             selectinload(ZoomSession.subject),
             selectinload(ZoomSession.created_by),
             selectinload(ZoomSession.zoom_account),
+            selectinload(ZoomSession.teacher),
         )
         if not is_admin(user):
             student = await self._student(session, user.id)
-            visible = [ZoomSession.created_by_user_id == user.id]
+            visible = [ZoomSession.created_by_user_id == user.id, ZoomSession.teacher_user_id == user.id]
             if student is not None and student.group_id is not None:
                 visible.append(
                     ZoomSession.is_active.is_(True)
@@ -338,7 +409,7 @@ class ZoomSessionRepository:
 
     # ── Boshqaruv ────────────────────────────────────────────────────────────
 
-    async def _apply(self, session: AsyncSession, zs: ZoomSession, data: ZoomSessionRequest) -> None:
+    async def _apply(self, session: AsyncSession, zs: ZoomSession, data: ZoomSessionRequest, user: User) -> None:
         # API yaratgan uchrashuvning havolasi bizniki — tahrirda almashtirilmaydi.
         if not zs.zoom_managed:
             if data.link_url is None:
@@ -350,13 +421,23 @@ class ZoomSessionRepository:
             zs.link_url = data.link_url
             zs.zoom_meeting_id = int(meeting_number)
         group_ids = set(data.group_ids)
-        found = set((await session.execute(select(Group.id).where(Group.id.in_(group_ids)))).scalars().all())
-        if found != group_ids:
+        group_names = dict(
+            (await session.execute(select(Group.id, Group.name).where(Group.id.in_(group_ids)))).all()
+        )
+        if set(group_names) != group_ids:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guruh topilmadi")
-        if data.subject_id is not None and await session.get(Subject, data.subject_id) is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fan topilmadi")
 
-        zs.title = data.title
+        teacher = await self._resolve_teacher(session, user, data.teacher_user_id)
+        if data.subject_id is None:
+            raise _subject_required()
+        subject = await session.get(Subject, data.subject_id)
+        if subject is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fan topilmadi")
+        if data.subject_id not in await self._teacher_subject_ids(session, teacher.id):
+            raise _subject_not_teachers()
+
+        zs.teacher_user_id = teacher.user_id
+        zs.title = data.title or auto_title(subject.name, teacher, list(group_names.values()))
         zs.starts_at = data.starts_at
         zs.ends_at = data.ends_at
         zs.subject_id = data.subject_id
@@ -368,6 +449,85 @@ class ZoomSessionRepository:
                 zs.group_links.remove(link)
         for group_id in group_ids - set(current):
             zs.group_links.append(ZoomSessionGroup(group_id=group_id))
+
+    # ── O'qituvchi va fan ────────────────────────────────────────────────────
+
+    @staticmethod
+    async def _teacher_by_user(session: AsyncSession, user_id: int) -> Teacher | None:
+        return (
+            await session.execute(
+                select(Teacher).options(selectinload(Teacher.kafedra)).where(Teacher.user_id == user_id)
+            )
+        ).scalar_one_or_none()
+
+    async def _own_teacher(self, session: AsyncSession, user: User) -> Teacher | None:
+        """Admin bo'lmagan o'qituvchi faqat o'zi uchun seans tuzadi."""
+        return None if is_admin(user) else await self._teacher_by_user(session, user.id)
+
+    async def _resolve_teacher(self, session: AsyncSession, user: User, teacher_user_id: int | None) -> Teacher:
+        own = await self._own_teacher(session, user)
+        if own is not None:
+            if teacher_user_id not in (None, own.user_id):
+                raise _teacher_locked()
+            return own
+        if teacher_user_id is None:
+            raise _teacher_required()
+        teacher = await self._teacher_by_user(session, teacher_user_id)
+        if teacher is None:
+            raise _teacher_not_found()
+        return teacher
+
+    @staticmethod
+    async def _teacher_subject_ids(session: AsyncSession, teacher_id: int) -> set[int]:
+        """O'qituvchining fanlari: `teacher_subject` va EPOS yuklamasi birgalikda.
+
+        Ikkalasi ham kerak: yuklama hammani qamramaydi, `teacher_subject` esa
+        yuklamada bor ba'zi fanlarni bilmaydi.
+        """
+        linked = select(TeacherSubject.subject_id).where(
+            TeacherSubject.teacher_id == teacher_id, TeacherSubject.is_active.is_(True)
+        )
+        assigned = select(TeacherAssignment.subject_id).where(
+            TeacherAssignment.teacher_id == teacher_id, TeacherAssignment.is_active.is_(True)
+        )
+        return set((await session.execute(union(linked, assigned))).scalars().all())
+
+    @staticmethod
+    def _teacher_option(teacher: Teacher) -> ZoomTeacherOption:
+        return ZoomTeacherOption(
+            user_id=teacher.user_id,
+            name=_readable_name(teacher.full_name),
+            kafedra_name=teacher.kafedra.name if teacher.kafedra else None,
+        )
+
+    async def teacher_options(
+        self, session: AsyncSession, user: User, search: str | None, limit: int
+    ) -> ZoomTeacherOptionListResponse:
+        own = await self._own_teacher(session, user)
+        if own is not None:
+            return ZoomTeacherOptionListResponse(teachers=[self._teacher_option(own)], locked=True)
+        stmt = (
+            select(Teacher)
+            .options(selectinload(Teacher.kafedra))
+            .join(User, User.id == Teacher.user_id)
+            .where(User.is_active.is_(True), Teacher.is_active.is_(True))
+        )
+        if search and search.strip():
+            stmt = stmt.where(Teacher.full_name.ilike(f"%{search.strip()}%"))
+        rows = (await session.execute(stmt.order_by(Teacher.full_name).limit(limit))).scalars().all()
+        return ZoomTeacherOptionListResponse(teachers=[self._teacher_option(t) for t in rows])
+
+    async def teacher_subjects(
+        self, session: AsyncSession, user: User, teacher_user_id: int
+    ) -> ZoomSubjectOptionListResponse:
+        teacher = await self._resolve_teacher(session, user, teacher_user_id)
+        ids = await self._teacher_subject_ids(session, teacher.id)
+        if not ids:
+            return ZoomSubjectOptionListResponse(subjects=[])
+        rows = (
+            await session.execute(select(Subject.id, Subject.name).where(Subject.id.in_(ids)).order_by(Subject.name))
+        ).all()
+        return ZoomSubjectOptionListResponse(subjects=[ZoomSubjectOption(id=i, name=n) for i, n in rows])
 
     # ── Akkaunt tanlash ──────────────────────────────────────────────────────
 
@@ -466,12 +626,12 @@ class ZoomSessionRepository:
         """Havola bo'lmasa — uchrashuv Zoom API orqali yaratiladi (ro'yxatdan o'tish bilan)."""
         managed = data.link_url is None
         zs = ZoomSession(created_by_user_id=user.id, group_links=[], zoom_managed=managed)
-        await self._apply(session, zs, data)
+        await self._apply(session, zs, data, user)
         meeting_id: int | None = None
         if managed:
             creds = await self._choose_for_new_meeting(session, data)
             try:
-                meeting = await zoom_api.create_meeting(creds, data.title, data.starts_at, data.ends_at)
+                meeting = await zoom_api.create_meeting(creds, zs.title, data.starts_at, data.ends_at)
             except ZoomApiError as cause:
                 raise api_error(cause) from cause
             meeting_id = int(meeting["id"])
@@ -496,7 +656,7 @@ class ZoomSessionRepository:
         zs = await self._get_managed(session, session_id, user)
         before = (zs.title, zs.starts_at, zs.ends_at)
         link_before = zs.link_url
-        await self._apply(session, zs, data)
+        await self._apply(session, zs, data, user)
         if zs.zoom_managed:
             # API yaratgan uchrashuv o'z akkauntida yashaydi — akkaunt o'zgarmaydi.
             creds = await self._session_credentials(session, zs)
@@ -657,7 +817,13 @@ class ZoomSessionRepository:
         group_name: str | None = None
         person = user.username
         if self._can_manage(zs, user):
-            name = user.username
+            # O'qituvchi yuz tekshiruvisiz kiradi: u talaba emas, darsni olib boradi.
+            if zs.teacher is not None and zs.teacher_user_id == user.id:
+                person = _readable_name(zs.teacher.full_name)
+                group_name = "O'qituvchi"
+                name = f"{person} · {group_name}"
+            else:
+                name = user.username
         else:
             student = await self._admit_student(session, zs, user)
             if zs.face_check_enabled and not await redis_client.exists(_face_ok_key(session_id, user.id)):

@@ -20,7 +20,7 @@ from app.modules.zoom_session.accounts import ZoomCredentials
 from app.modules.zoom_session.model import ZoomParticipantEvent, ZoomRegistrant, ZoomSession
 from app.modules.zoom_session.zoom_api import ZoomApiError, registrant_token, zoom_api
 from app.test.test_student_dashboard import _login
-from app.test.test_zoom_session import _create, _fake_face, _iso, zoom_scene  # noqa: F401
+from app.test.test_zoom_session import _fake_face, _iso, _teaching, zoom_scene  # noqa: F401
 
 SECRET = "test-webhook-secret"
 MEETING_ID = 81234567890
@@ -79,14 +79,16 @@ async def zoom_cloud(zoom_scene, monkeypatch):  # noqa: F811
     return {**zoom_scene, "calls": calls, "accounts": accounts, "owners": owners}
 
 
-async def _create_managed(auth_client, group_id: int, *, face: bool = True) -> dict:
+async def _create_managed(auth_client, scene: dict, *, face: bool = True, **extra) -> dict:
     created = await auth_client.post(
         "/zoom-sessions/",
         json={
             "title": "Avto dars",
             "starts_at": _iso(timedelta(minutes=-5)),
             "ends_at": _iso(timedelta(hours=1)),
-            "group_ids": [group_id],
+            "group_ids": [scene["group_id"]],
+            **_teaching(scene),
+            **extra,
             "face_check_enabled": face,
         },
     )
@@ -133,6 +135,7 @@ async def test_capabilities_follow_config(auth_client, zoom_scene, monkeypatch):
             "starts_at": _iso(timedelta(hours=1)),
             "ends_at": _iso(timedelta(hours=2)),
             "group_ids": [zoom_scene["group_id"]],
+            **_teaching(zoom_scene),
         },
     )
     assert created.status_code == 422
@@ -145,7 +148,7 @@ async def test_session_without_link_creates_zoom_meeting(auth_client, async_db, 
         "auto_create": True,
         "accounts": [{"id": 0, "name": "Asosiy (.env)", "auto_create": True}],
     }
-    zs = await _create_managed(auth_client, zoom_cloud["group_id"])
+    zs = await _create_managed(auth_client, zoom_cloud)
     assert zs["zoom_managed"] is True
     assert zs["link_url"].startswith(f"https://us06web.zoom.us/j/{MEETING_ID}")
     assert [c[0] for c in zoom_cloud["calls"]] == ["create"]
@@ -162,6 +165,7 @@ async def test_session_without_link_creates_zoom_meeting(auth_client, async_db, 
             "starts_at": _iso(timedelta(minutes=-5)),
             "ends_at": _iso(timedelta(hours=2)),
             "group_ids": [zoom_cloud["group_id"]],
+            **_teaching(zoom_cloud),
         },
     )
     assert updated.status_code == 200, updated.text
@@ -188,6 +192,7 @@ async def test_zoom_failure_does_not_create_session(auth_client, async_db, zoom_
             "starts_at": _iso(timedelta(hours=1)),
             "ends_at": _iso(timedelta(hours=2)),
             "group_ids": [zoom_cloud["group_id"]],
+            **_teaching(zoom_cloud),
         },
     )
     assert created.status_code == 502
@@ -197,7 +202,7 @@ async def test_zoom_failure_does_not_create_session(auth_client, async_db, zoom_
 
 @pytest.mark.asyncio
 async def test_student_gets_personal_token_after_face_check(auth_client, async_client, async_db, zoom_cloud, monkeypatch):
-    zs = await _create_managed(auth_client, zoom_cloud["group_id"])
+    zs = await _create_managed(auth_client, zoom_cloud)
     headers = await _login(async_client, "zm_member")
 
     # Yuz tasdig'isiz registrant ham qo'shilmaydi.
@@ -239,7 +244,7 @@ async def test_webhook_url_validation_and_signature(async_client, zoom_cloud):
 
 @pytest.mark.asyncio
 async def test_webhook_attendance_in_report(auth_client, async_client, async_db, zoom_cloud, monkeypatch):
-    zs = await _create_managed(auth_client, zoom_cloud["group_id"], face=False)
+    zs = await _create_managed(auth_client, zoom_cloud, face=False)
     headers = await _login(async_client, "zm_member")
     body = (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).json()
     user_id = int(body["customer_key"].removeprefix("lms-"))
