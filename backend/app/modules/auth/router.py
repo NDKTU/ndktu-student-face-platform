@@ -3,10 +3,10 @@ import logging
 
 from core.config import settings
 from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from core.dependencies.role_checker import AdminRequired, PermissionRequired
 from app.modules.audit import service as audit_service
 from app.modules.audit.model import AuditEvent
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,9 +51,11 @@ from .role.schemas import (
     RoleListResponse,
     RolePermissionAssignRequest,
 )
+from .student.badge import build_student_badge, load_badge_photo
 from .student.dashboard import build_student_dashboard
 from .student.repository import student_repository
 from .student.schemas import (
+    StudentBadgeResponse,
     StudentDashboardResponse,
     StudentListRequest,
     StudentListResponse,
@@ -516,6 +518,38 @@ async def get_student(
     current_user: User = Depends(PermissionRequired("read:student")),
 ):
     return await student_repository.get_student(session, student_id, current_user=current_user)
+
+
+# Bejik — faqat admin. `read:student` yetarli emas: u Rollar oynasidan boshqa
+# rollarga ham beriladi, bejik esa rasmiy hujjat sifatida chop etiladi.
+@student_router.get("/{student_id}/badge", response_model=StudentBadgeResponse)
+async def get_student_badge(
+    student_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(AdminRequired()),
+):
+    """Talaba bejigiga chiqadigan maʼlumot: F.I.Sh., fakultet, guruh, talaba ID."""
+    return await build_student_badge(session, student_id)
+
+
+@student_router.get("/{student_id}/badge/photo")
+async def get_student_badge_photo(
+    student_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(AdminRequired()),
+):
+    """Bejik uchun talaba surati (fayl).
+
+    Surat HEMIS'dan toʻgʻridan-toʻgʻri olinmaydi: u CORS'siz keladi va
+    brauzer bunday rasmli bejikni JPG qilib saqlashga ruxsat bermaydi
+    (`student/badge.py`).
+    """
+    content, media_type = await load_badge_photo(session, student_id)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 # EPOS/HEMIS bilan boshqariladigan maʼlumot: bu endpoint 2026-09-11 da

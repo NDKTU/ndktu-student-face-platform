@@ -70,6 +70,20 @@ class StudentResponse(StudentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class StudentBadgeResponse(BaseModel):
+    """Bejikka chiqadigan maydonlar — profilning qolgan qismi yuborilmaydi."""
+
+    student_id: int
+    full_name: str
+    faculty: Optional[str] = None
+    group_name: Optional[str] = None
+    student_id_number: Optional[str] = None
+    #: Surat manzili bor-yoʻqligi. Faylning oʻzi alohida soʻraladi
+    #: (`/students/{id}/badge/photo`): HEMIS sekin javob bersa ham,
+    #: bejikning matn qismi darhol koʻrinadi.
+    has_photo: bool = False
+
+
 class StudentListRequest(BaseModel):
     page: int = 1
     limit: int = 10

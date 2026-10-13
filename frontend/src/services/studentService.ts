@@ -136,6 +136,18 @@ export interface StudentDashboard {
     recent_results: StudentDashboardResult[];
 }
 
+// ── Talaba bejigi (`GET /students/{id}/badge`) — faqat admin ────────────────
+
+export interface StudentBadge {
+    student_id: number;
+    full_name: string;
+    faculty: string | null;
+    group_name: string | null;
+    student_id_number: string | null;
+    /** Surat manzili bor; faylning o'zi `getBadgePhoto` bilan olinadi. */
+    has_photo: boolean;
+}
+
 export const studentService = {
     /** Joriy talabaning bosh sahifa statistikasi — faqat o'zi. */
     getMyDashboard: async (): Promise<StudentDashboard> => {
@@ -176,6 +188,26 @@ export const studentService = {
 
     getStudentById: async (id: number): Promise<Student> => {
         const response = await api.get<Student>(`/students/${id}`);
+        return response.data;
+    },
+
+    getBadge: async (id: number): Promise<StudentBadge> => {
+        const response = await api.get<StudentBadge>(`/students/${id}/badge`);
+        return response.data;
+    },
+
+    /**
+     * Bejik uchun surat. HEMIS'dan to'g'ridan-to'g'ri emas, backend orqali:
+     * HEMIS CORS sarlavhasini bermaydi va bunday surat chizilgan canvas'ni
+     * brauzer JPG qilib saqlashga qo'ymaydi.
+     */
+    getBadgePhoto: async (id: number): Promise<Blob> => {
+        const response = await api.get<Blob>(`/students/${id}/badge/photo`, {
+            responseType: 'blob',
+            // Backend suratni HEMIS'dan 10 soniyagacha kutadi — umumiy
+            // 10 soniyalik chegara undan oldin uzib qo'yardi.
+            timeout: 20000,
+        });
         return response.data;
     },
 

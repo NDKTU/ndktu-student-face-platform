@@ -33,6 +33,7 @@
     "i18next": "^26.3.6",
     "jodit-react": "^5.3.21",
     "lucide-react": "^0.563.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.1",

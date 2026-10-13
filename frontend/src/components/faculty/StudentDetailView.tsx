@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { CheckCircle2, /* FolderEdit, */ XCircle, ArrowRight } from 'lucide-react';
 import { useUserResults } from '@/hooks/useResults';
+import { useRoleView } from '@/hooks/useRoleView';
+import { StudentBadgeButton } from '@/components/students/StudentBadgeButton';
 // import { /* ChangeGroupModal */ } from '@/components/ChangeGroupModal';
 import type { Faculty } from '@/services/facultyService';
 import type { Group } from '@/services/groupService';
@@ -40,6 +42,7 @@ export const StudentDetailView = ({
     onBackToStudents,
 }: StudentDetailViewProps) => {
     const navigate = useNavigate();
+    const { isAdmin } = useRoleView();
     // EPOS/HEMIS maʼlumoti: 2026-09-11 da kommentga olindi (yaratish/tahrirlash/oʻchirish).
 //     const [moveOpen, setMoveOpen] = useState(false);
     const [resultsPage, setResultsPage] = useState(1);
@@ -129,6 +132,9 @@ export const StudentDetailView = ({
                 onBack={onBackToStudents}
                 title={student.full_name || `Talaba #${student.id}`}
                 description={`${faculty.name} · ${group.name} · Talaba shaxsiy va akademik profili`}
+                // Admin bo'lmaganda `actions` umuman berilmaydi: bo'sh konteyner
+                // telefonda sarlavha ostida ortiqcha oraliq qoldirardi.
+                actions={isAdmin ? <StudentBadgeButton studentId={student.id} /> : undefined}
                 /* EPOS/HEMIS maʼlumoti: «Boshqa guruhga o'tkazish» 2026-09-11 da kommentga olindi.
                 actions={
                     <Button

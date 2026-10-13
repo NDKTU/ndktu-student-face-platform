@@ -38,6 +38,7 @@ import type { Result } from '@/services/resultService';
 import { formatDate } from '@/utils/date';
 import { useTranslation } from 'react-i18next';
 import { PersonAvatar } from '@/components/ui/PersonAvatar';
+import { StudentBadgeButton } from '@/components/students/StudentBadgeButton';
 import { formatGpa } from '@/utils/gpa';
 
 type SortField = 'name' | 'user_id' | 'created_at';
@@ -631,24 +632,29 @@ const StudentDetail = ({
     return (
         <div className="space-y-6">
             {/* Header & Back Button */}
-            <div className="flex items-center gap-4">
-                <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5 font-semibold">
-                    <ArrowLeft className="h-4 w-4" />
-                    <span>Orqaga</span>
-                </Button>
-                {/* Surat HEMIS'dan keladi va yuz tekshiruvida etalon sifatida
-                    ishlatiladi — uni ko'rsatmaslik xodimga «bu kimning surati
-                    bilan solishtirilyapti?» degan savolga javob bermasdi. */}
-                <PersonAvatar
-                    id={student.id}
-                    name={student.full_name || `Talaba #${student.id}`}
-                    src={student.image_path}
-                    className="h-14 w-14 text-base"
-                />
-                <div>
-                    <h1 className="page-title">{student.full_name || `Talaba #${student.id}`}</h1>
-                    <p className="text-xs text-muted-foreground">User ID: #{student.user_id}</p>
+            {/* Tashqi qator faqat «Bejik yaratish» uchun: admin bo'lmaganda
+                ichida bitta element qoladi va sarlavha avvalgidek ko'rinadi. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5 font-semibold">
+                        <ArrowLeft className="h-4 w-4" />
+                        <span>Orqaga</span>
+                    </Button>
+                    {/* Surat HEMIS'dan keladi va yuz tekshiruvida etalon sifatida
+                        ishlatiladi — uni ko'rsatmaslik xodimga «bu kimning surati
+                        bilan solishtirilyapti?» degan savolga javob bermasdi. */}
+                    <PersonAvatar
+                        id={student.id}
+                        name={student.full_name || `Talaba #${student.id}`}
+                        src={student.image_path}
+                        className="h-14 w-14 text-base"
+                    />
+                    <div>
+                        <h1 className="page-title">{student.full_name || `Talaba #${student.id}`}</h1>
+                        <p className="text-xs text-muted-foreground">User ID: #{student.user_id}</p>
+                    </div>
                 </div>
+                <StudentBadgeButton studentId={student.id} className="w-full shrink-0 sm:w-auto" />
             </div>
 
             {/* Information Cards */}

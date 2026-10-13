@@ -530,5 +530,20 @@
   "Ko'rish doirasi": "Область видимости",
   "Foydalanuvchi faqat shu bo'linmalarning talabalari va natijalarini ko'radi.": "Пользователь видит студентов и результаты только этих подразделений.",
   "Tanlanmagan — hech kim ko'rinmaydi": "Не выбрано — никто не виден",
-  "Ko'rish doirasini saqlashda xatolik yuz berdi": "Не удалось сохранить область видимости"
+  "Ko'rish doirasini saqlashda xatolik yuz berdi": "Не удалось сохранить область видимости",
+  "Bejik yaratish": "Создать бейдж",
+  "Talaba bejigi": "Бейдж студента",
+  "{{name}} bejigi": "Бейдж: {{name}}",
+  "O'lcham: {{w}} × {{h}} sm · {{pw}} × {{ph}} px · {{dpi}} DPI": "Размер: {{w}} × {{h}} см · {{pw}} × {{ph}} px · {{dpi}} DPI",
+  "Talaba surati yuklanmoqda...": "Загрузка фотографии студента...",
+  "Talabaning surati tizimda yo'q — bejikda standart rasm ishlatildi.": "В системе нет фотографии студента — на бейдже использовано стандартное изображение.",
+  "Talaba suratini yuklab bo'lmadi — bejikda standart rasm ishlatildi.": "Не удалось загрузить фотографию студента — на бейдже использовано стандартное изображение.",
+  "JPG formatida yuklab olish": "Скачать в формате JPG",
+  "Bejik JPG formatida yuklab olindi": "Бейдж скачан в формате JPG",
+  "Bejikni saqlab bo'lmadi": "Не удалось сохранить бейдж",
+  "Bejikni chizib bo'lmadi": "Не удалось сформировать бейдж",
+  "Bejik yaratish faqat administratorga ruxsat etilgan.": "Создание бейджа доступно только администратору.",
+  "Ruxsat yo'q": "Нет доступа",
+  "Yopish": "Закрыть",
+  "Kartani kursor yoki barmoq bilan burib ko'ring": "Поверните карточку курсором или пальцем"
 }

@@ -1,4 +1,5 @@
 import { useQuery, /* useMutation, */ /* useQueryClient */ } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { studentService, type StudentListParams /* , type StudentCreateRequest */ } from '@/services/studentService';
 
 export const useStudents = (
@@ -81,6 +82,27 @@ export const useStudent = (id: number) => {
 //         },
 //     });
 // };
+
+export const useStudentBadge = (id: number, enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['student-badge', id],
+        queryFn: () => studentService.getBadge(id),
+        enabled: enabled && !!id,
+    });
+};
+
+export const useStudentBadgePhoto = (id: number, enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['student-badge-photo', id],
+        queryFn: () => studentService.getBadgePhoto(id),
+        enabled: enabled && !!id,
+        // 502 — HEMIS javob bermadi. Uch marta qayta so'rash admin'ni
+        // yarim daqiqa kuttirardi; bitta urinishdan keyin bejik standart
+        // rasm bilan chiqadi va «Qayta urinish» tugmasi qoladi.
+        retry: (failureCount, error) => failureCount < 1 && !(isAxiosError(error) && error.response?.status === 404),
+        staleTime: 5 * 60 * 1000,
+    });
+};
 
 export const useMyStudentDashboard = (enabled: boolean = true) => {
     return useQuery({

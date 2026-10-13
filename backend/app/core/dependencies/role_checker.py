@@ -142,6 +142,41 @@ async def _roles_have_permission(session: AsyncSession, user: User, permission_n
     return result.scalars().first() is not None
 
 
+class AdminRequired:
+    """Faqat admin — ruxsat bilan ochilmaydigan endpointlar uchun.
+
+    `PermissionRequired` adminni o'tkazadi, lekin ruxsat Rollar oynasidan
+    istalgan rolga berilishi mumkin. Bu yerda esa ruxsat nomi umuman yo'q:
+    endpointni boshqa rolga ochib qo'yishning iloji bo'lmasligi kerak.
+
+    Faol ko'rinish hisobga olinadi (`apply_active_role`): o'qituvchi
+    ko'rinishiga o'tgan admin shu so'rovda admin emas — frontend ham tugmani
+    aynan shu holatda yashiradi.
+    """
+
+    async def __call__(
+        self,
+        user_id: int = Depends(get_current_user_id),
+        session: AsyncSession = Depends(db_helper.session_getter),
+        active_role_id: int | None = Depends(get_active_role_id),
+    ) -> User:
+        user_stmt = select(User).where(User.id == user_id).options(selectinload(User.roles))
+        user = (await session.execute(user_stmt)).scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        apply_active_role(user, active_role_id)
+
+        if not any(role.name.lower() == "admin" for role in user.roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: administrator role required",
+            )
+
+        return user
+
+
 class PermissionRequiredExceptRole(PermissionRequired):
     """`PermissionRequired`, ustiga — bitta rolni to'sish.
 
