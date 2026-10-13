@@ -142,8 +142,35 @@ export default function ZoomSessionDetailPage() {
                         description="Seans vaqti o'tgandan keyin unga kirib bo'lmaydi."
                     />
                 </Card>
+            ) : session.can_manage ? (
+                /* Darsni olib boruvchiga sahifadagi SDK berilmaydi: imzo doim
+                   ishtirokchi (`role: 0`) va uchrashuv `mute_upon_entry` bilan
+                   yaratilgan — 13.10 da o'qituvchi shu yo'l bilan kirib,
+                   ovozsiz va host huquqisiz qolgan, uchrashuv esa hostsiz o'tgan. */
+                <Card>
+                    <EmptyState
+                        icon={<Video className="h-6 w-6" />}
+                        title="Darsni host sifatida boshlang"
+                        description={
+                            session.zoom_managed
+                                ? "Uchrashuv Zoom'da host sifatida ochiladi: mikrofon yoqiq bo'ladi va talabalar ovozini boshqara olasiz."
+                                : "Uchrashuvni o'z Zoom akkauntingizda boshlang — havola egasi host bo'ladi."
+                        }
+                        action={
+                            session.zoom_managed ? (
+                                <Button isLoading={starting} onClick={() => void startAsHost()}>
+                                    <ExternalLink className="h-4 w-4" /> Host sifatida boshlash
+                                </Button>
+                            ) : session.link_url ? (
+                                <Button onClick={() => window.open(session.link_url ?? '', '_blank', 'noopener,noreferrer')}>
+                                    <ExternalLink className="h-4 w-4" /> Zoom'da ochish
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                </Card>
             ) : (
-                <ZoomMeetingBox sessionId={session.id} faceCheckEnabled={studentView && session.face_check_enabled} />
+                <ZoomMeetingBox sessionId={session.id} faceCheckEnabled={session.face_check_enabled} />
             )}
         </div>
     );
