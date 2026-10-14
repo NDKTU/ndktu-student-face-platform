@@ -176,11 +176,15 @@ async def face_check(
 )
 async def join(
     session_id: int,
+    app: bool = False,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: User = Depends(PermissionRequired("join:zoom_session")),
 ):
-    """Meeting SDK imzosi: guruh, vaqt va yuz tasdig'idan keyin. Sir brauzerga chiqmaydi."""
-    return await repo.join(session=session, session_id=session_id, user=user)
+    """Meeting SDK imzosi: guruh, vaqt va yuz tasdig'idan keyin. Sir brauzerga chiqmaydi.
+
+    `app=1` — telefondan: qo'shimcha ravishda Zoom ilovasi uchun shaxsiy havola.
+    """
+    return await repo.join(session=session, session_id=session_id, user=user, app=app)
 
 
 @router.post("/{session_id}/start", response_model=ZoomStartResponse)

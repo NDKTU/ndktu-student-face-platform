@@ -150,6 +150,9 @@ class ZoomJoinResponse(BaseModel):
     customer_key: str
     #: Host ZAK tokeni (SDK `zak`) — faqat darsni olib boruvchi o'qituvchiga.
     zak: Optional[str] = None
+    #: Telefon uchun: Zoom ilovasiga shaxsiy havola (faqat `?app=1` so'ralganda).
+    #: Brauzerdagi SDK (Component View) telefon va planshetda qo'llanmaydi.
+    app_join_url: Optional[str] = None
 
 
 # ── Yuz tekshiruvi (ilgari `course/face_check/schemas.py`) ────────────────────

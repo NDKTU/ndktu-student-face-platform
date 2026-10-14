@@ -85,6 +85,8 @@ export interface ZoomJoinResponse {
     customer_key: string;
     /** Host ZAK tokeni (SDK `zak`) — faqat darsni olib boruvchi o'qituvchiga. */
     zak?: string | null;
+    /** Telefon uchun: Zoom ilovasiga shaxsiy havola (faqat `join(id, { app: true })`). */
+    app_join_url?: string | null;
 }
 
 export type FaceCheckStage = 'join' | 'random';
@@ -204,7 +206,13 @@ export const zoomSessionService = {
     faceCheck: async (sessionId: number, payload: FaceCheckPayload) =>
         (await api.post<FaceCheckResult>(`/zoom-sessions/${sessionId}/face-check`, payload)).data,
     /** Meeting SDK imzosi — guruh, vaqt va yuz tasdig'idan keyin. */
-    join: async (sessionId: number) => (await api.post<ZoomJoinResponse>(`/zoom-sessions/${sessionId}/join`)).data,
+    /** `app` — telefondan: javobda Zoom ilovasi uchun shaxsiy havola ham keladi. */
+    join: async (sessionId: number, options?: { app?: boolean }) =>
+        (
+            await api.post<ZoomJoinResponse>(`/zoom-sessions/${sessionId}/join`, null, {
+                params: options?.app ? { app: true } : undefined,
+            })
+        ).data,
 
     report: async (sessionId: number) =>
         (await api.get<FaceCheckReport>(`/zoom-sessions/${sessionId}/report`)).data,

@@ -69,7 +69,7 @@ from .schemas import (
     ZoomTeacherOption,
     ZoomTeacherOptionListResponse,
 )
-from .zoom_api import ZoomApiError, api_error, registrant_token, zak_token, zoom_api
+from .zoom_api import ZoomApiError, api_error, registrant_join_url, registrant_token, zak_token, zoom_api
 
 logger = logging.getLogger(__name__)
 
@@ -812,7 +812,7 @@ class ZoomSessionRepository:
             admitted=admitted,
         )
 
-    async def join(self, session: AsyncSession, session_id: int, user: User) -> ZoomJoinResponse:
+    async def join(self, session: AsyncSession, session_id: int, user: User, *, app: bool = False) -> ZoomJoinResponse:
         """Meeting SDK imzosi — barcha tekshiruvlardan keyin.
 
         Yaratuvchi va admin tekshiruvsiz kiradi: ular talaba emas, darsni
@@ -878,6 +878,9 @@ class ZoomSessionRepository:
             registrant_token=token,
             customer_key=f"{CUSTOMER_KEY_PREFIX}{user.id}",
             zak=zak,
+            # Faqat telefondan so'ralganda: kompyuterda havola tasodifiy yuz
+            # tekshiruvlaridan chetlab o'tish yo'li bo'lib qolardi.
+            app_join_url=registrant_join_url(zs.link_url, meeting_number, token) if app and token else None,
         )
 
     async def _host_zak(self, session: AsyncSession, creds: ZoomCredentials, zs: ZoomSession) -> str:

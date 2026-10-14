@@ -222,9 +222,18 @@ async def test_student_gets_personal_token_after_face_check(auth_client, async_c
     register = [c for c in zoom_cloud["calls"] if c[0] == "register"]
     assert register == [("register", MEETING_ID, f"lms-{user_id}@lms.nsumt.uz", "Ali Talaba T", "ZM-101")]
 
+    # Kompyuterda ilova havolasi berilmaydi — tasodifiy yuz tekshiruvidan qochish yo'li bo'lardi.
+    assert body["app_join_url"] is None
+
     # Qayta kirish — token bazadan, Zoom'ga yana murojaat yo'q.
     again = await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)
     assert again.json()["registrant_token"] == body["registrant_token"]
+
+    # Telefondan: SDK u yerda ishlamaydi — Zoom ilovasiga shaxsiy havola.
+    mobile = await async_client.post(f"/zoom-sessions/{zs['id']}/join?app=1", headers=headers)
+    assert mobile.json()["app_join_url"] == (
+        f"https://us06web.zoom.us/w/{MEETING_ID}?tk=TOKEN-lms-{user_id}&pwd=Secret1"
+    )
     assert len([c for c in zoom_cloud["calls"] if c[0] == "register"]) == 1
     rows = (await async_db.execute(select(ZoomRegistrant))).scalars().all()
     assert [(r.user_id, r.registrant_id) for r in rows] == [(user_id, f"reg-lms-{user_id}")]

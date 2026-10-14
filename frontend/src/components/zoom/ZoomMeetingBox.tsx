@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { Hourglass, Loader2, LogOut, Maximize2, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Hourglass, Loader2, LogOut, Maximize2, MicOff, Minimize2, Radio, ScanFace, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { zoomSessionService } from '@/services/zoomSessionService';
 import { useZoomFaceCheck } from '@/hooks/useZoomFaceCheck';
 import { apiErrorMessage } from '@/utils/apiError';
 import type { FaceCheckResult, ZoomJoinResponse } from '@/services/zoomSessionService';
+import { isMobileDevice } from '@/utils/device';
 import { logger } from '@/utils/logger';
 import './ZoomMeetingBox.css';
 import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
@@ -94,6 +95,79 @@ function loadZoomSdk(): Promise<void> {
     return sdkPromise;
 }
 
+/**
+ * SDK'ning `/lib` dan oladigan og'ir fayllari — prod nginx jurnalidan
+ * (14.10): brauzerlar har kirishda aynan shularni so'ragan. Audio dekoder
+ * varianti (`audio.simd` / `audio.light.simd`) brauzerga qarab tanlanadi,
+ * shuning uchun ular bu yerda yo'q — keraksiz 3–4 MB yuklamaymiz.
+ */
+const ZOOM_LIB_PREFETCH = [
+    'manifest.json', 'js_media.min.js', 'net.wasm', 'net_thread.min.js',
+    'tp.min.js', 'tp.wasm', 'wmsc.min.js', 'video_simd.min.js', 'video.simd.wasm',
+    'sharing_simd.min.js', 'audio.encode.wasm',
+];
+
+let prefetchStarted = false;
+
+/**
+ * Sahifa ochilishi bilan SDK'ni oldindan yuklaymiz — talaba tugmaga qarab
+ * turgan va yuz tekshiruvidan o'tayotgan paytda. Ilgari yuklash faqat
+ * imzo kelgandan keyin boshlanardi va ~12–15 MB shu zanjirning oxirida
+ * kutilardi. `/lib` fayllari bir yillik kesh bilan beriladi, SDK ularni
+ * xuddi shu manzildan so'raydi — keyin tarmoqqa chiqmaydi. Xato bo'lsa
+ * jim: kirishda baribir yuklanadi.
+ */
+function prefetchZoom() {
+    if (prefetchStarted) return;
+    prefetchStarted = true;
+    loadZoomSdk()
+        .then(() =>
+            Promise.all(
+                ZOOM_LIB_PREFETCH.map((name) =>
+                    fetch(`${window.location.origin}/lib/${name}`, { priority: 'low' } as RequestInit).then((r) => r.blob()),
+                ),
+            ),
+        )
+        .catch(() => {
+            prefetchStarted = false;
+        });
+}
+
+/**
+ * Zoom asboblar panelidagi «Join Audio» tugmasi. SDK'da ovozga ulanishning
+ * ochiq metodi yo'q (`EmbeddedClient` da faqat `mute`/`muteAll`/`stopAudio`),
+ * shuning uchun tugmani o'zimiz bosamiz. Yorliq `aria-label` da va
+ * `language: 'en-US'` bilan doim inglizcha. SDK versiyasi almashsa, shu
+ * selektorni qayta tekshirish kerak (6.2.0 da tekshirilgan).
+ */
+const JOIN_AUDIO_SELECTOR = '[aria-label="Join Audio"], [title="Join Audio"]';
+/** Ulangandan keyin tugma shuncha vaqt ichida chiqmasa — qidirishni to'xtatamiz. */
+const JOIN_AUDIO_WAIT_MS = 30_000;
+
+function findJoinAudioButton(root: HTMLElement | null): HTMLElement | null {
+    const label = root?.querySelector<HTMLElement>(JOIN_AUDIO_SELECTOR);
+    if (!label) return null;
+    // Tooltip'li variantda `aria-label` o'rovchi elementda, bosiladigani ichida.
+    return label.matches('button') ? label : label.querySelector<HTMLElement>('button') ?? label;
+}
+
+/**
+ * Mikrofonga ruxsatni kirish tugmasi bosilgan zahoti so'raymiz. Ruxsatsiz
+ * Zoom ovozga umuman ulanmaydi — talaba o'qituvchini ham eshitmaydi.
+ * Oqim darhol yopiladi: mikrofonni keyin Zoom o'zi oladi. `false` — rad etildi.
+ */
+async function ensureMicrophone(): Promise<boolean> {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+    } catch (cause) {
+        // Mikrofon umuman yo'q — bu ruxsat masalasi emas, Zoom tinglashga ulaydi.
+        return (cause as DOMException)?.name === 'NotFoundError';
+    }
+}
+
 interface Props {
     sessionId: number;
     /** Darsni olib boruvchi: uchrashuvni host sifatida boshlaydi. */
@@ -120,9 +194,51 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
     const [attempts, setAttempts] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const faceCheck = useZoomFaceCheck(sessionId);
+    // Telefonda SDK (Component View) qo'llanmaydi — talaba Zoom ilovasiga o'tadi.
+    const mobile = useMemo(isMobileDevice, []);
+    const [micDenied, setMicDenied] = useState(false);
+    /** Ulangan, lekin ovoz yo'q («Join Audio» hali ko'rinib turibdi). */
+    const [audioMissing, setAudioMissing] = useState(false);
+    const audioWatchRef = useRef<number | null>(null);
     // Ma'ruzani tinglayotgan talaba sichqonchaga tegmaydi — avtochiqish uni
     // uchrashuvdan chiqarib yubormasin.
     useKeepSessionAlive(state !== 'idle');
+
+    // Quti faqat kirish mumkin bo'lganda chiziladi — SDK'ni shu zahoti
+    // yuklay boshlaymiz, tugma bosilishini kutmasdan.
+    // Telefonda SDK ishlatilmaydi — mobil trafikni behuda sarflamaymiz.
+    useEffect(() => {
+        if (!mobile) prefetchZoom();
+    }, [mobile]);
+
+    const stopAudioWatch = () => {
+        if (audioWatchRef.current) window.clearInterval(audioWatchRef.current);
+        audioWatchRef.current = null;
+        setAudioMissing(false);
+    };
+
+    /**
+     * Ulangandan keyin «Join Audio» ni bir marta o'zimiz bosamiz: brauzer ovozni
+     * faqat foydalanuvchi bosganda yoqadi, «Darsga qo'shilish» bosilgani esa
+     * sahifaga shu ruxsatni allaqachon bergan. Keyin kuzatib turamiz: tugma
+     * qayta paydo bo'lsa (ruxsat yo'q, ulanish uzildi) — ko'rinadigan ogohlantirish.
+     * 13.10–14.10 da o'qituvchi eshitilmaganining eng ehtimolli sababi — shu tugma bosilmagan.
+     */
+    const startAudioWatch = () => {
+        stopAudioWatch();
+        const startedAt = Date.now();
+        let clicked = false;
+        audioWatchRef.current = window.setInterval(() => {
+            const button = findJoinAudioButton(containerRef.current);
+            if (button && !clicked && !button.hasAttribute('disabled')) {
+                clicked = true;
+                button.click();
+                return;
+            }
+            // Bosganimizdan keyin ham tugma turgan bo'lsa — ovoz ulanmagan.
+            if (clicked || Date.now() - startedAt > JOIN_AUDIO_WAIT_MS) setAudioMissing(Boolean(button));
+        }, 1500);
+    };
 
     useEffect(() => {
         const onChange = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
@@ -165,6 +281,7 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
     useEffect(() => {
         return () => {
             if (retryRef.current) window.clearTimeout(retryRef.current);
+            if (audioWatchRef.current) window.clearInterval(audioWatchRef.current);
             clientRef.current?.leaveMeeting().catch(() => { /* uchrashuv allaqachon yopilgan */ });
             clientRef.current = null;
         };
@@ -182,6 +299,7 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
         await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
         clientRef.current = null;
         faceCheck.stop();
+        stopAudioWatch();
         exitFullscreen();
         setState('idle');
     };
@@ -204,7 +322,10 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
     };
 
     const join = async () => {
-        enterFullscreen();
+        if (!mobile) {
+            enterFullscreen();
+            setMicDenied(!(await ensureMicrophone()));
+        }
         if (faceCheckEnabled) {
             const allowed = await verifyBeforeJoin();
             if (!allowed) {
@@ -218,12 +339,19 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
         cancelledRef.current = false;
         let payload: ZoomJoinResponse;
         try {
-            payload = await zoomSessionService.join(sessionId);
+            payload = await zoomSessionService.join(sessionId, { app: mobile });
         } catch (cause) {
             logger.error('Zoom join failed', cause);
             setError(apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi."));
             exitFullscreen();
             setState('idle');
+            return;
+        }
+        // Telefon: shaxsiy havola bilan Zoom ilovasi ochiladi. Havola faqat
+        // LMS yaratgan uchrashuvda bor; qo'lda berilgan havolada SDK'ga qaytamiz.
+        if (payload.app_join_url) {
+            setState('idle');
+            window.location.href = payload.app_join_url;
             return;
         }
         await connect(payload);
@@ -268,6 +396,7 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                 if (stateName === 'Closed' || stateName === 'Fail') {
                     clientRef.current = null;
                     faceCheck.stop();
+                    stopAudioWatch();
                     exitFullscreen();
                     setState('idle');
                 }
@@ -299,6 +428,7 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                 containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             });
             if (faceCheckEnabled) faceCheck.startRandomChecks();
+            startAudioWatch();
         } catch (cause) {
             await clientRef.current?.leaveMeeting().catch(() => undefined);
             clientRef.current = null;
@@ -360,6 +490,8 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                                 ? 'Kameraga qarab turing — bu bir necha soniya oladi.'
                                 : faceCheckEnabled
                                     ? "Uchrashuv shu sahifada ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi."
+                                    : mobile
+                                    ? "Telefonda dars Zoom ilovasida ochiladi — ilova o'rnatilmagan bo'lsa, avval uni o'rnating."
                                     : host
                                     ? "Uchrashuv shu sahifada host sifatida ochiladi: mikrofon yoqiq, talabalar ovozini boshqara olasiz."
                                     : 'Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.'}
@@ -421,6 +553,18 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
             )}
 
             {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
+
+            {/* Ovoz ulanmagan — bu quti ichida, to'liq ekranda ham ko'rinadi. */}
+            {state === 'joined' && audioMissing && (
+                <div role="alert" className="flex items-start gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                    <MicOff className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                        {micDenied
+                            ? "Brauzer mikrofonga ruxsat bermadi — usiz Zoom ovozga ulanmaydi va o'qituvchini eshitmaysiz. Manzil satridagi qulf belgisidan mikrofonga ruxsat bering, so'ng pastdagi «Join Audio» tugmasini bosing."
+                            : "Ovoz ulanmagan. Pastdagi «Join Audio» tugmasini bosing — mikrofonni keyin o'chirib qo'yishingiz mumkin, o'qituvchi baribir eshitiladi."}
+                    </span>
+                </div>
+            )}
 
             {/* Keep the SDK mounted and measurable while joining, including
                 its audio prompts and waiting room. Scroll only if SDK panels

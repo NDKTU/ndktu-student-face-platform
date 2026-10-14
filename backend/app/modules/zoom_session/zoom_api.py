@@ -24,7 +24,7 @@ import math
 import time
 from datetime import datetime
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 from core.config import settings
@@ -66,6 +66,21 @@ def api_error(cause: ZoomApiError):
 def registrant_token(join_url: str) -> str | None:
     """Registrantning shaxsiy kirish tokeni — `join_url` dagi `tk`."""
     return parse_qs(urlparse(join_url).query).get("tk", [None])[0]
+
+
+def registrant_join_url(link_url: str, meeting_number: str, token: str) -> str:
+    """Registrantning Zoom ilovasi uchun shaxsiy havolasi (`/w/<raqam>?tk=..&pwd=..`).
+
+    Zoom `add_registrant` javobidagi `join_url` bilan bir xil shakl; biz faqat
+    tokenni saqlaymiz, havolani uchrashuv havolasidagi domen va paroldan yig'amiz.
+    """
+    parsed = urlparse(link_url or "")
+    host = parsed.hostname or "zoom.us"
+    query = {"tk": token}
+    pwd = parse_qs(parsed.query).get("pwd", [None])[0]
+    if pwd:
+        query["pwd"] = pwd
+    return f"https://{host}/w/{meeting_number}?{urlencode(query)}"
 
 
 def zak_token(start_url: str) -> str | None:
