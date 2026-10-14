@@ -873,14 +873,25 @@ export const badgeToJpeg = async (canvas: HTMLCanvasElement): Promise<Blob> => {
  * mumkin bo'lmagan belgilar `_` ga almashadi; harflar (kirill ham) qoladi.
  */
 export const badgeFileName = (fullName: string, studentIdNumber: string | null, studentId: number): string => {
-    const clean = (value: string) =>
-        value
-            .replace(/['`´ʻʼ‘’]/g, '')
-            .replace(/[^\p{L}\p{N}]+/gu, '_')
-            .replace(/^_+|_+$/g, '');
-    const parts = ['Bejik', clean(fullName).slice(0, 80), clean(studentIdNumber || '') || `ID${studentId}`];
+    const parts = [
+        'Bejik',
+        cleanFileNamePart(fullName).slice(0, 80),
+        cleanFileNamePart(studentIdNumber || '') || `ID${studentId}`,
+    ];
     return `${parts.filter(Boolean).join('_')}.jpg`;
 };
+
+/** Bir nechta bejik arxivi nomi: `Bejiklar_25A_26_TVM.zip` (guruh nomi bo'lsa). */
+export const badgeArchiveName = (label?: string | null): string => {
+    const parts = ['Bejiklar', cleanFileNamePart(label || '').slice(0, 80)];
+    return `${parts.filter(Boolean).join('_')}.zip`;
+};
+
+const cleanFileNamePart = (value: string): string =>
+    value
+        .replace(/['`´ʻʼ‘’]/g, '')
+        .replace(/[^\p{L}\p{N}]+/gu, '_')
+        .replace(/^_+|_+$/g, '');
 
 export const saveBlob = (blob: Blob, fileName: string): void => {
     const url = URL.createObjectURL(blob);

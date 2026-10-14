@@ -39,6 +39,7 @@ import { formatDate } from '@/utils/date';
 import { useTranslation } from 'react-i18next';
 import { PersonAvatar } from '@/components/ui/PersonAvatar';
 import { StudentBadgeButton } from '@/components/students/StudentBadgeButton';
+import { StudentBadgesDownloadButton } from '@/components/students/StudentBadgesDownloadButton';
 import { formatGpa } from '@/utils/gpa';
 
 type SortField = 'name' | 'user_id' | 'created_at';
@@ -315,6 +316,17 @@ export const StudentsPage = () => {
                 totalLabel={t("Talabalar")}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={handleClearFilters}
+                actions={
+                    // Qidiruv ham, guruh ham hisobga olinadi: arxivga aynan
+                    // ro'yxatda ko'rinib turgan talabalar tushadi (barcha sahifalar).
+                    <StudentBadgesDownloadButton
+                        search={debouncedSearch}
+                        groupId={parsedGroup}
+                        groupName={parsedGroup ? groupNameById.get(parsedGroup) : undefined}
+                        total={totalCount}
+                        className="w-full sm:w-auto"
+                    />
+                }
                 extraFilters={
                     <PermissionGate permission="read:group">
                         <div className="w-full sm:w-[260px]">

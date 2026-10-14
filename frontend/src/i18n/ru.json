@@ -545,5 +545,13 @@
   "Bejik yaratish faqat administratorga ruxsat etilgan.": "Создание бейджа доступно только администратору.",
   "Ruxsat yo'q": "Нет доступа",
   "Yopish": "Закрыть",
-  "Kartani kursor yoki barmoq bilan burib ko'ring": "Поверните карточку курсором или пальцем"
+  "Kartani kursor yoki barmoq bilan burib ko'ring": "Поверните карточку курсором или пальцем",
+  "Bejiklarni yuklab olish": "Скачать бейджи",
+  "Bejiklar: {{done}} / {{total}}": "Бейджи: {{done}} / {{total}}",
+  "Ro'yxatdagi barcha talabalarning bejiklari — bitta ZIP arxivda": "Бейджи всех студентов из списка — одним ZIP-архивом",
+  "Bir yo'la eng ko'pi {{max}} ta bejik yuklab olinadi — avval guruhni tanlang.": "За один раз можно скачать не более {{max}} бейджей — сначала выберите группу.",
+  "Bejiklarni yaratib bo'lmadi": "Не удалось сформировать бейджи",
+  "{{count}} ta bejik ZIP arxivda yuklab olindi": "Бейджей скачано в ZIP-архиве: {{count}}",
+  "{{count}} ta talabaning bejigini yaratib bo'lmadi": "Не удалось сформировать бейджи студентов: {{count}}",
+  "{{count}} ta talabaning suratini yuklab bo'lmadi — bejikda standart rasm ishlatildi": "Не удалось загрузить фотографии студентов: {{count}} — на бейджах использовано стандартное изображение"
 }
