@@ -68,6 +68,14 @@
     border-radius: 0;
 }
 
+/* Kirish tugmasi bosilishi bilan to'liq ekran ochiladi — yuz tekshiruvi va
+   o'qituvchini kutish kartochkasi ekran o'rtasida tursin. */
+.zoom-meeting-shell:fullscreen .zoom-meeting-placeholder {
+    flex: 1;
+    justify-content: center;
+    border-radius: 0;
+}
+
 .zoom-meeting-shell:fullscreen .zoom-meeting-viewport {
     flex: 1;
     min-height: 200px;

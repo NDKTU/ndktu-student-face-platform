@@ -33,7 +33,7 @@ from app.core.utils.face_absence import FAILED_STATUSES, build_absence_spans, sp
 from app.core.utils.face_service import classify, verify_face
 from app.core.utils.lesson_access import is_admin
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
-from app.core.utils.zoom_signature import sign_meeting
+from app.core.utils.zoom_signature import HOST_ROLE, PARTICIPANT_ROLE, sign_meeting
 from app.modules.auth.model import Student, Teacher, TeacherAssignment, TeacherSubject, User
 from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
@@ -69,7 +69,7 @@ from .schemas import (
     ZoomTeacherOption,
     ZoomTeacherOptionListResponse,
 )
-from .zoom_api import ZoomApiError, api_error, registrant_token, zoom_api
+from .zoom_api import ZoomApiError, api_error, registrant_token, zak_token, zoom_api
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +309,15 @@ class ZoomSessionRepository:
     def _can_manage(zs: ZoomSession, user: User) -> bool:
         """Admin, yaratuvchi va biriktirilgan o'qituvchi: ular darsni olib boradi."""
         return is_admin(user) or user.id in {zs.created_by_user_id, zs.teacher_user_id} - {None}
+
+    @staticmethod
+    def _is_host(zs: ZoomSession, user: User) -> bool:
+        """Uchrashuvda host — darsning o'qituvchisi (o'qituvchisiz eski seansda — yaratuvchi).
+
+        Admin boshqaradi, lekin host emas: bir Zoom foydalanuvchisi ikki joyda
+        host bo'lib o'tirsa, Zoom birini chiqarib yuboradi.
+        """
+        return user.id == (zs.teacher_user_id or zs.created_by_user_id)
 
     async def _get(self, session: AsyncSession, session_id: int) -> ZoomSession:
         zs = (
@@ -835,7 +844,13 @@ class ZoomSessionRepository:
             name = " · ".join(part for part in (student.full_name, group_name) if part)
 
         token: str | None = None
-        if zs.zoom_managed:
+        zak: str | None = None
+        if zs.zoom_managed and self._is_host(zs, user):
+            # Darsni olib boruvchi sahifaning o'zida host bo'lib kiradi. Ilgari
+            # u registrant-ishtirokchi edi: `mute_upon_entry` mikrofonini
+            # o'chirar, uchrashuv esa hostsiz o'tardi (13.10, seans 4).
+            zak = await self._host_zak(session, creds, zs)
+        elif zs.zoom_managed:
             if not creds.api_enabled:
                 raise _not_configured()
             # Registrant ismi Zoom'da «Ism Familiya Guruh» bo'lib ko'rinadi.
@@ -849,7 +864,11 @@ class ZoomSessionRepository:
         not_after = int(zs.ends_at.replace(tzinfo=timezone.utc).timestamp())
         return ZoomJoinResponse(
             signature=sign_meeting(
-                meeting_number, not_after=not_after, sdk_key=creds.sdk_key, sdk_secret=creds.sdk_secret
+                meeting_number,
+                not_after=not_after,
+                sdk_key=creds.sdk_key,
+                sdk_secret=creds.sdk_secret,
+                role=HOST_ROLE if zak else PARTICIPANT_ROLE,
             ),
             sdk_key=creds.sdk_key,
             meeting_number=meeting_number,
@@ -858,7 +877,22 @@ class ZoomSessionRepository:
             user_name=name or user.username,
             registrant_token=token,
             customer_key=f"{CUSTOMER_KEY_PREFIX}{user.id}",
+            zak=zak,
         )
+
+    async def _host_zak(self, session: AsyncSession, creds: ZoomCredentials, zs: ZoomSession) -> str:
+        """Uchrashuv egasining ZAK tokeni — har safar yangisi (~2 soat amal qiladi)."""
+        if not creds.api_enabled or not zs.zoom_meeting_id:
+            raise _not_configured()
+        try:
+            meeting = await zoom_api.get_meeting(creds, zs.zoom_meeting_id)
+        except ZoomApiError as cause:
+            raise api_error(cause) from cause
+        zak = zak_token(meeting.get("start_url") or "")
+        if not zak:
+            # Ishtirokchi bo'lib kiritmaymiz: aynan shu ovozsiz, hostsiz dars edi.
+            raise api_error(ZoomApiError(502, None, "start_url ichida ZAK yo'q"))
+        return zak
 
     async def _registrant_token(
         self,

@@ -83,6 +83,8 @@ export interface ZoomJoinResponse {
     registrant_token?: string | null;
     /** SDK `customerKey` — webhook hodisasini foydalanuvchiga bog'laydi. */
     customer_key: string;
+    /** Host ZAK tokeni (SDK `zak`) — faqat darsni olib boruvchi o'qituvchiga. */
+    zak?: string | null;
 }
 
 export type FaceCheckStage = 'join' | 'random';

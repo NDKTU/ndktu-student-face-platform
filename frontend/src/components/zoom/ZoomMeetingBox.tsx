@@ -96,6 +96,8 @@ function loadZoomSdk(): Promise<void> {
 
 interface Props {
     sessionId: number;
+    /** Darsni olib boruvchi: uchrashuvni host sifatida boshlaydi. */
+    host?: boolean;
     /** Kirishdan oldin yuz tekshiruvi (server talab qiladi) va dars davomida tasodifiy. */
     faceCheckEnabled?: boolean;
 }
@@ -103,7 +105,7 @@ interface Props {
 // Shaxs tasdiqlanmaguncha imzo berilmaydi — buni server hal qiladi
 // (`zoom_session/repository.py::join`). Urinishlar cheklanmaydi: yomon yorug'lik
 // talabaning aybi emas. Ilgari uch urinishdan keyin talaba baribir kirardi.
-export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) => {
+export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = false }: Props) => {
     const { user } = useAuth();
     const shellRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
@@ -127,6 +129,24 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
+
+    /**
+     * Darsga kirish tugmasi bosilganda — to'liq ekran. Brauzer uni faqat
+     * bosish paytida ruxsat beradi: kirish esa bir necha soniya davom etadi
+     * (yuz, server, SDK), shuning uchun ulangandan keyin so'rab bo'lmaydi.
+     * Shuning uchun `join` ning birinchi `await` idan oldin chaqiriladi.
+     * iPhone Safari elementni to'liq ekranga chiqarmaydi — u yerda jim o'tadi.
+     */
+    const enterFullscreen = () => {
+        const element = shellRef.current;
+        if (!element || document.fullscreenElement === element || !element.requestFullscreen) return;
+        element.requestFullscreen().catch(() => undefined);
+    };
+
+    /** Kirish bo'lmadi yoki uchrashuv tugadi — sahifaga qaytamiz. */
+    const exitFullscreen = () => {
+        if (document.fullscreenElement === shellRef.current) void document.exitFullscreen().catch(() => undefined);
+    };
 
     const toggleFullscreen = async () => {
         const element = shellRef.current;
@@ -154,6 +174,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
         cancelledRef.current = true;
         if (retryRef.current) window.clearTimeout(retryRef.current);
         retryRef.current = null;
+        exitFullscreen();
         setState('idle');
     };
 
@@ -161,7 +182,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
         await clientRef.current?.leaveMeeting().catch(() => { /* allaqachon yopiq */ });
         clientRef.current = null;
         faceCheck.stop();
-        if (document.fullscreenElement === shellRef.current) await document.exitFullscreen().catch(() => undefined);
+        exitFullscreen();
         setState('idle');
     };
 
@@ -183,9 +204,11 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
     };
 
     const join = async () => {
+        enterFullscreen();
         if (faceCheckEnabled) {
             const allowed = await verifyBeforeJoin();
             if (!allowed) {
+                exitFullscreen();
                 setState('idle');
                 return;
             }
@@ -199,6 +222,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
         } catch (cause) {
             logger.error('Zoom join failed', cause);
             setError(apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi."));
+            exitFullscreen();
             setState('idle');
             return;
         }
@@ -244,7 +268,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                 if (stateName === 'Closed' || stateName === 'Fail') {
                     clientRef.current = null;
                     faceCheck.stop();
-                    if (document.fullscreenElement === shellRef.current) void document.exitFullscreen().catch(() => undefined);
+                    exitFullscreen();
                     setState('idle');
                 }
             });
@@ -254,6 +278,9 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                 meetingNumber: payload.meeting_number,
                 password: payload.passcode ?? '',
                 userName: payload.user_name || user?.username || 'Talaba',
+                // O'qituvchi host bo'lib kiradi (imzoda `role: 1` + ZAK) —
+                // mikrofon o'chirilmaydi va talabalarni boshqara oladi.
+                ...(payload.zak ? { zak: payload.zak } : {}),
                 // LMS yaratgan uchrashuv ro'yxatdan o'tishni talab qiladi:
                 // talaba faqat server bergan shaxsiy token bilan kira oladi.
                 ...(payload.registrant_token ? { tk: payload.registrant_token } : {}),
@@ -294,6 +321,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                     ? `Uchrashuvga qo'shilib bo'lmadi: ${sdkReason}.`
                     : "Uchrashuvga qo'shilib bo'lmadi. Qayta urinib ko'ring.",
             );
+            exitFullscreen();
             setState('idle');
         }
     };
@@ -301,7 +329,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
     return (
         <div ref={shellRef} className="zoom-meeting-shell min-w-0 rounded-2xl border border-border/60 bg-card shadow-sm">
             {state === 'waiting' ? (
-                <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-card to-primary/10 px-4 py-10 text-center sm:px-8 sm:py-14">
+                <div className="zoom-meeting-placeholder flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-card to-primary/10 px-4 py-10 text-center sm:px-8 sm:py-14">
                     <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-600 shadow-sm">
                         <Hourglass className="h-5 w-5" />
                     </span>
@@ -319,7 +347,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                     </Button>
                 </div>
             ) : state === 'idle' || state === 'verifying' ? (
-                <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 px-4 py-10 text-center sm:px-8 sm:py-14">
+                <div className="zoom-meeting-placeholder flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 px-4 py-10 text-center sm:px-8 sm:py-14">
                     <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
                         {state === 'verifying' ? <ScanFace className="h-5 w-5" /> : <Video className="h-5 w-5" />}
                     </span>
@@ -332,6 +360,8 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                                 ? 'Kameraga qarab turing — bu bir necha soniya oladi.'
                                 : faceCheckEnabled
                                     ? "Uchrashuv shu sahifada ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi."
+                                    : host
+                                    ? "Uchrashuv shu sahifada host sifatida ochiladi: mikrofon yoqiq, talabalar ovozini boshqara olasiz."
                                     : 'Uchrashuv shu sahifada ochiladi — Zoom ilovasi shart emas.'}
                         </p>
                     </div>
@@ -355,7 +385,7 @@ export const ZoomMeetingBox = ({ sessionId, faceCheckEnabled = false }: Props) =
                                 : <Video className="mr-2 h-4 w-4" />}
                             {state === 'verifying'
                                 ? 'Tekshirilmoqda...'
-                                : attempts > 0 ? "Qayta urinish" : "Darsga qo'shilish"}
+                                : attempts > 0 ? "Qayta urinish" : host ? 'Darsni boshlash' : "Darsga qo'shilish"}
                         </Button>
                     </div>
                 </div>

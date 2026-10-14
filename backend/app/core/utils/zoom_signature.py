@@ -11,9 +11,10 @@ import time
 import jwt
 from core.config import settings
 
-# Talaba doim ishtirokchi: uchrashuvni o'qituvchi Zoom ilovasida boshlaydi,
-# shuning uchun host roli (1) va ZAK token kerak emas.
+# Talaba — ishtirokchi (0). O'qituvchi LMS yaratgan uchrashuvni sahifaning
+# o'zida host (1) bo'lib boshlaydi — bu rol faqat ZAK bilan birga ishlaydi.
 PARTICIPANT_ROLE = 0
+HOST_ROLE = 1
 
 #: Zoom: `exp` `iat` dan kamida 1800 soniya keyin bo'lishi shart.
 MIN_SIGNATURE_SECONDS = 1800
@@ -25,8 +26,9 @@ def sign_meeting(
     not_after: int | None = None,
     sdk_key: str | None = None,
     sdk_secret: str | None = None,
+    role: int = PARTICIPANT_ROLE,
 ) -> str:
-    """Ishtirokchi imzosi. `not_after` (unix vaqt) — imzo undan keyin amal qilmaydi.
+    """Meeting SDK imzosi (standart — ishtirokchi). `not_after` (unix vaqt) — imzo undan keyin amal qilmaydi.
 
     `sdk_key`/`sdk_secret` — uchrashuv egasi akkauntidagi SDK ilovasi
     (`zoom_session/accounts.py`); berilmasa — `.env` dagisi.
@@ -48,7 +50,7 @@ def sign_meeting(
         "appKey": key,
         "sdkKey": key,
         "mn": meeting_number,
-        "role": PARTICIPANT_ROLE,
+        "role": role,
         "iat": issued_at,
         "exp": expires_at,
         "tokenExp": expires_at,

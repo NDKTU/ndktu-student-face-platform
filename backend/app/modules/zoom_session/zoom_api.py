@@ -68,6 +68,15 @@ def registrant_token(join_url: str) -> str | None:
     return parse_qs(urlparse(join_url).query).get("tk", [None])[0]
 
 
+def zak_token(start_url: str) -> str | None:
+    """Host'ning ZAK tokeni — `start_url` dagi `zak` (~2 soat amal qiladi).
+
+    Alohida `/users/{id}/token?type=zak` chaqiruvi kerak emas: u yangi
+    ruxsat (scope) talab qilardi, `start_url` esa allaqachon olinadi.
+    """
+    return parse_qs(urlparse(start_url).query).get("zak", [None])[0]
+
+
 def _zoom_time(value: datetime) -> str:
     """Bizdagi naiv UTC → Zoom formati (`Z` bilan — zona alohida talqin qilinmaydi)."""
     return value.strftime("%Y-%m-%dT%H:%M:%SZ")

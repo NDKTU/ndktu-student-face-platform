@@ -11,6 +11,7 @@ import hmac
 import json
 from datetime import datetime, timedelta, timezone
 
+import jwt
 import pytest
 import pytest_asyncio
 from core.config import settings
@@ -227,6 +228,39 @@ async def test_student_gets_personal_token_after_face_check(auth_client, async_c
     assert len([c for c in zoom_cloud["calls"] if c[0] == "register"]) == 1
     rows = (await async_db.execute(select(ZoomRegistrant))).scalars().all()
     assert [(r.user_id, r.registrant_id) for r in rows] == [(user_id, f"reg-lms-{user_id}")]
+
+
+@pytest.mark.asyncio
+async def test_teacher_joins_on_page_as_host(auth_client, async_client, zoom_cloud, monkeypatch):
+    """O'qituvchi sahifaning o'zida host: `role: 1` + ZAK, registrant emas.
+
+    13.10 da u registrant-ishtirokchi bo'lib kirgan — `mute_upon_entry` uni
+    ovozsiz qoldirgan, uchrashuv esa hostsiz o'tgan.
+    """
+    zs = await _create_managed(auth_client, zoom_cloud)
+    headers = await _login(async_client, "zm_teacher")
+    joined = await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)
+    assert joined.status_code == 200, joined.text
+    body = joined.json()
+    assert body["zak"] == "ZAK"
+    assert body["registrant_token"] is None
+    claims = jwt.decode(body["signature"], options={"verify_signature": False})
+    assert claims["role"] == 1
+    assert not [c for c in zoom_cloud["calls"] if c[0] == "register"]
+
+    # Admin boshqaradi, lekin host emas — ikkinchi host o'qituvchini chiqarib yuborardi.
+    admin = (await auth_client.post(f"/zoom-sessions/{zs['id']}/join")).json()
+    assert admin["zak"] is None
+    assert jwt.decode(admin["signature"], options={"verify_signature": False})["role"] == 0
+
+    # ZAK kelmasa ishtirokchi bo'lib kiritilmaydi — aynan o'sha ovozsiz dars bo'lardi.
+    async def no_zak(creds, meeting_id):
+        return {"id": meeting_id, "start_url": f"https://us06web.zoom.us/s/{meeting_id}"}
+
+    monkeypatch.setattr(zoom_api, "get_meeting", no_zak)
+    failed = await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)
+    assert failed.status_code == 502
+    assert failed.json()["detail"]["code"] == "zoom_api_error"
 
 
 @pytest.mark.asyncio

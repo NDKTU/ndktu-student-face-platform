@@ -26,7 +26,7 @@ type Tab = 'meeting' | 'report';
  */
 export default function ZoomSessionDetailPage() {
     const sessionId = Number(useParams().sessionId);
-    const { hasPermission } = useAuth();
+    const { hasPermission, user } = useAuth();
     const { data: session, isLoading, isError, refetch } = useZoomSession(sessionId);
     const [tab, setTab] = useState<Tab>('meeting');
     const [starting, setStarting] = useState(false);
@@ -51,6 +51,9 @@ export default function ZoomSessionDetailPage() {
     // Yaratuvchi va admin darsni olib boradi: ular uchun yuz tekshiruvi yo'q,
     // server ham ularga vaqt va guruh shartini qo'ymaydi.
     const studentView = !session.can_manage;
+    // Host — darsning o'qituvchisi (server ham shunday hal qiladi:
+    // `repository.py::_is_host`); admin kuzatuvchi bo'lib kiradi.
+    const isHost = session.zoom_managed && (session.teacher_user_id ? user?.id === session.teacher_user_id : session.can_manage);
 
     // Host havolasi har safar yangidan olinadi: ichidagi ZAK ~2 soatda eskiradi.
     // Oyna avval ochiladi — `await` dan keyin brauzer popup'ni bloklardi.
@@ -81,7 +84,7 @@ export default function ZoomSessionDetailPage() {
                         <SessionStatusBadge session={session} />
                         {session.can_manage && session.zoom_managed && (
                             <Button size="sm" isLoading={starting} onClick={() => void startAsHost()}>
-                                <ExternalLink className="h-4 w-4" /> Host sifatida boshlash
+                                <ExternalLink className="h-4 w-4" /> Zoom ilovasida boshlash
                             </Button>
                         )}
                     </div>
@@ -142,26 +145,17 @@ export default function ZoomSessionDetailPage() {
                         description="Seans vaqti o'tgandan keyin unga kirib bo'lmaydi."
                     />
                 </Card>
-            ) : session.can_manage ? (
-                /* Darsni olib boruvchiga sahifadagi SDK berilmaydi: imzo doim
-                   ishtirokchi (`role: 0`) va uchrashuv `mute_upon_entry` bilan
-                   yaratilgan — 13.10 da o'qituvchi shu yo'l bilan kirib,
-                   ovozsiz va host huquqisiz qolgan, uchrashuv esa hostsiz o'tgan. */
+            ) : session.can_manage && !session.zoom_managed ? (
+                /* Qo'lda berilgan havola: uchrashuv o'qituvchining o'z Zoom'ida,
+                   LMS uning ZAK'ini ololmaydi. Sahifadagi SDK bilan u faqat
+                   ishtirokchi bo'lardi — ovozsiz va host huquqisiz. */
                 <Card>
                     <EmptyState
                         icon={<Video className="h-6 w-6" />}
                         title="Darsni host sifatida boshlang"
-                        description={
-                            session.zoom_managed
-                                ? "Uchrashuv Zoom'da host sifatida ochiladi: mikrofon yoqiq bo'ladi va talabalar ovozini boshqara olasiz."
-                                : "Uchrashuvni o'z Zoom akkauntingizda boshlang — havola egasi host bo'ladi."
-                        }
+                        description="Uchrashuvni o'z Zoom akkauntingizda boshlang — havola egasi host bo'ladi."
                         action={
-                            session.zoom_managed ? (
-                                <Button isLoading={starting} onClick={() => void startAsHost()}>
-                                    <ExternalLink className="h-4 w-4" /> Host sifatida boshlash
-                                </Button>
-                            ) : session.link_url ? (
+                            session.link_url ? (
                                 <Button onClick={() => window.open(session.link_url ?? '', '_blank', 'noopener,noreferrer')}>
                                     <ExternalLink className="h-4 w-4" /> Zoom'da ochish
                                 </Button>
@@ -170,7 +164,11 @@ export default function ZoomSessionDetailPage() {
                     />
                 </Card>
             ) : (
-                <ZoomMeetingBox sessionId={session.id} faceCheckEnabled={session.face_check_enabled} />
+                <ZoomMeetingBox
+                    sessionId={session.id}
+                    host={isHost}
+                    faceCheckEnabled={studentView && session.face_check_enabled}
+                />
             )}
         </div>
     );

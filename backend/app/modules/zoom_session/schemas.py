@@ -148,6 +148,8 @@ class ZoomJoinResponse(BaseModel):
     registrant_token: Optional[str] = None
     #: SDK `customerKey`: webhook hodisasida ishtirokchini foydalanuvchiga bog'laydi.
     customer_key: str
+    #: Host ZAK tokeni (SDK `zak`) — faqat darsni olib boruvchi o'qituvchiga.
+    zak: Optional[str] = None
 
 
 # ── Yuz tekshiruvi (ilgari `course/face_check/schemas.py`) ────────────────────
