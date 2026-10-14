@@ -17,7 +17,6 @@ import { useZoomSession } from '@/hooks/useZoomSessions';
 import { zoomSessionService } from '@/services/zoomSessionService';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate, formatTime } from '@/utils/date';
-import { isMobileDevice } from '@/utils/device';
 
 type Tab = 'meeting' | 'report';
 
@@ -164,26 +163,12 @@ export default function ZoomSessionDetailPage() {
                         }
                     />
                 </Card>
-            ) : isHost && isMobileDevice() ? (
-                /* Telefonda brauzerdagi Zoom (Component View) qo'llanmaydi —
-                   host darsni Zoom ilovasida boshlaydi. */
-                <Card>
-                    <EmptyState
-                        icon={<Video className="h-6 w-6" />}
-                        title="Darsni Zoom ilovasida boshlang"
-                        description="Telefonda dars Zoom ilovasida host sifatida ochiladi — mikrofon yoqiq bo'ladi va talabalar ovozini boshqara olasiz."
-                        action={
-                            <Button isLoading={starting} onClick={() => void startAsHost()}>
-                                <ExternalLink className="h-4 w-4" /> Zoom ilovasida boshlash
-                            </Button>
-                        }
-                    />
-                </Card>
             ) : (
                 <ZoomMeetingBox
                     sessionId={session.id}
                     host={isHost}
                     faceCheckEnabled={studentView && session.face_check_enabled}
+                    appFallback={session.zoom_managed}
                 />
             )}
         </div>

@@ -10,6 +10,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      // Ikkinchi sahifa — Zoom xonasi (Client View). SPA'dan alohida, chunki
+      // Zoom va saytning global stillari bir-birini buzadi (src/zoomRoom/).
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        zoomRoom: path.resolve(__dirname, 'zoom-room.html'),
+      },
+    },
+  },
   server: {
     proxy: {
       // Фронт ходит только на `/api` (config/env.ts: API_BASE_URL по умолчанию '/api'),
