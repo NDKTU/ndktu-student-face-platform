@@ -1,0 +1,25 @@
+# Docker build konteksti — faqat kod va bogʻliqliklar roʻyxati.
+#
+# Bu fayl boʻlmaganda `docker compose build backend` har safar butun papkani
+# yuborardi: lokal `.venv` (264 MB), `uploads` (67 MB), `logs` — kodning
+# oʻzi esa 11 MB. Bundan tashqari `COPY . .` xostning `.venv` ini obrazdagi
+# toʻgʻri `.venv` ustiga yozardi (`uv sync` keyin uni tuzatardi), va
+# foydalanuvchi fayllari obraz ichiga tushib qolardi.
+
+# Virtual muhit — obrazda `uv sync` oʻzi yigʻadi.
+.venv/
+
+# Ma'lumotlar — konteynerga tom (volume) sifatida ulanadi, obrazga emas.
+uploads/
+logs/
+
+# Keshlar va yigʻish qoldiqlari.
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Sirlar va namunalar.
+.env
+.env.*

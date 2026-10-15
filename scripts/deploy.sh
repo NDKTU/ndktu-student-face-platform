@@ -93,7 +93,19 @@ echo "🔨 [1/3] Building images..."
 FACE_HASH=$(git -C "$PROJECT_DIR" ls-tree -r HEAD -- face-detection/ | sha256sum | cut -c1-12)
 FACE_HASH_TAG="nusmt-face-detection:${FACE_HASH}"
 
-if docker image inspect "$FACE_HASH_TAG" >/dev/null 2>&1; then
+# Xesh faqat **commit qilingan** fayllardan olinadi. Commit qilinmagan
+# o'zgarishlar unga tushmaydi: 15.10 da shu sabab skript «unchanged» deb eski
+# obrazni oldi va yangi jonlilik kodi deploy bo'lmadi. Endi ishchi papka
+# toza bo'lmasa — ogohlantiramiz va baribir yig'amiz. Bunday obrazga xesh
+# tegi qo'yilmaydi: aks holda keyingi deploy commit qilinmagan versiyani
+# o'sha commit nomi bilan qayta ishlatib yuborardi.
+FACE_DIRTY=$(git -C "$PROJECT_DIR" status --porcelain -- face-detection/)
+
+if [ -n "$FACE_DIRTY" ]; then
+    echo "  ⚠ face-detection has uncommitted changes — building from the working tree:"
+    echo "$FACE_DIRTY" | sed 's/^/      /'
+    $COMPOSE build face-detection
+elif docker image inspect "$FACE_HASH_TAG" >/dev/null 2>&1; then
     echo "  ✓ face-detection unchanged (${FACE_HASH}) — reusing cached image"
     docker tag "$FACE_HASH_TAG" nusmt-face-detection:latest
 else

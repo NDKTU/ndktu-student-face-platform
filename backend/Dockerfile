@@ -4,6 +4,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/face
 ENV UV_NO_SYNC=1
+# Kesh BuildKit tomida, obraz esa boshqa fayl tizimida — uv qattiq havola
+# qila olmaydi va ogohlantirib nusxaga oʻtadi. Shuni darhol aytib qoʻyamiz.
+ENV UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -17,13 +20,18 @@ WORKDIR /face
 
 RUN pip install --no-cache-dir uv
 
-# Dependency layer — cached unless pyproject.toml / uv.lock change
+# Dependency layer — cached unless pyproject.toml / uv.lock change.
+# uv keshi yigʻishlar orasida saqlanadi (BuildKit cache mount): bitta paket
+# oʻzgarsa, qatlam qayta yigʻiladi, lekin qolgan paketlar qayta yuklanmaydi.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev --no-install-project
 
-# Application code — changes on every commit, rebuilds quickly
+# Application code — changes on every commit, rebuilds quickly.
+# Kontekstda .venv, uploads va logs yoʻq — backend/.dockerignore.
 COPY . .
-RUN uv sync --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev
 
 EXPOSE 8000
 
