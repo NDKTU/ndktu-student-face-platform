@@ -6,6 +6,7 @@ import {
     BookOpen,
     Brain,
     Building2,
+    CalendarDays,
     ChartColumnBig,
     ChartNoAxesCombined,
     ClipboardCheck,
@@ -334,6 +335,8 @@ const GROUPED_ITEM_LABELS: Record<string, string> = {
 // RESOURCES[resource] convention (their route/permission differs from the
 // admin/staff page for the same concept, e.g. quiz-taking vs quiz management).
 const STUDENT_BESPOKE_ITEMS: StudentSidebarItem[] = [
+    // HEMIS jadvali: bekend talabani logini orqali HEMIS guruhi bo'yicha topadi.
+    { name: 'Dars jadvali', href: '/schedule', icon: CalendarDays, tone: 'blue', permission: 'user:me', section: 'Umumiy' },
     { name: 'Test ishlash', href: '/quiz-test', icon: PlayCircle, tone: 'green', permission: 'quiz_process:start_quiz' },
     { name: 'Psixologiya', href: '/psychology/student', icon: Brain, tone: 'pink', permission: 'read:psychology' },
     // Umumiy «Psixologiya natijalari» sahifasi, lekin talabaga bekend faqat
@@ -434,6 +437,16 @@ const STAFF_BESPOKE_ITEMS: {
         permission: 'hemis_admin_sync',
         section: 'Tizim',
         group: 'Sozlamalar',
+    },
+    // Butun universitet jadvali — HEMIS zerkalosi. Ruxsat sinxronizatsiya
+    // bilan bir xil: jadvalni ko'rish ham, yangilash ham ma'muriyat ishi.
+    {
+        name: 'HEMIS dars jadvali',
+        href: '/admin/hemis-schedule',
+        icon: CalendarDays,
+        tone: 'blue',
+        permission: 'hemis_admin_sync',
+        section: "O'quv jarayoni",
     },
     // Elementar testni ishlash — har bir xodim uchun (`general_test:take`
     // barcha rollarda; ro'yxatda faqat unga biriktirilgan testlar). Adminda
@@ -605,8 +618,14 @@ export const buildSidebar = (
     // koʻrinishi: xizmat kaliti unga faqat oʻqishga ruxsat beradi, shuning
     // uchun punkt bor, lekin sahifada yuborish tugmasi yoʻq. Ruxsat bilan
     // chegaralanmagan — bizda bu boʻlimga mos ruxsat yoʻq, u boshqa tizimda.
+    // «Dars jadvali» — o'qituvchining o'z jadvali (HEMIS, logini bo'yicha).
+    // Ruxsat bilan emas, rol bilan: `/schedule/my` hammaga ochiq (`user:me`),
+    // lekin ma'lumot faqat o'qituvchi va talabaga bor.
     const commonItems = [
         ...ALWAYS_VISIBLE.items,
+        ...(isTeacher
+            ? [{ name: 'Dars jadvali', href: '/schedule', icon: CalendarDays, tone: 'blue' as const }]
+            : []),
         ...(isAdmin
             ? [{ name: 'Arizalar', href: '/requests', icon: FileText, tone: 'blue' as const }]
             : []),

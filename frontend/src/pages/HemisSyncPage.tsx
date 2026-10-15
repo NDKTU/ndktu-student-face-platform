@@ -16,6 +16,7 @@ import { useGroups } from '@/hooks/useGroups';
 import { HemisDataToken } from '@/components/hemis/HemisDataToken';
 import { GroupDuplicates } from '@/components/hemis/GroupDuplicates';
 import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
+import { HemisScheduleSync } from '@/components/hemis/HemisScheduleSync';
 import { formatDate } from '@/utils/date';
 
 /* Шаги мастера: проверка данных → синхронизация → готово. */
@@ -126,6 +127,7 @@ const HemisSyncPage = () => {
                 <GroupDuplicates />
                 <HemisDataToken />
                 <HemisStudentImport />
+                <HemisScheduleSync />
             </div>
         );
     }

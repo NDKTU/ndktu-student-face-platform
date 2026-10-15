@@ -32,6 +32,8 @@ const ActiveQuizzesPage = lazy(() => import('@/pages/ActiveQuizzesPage'));
 const ResultsPage = lazy(() => import('@/pages/ResultsPage'));
 const TeachersPage = lazy(() => import('@/pages/TeachersPage'));
 const HemisSyncPage = lazy(() => import('@/pages/HemisSyncPage'));
+const HemisSchedulePage = lazy(() => import('@/pages/HemisSchedulePage'));
+const MySchedulePage = lazy(() => import('@/pages/MySchedulePage'));
 const EduPlanSyncPage = lazy(() => import('@/pages/EduPlanSyncPage'));
 const FacultyPage = lazy(() => import('@/pages/FacultyPage'));
 const KafedraPage = lazy(() => import('@/pages/KafedraPage'));
@@ -401,6 +403,8 @@ function App() {
                                         <Route path="/groups/:groupId/students" element={<PermissionRoute permission="read:group"><GroupStudentsPage /></PermissionRoute>} />
                                         <Route path="/students" element={<PermissionRoute permission="read:student"><StudentsPage /></PermissionRoute>} />
                                         <Route path="/admin/hemis-sync" element={<PermissionRoute permission="hemis_admin_sync"><HemisSyncPage /></PermissionRoute>} />
+                                        <Route path="/admin/hemis-schedule" element={<PermissionRoute permission="hemis_admin_sync"><HemisSchedulePage /></PermissionRoute>} />
+                                        <Route path="/schedule" element={<PermissionRoute permission="user:me"><MySchedulePage /></PermissionRoute>} />
                                         <Route path="/admin/eduplan-sync" element={<PermissionRoute permission="sync:eduplan"><EduPlanSyncPage /></PermissionRoute>} />
                                         <Route path="/admin/file-quotas" element={<PermissionRoute permission="read:file_quota"><FileQuotasPage /></PermissionRoute>} />
                                         <Route path="/admin/zoom-accounts" element={<PermissionRoute permission="read:zoom_account"><ZoomAccountsPage /></PermissionRoute>} />

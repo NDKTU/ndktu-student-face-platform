@@ -31,6 +31,8 @@ const PATH_LABELS: Record<string, string> = {
     '/groups':              'Guruhlar',
     '/students':            'Talabalar',
     '/admin/hemis-sync':    'HEMIS sinxronizatsiyasi',
+    '/admin/hemis-schedule': 'HEMIS dars jadvali',
+    '/schedule':            'Dars jadvali',
     '/admin/eduplan-sync':  'EPMOS sinxronizatsiyasi',
     '/admin/file-quotas':   'Fayl yuklash limitlari',
     '/admin/zoom-accounts': 'Zoom akkauntlar',
