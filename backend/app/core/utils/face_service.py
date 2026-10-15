@@ -6,8 +6,12 @@ qarorni server qiladi — natija jurnal va testga ruxsatga tushadi, brauzerga
 ishonib bo'lmaydi.
 """
 
+import logging
+
 import httpx
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 #: Kirishdagi yuz tasdig'i shuncha soniya amal qiladi: talaba «Boshlash» ni
 #: shu orada bosishi kerak. Uzoq qilinsa, tasdiqlangan talaba o'rniga
@@ -21,6 +25,7 @@ FACE_ENTRY_MESSAGES = {
     "multiple_faces": "Kadrda bir nechta odam bor — yolg'iz qolib, qayta urinib ko'ring",
     "different_person": "Yuz profil surati bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
     "no_reference": "Profil suratingizdan yuz aniqlanmadi — o'qituvchiga murojaat qiling",
+    "spoof": "Kamera oldida tirik yuz bo'lishi kerak — rasm yoki telefon ekrani qabul qilinmaydi",
 }
 
 
@@ -42,7 +47,13 @@ async def verify_face(image_base64: str, reference_url: str) -> dict:
 
 
 def classify(result: dict) -> str:
-    """Xizmat javobidan holat: ok, no_face, multiple_faces, different_person, no_reference."""
+    """Xizmat javobidan holat: ok, no_face, multiple_faces, different_person, no_reference, spoof.
+
+    `spoof` — yuz tirik emas (telefon ekrani yoki bosma surat). U yuz
+    mosligidan oldin tekshiriladi: HEMIS suratining o'zi kamera oldiga
+    tutilsa, aynan u «mos keldi» deyilardi. Faqat `liveness_mode=enforce`
+    da qaytariladi; `log` da faqat jurnalga yoziladi.
+    """
     face_count = int(result.get("face_count") or 0)
     if not result.get("reference_ready") and face_count == 1:
         return "no_reference"
@@ -50,4 +61,14 @@ def classify(result: dict) -> str:
         return "no_face"
     if face_count > 1:
         return "multiple_faces"
+    if result.get("is_live") is False:
+        mode = settings.face_service.liveness_mode
+        if mode == "enforce":
+            return "spoof"
+        if mode == "log":
+            logger.warning(
+                "Liveness: frame looks not live (score=%s, match=%s) — log mode, not rejected",
+                result.get("liveness_score"),
+                result.get("is_match"),
+            )
     return "ok" if result.get("is_match") else "different_person"

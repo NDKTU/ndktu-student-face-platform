@@ -9,7 +9,7 @@ from mediapipe.tasks.python import vision
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.services import arcface
+from app.services import arcface, liveness
 
 logger = get_logger(__name__)
 
@@ -33,6 +33,7 @@ class FaceDetector:
         self._local = threading.local()
         self._encoding_lock = threading.Lock()
         self._embedder = arcface.ArcFaceEmbedder()
+        self._liveness = liveness.LivenessModel()
         logger.info("FaceDetector initialised (engine=%s)", settings.face_engine)
 
     @property
@@ -95,6 +96,21 @@ class FaceDetector:
             return None
 
         return self._embedder.embed(aligned)
+
+    def liveness_score(self, bgr_frame: np.ndarray) -> float | None:
+        """Tirik yuz ehtimoli (0..1); ``None`` — yuz yoʻq yoki model oʻchiq.
+
+        Ramka vektor hisobidagi kabi eng ishonchli yuzdan olinadi: kadr chetida
+        qoʻshnining yuzi boʻlsa, baho oʻsha emas, tekshirilayotgan yuz uchun.
+        """
+        if not settings.liveness_enabled:
+            return None
+        detections = self._detect(bgr_frame)
+        if not detections:
+            return None
+        best = max(detections, key=lambda d: d.categories[0].score if d.categories else 0.0)
+        box = best.bounding_box
+        return self._liveness.score(bgr_frame, box.origin_x, box.origin_y, box.width, box.height)
 
     def _encode_dlib(self, bgr_frame: np.ndarray):
         rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)

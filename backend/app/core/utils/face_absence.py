@@ -24,7 +24,7 @@ from datetime import datetime
 FAILED_STREAK = 2
 
 #: Talabani ayblaydigan statuslar — faqat shular davr hosil qiladi.
-FAILED_STATUSES = frozenset({"no_face", "multiple_faces", "different_person"})
+FAILED_STATUSES = frozenset({"no_face", "multiple_faces", "different_person", "spoof"})
 
 #: Talabaning aybi emas: kamera ochilmadi, profil surati yo'q, yoki sahifa
 #: fonda qolgan (boshqa tabda konspekt ochgan). Bular davr ochmaydi va uni

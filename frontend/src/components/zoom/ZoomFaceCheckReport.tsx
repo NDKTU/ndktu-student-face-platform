@@ -10,6 +10,7 @@ const REASON_LABEL: Record<string, string> = {
     no_face: "yuz ko'rinmadi",
     multiple_faces: 'bir nechta odam',
     different_person: 'boshqa odam',
+    spoof: 'rasm yoki ekran',
 };
 
 const formatMinutes = (seconds: number) => {

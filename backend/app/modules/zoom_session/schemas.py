@@ -164,6 +164,8 @@ CHECK_STATUSES = Literal[
     "multiple_faces",
     "different_person",
     "no_reference",
+    # Tirik yuz emas — rasm yoki ekran (`liveness_mode=enforce` da).
+    "spoof",
     "no_camera",
     # Sahifa fonda qolgan: kadr ishonchsiz, talabani ayblamaydi.
     "page_hidden",

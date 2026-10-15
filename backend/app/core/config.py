@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, PostgresDsn
@@ -185,6 +186,15 @@ class EduPlanConfig(BaseModel):
 class FaceServiceConfig(BaseModel):
     url: str = "http://face-detection:8000"
     internal_token: str = ""
+    # Jonlilik (rasm/ekran emas, tirik yuz) — `face-detection` baholaydi,
+    # qarorni bekend qiladi (`core/utils/face_service.py::classify`):
+    #   off     — e'tiborga olinmaydi;
+    #   log     — rad etmaydi, faqat jurnalga yozadi (chegarani o'lchash davri);
+    #   enforce — tirik bo'lmagan yuz `spoof` holati bilan rad etiladi.
+    # `log` dan boshlanadi: chegara hali haqiqiy veb-kamera kadrlarida
+    # o'lchanmagan, noto'g'ri chegara esa imtihon o'rtasida tirik talabani
+    # «rasm» deb chiqarib yuborardi. O'lchov: face-detection/scripts/liveness_scores.py.
+    liveness_mode: Literal["off", "log", "enforce"] = "log"
 
 
 class RedisConfig(BaseModel):

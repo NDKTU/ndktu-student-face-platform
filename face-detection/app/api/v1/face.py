@@ -18,6 +18,7 @@ from app.core.logging import get_logger
 from app.core.security import verify_internal_token
 from app.models.schemas import VerifyFaceRequest, VerifyFaceResponse
 from app.services import reference_cache, video_service
+from app.core.config import settings
 from app.services.video_service import get_detector
 
 router = APIRouter()
@@ -47,6 +48,16 @@ async def verify_face(data: VerifyFaceRequest) -> VerifyFaceResponse:
     if face_count != 1:
         return VerifyFaceResponse(face_count=face_count, is_match=False, reference_ready=False)
 
+    # Jonlilik — etalonga bogʻliq emas, shuning uchun har bir javobga qoʻshiladi.
+    # Har bir baho jurnalga yoziladi: chegara shu yozuvlardan oʻlchanadi.
+    score = await video_service.liveness_score(frame)
+    live = {
+        "liveness_score": None if score is None else round(score, 4),
+        "is_live": None if score is None else score >= settings.liveness_threshold,
+    }
+    if score is not None:
+        logger.info("liveness score=%.4f live=%s", score, live["is_live"])
+
     # Etalon dars davomida oʻzgarmaydi, tekshiruv esa har 5-12 daqiqada
     # takrorlanadi — shuning uchun vektor keshdan olinadi.
     reference_encoding = await reference_cache.get_encoding(data.reference_url)
@@ -54,12 +65,12 @@ async def verify_face(data: VerifyFaceRequest) -> VerifyFaceResponse:
         # Sabab ikki xil — rasm kelmadi yoki unda yuz topilmadi. Ikkalasida
         # ham qaror bir xil, batafsili jurnalda.
         return VerifyFaceResponse(
-            face_count=face_count, is_match=False, reference_ready=False, detail="reference unavailable"
+            face_count=face_count, is_match=False, reference_ready=False, detail="reference unavailable", **live
         )
 
     current_encoding = await video_service.get_face_encoding(frame)
     if current_encoding is None:
-        return VerifyFaceResponse(face_count=face_count, is_match=False, reference_ready=True)
+        return VerifyFaceResponse(face_count=face_count, is_match=False, reference_ready=True, **live)
 
     is_match = get_detector().compare_faces(reference_encoding, current_encoding, tolerance=data.tolerance)
-    return VerifyFaceResponse(face_count=face_count, is_match=bool(is_match), reference_ready=True)
+    return VerifyFaceResponse(face_count=face_count, is_match=bool(is_match), reference_ready=True, **live)

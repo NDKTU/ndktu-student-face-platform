@@ -32,3 +32,8 @@ class VerifyFaceResponse(BaseModel):
     # Etalon fotoda yuz topilmagan bo'lsa `False` — bu talabaning aybi emas.
     reference_ready: bool
     detail: str | None = None
+    # Jonlilik: tirik yuz ehtimoli (0..1) va chegara bo'yicha xulosa.
+    # `None` — baholanmadi (yuz bitta emas, model o'chiq). Qarorni bekend
+    # qiladi: `log` rejimida faqat jurnalga yozadi, `enforce` da rad etadi.
+    liveness_score: float | None = None
+    is_live: bool | None = None

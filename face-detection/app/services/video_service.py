@@ -70,6 +70,12 @@ async def get_face_encoding(frame: np.ndarray):
     return await loop.run_in_executor(_executor, get_detector().get_face_encoding, frame)
 
 
+async def liveness_score(frame: np.ndarray) -> float | None:
+    """Tirik yuz ehtimoli — rasm yoki ekran emasligini baholaydi. ~2x2 ms."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, get_detector().liveness_score, frame)
+
+
 async def decode_frame(payload: bytes) -> np.ndarray | None:
     """Разбор JPEG в кадр OpenCV. Тоже счёт на процессоре, хоть и недорогой."""
     loop = asyncio.get_running_loop()

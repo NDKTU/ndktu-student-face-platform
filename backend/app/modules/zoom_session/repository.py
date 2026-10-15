@@ -107,6 +107,7 @@ _STATUS_MESSAGE = {
     "multiple_faces": "Kadrda bir nechta odam ko'rindi — yolg'iz qoling",
     "different_person": "Yuz HEMIS'dagi surat bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
     "no_reference": "HEMIS suratingizdan yuz aniqlanmadi — dekanatga murojaat qiling",
+    "spoof": "Kamera oldida tirik yuz bo'lishi kerak — rasm yoki telefon ekrani qabul qilinmaydi",
     "no_camera": "Kamera ochilmadi",
     "page_hidden": "Sahifa fonda edi — tekshiruv o'tkazilmadi",
 }

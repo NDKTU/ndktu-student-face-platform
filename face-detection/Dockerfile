@@ -32,6 +32,19 @@ RUN mkdir -p /face/models \
     && python -c "import zipfile; zipfile.ZipFile('/tmp/buffalo_s.zip').extract('w600k_mbf.onnx', '/face/models')" \
     && rm /tmp/buffalo_s.zip
 
+# Jonlilik (anti-spoofing): MiniFASNet V2 + V1SE, Apache-2.0, ~1.7 MB har biri.
+# Sabab ArcFace'niki bilan bir: start paytida tarmoqqa chiqmaymiz. SHA-256
+# tekshiriladi — relizdagi fayl almashtirilsa, yigʻish toʻxtaydi, jim
+# boshqa model bilan ishlamaydi. app/services/liveness.py
+RUN curl -fsSL -o /face/models/MiniFASNetV2.onnx \
+       https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/MiniFASNetV2.onnx \
+    && curl -fsSL -o /face/models/MiniFASNetV1SE.onnx \
+       https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/MiniFASNetV1SE.onnx \
+    && printf '%s  %s\n' \
+       b32929adc2d9c34b9486f8c4c7bc97c1b69bc0ea9befefc380e4faae4e463907 /face/models/MiniFASNetV2.onnx \
+       ebab7f90c7833fbccd46d3a555410e78d969db5438e169b6524be444862b3676 /face/models/MiniFASNetV1SE.onnx \
+       | sha256sum -c -
+
 # Application code — changes on every commit, rebuilds quickly
 COPY . .
 RUN uv sync --no-dev

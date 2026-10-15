@@ -38,7 +38,7 @@ export interface VerifyEntryFaceRequest {
 export interface VerifyEntryFaceResponse {
     /** true — `startQuiz` endi ruxsat beradi (tasdiq bir necha daqiqa amal qiladi). */
     verified: boolean;
-    status: 'ok' | 'no_face' | 'multiple_faces' | 'different_person' | 'no_reference';
+    status: 'ok' | 'no_face' | 'multiple_faces' | 'different_person' | 'no_reference' | 'spoof';
     message: string;
 }
 

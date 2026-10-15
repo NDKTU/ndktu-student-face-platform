@@ -95,6 +95,8 @@ export type FaceCheckStatus =
     | 'no_face'
     | 'multiple_faces'
     | 'different_person'
+    /** Tirik yuz emas — rasm yoki telefon ekrani. */
+    | 'spoof'
     | 'no_reference'
     | 'no_camera'
     /** Sahifa fonda edi — kadr ishonchsiz, talabani ayblamaydi. */

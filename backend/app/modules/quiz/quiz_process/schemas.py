@@ -22,7 +22,7 @@ class VerifyEntryFaceRequest(BaseModel):
 class VerifyEntryFaceResponse(BaseModel):
     #: True — `start_quiz` ruxsat beradi (tasdiq bir necha daqiqa amal qiladi).
     verified: bool
-    #: ok, no_face, multiple_faces, different_person, no_reference.
+    #: ok, no_face, multiple_faces, different_person, no_reference, spoof.
     status: str
     message: str
 

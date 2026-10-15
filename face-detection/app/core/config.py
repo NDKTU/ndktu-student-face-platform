@@ -41,6 +41,20 @@ class Settings(BaseSettings):
     # veb-kamera kadri koʻproq farq qiladi.
     arcface_threshold: float = 0.45
 
+    # Jonlilik (anti-spoofing): MiniFASNet V2 va V1SE, obraz yigʻilishida
+    # yuklanadi (Dockerfile). Fayllar boʻlmasa tekshiruv oʻchadi, yuz tanish
+    # esa ishlashda davom etadi — app/services/liveness.py.
+    liveness_enabled: bool = True
+    liveness_v2_model_path: str = str(BASE_DIR / "models" / "MiniFASNetV2.onnx")
+    liveness_v1se_model_path: str = str(BASE_DIR / "models" / "MiniFASNetV1SE.onnx")
+
+    # «Tirik» deyish uchun ikki model oʻrtacha ehtimolining pastki chegarasi.
+    # Repo namunalarida (MediaPipe ramkasi bilan): tirik yuz 0.999, soxta
+    # 0.012 va 0.22. Haqiqiy veb-kamera kadrlari hali oʻlchanmagan — shu
+    # sababli bekend avval faqat jurnalga yozadi (LIVENESS_MODE=log) va
+    # chegara prod kadrlaridan keyin aniqlanadi (scripts/liveness_scores.py).
+    liveness_threshold: float = 0.5
+
     # ONNX seansining ichki oqimlari. Pul allaqachon oqimlar boʻyicha
     # taqsimlaydi, shuning uchun bu yerda 1 — aks holda oqimlar oqim yasab,
     # yadrolardan oshib ketardi.
