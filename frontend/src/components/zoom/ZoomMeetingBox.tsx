@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, ScanFace, Video } from 'lucide-react';
+import { FaceEntryCamera } from '@/components/FaceEntryCamera';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { zoomSessionService } from '@/services/zoomSessionService';
-import { useZoomFaceCheck } from '@/hooks/useZoomFaceCheck';
 import { apiErrorMessage } from '@/utils/apiError';
-import type { FaceCheckResult } from '@/services/zoomSessionService';
 import { isMobileDevice } from '@/utils/device';
 import { logger } from '@/utils/logger';
 import { saveZoomRoomTicket } from '@/utils/zoomRoom';
@@ -66,11 +66,18 @@ interface Props {
 // (`zoom_session/repository.py::join`). Urinishlar cheklanmaydi: yomon yorug'lik
 // talabaning aybi emas. Ilgari uch urinishdan keyin talaba baribir kirardi.
 export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = false, appFallback = false }: Props) => {
-    const [state, setState] = useState<'idle' | 'verifying' | 'joining'>('idle');
+    const [joining, setJoining] = useState(false);
     const [error, setError] = useState('');
-    const [faceResult, setFaceResult] = useState<FaceCheckResult | null>(null);
-    const [attempts, setAttempts] = useState(0);
-    const faceCheck = useZoomFaceCheck(sessionId);
+    /**
+     * Kirishdagi yuz tekshiruvi oynasi — elementar testlardagi bilan bir xil
+     * (`FaceEntryCamera`): talaba o'zini ko'radi, ramkaga qarab turadi, kadr
+     * o'zi olinadi. Ilgari kamera yashirin ochilib, yarim soniyada kadr olardi:
+     * talaba kadrga tushganini bilmas, «yuz topilmadi» ko'p chiqardi.
+     * Qiymat — tasdiqdan keyin qayerga: brauzerdagi xona yoki Zoom ilovasi.
+     */
+    const [faceTarget, setFaceTarget] = useState<'room' | 'app' | null>(null);
+    const [verifying, setVerifying] = useState(false);
+    const [faceResult, setFaceResult] = useState<{ ok: boolean; text: string } | null>(null);
     const mobile = useMemo(isMobileDevice, []);
     const showAppFallback = appFallback && mobile && !host;
 
@@ -78,105 +85,85 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
         prefetchZoom();
     }, []);
 
-    /** Kirishdan oldingi tekshiruv. `true` — server tasdiqladi, imzo olish mumkin. */
-    const verifyBeforeJoin = async (): Promise<boolean> => {
-        setState('verifying');
-        setError('');
-        setAttempts((n) => n + 1);
-        try {
-            const result = await faceCheck.runCheck('join');
-            setFaceResult(result);
-            return Boolean(result?.admitted);
-        } catch (cause) {
-            // Guruh, vaqt, HEMIS surati yoki xizmat — sababni aytamiz.
-            setFaceResult(null);
-            setError(apiErrorMessage(cause, "Shaxsni tekshirib bo'lmadi. Qayta urinib ko'ring."));
-            return false;
-        } finally {
-            // Kamera bu yerda kerak emas — xonada tekshiruv o'zi qayta ochadi.
-            faceCheck.stop();
-        }
-    };
-
-    /** `app` — Zoom ilovasiga (zaxira yo'l), aks holda — brauzerdagi xonaga. */
-    const join = async (app = false) => {
-        if (faceCheckEnabled && !(await verifyBeforeJoin())) {
-            setState('idle');
-            return;
-        }
-        setState('joining');
+    /** Imzo olib, Zoom'ni ochadi. `app` — Zoom ilovasiga (zaxira yo'l). */
+    const openZoom = async (app: boolean) => {
+        setJoining(true);
         setError('');
         try {
             const payload = await zoomSessionService.join(sessionId, { app });
             if (app && payload.app_join_url) {
-                setState('idle');
+                setJoining(false);
                 window.location.href = payload.app_join_url;
                 return;
             }
-            saveZoomRoomTicket(sessionId, {
-                payload,
-                faceCheck: faceCheckEnabled && !faceCheck.notApplicable,
-            });
+            saveZoomRoomTicket(sessionId, { payload, faceCheck: faceCheckEnabled });
             // Alohida HTML sahifa, to'liq yuklash: Client View va saytning
             // stillari bir-biriga aralashmasin (`zoom-room.html`).
             window.location.assign(`/zoom-room.html?session=${sessionId}`);
         } catch (cause) {
             logger.error('Zoom join failed', cause);
             setError(apiErrorMessage(cause, "Uchrashuvga qo'shilib bo'lmadi."));
-            setState('idle');
+            setJoining(false);
         }
     };
 
-    const busy = state !== 'idle';
+    const start = (app = false) => {
+        if (!faceCheckEnabled) {
+            void openZoom(app);
+            return;
+        }
+        setError('');
+        setFaceResult(null);
+        setFaceTarget(app ? 'app' : 'room');
+    };
+
+    /** Oynadagi kadr — serverga `join` tekshiruvi; tasdiqlansa — Zoom. */
+    const captureFace = async (image: string) => {
+        if (!faceTarget) return;
+        setVerifying(true);
+        try {
+            const result = await zoomSessionService.faceCheck(sessionId, { stage: 'join', image_base64: image });
+            setFaceResult({ ok: Boolean(result.admitted), text: result.message });
+            if (result.admitted) {
+                const app = faceTarget === 'app';
+                setFaceTarget(null);
+                await openZoom(app);
+            }
+        } catch (cause) {
+            // Guruh, vaqt, HEMIS surati yoki xizmat — bu yerda qayta urinish
+            // yordam bermaydi: oynani yopamiz va sababni ochiq aytamiz.
+            setFaceTarget(null);
+            setError(apiErrorMessage(cause, "Shaxsni tekshirib bo'lmadi. Qayta urinib ko'ring."));
+        } finally {
+            setVerifying(false);
+        }
+    };
 
     return (
         <div className="min-w-0 rounded-2xl border border-border/60 bg-card shadow-sm">
             <div className="flex flex-col items-center gap-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 px-4 py-10 text-center sm:px-8 sm:py-14">
                 <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
-                    {state === 'verifying' ? <ScanFace className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                    <Video className="h-5 w-5" />
                 </span>
                 <div className="space-y-1">
                     <p className="text-lg font-semibold tracking-tight">
-                        {state === 'verifying'
-                            ? 'Shaxsingiz tekshirilmoqda'
-                            : state === 'joining'
-                                ? 'Zoom ochilmoqda...'
-                                : "Dars jonli efirda o'tadi"}
+                        {joining ? 'Zoom ochilmoqda...' : "Dars jonli efirda o'tadi"}
                     </p>
                     <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
-                        {state === 'verifying'
-                            ? 'Kameraga qarab turing — bu bir necha soniya oladi.'
-                            : host
-                                ? "Zoom butun ekranda host sifatida ochiladi: «Join Audio» ni bosing — mikrofon yoqiq bo'ladi, talabalar ovozini boshqara olasiz."
-                                : faceCheckEnabled
-                                    ? "Zoom butun ekranda ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi, dars davomida ham tasodifiy tekshiriladi."
-                                    : "Zoom butun ekranda ochiladi — ilova shart emas. Kirgach «Join Audio» ni bosing."}
+                        {host
+                            ? "Zoom butun ekranda host sifatida ochiladi: «Join Audio» ni bosing — mikrofon yoqiq bo'ladi, talabalar ovozini boshqara olasiz."
+                            : faceCheckEnabled
+                                ? "Zoom butun ekranda ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi, dars davomida ham tasodifiy tekshiriladi."
+                                : "Zoom butun ekranda ochiladi — ilova shart emas. Kirgach «Join Audio» ni bosing."}
                     </p>
                 </div>
-                {/* Tekshiruv bu foydalanuvchiga tegishli emasligi ochiq aytiladi —
-                    aks holda «tekshirildi» degan taassurot qolardi. */}
-                {faceCheckEnabled && faceCheck.notApplicable && (
-                    <p className="text-xs text-muted-foreground">
-                        Yuz nazorati faqat guruh talabalari uchun — sizga qo'llanmadi.
-                    </p>
-                )}
-                {/* Tekshiruv natijasi: nima bo'lgani va nechanchi urinish. */}
-                {faceResult && faceResult.status !== 'ok' && state === 'idle' && (
-                    <p className="text-xs text-amber-600">
-                        {faceResult.message}. Qayta urinib ko'ring — tasdiqlanmaguncha darsga kirib bo'lmaydi.
-                    </p>
-                )}
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                    <Button onClick={() => void join()} disabled={busy}>
-                        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
-                        {state === 'verifying'
-                            ? 'Tekshirilmoqda...'
-                            : state === 'joining'
-                                ? 'Ochilmoqda...'
-                                : attempts > 0 ? 'Qayta urinish' : host ? 'Darsni boshlash' : "Darsga qo'shilish"}
+                    <Button onClick={() => start()} disabled={joining}>
+                        {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
+                        {joining ? 'Ochilmoqda...' : host ? 'Darsni boshlash' : "Darsga qo'shilish"}
                     </Button>
                     {showAppFallback && (
-                        <Button variant="outline" onClick={() => void join(true)} disabled={busy}>
+                        <Button variant="outline" onClick={() => start(true)} disabled={joining}>
                             <ExternalLink className="mr-2 h-4 w-4" /> Zoom ilovasida ochish
                         </Button>
                     )}
@@ -188,6 +175,25 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                 )}
             </div>
             {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
+
+            <Modal isOpen={faceTarget !== null} onClose={() => setFaceTarget(null)} title="Shaxsni tasdiqlash">
+                <div className="space-y-4">
+                    <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <ScanFace className="mt-0.5 h-4 w-4 shrink-0" />
+                        Yuzingizni ramkaga joylang va bir lahza qimirlamay turing — kadr o'zi olinadi.
+                        Tasdiqlangach dars ochiladi.
+                    </p>
+                    {/* Oyna yopilishi bilan kamera o'chadi — FaceEntryCamera o'zi yopadi. */}
+                    {faceTarget !== null && (
+                        <FaceEntryCamera onCapture={captureFace} busy={verifying || joining} result={faceResult} />
+                    )}
+                    <div className="flex justify-end">
+                        <Button type="button" variant="outline" onClick={() => setFaceTarget(null)}>
+                            Bekor qilish
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
