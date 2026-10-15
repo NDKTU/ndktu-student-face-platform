@@ -318,14 +318,15 @@ function GradeCell({
     }
     // Qayta topshirishga qaytarilgan ishning bahosi yangisi qo'yilguncha turadi.
     const graded = (cell.status === 'graded' || cell.status === 'returned') && cell.grade != null;
-    const rejected = cell.status === 'rejected';
+    // Bahosiz qaytarilgan — ish talabada, baho yo'q.
+    const reopened = cell.status === 'returned' && !graded;
     return (
         <button
             type="button"
             onClick={() => onOpenHomework(homework.id)}
             title={[
                 homework.title,
-                graded ? `${cell.grade} / ${homework.max_grade}` : rejected ? 'rad etilgan' : 'tekshirilmagan',
+                graded ? `${cell.grade} / ${homework.max_grade}` : reopened ? 'bahosiz qaytarilgan' : 'tekshirilmagan',
                 cell.status === 'returned' ? 'qayta topshirishga qaytarilgan' : null,
                 cell.late ? 'kech topshirilgan' : null,
             ].filter(Boolean).join(' · ')}
@@ -334,13 +335,13 @@ function GradeCell({
                 'relative transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 graded
                     ? gradeClass((cell.grade! * 5) / homework.max_grade)
-                    : rejected
-                        ? REVIEW_CLASS.rejected
+                    : reopened
+                        ? REVIEW_CLASS.returned
                         : REVIEW_CLASS.pending,
             )}
         >
-            {graded ? cell.grade : rejected ? 'R' : '?'}
-            {cell.status === 'returned' && (
+            {graded ? cell.grade : reopened ? 'Q' : '?'}
+            {graded && cell.status === 'returned' && (
                 <span aria-hidden className="absolute -bottom-1 -right-1 h-2 w-2 rounded-full bg-primary ring-2 ring-card" />
             )}
             {/* Kechikish holatdan emas, vaqtdan — baholangandan keyin ham ko'rinsin. */}
@@ -449,8 +450,8 @@ async function exportExcel(data: Gradebook, groups: ColumnGroup[], groupName: st
                     if (column.kind !== 'homework') return '';
                     const cell = row.homeworks[String(column.homework.id)];
                     if (!cell) return isPastDeadline(column.homework.deadline) ? 'Topshirmagan' : '';
-                    if (cell.status === 'graded' || cell.status === 'returned') return cell.grade ?? '';
-                    return cell.status === 'rejected' ? 'Rad etilgan' : 'Tekshirilmagan';
+                    if (cell.grade != null && (cell.status === 'graded' || cell.status === 'returned')) return cell.grade;
+                    return cell.status === 'returned' ? 'Qaytarilgan' : 'Tekshirilmagan';
                 }),
                 average ? Number(average.value.toFixed(2)) : '',
             ];

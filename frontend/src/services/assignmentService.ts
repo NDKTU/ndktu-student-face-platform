@@ -1,22 +1,27 @@
 import api from './api';
 
 /**
- * `rejected` — o'qituvchi ishni baholamay rad etdi (sababi `feedback` da);
- * `returned` — baholangan ishni qayta topshirishga qaytardi, eski baho turadi.
- * Ikkalasida ham talaba yangi javob yubora oladi.
+ * `returned` — o'qituvchi ishni qayta topshirishga qaytardi: baholanganida
+ * eski baho yangisi qo'yilguncha turadi, baholanmaganida baho yo'q, sababi
+ * `feedback` da. Talaba yangi javob yubora oladi.
  */
-export type SubmissionStatus = 'draft' | 'submitted' | 'late' | 'graded' | 'returned' | 'rejected';
+export type SubmissionStatus = 'draft' | 'submitted' | 'late' | 'graded' | 'returned';
 
 /** Ish talabaga qaytgan — u qayta topshira oladi. */
 export const isReopened = (status: SubmissionStatus | undefined | null): boolean =>
-    status === 'rejected' || status === 'returned';
+    status === 'returned';
+
+/** Urinishlar soni: 1 — qayta topshirishsiz. */
+export const ATTEMPTS_MIN = 1;
+export const ATTEMPTS_MAX = 5;
+export const ATTEMPTS_DEFAULT = 2;
 
 /** Avvalgi urinish — talaba qayta topshirgach saqlanadi. */
 export interface SubmissionAttempt {
     submitted_text?: string | null;
     submitted_files: SubmissionFile[];
     submitted_at?: string | null;
-    /** Urinish qanday yopilgan: `rejected` yoki `returned`. */
+    /** Urinish qanday yopilgan — doim `returned`. */
     status: SubmissionStatus;
     grade?: number | null;
     feedback?: string | null;
@@ -58,6 +63,8 @@ export interface Assignment {
     description?: string | null;
     deadline: string;
     max_grade: number;
+    /** Talaba javobni necha marta yuborishi mumkin (birinchisi ham urinish). */
+    max_attempts: number;
     allow_file: boolean;
     allow_text: boolean;
     allowed_file_types: string[];
@@ -84,6 +91,7 @@ export interface AssignmentCreateRequest {
     description?: string | null;
     deadline: string;
     max_grade?: number;
+    max_attempts?: number;
     attachments?: SubmissionFile[];
 }
 
@@ -93,6 +101,7 @@ export interface AssignmentUpdateRequest {
     description?: string | null;
     deadline?: string;
     max_grade?: number;
+    max_attempts?: number;
     attachments?: SubmissionFile[];
 }
 
@@ -200,15 +209,10 @@ export const assignmentService = {
         );
         return response.data;
     },
-    /** Baholamay rad etish — sabab majburiy, talaba qayta yuboradi. */
-    reject: async (assignmentId: number, userId: number, reason: string) => {
-        const response = await api.put<Submission>(
-            `/homework/${assignmentId}/submission/${userId}/reject`,
-            { reason },
-        );
-        return response.data;
-    },
-    /** Baholangan ishni qayta topshirishga qaytarish; eski baho yangisi qo'yilguncha turadi. */
+    /**
+     * Qayta topshirishga qaytarish (`max_attempts` doirasida). Baholangan ishda
+     * eski baho yangisi qo'yilguncha turadi; baholanmaganida izoh majburiy.
+     */
     returnForResubmit: async (assignmentId: number, userId: number, comment?: string | null) => {
         const response = await api.put<Submission>(
             `/homework/${assignmentId}/submission/${userId}/return`,

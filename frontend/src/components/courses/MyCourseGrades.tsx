@@ -34,8 +34,8 @@ const homeworkState = (hw: MyHomeworkGrade): TaskState => {
     if ((hw.status === 'graded' || hw.status === 'returned') && hw.grade != null) {
         return { kind: 'graded', grade: hw.grade, onFive: (hw.grade * 5) / hw.max_grade };
     }
-    // Rad etilgan ish — yana qilinishi kerak bo'lgan ish.
-    if (hw.status === 'rejected') return { kind: 'open' };
+    // Bahosiz qaytarilgan ish — yana qilinishi kerak bo'lgan ish.
+    if (hw.status === 'returned') return { kind: 'open' };
     if (hw.status) return { kind: 'pending' };
     return isPastDeadline(hw.deadline) ? { kind: 'missed' } : { kind: 'open' };
 };
@@ -269,13 +269,12 @@ function HomeworkTile({ homework, onSubmit }: { homework: MyHomeworkGrade; onSub
 
     let status: ReactNode;
     let details: (string | null)[] = [];
-    const rejected = homework.status === 'rejected';
     const returned = homework.status === 'returned';
     if (state.kind === 'graded') {
         status = <span className={GRADE_TEXT[gradeLevel(state.onFive)]}>{gradeWord(state.onFive)} — {state.grade} / {homework.max_grade}</span>;
         details = [submitted, returned ? "O'qituvchi qayta topshirishga ruxsat berdi" : null];
-    } else if (rejected) {
-        status = <span className="text-destructive">Rad etildi — qayta topshiring</span>;
+    } else if (returned) {
+        status = <span className="text-primary">Qaytarildi — qayta topshiring</span>;
         details = [submitted];
     } else if (state.kind === 'pending') {
         status = <span className="text-amber-700 dark:text-amber-400">Tekshirilmoqda</span>;
@@ -303,7 +302,7 @@ function HomeworkTile({ homework, onSubmit }: { homework: MyHomeworkGrade; onSub
                     onClick={onSubmit}
                     className="mt-2 inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                    {rejected || returned ? 'Qayta topshirish' : 'Topshirish'} <ChevronRight className="h-3.5 w-3.5" />
+                    {returned ? 'Qayta topshirish' : 'Topshirish'} <ChevronRight className="h-3.5 w-3.5" />
                 </button>
             )}
         />

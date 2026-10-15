@@ -78,7 +78,7 @@ export const useSubmitAssignment = (assignmentId: number | undefined) => {
     });
 };
 
-/** Ish talabaga qaytgach (rad etildi / qayta topshirishga) — o'sha keshlar. */
+/** Ish talabaga qayta topshirishga qaytgach — o'sha keshlar. */
 const useInvalidateReview = (assignmentId: number | undefined) => {
     const qc = useQueryClient();
     return () => {
@@ -87,15 +87,6 @@ const useInvalidateReview = (assignmentId: number | undefined) => {
         qc.invalidateQueries({ queryKey: ['lesson-gradebook'] });
         qc.invalidateQueries({ queryKey: ['course-gradebook'] });
     };
-};
-
-export const useRejectSubmission = (assignmentId: number | undefined) => {
-    const invalidate = useInvalidateReview(assignmentId);
-    return useMutation({
-        mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
-            assignmentService.reject(assignmentId!, userId, reason),
-        onSuccess: invalidate,
-    });
 };
 
 export const useReturnSubmission = (assignmentId: number | undefined) => {

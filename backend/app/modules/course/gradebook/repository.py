@@ -383,10 +383,10 @@ class GradebookRepository:
                 grade=sub.grade if sub else None,
                 submitted_at=sub.submitted_at if sub else None,
                 late=bool(submitted_at and submitted_at > _naive(h.deadline)),
-                # Rad etilgan / qaytarilgan ishda izoh — talaba nima qilishi kerakligi.
+                # Qaytarilgan ishda izoh — talaba nima qilishi kerakligi.
                 feedback=(
                     (sub.feedback or None)
-                    if sub and sub.status in ("graded", "rejected", "returned")
+                    if sub and sub.status in ("graded", "returned")
                     else None
                 ),
             )

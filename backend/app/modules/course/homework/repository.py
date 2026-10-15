@@ -34,7 +34,6 @@ from .schemas import (
     SubmissionFile,
     SubmissionGradeRequest,
     SubmissionListResponse,
-    SubmissionRejectRequest,
     SubmissionResponse,
     SubmissionReturnRequest,
     SubmissionSubmitRequest,
@@ -51,9 +50,9 @@ _ALLOWED_EXTS = {"pdf", "jpg", "jpeg", "png"}
 _SUBMISSION_MAX = 2 * 1024 * 1024
 _SUBMISSION_MAX_FILES = 1
 
-#: Talaba topshirgan, o'qituvchi ko'rishi mumkin bo'lgan holatlar — rad
-#: etish shulardan biridan bo'ladi. Baholangan ish ham rad etiladi:
-#: baho qo'yilgach ko'chirma ekani ma'lum bo'lishi mumkin.
+#: Talaba topshirgan, o'qituvchi ko'rishi mumkin bo'lgan holatlar — qayta
+#: topshirishga qaytarish shulardan biridan bo'ladi. Baholanmagan ish ham
+#: qaytariladi: noto'g'ri fayl, bo'sh sahifa, ko'chirma.
 _HANDED_IN = ("submitted", "late", "graded")
 
 _ALREADY_SUBMITTED = "Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi"
@@ -169,28 +168,37 @@ class HomeworkRepository:
         )
         totals = {course_id: count for course_id, count in (await session.execute(totals_stmt)).all()}
 
+        # `returned` baholi va bahosiz bo'ladi — ular alohida sanaladi.
+        has_grade = HomeworkSubmission.grade.is_not(None)
         counts_stmt = (
-            select(HomeworkSubmission.homework_id, HomeworkSubmission.status, func.count(HomeworkSubmission.id))
+            select(
+                HomeworkSubmission.homework_id,
+                HomeworkSubmission.status,
+                has_grade,
+                func.count(HomeworkSubmission.id),
+            )
             .where(HomeworkSubmission.homework_id.in_([a.id for a in items]))
-            .group_by(HomeworkSubmission.homework_id, HomeworkSubmission.status)
+            .group_by(HomeworkSubmission.homework_id, HomeworkSubmission.status, has_grade)
         )
         per_homework: dict[int, dict[str, int]] = {}
-        for homework_id, sub_status, count in (await session.execute(counts_stmt)).all():
-            per_homework.setdefault(homework_id, {})[sub_status] = count
+        for homework_id, sub_status, graded, count in (await session.execute(counts_stmt)).all():
+            key = f"{sub_status}_graded" if sub_status == "returned" and graded else sub_status
+            bucket = per_homework.setdefault(homework_id, {})
+            bucket[key] = bucket.get(key, 0) + count
 
         stats: dict[int, HomeworkStats] = {}
         for a in items:
             counts = per_homework.get(a.id, {})
             stats[a.id] = HomeworkStats(
                 total_students=totals.get(a.course_id, 0),
-                # `returned` — baholangan ish, talaba qayta yuborishi mumkin: baho
-                # hali turibdi, shuning uchun u topshirilgan ham, baholangan ham.
-                # `rejected` hech biriga kirmaydi — ish talabada.
+                # Baholi `returned` — talaba qayta yuborishi mumkin, lekin baho
+                # hali turibdi: u topshirilgan ham, baholangan ham. Bahosiz
+                # `returned` hech biriga kirmaydi — ish talabada.
                 submitted=counts.get("submitted", 0)
                 + counts.get("late", 0)
                 + counts.get("graded", 0)
-                + counts.get("returned", 0),
-                graded=counts.get("graded", 0) + counts.get("returned", 0),
+                + counts.get("returned_graded", 0),
+                graded=counts.get("graded", 0) + counts.get("returned_graded", 0),
                 late=counts.get("late", 0),
             )
         return stats
@@ -255,6 +263,7 @@ class HomeworkRepository:
             description=a.description,
             deadline=a.deadline,
             max_grade=a.max_grade,
+            max_attempts=a.max_attempts,
             allow_file=a.allow_file,
             allow_text=a.allow_text,
             allowed_file_types=list(a.allowed_file_types or []),
@@ -334,6 +343,7 @@ class HomeworkRepository:
             description=data.description,
             deadline=_to_naive_utc(data.deadline),
             max_grade=data.max_grade,
+            max_attempts=data.max_attempts,
             allow_file=True,
             allow_text=False,
             allowed_file_types=SUBMISSION_FILE_TYPES,
@@ -366,6 +376,7 @@ class HomeworkRepository:
             "description",
             "deadline",
             "max_grade",
+            "max_attempts",
         ):
             val = getattr(data, field)
             if val is not None:
@@ -848,38 +859,6 @@ class HomeworkRepository:
             payload={"homework_id": a.id, "lesson_id": a.lesson_id, "course_id": a.course_id},
         )
 
-    async def reject_submission(
-        self,
-        session: AsyncSession,
-        homework_id: int,
-        user_id: int,
-        data: SubmissionRejectRequest,
-        current_user: User,
-    ) -> SubmissionResponse:
-        """Ishni baholamay rad etadi: talaba yangi javob yuborishi kerak.
-
-        Baho olib tashlanadi — rad etilgan ish jurnalga tushmasligi kerak.
-        Sabab majburiy va talabaga `feedback` sifatida ko'rinadi.
-        """
-        a, sub = await self._load_for_review(session, homework_id, user_id, current_user)
-        if sub.status not in _HANDED_IN:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Bu ish allaqachon talabaga qaytarilgan",
-            )
-        sub.status = "rejected"
-        sub.grade = None
-        sub.feedback = data.reason.strip()
-        sub.graded_by_user_id = current_user.id
-        sub.graded_at = _utcnow()
-        await self._notify(
-            session, a, sub.user_id,
-            title=f"Vazifa rad etildi: {a.title}",
-            body=f"Sabab: {sub.feedback}. Javobni qayta yuboring.",
-        )
-        await session.commit()
-        return await self._reload(session, sub.id)
-
     async def return_submission(
         self,
         session: AsyncSession,
@@ -888,30 +867,43 @@ class HomeworkRepository:
         data: SubmissionReturnRequest,
         current_user: User,
     ) -> SubmissionResponse:
-        """Baholangan ishni qayta topshirishga qaytaradi (odatda past baho uchun).
+        """Ishni qayta topshirishga qaytaradi — urinishlar qolgan bo'lsa.
 
-        Eski baho yangisi qo'yilguncha turadi: talaba qayta yubormasa, jurnalda
-        bo'sh joy emas, avvalgi natija qoladi.
+        Baholangan ishda eski baho yangisi qo'yilguncha turadi: talaba qayta
+        yubormasa, jurnalda bo'sh joy emas, avvalgi natija qoladi. Baholanmagan
+        ish (noto'g'ri fayl, ko'chirma) bahosiz qaytadi, izoh majburiy.
         """
         a, sub = await self._load_for_review(session, homework_id, user_id, current_user)
-        if sub.status != "graded":
+        if sub.status not in _HANDED_IN:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Qayta topshirishga faqat baholangan ish qaytariladi",
+                detail="Bu ish allaqachon talabaga qaytarilgan",
             )
-        sub.status = "returned"
+        used = len(sub.attempts or []) + 1
+        if used >= a.max_attempts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Urinishlar tugagan: {used} / {a.max_attempts}",
+            )
         comment = (data.comment or "").strip()
+        if sub.grade is None and len(comment) < 3:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Baholanmagan ishni qaytarishda sababni yozing",
+            )
+
+        sub.status = "returned"
         if comment:
             sub.feedback = comment
-        await self._notify(
-            session, a, sub.user_id,
-            title=f"Vazifani qayta topshirishingiz mumkin: {a.title}",
-            body=(
-                f"Joriy baho: {sub.grade} / {a.max_grade}. "
-                + (f"Izoh: {comment}. " if comment else "")
-                + "Yangi javob yuborsangiz, o'qituvchi uni qayta baholaydi."
-            ),
-        )
+        left = a.max_attempts - used
+        if sub.grade is not None:
+            title = f"Vazifani qayta topshirishingiz mumkin: {a.title}"
+            body = f"Joriy baho: {sub.grade} / {a.max_grade}. " + (f"Izoh: {comment}. " if comment else "")
+        else:
+            title = f"Vazifa qayta topshirishga qaytarildi: {a.title}"
+            body = f"Sabab: {comment}. "
+        body += f"Yangi javob yuboring, o'qituvchi uni qayta baholaydi. Qolgan urinishlar: {left}."
+        await self._notify(session, a, sub.user_id, title=title, body=body)
         await session.commit()
         return await self._reload(session, sub.id)
 

@@ -5,17 +5,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
-SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned", "rejected"]
+SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned"]
 
-#: Ish talabaga qaytgan — u yangi javob yubora oladi.
-#: `rejected` — o'qituvchi ishni baholamay rad etdi (sababi `feedback` da);
-#: `returned` — baholangan ishni past baho uchun qayta topshirishga qaytardi,
-#: eski baho yangisi qo'yilguncha turadi.
-REOPENED_STATUSES = ("rejected", "returned")
+#: Ish talabaga qaytgan — u yangi javob yubora oladi. `returned` ni faqat
+#: o'qituvchi qo'yadi: baholangan ishda eski baho yangisi qo'yilguncha turadi,
+#: baholanmagan ishda baho yo'q, sababi `feedback` da.
+REOPENED_STATUSES = ("returned",)
 
 # Baholash 5 ballik tizimda: 1 — eng past, 5 — eng yuqori.
 GRADE_MIN = 1
 GRADE_MAX = 5
+
+#: Javob yuborish urinishlari: 1 — qayta topshirishsiz.
+ATTEMPTS_MIN = 1
+ATTEMPTS_MAX = 5
+ATTEMPTS_DEFAULT = 2
 
 
 class SubmissionFile(BaseModel):
@@ -35,6 +39,7 @@ class HomeworkCreateRequest(BaseModel):
     description: Optional[str] = None
     deadline: datetime
     max_grade: int = Field(default=GRADE_MAX, ge=GRADE_MIN, le=GRADE_MAX)
+    max_attempts: int = Field(default=ATTEMPTS_DEFAULT, ge=ATTEMPTS_MIN, le=ATTEMPTS_MAX)
     attachments: List[SubmissionFile] = []
 
 
@@ -44,6 +49,7 @@ class HomeworkUpdateRequest(BaseModel):
     description: Optional[str] = None
     deadline: Optional[datetime] = None
     max_grade: Optional[int] = Field(default=None, ge=GRADE_MIN, le=GRADE_MAX)
+    max_attempts: Optional[int] = Field(default=None, ge=ATTEMPTS_MIN, le=ATTEMPTS_MAX)
     attachments: Optional[List[SubmissionFile]] = None
 
 
@@ -76,6 +82,7 @@ class HomeworkResponse(BaseModel):
     description: Optional[str] = None
     deadline: TashkentDatetime
     max_grade: int
+    max_attempts: int = ATTEMPTS_DEFAULT
     allow_file: bool
     allow_text: bool
     allowed_file_types: List[str] = []
@@ -134,14 +141,10 @@ class SubmissionGradeRequest(BaseModel):
     feedback: Optional[str] = None
 
 
-class SubmissionRejectRequest(BaseModel):
-    #: Majburiy: talaba nima uchun rad etilganini bilmasa, xuddi shu xatoni
-    #: takrorlaydi.
-    reason: str = Field(min_length=3, max_length=2000)
-
-
 class SubmissionReturnRequest(BaseModel):
-    #: Ixtiyoriy: bo'sh bo'lsa, baho bilan qo'yilgan izoh qoladi.
+    #: Baholangan ishda ixtiyoriy: bo'sh bo'lsa, baho bilan qo'yilgan izoh
+    #: qoladi. Baholanmagan ishda majburiy — talaba nima uchun qaytganini
+    #: bilmasa, xuddi shu xatoni takrorlaydi (tekshiruv repozitoriyda).
     comment: Optional[str] = Field(default=None, max_length=2000)
 
 
@@ -151,7 +154,7 @@ class SubmissionAttempt(BaseModel):
     submitted_text: Optional[str] = None
     submitted_files: List[SubmissionFile] = []
     submitted_at: Optional[TashkentDatetime] = None
-    #: Urinish qanday yopilgan: `rejected` yoki `returned`.
+    #: Urinish qanday yopilgan — doim `returned`.
     status: str
     grade: Optional[int] = None
     feedback: Optional[str] = None

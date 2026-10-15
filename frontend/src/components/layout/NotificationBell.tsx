@@ -56,7 +56,7 @@ export const NotificationBell = () => {
             navigate(`/requests/${requestId}`);
             return;
         }
-        // Uy vazifasi qaytdi (rad etildi / qayta topshirishga) — o'sha dars yoki kurs.
+        // Uy vazifasi qayta topshirishga qaytdi — o'sha dars yoki kurs.
         const lessonId = notification.payload?.lesson_id;
         const courseId = notification.payload?.course_id;
         if (typeof lessonId === 'number') navigate(`/lessons/${lessonId}`);

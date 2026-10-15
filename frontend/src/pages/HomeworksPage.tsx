@@ -41,11 +41,11 @@ const pendingCount = (item: Assignment) =>
     item.stats ? item.stats.submitted - item.stats.graded : 0;
 
 /** Talabaning shu vazifadagi holati. */
-type MyState = 'todo' | 'missed' | 'waiting' | 'graded' | 'rejected' | 'returned';
+type MyState = 'todo' | 'missed' | 'waiting' | 'graded' | 'returned';
 const myState = (item: Assignment): MyState => {
     const mine = item.my_submission;
     if (!mine) return isOverdue(item) ? 'missed' : 'todo';
-    if (mine.status === 'graded' || mine.status === 'rejected' || mine.status === 'returned') return mine.status;
+    if (mine.status === 'graded' || mine.status === 'returned') return mine.status;
     return 'waiting';
 };
 
@@ -54,7 +54,6 @@ const MY_STATE_LABEL: Record<MyState, string> = {
     missed: 'Topshirilmagan · muddat tugagan',
     waiting: 'Topshirildi · tekshirilmoqda',
     graded: 'Baholandi',
-    rejected: 'Rad etildi · qayta topshiring',
     returned: 'Qayta topshirish mumkin',
 };
 
@@ -63,7 +62,6 @@ const MY_STATE_CLASS: Record<MyState, string> = {
     missed: LATE_CLASS,
     waiting: REVIEW_CLASS.pending,
     graded: REVIEW_CLASS.graded,
-    rejected: REVIEW_CLASS.rejected,
     returned: REVIEW_CLASS.returned,
 };
 

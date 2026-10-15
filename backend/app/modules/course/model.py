@@ -255,6 +255,12 @@ class Homework(Base, IdIntPk, TimestampMixin):
     # Baholash 5 ballik tizimda (1–5). Ustun saqlanadi, chunki eski
     # yozuvlar unga tayanadi, lekin qiymat endi doim 5.
     max_grade: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    #: Talaba javobni necha marta yuborishi mumkin: birinchi javob ham urinish.
+    #: Qayta topshirishni faqat o'qituvchi ochadi (`return_submission`), bu
+    #: son esa uni cheklaydi — 1 bo'lsa, ishni qaytarib bo'lmaydi.
+    max_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=2, server_default=text("2")
+    )
     allow_file: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Talaba javobi faqat fayl (PDF yoki rasm) — `SUBMISSION_FILE_TYPES`.
     allow_text: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -297,9 +303,9 @@ class HomeworkSubmission(Base, IdIntPk, TimestampMixin):
     )
     graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    #: Avvalgi urinishlar — o'qituvchi ishni rad etgan (`rejected`) yoki past
-    #: baho uchun qayta topshirishga qaytargan (`returned`) bo'lsa, talaba yangi
-    #: javob yuborganda eskisi shu yerga ko'chadi: javob, vaqt, baho, izoh.
+    #: Avvalgi urinishlar — o'qituvchi ishni qayta topshirishga qaytargan
+    #: (`returned`) bo'lsa, talaba yangi javob yuborganda eskisi shu yerga
+    #: ko'chadi: javob, vaqt, baho, izoh. Joriy urinish raqami — `len + 1`.
     #: Alohida jadval emas — urinishlar faqat shu ish bilan birga o'qiladi.
     #: `(homework_id, user_id)` bo'yicha bitta qator qoidasi saqlanadi:
     #: jurnal va hisobotlar shunga tayanadi.

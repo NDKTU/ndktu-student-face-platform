@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, FileText, Loader2, RotateCcw, UploadCloud, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, RotateCcw, UploadCloud } from 'lucide-react';
 import { useMySubmission, useSubmitAssignment } from '@/hooks/useAssignments';
 import {
     assignmentService,
@@ -51,8 +51,11 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
     // aks holda label doim birinchi inputni ochadi.
     const inputId = `homework-submission-${assignment.id}`;
     const isGraded = submission?.status === 'graded';
-    // O'qituvchi ishni rad etgan yoki qayta topshirishga qaytargan: yangi javob mumkin.
+    // O'qituvchi ishni qayta topshirishga qaytargan: yangi javob mumkin.
     const reopened = isReopened(submission?.status);
+    // Talaba hozir nechanchi urinishni yuboradi: qaytarilgan ishda — keyingisini.
+    const usedAttempts = submission ? (submission.attempts?.length ?? 0) + 1 : 0;
+    const maxAttempts = assignment.max_attempts ?? 1;
     const isLate = new Date(assignment.deadline).getTime() < Date.now();
     const busy = uploading || submitMut.isPending;
 
@@ -179,34 +182,33 @@ export const HomeworkSubmissionBox = ({ assignment }: { assignment: Assignment }
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold">Mening javobim</p>
                 {submission && !reopened && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Vazifa yuklandi</span>}
-                {submission?.status === 'rejected' && <span className="inline-flex items-center gap-1 rounded-full border border-destructive/25 bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive"><XCircle className="h-3.5 w-3.5" />Rad etildi</span>}
-                {submission?.status === 'returned' && <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"><RotateCcw className="h-3.5 w-3.5" />Qayta topshirish mumkin</span>}
+                {reopened && <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"><RotateCcw className="h-3.5 w-3.5" />Qayta topshirish mumkin</span>}
+                {maxAttempts > 1 && submission && (
+                    <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                        Urinish {reopened ? usedAttempts + 1 : usedAttempts} / {maxAttempts}
+                    </span>
+                )}
             </div>
             {submission && reopened ? (
                 <>
-                    <div
-                        className={
-                            submission.status === 'rejected'
-                                ? 'space-y-2 rounded-2xl border border-destructive/25 bg-destructive/5 p-4'
-                                : 'space-y-2 rounded-2xl border border-primary/25 bg-primary/5 p-4'
-                        }
-                    >
+                    <div className="space-y-2 rounded-2xl border border-primary/25 bg-primary/5 p-4">
                         <p className="text-sm font-medium">
-                            {submission.status === 'rejected'
-                                ? "O'qituvchi ishingizni rad etdi. Xatoni tuzatib, javobni qayta yuboring."
-                                : `Joriy baho: ${submission.grade} / ${assignment.max_grade}. O'qituvchi ishni tuzatib qayta topshirishga ruxsat berdi — yangi javobni u qayta baholaydi.`}
+                            {submission.grade != null
+                                ? `Joriy baho: ${submission.grade} / ${assignment.max_grade}. O'qituvchi ishni tuzatib qayta topshirishga qaytardi — yangi javobni u qayta baholaydi.`
+                                : "O'qituvchi ishingizni qayta topshirishga qaytardi. Xatoni tuzatib, javobni qayta yuboring."}
                         </p>
                         {submission.feedback && (
                             <p className="rounded-lg bg-background/70 px-3 py-2 text-sm">
-                                <span className="font-medium">{submission.status === 'rejected' ? 'Sabab: ' : 'O‘qituvchi izohi: '}</span>
+                                <span className="font-medium">{submission.grade != null ? 'O‘qituvchi izohi: ' : 'Sabab: '}</span>
                                 {submission.feedback}
                             </p>
                         )}
                         <p className="text-xs text-muted-foreground">Avvalgi javobingiz:</p>
                         <SubmittedFiles files={submission.submitted_files ?? []} />
-                        {submission.status === 'returned' && (
-                            <p className="text-xs text-muted-foreground">Qayta yubormasangiz, joriy baho qoladi.</p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                            {usedAttempts + 1 >= maxAttempts ? 'Bu oxirgi urinish. ' : ''}
+                            {submission.grade != null ? 'Qayta yubormasangiz, joriy baho qoladi.' : ''}
+                        </p>
                     </div>
                     {uploader}
                 </>

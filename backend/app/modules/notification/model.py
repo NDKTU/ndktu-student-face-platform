@@ -25,7 +25,7 @@ class NotificationType:
 
     #: ROYD'dagi murojaat holati o'zgardi (integration/royd webhook).
     REQUEST_STATUS = "request_status"
-    #: Uy vazifasi talabaga qaytdi: rad etildi yoki qayta topshirishga ruxsat.
+    #: Uy vazifasi talabaga qayta topshirishga qaytdi.
     HOMEWORK = "homework"
     #: Umumiy xabar — manbasi ko'rsatilmagan.
     GENERAL = "general"

@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { FilePickerModal } from '@/components/file/FilePickerModal';
 import { FileSourceField } from '@/components/file/FileSourceField';
 import { Input } from '@/components/ui/Input';
-import { CalendarClock, ClipboardList, FileText, Info, Loader2, X } from 'lucide-react';
+import { CalendarClock, ClipboardList, FileText, Info, Loader2, RotateCcw, X } from 'lucide-react';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/useAssignments';
 import { resourceService } from '@/services/resourceService';
-import type { Assignment, SubmissionFile } from '@/services/assignmentService';
+import { ATTEMPTS_DEFAULT, ATTEMPTS_MAX, ATTEMPTS_MIN, type Assignment, type SubmissionFile } from '@/services/assignmentService';
 import { DeadlinePicker } from '@/components/homework/DeadlinePicker';
 import { toLocalInput } from '@/components/announcement/labels';
 
@@ -32,6 +32,7 @@ export const AssignmentFormModal = ({
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
+    const [maxAttempts, setMaxAttempts] = useState(ATTEMPTS_DEFAULT);
     // Saqlangan ilovalar (tahrirlashda) va yangi tanlanganlar alohida turadi:
     // birinchisi allaqachon serverda, ikkinchisi saqlashda yuklanadi.
     const [attachments, setAttachments] = useState<SubmissionFile[]>([]);
@@ -47,6 +48,7 @@ export const AssignmentFormModal = ({
             setDescription(editing.description ?? '');
             setDeadline(toLocalInput(editing.deadline));
             setAttachments(editing.attachments ?? []);
+            setMaxAttempts(editing.max_attempts ?? ATTEMPTS_DEFAULT);
         } else {
             const future = new Date();
             future.setDate(future.getDate() + 7);
@@ -54,6 +56,7 @@ export const AssignmentFormModal = ({
             setDescription('');
             setDeadline(toLocalInput(future.toISOString()));
             setAttachments([]);
+            setMaxAttempts(ATTEMPTS_DEFAULT);
         }
         setNewFiles([]);
         setError('');
@@ -85,6 +88,7 @@ export const AssignmentFormModal = ({
                 deadline: new Date(deadline).toISOString(),
                 // Baholash 5 ballik tizimda — o'qituvchi sozlamaydi.
                 max_grade: 5,
+                max_attempts: maxAttempts,
                 attachments: [...attachments, ...uploaded],
             };
             if (editing) {
@@ -196,6 +200,37 @@ export const AssignmentFormModal = ({
                     <DeadlinePicker value={deadline} onChange={setDeadline} />
                     <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
                         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Sana va vaqt mahalliy vaqt bo‘yicha ko‘rsatiladi.
+                    </p>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-primary" />
+                        <p id="max-attempts-label" className="text-sm font-semibold">Urinishlar soni</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="max-attempts-label">
+                        {Array.from({ length: ATTEMPTS_MAX - ATTEMPTS_MIN + 1 }, (_, index) => ATTEMPTS_MIN + index).map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                role="radio"
+                                aria-checked={maxAttempts === value}
+                                onClick={() => setMaxAttempts(value)}
+                                className={
+                                    maxAttempts === value
+                                        ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground ring-2 ring-primary/40'
+                                        : 'flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-sm font-bold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary'
+                                }
+                            >
+                                {value}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        {maxAttempts === 1
+                            ? 'Talaba javobni bir marta yuboradi, ishni qayta topshirishga qaytarib bo‘lmaydi.'
+                            : `Talaba javobni ${maxAttempts} martagacha yuborishi mumkin — qayta topshirishga ishni siz qaytarasiz.`}
                     </p>
                 </div>
 

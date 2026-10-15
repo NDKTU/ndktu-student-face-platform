@@ -14,12 +14,10 @@ import {
     Undo2,
     UserX,
     Users,
-    XCircle,
 } from 'lucide-react';
 import {
     useAssignment,
     useGradeSubmission,
-    useRejectSubmission,
     useReturnSubmission,
     useSubmissions,
 } from '@/hooks/useAssignments';
@@ -74,9 +72,9 @@ export default function HomeworkSubmissionsPage() {
         () => submissions.filter((item) => reviewState(item.status) === 'graded'),
         [submissions],
     );
-    // Rad etilgan va qayta topshirishga qaytarilgan — navbat talabada.
+    // Qayta topshirishga qaytarilgan — navbat talabada.
     const reopenedList = useMemo(
-        () => submissions.filter((item) => ['rejected', 'returned'].includes(reviewState(item.status))),
+        () => submissions.filter((item) => reviewState(item.status) === 'returned'),
         [submissions],
     );
 
@@ -283,6 +281,12 @@ function HomeworkBrief({ homework }: { homework: Assignment }) {
                         <dd className="font-medium">1 dan {homework.max_grade} gacha ball</dd>
                     </div>
                     <div>
+                        <dt className="text-xs text-muted-foreground">Urinishlar</dt>
+                        <dd className="font-medium">
+                            {homework.max_attempts > 1 ? `${homework.max_attempts} tagacha` : 'Bitta, qayta topshirishsiz'}
+                        </dd>
+                    </div>
+                    <div>
                         <dt className="text-xs text-muted-foreground">Javob turi</dt>
                         <dd className="font-medium">{answerFormatLabel(homework.allow_text, homework.allow_file)}</dd>
                     </div>
@@ -339,14 +343,11 @@ function FileList({ files }: { files: SubmissionFile[] }) {
     );
 }
 
-type ReviewAction = 'reject' | 'return' | null;
-
 function SubmissionCard({ submission, homework }: { submission: Submission; homework: Assignment }) {
     const gradeMut = useGradeSubmission(homework.id);
-    const rejectMut = useRejectSubmission(homework.id);
     const returnMut = useReturnSubmission(homework.id);
-    const [action, setAction] = useState<ReviewAction>(null);
-    const [actionText, setActionText] = useState('');
+    const [returning, setReturning] = useState(false);
+    const [returnText, setReturnText] = useState('');
     const savedGrade = submission.grade != null ? String(submission.grade) : '';
     const savedFeedback = submission.feedback ?? '';
     const [grade, setGrade] = useState(savedGrade);
@@ -356,9 +357,12 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
     const state = reviewState(submission.status);
     // Qayta topshirilgan ishda kechikish birinchi urinishdan hisoblanadi.
     const late = lateBy(submission.first_submitted_at ?? submission.submitted_at, homework.deadline);
-    const reopened = state === 'rejected' || state === 'returned';
-    const isLow = submission.grade != null && submission.grade <= LOW_GRADE;
+    const reopened = state === 'returned';
+    const hasGrade = submission.grade != null;
+    const isLow = hasGrade && submission.grade! <= LOW_GRADE;
     const attempts = submission.attempts ?? [];
+    const attemptNo = attempts.length + 1;
+    const attemptsLeft = homework.max_attempts - attemptNo;
     const isDirty = grade !== savedGrade || feedback.trim() !== savedFeedback.trim();
     const isEmptyAnswer = !submission.submitted_text?.trim() && submission.submitted_files.length === 0;
 
@@ -378,37 +382,30 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
         );
     };
 
-    const openAction = (next: ReviewAction) => {
-        setAction(next);
-        setActionText('');
+    const toggleReturn = (open: boolean) => {
+        setReturning(open);
+        setReturnText('');
         setError('');
     };
 
-    const confirmAction = () => {
-        const text = actionText.trim();
-        if (action === 'reject') {
-            if (text.length < 3) {
-                setError('Rad etish sababini yozing — talaba nimani tuzatishi kerakligini bilsin');
-                return;
-            }
-            rejectMut.mutate(
-                { userId: submission.user_id, reason: text },
-                {
-                    onSuccess: () => toast.success('Ish rad etildi, talabaga xabar yuborildi'),
-                    onError: (cause) => setError(apiErrorMessage(cause, 'Rad etishda xatolik yuz berdi')),
-                },
-            );
-        } else if (action === 'return') {
-            returnMut.mutate(
-                { userId: submission.user_id, comment: text || null },
-                {
-                    onSuccess: () => toast.success('Talabaga qayta topshirishga ruxsat berildi'),
-                    onError: (cause) => setError(apiErrorMessage(cause, 'Qaytarishda xatolik yuz berdi')),
-                },
-            );
+    const confirmReturn = () => {
+        const text = returnText.trim();
+        // Baholanmagan ish bahosiz qaytadi — talaba nima uchun ekanini bilsin.
+        if (!hasGrade && text.length < 3) {
+            setError('Sababini yozing — talaba nimani tuzatishi kerakligini bilsin');
+            return;
         }
+        returnMut.mutate(
+            { userId: submission.user_id, comment: text || null },
+            {
+                onSuccess: () => {
+                    setReturning(false);
+                    toast.success('Ish qayta topshirishga qaytarildi, talabaga xabar yuborildi');
+                },
+                onError: (cause) => setError(apiErrorMessage(cause, 'Qaytarishda xatolik yuz berdi')),
+            },
+        );
     };
-    const actionBusy = rejectMut.isPending || returnMut.isPending;
 
     const student = submission.user;
     const name = student?.full_name || student?.username || `Foydalanuvchi #${submission.user_id}`;
@@ -430,9 +427,9 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                                 <AlertTriangle className="h-3 w-3" /> {late} kech
                             </span>
                         )}
-                        {attempts.length > 0 && (
+                        {homework.max_attempts > 1 && (
                             <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
-                                {attempts.length + 1}-urinish
+                                Urinish {Math.min(attemptNo, homework.max_attempts)} / {homework.max_attempts}
                             </span>
                         )}
                         <span className={cn('rounded-full border px-3 py-1 text-xs font-bold', REVIEW_CLASS[state])}>
@@ -459,35 +456,22 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                 </div>
 
                 {reopened && (
-                    <div
-                        className={cn(
-                            'flex gap-2 rounded-2xl border p-3 text-sm',
-                            state === 'rejected'
-                                ? 'border-destructive/25 bg-destructive/5'
-                                : 'border-primary/25 bg-primary/5',
-                        )}
-                    >
-                        {state === 'rejected' ? (
-                            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                        ) : (
-                            <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        )}
+                    <div className="flex gap-2 rounded-2xl border border-primary/25 bg-primary/5 p-3 text-sm">
+                        <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                         <div className="space-y-1">
                             <p className="font-semibold">
-                                {state === 'rejected'
-                                    ? 'Ish rad etilgan — talaba qayta topshirishini kutmoqda'
-                                    : 'Qayta topshirishga ruxsat berilgan — talaba yangi javob yuborishini kutmoqda'}
+                                Qayta topshirishga qaytarilgan — talaba yangi javob yuborishini kutmoqda
                             </p>
                             {submission.feedback && (
                                 <p className="text-muted-foreground">
-                                    {state === 'rejected' ? 'Sabab' : 'Izoh'}: {submission.feedback}
+                                    {hasGrade ? 'Izoh' : 'Sabab'}: {submission.feedback}
                                 </p>
                             )}
-                            {state === 'returned' && (
-                                <p className="text-xs text-muted-foreground">
-                                    Talaba qayta yubormasa, joriy baho ({submission.grade} / {homework.max_grade}) qoladi.
-                                </p>
-                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {hasGrade
+                                    ? `Talaba qayta yubormasa, joriy baho (${submission.grade} / ${homework.max_grade}) qoladi.`
+                                    : "Ish baholanmagan — talaba qayta yubormasa, jurnalda baho bo'lmaydi."}
+                            </p>
                         </div>
                     </div>
                 )}
@@ -543,69 +527,60 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                         </p>
                     )}
 
-                    {!reopened && action === null && (
+                    {!reopened && !returning && attemptsLeft > 0 && (
                         <div className="flex flex-wrap items-center gap-2">
-                            {state === 'graded' && (
-                                <Button
-                                    variant={isLow ? 'primary' : 'outline'}
-                                    size="sm"
-                                    onClick={() => openAction('return')}
-                                    className="gap-1.5"
-                                >
-                                    <Undo2 className="h-4 w-4" /> Qayta topshirishga ruxsat berish
-                                </Button>
-                            )}
                             <Button
-                                variant="ghost"
+                                variant={isLow ? 'primary' : 'outline'}
                                 size="sm"
-                                onClick={() => openAction('reject')}
-                                className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => toggleReturn(true)}
+                                className="gap-1.5"
                             >
-                                <XCircle className="h-4 w-4" /> Rad etish
+                                <Undo2 className="h-4 w-4" /> Qayta topshirishga qaytarish
                             </Button>
-                            {state === 'graded' && isLow && (
-                                <span className="text-xs text-muted-foreground">
-                                    Past baho — talabaga ishni tuzatib qayta yuborish imkonini bering
-                                </span>
-                            )}
+                            <span className="text-xs text-muted-foreground">
+                                {isLow ? 'Past baho — talabaga ishni tuzatib qayta yuborish imkonini bering. ' : ''}
+                                Qolgan urinishlar: {attemptsLeft}
+                            </span>
                         </div>
                     )}
+                    {!reopened && homework.max_attempts > 1 && attemptsLeft <= 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Urinishlar tugagan ({homework.max_attempts} / {homework.max_attempts}) — ishni endi faqat baholash mumkin.
+                        </p>
+                    )}
 
-                    {action !== null && (
+                    {returning && (
                         <div className="space-y-2 rounded-2xl border border-border bg-muted/30 p-3">
-                            <label htmlFor={`action-${submission.id}`} className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                {action === 'reject' ? 'Rad etish sababi (majburiy)' : 'Talabaga izoh (ixtiyoriy)'}
+                            <label htmlFor={`return-${submission.id}`} className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                {hasGrade ? 'Talabaga izoh (ixtiyoriy)' : 'Qaytarish sababi (majburiy)'}
                             </label>
                             <textarea
-                                id={`action-${submission.id}`}
-                                value={actionText}
-                                onChange={(event) => { setActionText(event.target.value); setError(''); }}
+                                id={`return-${submission.id}`}
+                                value={returnText}
+                                onChange={(event) => { setReturnText(event.target.value); setError(''); }}
                                 rows={3}
                                 maxLength={2000}
                                 autoFocus
                                 placeholder={
-                                    action === 'reject'
-                                        ? "Masalan: boshqa vazifaning fayli yuklangan, fayl o'qilmaydi"
-                                        : "Nimani tuzatish kerak? Bo'sh qolsa, baho bilan yozilgan izoh qoladi"
+                                    hasGrade
+                                        ? "Nimani tuzatish kerak? Bo'sh qolsa, baho bilan yozilgan izoh qoladi"
+                                        : "Masalan: boshqa vazifaning fayli yuklangan, fayl o'qilmaydi"
                                 }
                                 className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                             <p className="text-xs text-muted-foreground">
-                                {action === 'reject'
-                                    ? "Baho olib tashlanadi. Talaba xabar oladi va yangi javob yuboradi."
-                                    : "Joriy baho yangisi qo'yilguncha saqlanadi. Talaba xabar oladi va yangi javob yuborishi mumkin."}
+                                {hasGrade
+                                    ? "Joriy baho yangisi qo'yilguncha saqlanadi. "
+                                    : 'Ish bahosiz qaytadi. '}
+                                Talaba xabar oladi va {attemptNo + 1}-urinishni yuboradi
+                                {attemptsLeft === 1 ? ' — bu oxirgi urinish.' : ` (jami ${homework.max_attempts} ta).`}
                             </p>
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    size="sm"
-                                    variant={action === 'reject' ? 'danger' : 'primary'}
-                                    onClick={confirmAction}
-                                    disabled={actionBusy}
-                                >
-                                    {actionBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {action === 'reject' ? 'Rad etish' : 'Ruxsat berish'}
+                                <Button size="sm" onClick={confirmReturn} disabled={returnMut.isPending}>
+                                    {returnMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Qaytarish
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => openAction(null)} disabled={actionBusy}>
+                                <Button size="sm" variant="ghost" onClick={() => toggleReturn(false)} disabled={returnMut.isPending}>
                                     Bekor qilish
                                 </Button>
                             </div>
@@ -652,14 +627,14 @@ function AttemptHistory({ attempts, maxGrade }: { attempts: SubmissionAttempt[];
                                         REVIEW_CLASS[reviewState(attempt.status)],
                                     )}
                                 >
-                                    {attempt.status === 'returned' && attempt.grade != null
+                                    {attempt.grade != null
                                         ? `Baho ${attempt.grade} / ${maxGrade} · qaytarilgan`
-                                        : REVIEW_LABEL[reviewState(attempt.status)]}
+                                        : 'Bahosiz qaytarilgan'}
                                 </span>
                             </div>
                             {attempt.feedback && (
                                 <p className="text-muted-foreground">
-                                    {attempt.status === 'rejected' ? 'Sabab' : 'Izoh'}: {attempt.feedback}
+                                    {attempt.grade != null ? 'Izoh' : 'Sabab'}: {attempt.feedback}
                                 </p>
                             )}
                             {attempt.submitted_text && (

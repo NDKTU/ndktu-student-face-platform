@@ -1,8 +1,9 @@
-"""Uy vazifasi: rad etish va qayta topshirish.
+"""Uy vazifasi: qayta topshirish va urinishlar soni.
 
-O'qituvchi ishni baholamay rad etadi (sabab majburiy) yoki baholangan ishni
-past baho uchun qayta topshirishga qaytaradi. Ikkala holda ham talaba yangi
-javob yuboradi, eskisi `attempts` ga ko'chadi, talaba bildirishnoma oladi.
+O'qituvchi ishni qayta topshirishga qaytaradi: baholanganini (eski baho
+turadi) yoki baholanmaganini (sabab majburiy). Talaba yangi javob yuboradi,
+eskisi `attempts` ga ko'chadi, talaba bildirishnoma oladi. Qaytarish
+vazifaning `max_attempts` bilan cheklangan.
 """
 
 from datetime import datetime, timedelta
@@ -77,7 +78,7 @@ async def test_low_grade_returned_and_resubmitted(
 
 
 @pytest.mark.asyncio
-async def test_rejected_without_grade_and_reason_required(
+async def test_ungraded_returned_without_grade_reason_required(
     async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher  # noqa: F811
 ):
     student, homework = await _enrolled_student_homework(
@@ -86,28 +87,88 @@ async def test_rejected_without_grade_and_reason_required(
     headers = await _headers(async_client, "fs_student")
     assert (await _submit(async_client, homework.id, headers)).status_code == 201
 
-    # Baholanmagan ishni «past baho» uchun qaytarib bo'lmaydi.
-    early_return = await auth_client.put(f"/homework/{homework.id}/submission/{student.id}/return", json={})
-    assert early_return.status_code == 409
+    # Rad etish endi yo'q — o'rniga baholanmagan ishni qaytarish.
+    gone = await auth_client.put(
+        f"/homework/{homework.id}/submission/{student.id}/reject", json={"reason": "Boshqa fayl"}
+    )
+    assert gone.status_code in (404, 405)
 
-    no_reason = await auth_client.put(f"/homework/{homework.id}/submission/{student.id}/reject", json={"reason": ""})
+    no_reason = await auth_client.put(f"/homework/{homework.id}/submission/{student.id}/return", json={})
     assert no_reason.status_code == 422
 
-    rejected = await auth_client.put(
-        f"/homework/{homework.id}/submission/{student.id}/reject", json={"reason": "Boshqa vazifa fayli yuklangan"}
+    returned = await auth_client.put(
+        f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Boshqa vazifa fayli yuklangan"}
     )
-    assert rejected.status_code == 200, rejected.text
-    assert rejected.json()["status"] == "rejected"
-    assert rejected.json()["grade"] is None
+    assert returned.status_code == 200, returned.text
+    assert returned.json()["status"] == "returned"
+    assert returned.json()["grade"] is None
 
     again = await auth_client.put(
-        f"/homework/{homework.id}/submission/{student.id}/reject", json={"reason": "Yana bir bor"}
+        f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Yana bir bor"}
     )
     assert again.status_code == 409
+
+    # Bahosiz qaytarilgan ish statistikada topshirilgan hisoblanmaydi — ish talabada.
+    listed = await auth_client.get(f"/homework/{homework.id}")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["stats"]["submitted"] == 0
 
     resubmitted = await _submit(async_client, homework.id, headers)
     assert resubmitted.status_code == 201, resubmitted.text
     assert resubmitted.json()["attempts"][0]["feedback"] == "Boshqa vazifa fayli yuklangan"
+
+
+@pytest.mark.asyncio
+async def test_return_limited_by_max_attempts(
+    async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher  # noqa: F811
+):
+    student, homework = await _enrolled_student_homework(
+        async_db, test_kafedra, test_subject, test_group, test_teacher
+    )
+    updated = await auth_client.put(f"/homework/{homework.id}", json={"max_attempts": 3})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["max_attempts"] == 3
+
+    headers = await _headers(async_client, "fs_student")
+    assert (await _submit(async_client, homework.id, headers)).status_code == 201
+    for _ in range(2):
+        returned = await auth_client.put(
+            f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Qayta ishlang"}
+        )
+        assert returned.status_code == 200, returned.text
+        assert (await _submit(async_client, homework.id, headers)).status_code == 201
+
+    # Uchinchi urinish oxirgisi: qaytarib bo'lmaydi, baho qo'yiladi.
+    exhausted = await auth_client.put(
+        f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Yana"}
+    )
+    assert exhausted.status_code == 409
+    assert "3 / 3" in exhausted.json()["detail"]
+
+    sub = (
+        await async_db.execute(select(HomeworkSubmission).where(HomeworkSubmission.homework_id == homework.id))
+    ).scalar_one()
+    await async_db.refresh(sub)
+    assert len(sub.attempts) == 2
+
+
+@pytest.mark.asyncio
+async def test_single_attempt_cannot_be_returned(
+    async_client, async_db, auth_client, temp_uploads, test_kafedra, test_subject, test_group, test_teacher  # noqa: F811
+):
+    student, homework = await _enrolled_student_homework(
+        async_db, test_kafedra, test_subject, test_group, test_teacher
+    )
+    bad = await auth_client.put(f"/homework/{homework.id}", json={"max_attempts": 6})
+    assert bad.status_code == 422
+    assert (await auth_client.put(f"/homework/{homework.id}", json={"max_attempts": 1})).status_code == 200
+
+    headers = await _headers(async_client, "fs_student")
+    assert (await _submit(async_client, homework.id, headers)).status_code == 201
+    await auth_client.put(f"/homework/{homework.id}/submission/{student.id}/grade", json={"grade": 2})
+
+    returned = await auth_client.put(f"/homework/{homework.id}/submission/{student.id}/return", json={})
+    assert returned.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -131,10 +192,10 @@ async def test_resubmission_after_deadline_is_not_late(
     sub.status = "submitted"
     await async_db.commit()
 
-    rejected = await auth_client.put(
-        f"/homework/{homework.id}/submission/{student.id}/reject", json={"reason": "Fayl o'qilmaydi"}
+    returned = await auth_client.put(
+        f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Fayl o'qilmaydi"}
     )
-    assert rejected.status_code == 200, rejected.text
+    assert returned.status_code == 200, returned.text
 
     resubmitted = await _submit(async_client, homework.id, headers)
     assert resubmitted.status_code == 201, resubmitted.text
