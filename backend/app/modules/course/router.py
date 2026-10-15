@@ -55,7 +55,9 @@ from .homework.schemas import (
     SubmissionFile,
     SubmissionGradeRequest,
     SubmissionListResponse,
+    SubmissionRejectRequest,
     SubmissionResponse,
+    SubmissionReturnRequest,
     SubmissionSubmitRequest,
 )
 from .lesson.repository import get_lesson_repository
@@ -487,6 +489,52 @@ async def grade_submission(
     current_user: "User" = Depends(PermissionRequired("update:submission")),
 ):
     return await get_homework_repository.grade_submission(
+        session=session,
+        homework_id=homework_id,
+        user_id=user_id,
+        data=data,
+        current_user=current_user,
+    )
+
+
+@homework_router.put(
+    "/{homework_id}/submission/{user_id}/reject",
+    response_model=SubmissionResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def reject_submission(
+    homework_id: int,
+    user_id: int,
+    data: SubmissionRejectRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:submission")),
+):
+    """Ishni baholamay rad etish — sabab majburiy, talaba qayta yuboradi."""
+    return await get_homework_repository.reject_submission(
+        session=session,
+        homework_id=homework_id,
+        user_id=user_id,
+        data=data,
+        current_user=current_user,
+    )
+
+
+@homework_router.put(
+    "/{homework_id}/submission/{user_id}/return",
+    response_model=SubmissionResponse,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60))],
+)
+async def return_submission(
+    homework_id: int,
+    user_id: int,
+    data: SubmissionReturnRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: "User" = Depends(PermissionRequired("update:submission")),
+):
+    """Baholangan ishni qayta topshirishga qaytarish (past baho uchun).
+
+    Eski baho yangisi qo'yilguncha saqlanadi."""
+    return await get_homework_repository.return_submission(
         session=session,
         homework_id=homework_id,
         user_id=user_id,

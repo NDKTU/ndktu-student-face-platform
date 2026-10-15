@@ -5,7 +5,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
-SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned"]
+SUBMISSION_STATUS = Literal["draft", "submitted", "late", "graded", "returned", "rejected"]
+
+#: Ish talabaga qaytgan — u yangi javob yubora oladi.
+#: `rejected` — o'qituvchi ishni baholamay rad etdi (sababi `feedback` da);
+#: `returned` — baholangan ishni past baho uchun qayta topshirishga qaytardi,
+#: eski baho yangisi qo'yilguncha turadi.
+REOPENED_STATUSES = ("rejected", "returned")
 
 # Baholash 5 ballik tizimda: 1 — eng past, 5 — eng yuqori.
 GRADE_MIN = 1
@@ -128,6 +134,30 @@ class SubmissionGradeRequest(BaseModel):
     feedback: Optional[str] = None
 
 
+class SubmissionRejectRequest(BaseModel):
+    #: Majburiy: talaba nima uchun rad etilganini bilmasa, xuddi shu xatoni
+    #: takrorlaydi.
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+class SubmissionReturnRequest(BaseModel):
+    #: Ixtiyoriy: bo'sh bo'lsa, baho bilan qo'yilgan izoh qoladi.
+    comment: Optional[str] = Field(default=None, max_length=2000)
+
+
+class SubmissionAttempt(BaseModel):
+    """Avvalgi urinish — talaba qayta topshirgach saqlanadi."""
+
+    submitted_text: Optional[str] = None
+    submitted_files: List[SubmissionFile] = []
+    submitted_at: Optional[TashkentDatetime] = None
+    #: Urinish qanday yopilgan: `rejected` yoki `returned`.
+    status: str
+    grade: Optional[int] = None
+    feedback: Optional[str] = None
+    graded_at: Optional[TashkentDatetime] = None
+
+
 class SubmissionResponse(BaseModel):
     id: int
     homework_id: int
@@ -139,6 +169,10 @@ class SubmissionResponse(BaseModel):
     grade: Optional[int] = None
     feedback: Optional[str] = None
     graded_at: Optional[TashkentDatetime] = None
+    #: Kechikish shundan hisoblanadi: qayta topshirishni o'qituvchi so'ragan.
+    first_submitted_at: Optional[TashkentDatetime] = None
+    #: Avvalgi urinishlar, eskisidan yangisiga.
+    attempts: List[SubmissionAttempt] = []
     user: Optional[SubmissionUserInfo] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime

@@ -41,11 +41,12 @@ const pendingCount = (item: Assignment) =>
     item.stats ? item.stats.submitted - item.stats.graded : 0;
 
 /** Talabaning shu vazifadagi holati. */
-type MyState = 'todo' | 'missed' | 'waiting' | 'graded';
+type MyState = 'todo' | 'missed' | 'waiting' | 'graded' | 'rejected' | 'returned';
 const myState = (item: Assignment): MyState => {
     const mine = item.my_submission;
     if (!mine) return isOverdue(item) ? 'missed' : 'todo';
-    return mine.status === 'graded' ? 'graded' : 'waiting';
+    if (mine.status === 'graded' || mine.status === 'rejected' || mine.status === 'returned') return mine.status;
+    return 'waiting';
 };
 
 const MY_STATE_LABEL: Record<MyState, string> = {
@@ -53,6 +54,8 @@ const MY_STATE_LABEL: Record<MyState, string> = {
     missed: 'Topshirilmagan · muddat tugagan',
     waiting: 'Topshirildi · tekshirilmoqda',
     graded: 'Baholandi',
+    rejected: 'Rad etildi · qayta topshiring',
+    returned: 'Qayta topshirish mumkin',
 };
 
 const MY_STATE_CLASS: Record<MyState, string> = {
@@ -60,6 +63,8 @@ const MY_STATE_CLASS: Record<MyState, string> = {
     missed: LATE_CLASS,
     waiting: REVIEW_CLASS.pending,
     graded: REVIEW_CLASS.graded,
+    rejected: REVIEW_CLASS.rejected,
+    returned: REVIEW_CLASS.returned,
 };
 
 /**
@@ -103,7 +108,9 @@ function MyStateBadge({ item }: { item: Assignment }) {
             <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold', MY_STATE_CLASS[state])}>
                 {state === 'graded' && item.my_submission?.grade != null
                     ? `Baho: ${item.my_submission.grade} / ${item.max_grade}`
-                    : MY_STATE_LABEL[state]}
+                    : state === 'returned' && item.my_submission?.grade != null
+                        ? `Baho: ${item.my_submission.grade} / ${item.max_grade} · qayta topshirish mumkin`
+                        : MY_STATE_LABEL[state]}
             </span>
             {late && (
                 <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold', LATE_CLASS)}>

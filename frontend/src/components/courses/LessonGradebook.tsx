@@ -202,7 +202,9 @@ function HomeworkCell({ row, homework, onOpen }: { row: GradebookRow; homework: 
             <span className="text-muted-foreground/60">—</span>
         );
     }
-    const graded = cell.status === 'graded';
+    // Qayta topshirishga qaytarilgan ishning bahosi yangisi qo'yilguncha turadi.
+    const graded = cell.status === 'graded' || cell.status === 'returned';
+    const rejected = cell.status === 'rejected';
     return (
         <button
             type="button"
@@ -213,11 +215,12 @@ function HomeworkCell({ row, homework, onOpen }: { row: GradebookRow; homework: 
             <span
                 className={cn(
                     'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold tabular-nums',
-                    graded ? REVIEW_CLASS.graded : REVIEW_CLASS.pending,
+                    graded ? REVIEW_CLASS.graded : rejected ? REVIEW_CLASS.rejected : REVIEW_CLASS.pending,
                 )}
             >
-                {graded ? `${cell.grade} / ${homework.max_grade}` : 'Tekshirilmagan'}
+                {graded ? `${cell.grade} / ${homework.max_grade}` : rejected ? 'Rad etilgan' : 'Tekshirilmagan'}
             </span>
+            {cell.status === 'returned' && <span className="text-[10px] font-medium text-primary">qayta topshirishda</span>}
             {cell.late && <span className="text-[10px] font-medium text-destructive">kech topshirilgan</span>}
         </button>
     );
@@ -250,7 +253,7 @@ function summarize(data: Gradebook) {
     for (const row of data.students) {
         if (row.homework) {
             submitted += 1;
-            if (row.homework.status === 'graded') graded += 1;
+            if (row.homework.status === 'graded' || row.homework.status === 'returned') graded += 1;
         }
         if (row.quizzes.some((cell) => cell.grade != null)) tookQuiz += 1;
     }
@@ -272,7 +275,7 @@ async function exportExcel(data: Gradebook) {
             row.full_name,
             row.group_name ?? '',
             ...(data.homework
-                ? [row.homework ? (row.homework.status === 'graded' ? row.homework.grade ?? '' : 'Tekshirilmagan') : '']
+                ? [row.homework ? exportHomework(row.homework.status, row.homework.grade) : '']
                 : []),
             ...data.quizzes.map((quiz) => row.quizzes.find((cell) => cell.quiz_id === quiz.id)?.grade ?? ''),
         ]);
@@ -283,4 +286,10 @@ async function exportExcel(data: Gradebook) {
     } catch {
         toast.error("Faylni yuklab bo'lmadi");
     }
+}
+
+/** Excel katagi: baho, «Rad etilgan» yoki «Tekshirilmagan». */
+function exportHomework(status: string, grade?: number | null): string | number {
+    if (status === 'graded' || status === 'returned') return grade ?? '';
+    return status === 'rejected' ? 'Rad etilgan' : 'Tekshirilmagan';
 }

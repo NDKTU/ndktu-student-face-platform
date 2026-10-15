@@ -78,6 +78,35 @@ export const useSubmitAssignment = (assignmentId: number | undefined) => {
     });
 };
 
+/** Ish talabaga qaytgach (rad etildi / qayta topshirishga) — o'sha keshlar. */
+const useInvalidateReview = (assignmentId: number | undefined) => {
+    const qc = useQueryClient();
+    return () => {
+        qc.invalidateQueries({ queryKey: ['submissions', assignmentId] });
+        qc.invalidateQueries({ queryKey: ['assignments'] });
+        qc.invalidateQueries({ queryKey: ['lesson-gradebook'] });
+        qc.invalidateQueries({ queryKey: ['course-gradebook'] });
+    };
+};
+
+export const useRejectSubmission = (assignmentId: number | undefined) => {
+    const invalidate = useInvalidateReview(assignmentId);
+    return useMutation({
+        mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
+            assignmentService.reject(assignmentId!, userId, reason),
+        onSuccess: invalidate,
+    });
+};
+
+export const useReturnSubmission = (assignmentId: number | undefined) => {
+    const invalidate = useInvalidateReview(assignmentId);
+    return useMutation({
+        mutationFn: ({ userId, comment }: { userId: number; comment?: string | null }) =>
+            assignmentService.returnForResubmit(assignmentId!, userId, comment),
+        onSuccess: invalidate,
+    });
+};
+
 export const useGradeSubmission = (assignmentId: number | undefined) => {
     const qc = useQueryClient();
     return useMutation({

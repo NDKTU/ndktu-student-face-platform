@@ -9,20 +9,31 @@
  */
 import type { SubmissionStatus } from '@/services/assignmentService';
 
-/** Talaba ishining tekshiruv holati (kechikish alohida — `lateBy`). */
-export type ReviewState = 'pending' | 'graded';
+/**
+ * Talaba ishining tekshiruv holati (kechikish alohida — `lateBy`).
+ *
+ * `rejected` va `returned` — ish talabada: o'qituvchi rad etgan yoki past
+ * baho uchun qayta topshirishga qaytargan, endi navbat talabaniki.
+ */
+export type ReviewState = 'pending' | 'graded' | 'rejected' | 'returned';
 
-export const reviewState = (status: SubmissionStatus): ReviewState =>
-    status === 'graded' ? 'graded' : 'pending';
+export const reviewState = (status: SubmissionStatus): ReviewState => {
+    if (status === 'graded' || status === 'rejected' || status === 'returned') return status;
+    return 'pending';
+};
 
 export const REVIEW_LABEL: Record<ReviewState, string> = {
     pending: 'Tekshirilmagan',
     graded: 'Baholangan',
+    rejected: 'Rad etilgan',
+    returned: 'Qayta topshirishda',
 };
 
 export const REVIEW_CLASS: Record<ReviewState, string> = {
     pending: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
     graded: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    rejected: 'border-destructive/25 bg-destructive/10 text-destructive',
+    returned: 'border-primary/25 bg-primary/10 text-primary',
 };
 
 export const LATE_CLASS = 'border-destructive/25 bg-destructive/10 text-destructive';

@@ -297,9 +297,36 @@ class HomeworkSubmission(Base, IdIntPk, TimestampMixin):
     )
     graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    #: Avvalgi urinishlar — o'qituvchi ishni rad etgan (`rejected`) yoki past
+    #: baho uchun qayta topshirishga qaytargan (`returned`) bo'lsa, talaba yangi
+    #: javob yuborganda eskisi shu yerga ko'chadi: javob, vaqt, baho, izoh.
+    #: Alohida jadval emas — urinishlar faqat shu ish bilan birga o'qiladi.
+    #: `(homework_id, user_id)` bo'yicha bitta qator qoidasi saqlanadi:
+    #: jurnal va hisobotlar shunga tayanadi.
+    attempts: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
+
     homework: Mapped["Homework"] = relationship("Homework", back_populates="submissions")
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
     graded_by: Mapped["User | None"] = relationship("User", foreign_keys=[graded_by_user_id])
+
+    @property
+    def first_submitted_at(self) -> datetime | None:
+        """Birinchi urinish vaqti — kechikish shundan hisoblanadi.
+
+        Qayta topshirishni o'qituvchining o'zi so'ragan: muddatdan keyin
+        yuborilgan ikkinchi javob talabani «kech topshirgan» qilib qo'ymasligi
+        kerak.
+        """
+        if self.attempts:
+            raw = self.attempts[0].get("submitted_at")
+            if raw:
+                try:
+                    return datetime.fromisoformat(raw)
+                except ValueError:
+                    pass
+        return self.submitted_at
 
     def __str__(self):
         return f"Submission {self.id} (homework={self.homework_id}, user={self.user_id})"

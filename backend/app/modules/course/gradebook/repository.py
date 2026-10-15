@@ -59,7 +59,8 @@ class GradebookRepository:
             )
         ).all()
         for sub in subs:
-            submitted_at = _naive(sub.submitted_at)
+            # Qayta topshirilgan ishda kechikish birinchi urinishdan.
+            submitted_at = _naive(sub.first_submitted_at)
             deadline = deadlines[sub.homework_id]
             cells.setdefault(sub.user_id, {})[sub.homework_id] = GradebookHomeworkCell(
                 status=sub.status,
@@ -372,7 +373,7 @@ class GradebookRepository:
 
         def homework_grade(h: Homework) -> MyHomeworkGrade:
             sub = subs.get(h.id)
-            submitted_at = _naive(sub.submitted_at) if sub else None
+            submitted_at = _naive(sub.first_submitted_at) if sub else None
             return MyHomeworkGrade(
                 id=h.id,
                 title=h.title,
@@ -382,7 +383,12 @@ class GradebookRepository:
                 grade=sub.grade if sub else None,
                 submitted_at=sub.submitted_at if sub else None,
                 late=bool(submitted_at and submitted_at > _naive(h.deadline)),
-                feedback=(sub.feedback or None) if sub and sub.status == "graded" else None,
+                # Rad etilgan / qaytarilgan ishda izoh — talaba nima qilishi kerakligi.
+                feedback=(
+                    (sub.feedback or None)
+                    if sub and sub.status in ("graded", "rejected", "returned")
+                    else None
+                ),
             )
 
         def quiz_grade(q: Quiz) -> MyQuizGrade:

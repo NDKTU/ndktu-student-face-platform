@@ -16,6 +16,8 @@ from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.file.repository import get_file_repository
 from app.modules.file.storage import sync_usages
+from app.modules.notification.model import NotificationType
+from app.modules.notification.repository import create_notification
 from app.modules.organization_structure.model import Group
 
 from .schemas import (
@@ -26,11 +28,15 @@ from .schemas import (
     HomeworkStats,
     HomeworkUpdateRequest,
     MySubmissionInfo,
+    REOPENED_STATUSES,
     NotSubmittedStudent,
+    SubmissionAttempt,
     SubmissionFile,
     SubmissionGradeRequest,
     SubmissionListResponse,
+    SubmissionRejectRequest,
     SubmissionResponse,
+    SubmissionReturnRequest,
     SubmissionSubmitRequest,
     SubmissionUserInfo,
 )
@@ -44,6 +50,13 @@ _ALLOWED_EXTS = {"pdf", "jpg", "jpeg", "png"}
 # Bitta vazifaga — bitta fayl, turidan qat'i nazar 2 MB gacha.
 _SUBMISSION_MAX = 2 * 1024 * 1024
 _SUBMISSION_MAX_FILES = 1
+
+#: Talaba topshirgan, o'qituvchi ko'rishi mumkin bo'lgan holatlar — rad
+#: etish shulardan biridan bo'ladi. Baholangan ish ham rad etiladi:
+#: baho qo'yilgach ko'chirma ekani ma'lum bo'lishi mumkin.
+_HANDED_IN = ("submitted", "late", "graded")
+
+_ALREADY_SUBMITTED = "Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi"
 
 
 # `upload_submission_file` beradigan nom: uuid4 va kengaytma.
@@ -170,8 +183,14 @@ class HomeworkRepository:
             counts = per_homework.get(a.id, {})
             stats[a.id] = HomeworkStats(
                 total_students=totals.get(a.course_id, 0),
-                submitted=counts.get("submitted", 0) + counts.get("late", 0) + counts.get("graded", 0),
-                graded=counts.get("graded", 0),
+                # `returned` — baholangan ish, talaba qayta yuborishi mumkin: baho
+                # hali turibdi, shuning uchun u topshirilgan ham, baholangan ham.
+                # `rejected` hech biriga kirmaydi — ish talabada.
+                submitted=counts.get("submitted", 0)
+                + counts.get("late", 0)
+                + counts.get("graded", 0)
+                + counts.get("returned", 0),
+                graded=counts.get("graded", 0) + counts.get("returned", 0),
                 late=counts.get("late", 0),
             )
         return stats
@@ -426,17 +445,15 @@ class HomeworkRepository:
         authors = await self._bulk_authors(session, items)
         mine: dict[int, MySubmissionInfo] = {}
         if items:
-            my_stmt = select(
-                HomeworkSubmission.homework_id,
-                HomeworkSubmission.status,
-                HomeworkSubmission.grade,
-                HomeworkSubmission.submitted_at,
-            ).where(
+            my_stmt = select(HomeworkSubmission).where(
                 HomeworkSubmission.user_id == current_user.id,
                 HomeworkSubmission.homework_id.in_([a.id for a in items]),
             )
-            for homework_id, sub_status, grade, submitted_at in (await session.execute(my_stmt)).all():
-                mine[homework_id] = MySubmissionInfo(status=sub_status, grade=grade, submitted_at=submitted_at)
+            for sub in (await session.execute(my_stmt)).scalars().all():
+                # Kechikish birinchi urinishdan: qayta topshirishni o'qituvchi so'ragan.
+                mine[sub.homework_id] = MySubmissionInfo(
+                    status=sub.status, grade=sub.grade, submitted_at=sub.first_submitted_at
+                )
         return HomeworkListResponse(
             total=total,
             page=request.page,
@@ -508,6 +525,8 @@ class HomeworkRepository:
             grade=sub.grade,
             feedback=sub.feedback,
             graded_at=sub.graded_at,
+            first_submitted_at=sub.first_submitted_at,
+            attempts=[SubmissionAttempt(**item) for item in (sub.attempts or [])],
             user=user_info,
             created_at=sub.created_at,
             updated_at=sub.updated_at,
@@ -528,16 +547,15 @@ class HomeworkRepository:
         await self._ensure_course_access(session, a.course_id, current_user)
 
         existing = (await session.execute(
-            select(HomeworkSubmission.id).where(
+            select(HomeworkSubmission.status).where(
                 HomeworkSubmission.homework_id == homework_id,
                 HomeworkSubmission.user_id == current_user.id,
             )
         )).scalar_one_or_none()
-        if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi",
-            )
+        # Rad etilgan yoki qayta topshirishga qaytarilgan ishga yangi fayl
+        # yuklash mumkin — qolgan hollarda topshirilgan ish o'zgarmaydi.
+        if existing is not None and existing not in REOPENED_STATUSES:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_ALREADY_SUBMITTED)
 
         if not a.allow_file:
             raise HTTPException(
@@ -601,11 +619,8 @@ class HomeworkRepository:
             HomeworkSubmission.user_id == current_user.id,
         )
         sub = (await session.execute(existing_stmt)).scalar_one_or_none()
-        if sub is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Vazifa allaqachon yuklangan. Uni o'zgartirib yoki o'chirib bo'lmaydi",
-            )
+        if sub is not None and sub.status not in REOPENED_STATUSES:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_ALREADY_SUBMITTED)
 
         text = (data.submitted_text or "").strip() or None
         if text and not a.allow_text:
@@ -649,18 +664,32 @@ class HomeworkRepository:
 
         now = _utcnow()
         deadline = a.deadline.replace(tzinfo=None) if a.deadline.tzinfo else a.deadline
-        is_late = now > deadline
-        new_status = "late" if is_late else "submitted"
+        files = [f.model_dump() for f in data.submitted_files]
 
-        sub = HomeworkSubmission(
-            homework_id=homework_id,
-            user_id=current_user.id,
-            submitted_text=text,
-            submitted_files=[f.model_dump() for f in data.submitted_files],
-            submitted_at=now,
-            status=new_status,
-        )
-        session.add(sub)
+        if sub is None:
+            sub = HomeworkSubmission(
+                homework_id=homework_id,
+                user_id=current_user.id,
+                submitted_text=text,
+                submitted_files=files,
+                submitted_at=now,
+                status="late" if now > deadline else "submitted",
+            )
+            session.add(sub)
+        else:
+            # Qayta topshirish: eski urinish tarixga ko'chadi, qator o'sha.
+            # Kechikish birinchi urinish bo'yicha — qaytarishni o'qituvchi so'ragan,
+            # muddatdan keyin yuborilgan ikkinchi javob talabani jazolamaydi.
+            first = sub.first_submitted_at
+            sub.attempts = [*(sub.attempts or []), _attempt_snapshot(sub)]
+            sub.submitted_text = text
+            sub.submitted_files = files
+            sub.submitted_at = now
+            sub.status = "late" if first and first > deadline else "submitted"
+            sub.grade = None
+            sub.feedback = None
+            sub.graded_by_user_id = None
+            sub.graded_at = None
 
         await session.commit()
         await session.refresh(sub)
@@ -772,6 +801,132 @@ class HomeworkRepository:
         ).scalar_one()
         names = await self._resolve_names(session, [loaded.user_id])
         return await self._serialize_submission(loaded, names)
+
+    async def _load_for_review(
+        self, session: AsyncSession, homework_id: int, user_id: int, current_user: User
+    ) -> tuple[Homework, HomeworkSubmission]:
+        a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
+        if not a:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+        await self._check_course_owner(session, a.course_id, current_user)
+
+        sub = (
+            await session.execute(
+                select(HomeworkSubmission).where(
+                    HomeworkSubmission.homework_id == homework_id,
+                    HomeworkSubmission.user_id == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        return a, sub
+
+    async def _reload(self, session: AsyncSession, sub_id: int) -> SubmissionResponse:
+        loaded = (
+            await session.execute(
+                select(HomeworkSubmission)
+                .options(selectinload(HomeworkSubmission.user))
+                .where(HomeworkSubmission.id == sub_id)
+            )
+        ).scalar_one()
+        names = await self._resolve_names(session, [loaded.user_id])
+        return await self._serialize_submission(loaded, names)
+
+    async def _notify(self, session: AsyncSession, a: Homework, user_id: int, title: str, body: str) -> None:
+        """Talabaga xabar: ish unga qaytdi va u yana nimadir qilishi kerak.
+
+        Bildirishnoma o'zgarish bilan bitta tranzaksiyada yoziladi
+        (`create_notification` kommit qilmaydi).
+        """
+        await create_notification(
+            session,
+            user_id=user_id,
+            type_=NotificationType.HOMEWORK,
+            title=title,
+            body=body,
+            payload={"homework_id": a.id, "lesson_id": a.lesson_id, "course_id": a.course_id},
+        )
+
+    async def reject_submission(
+        self,
+        session: AsyncSession,
+        homework_id: int,
+        user_id: int,
+        data: SubmissionRejectRequest,
+        current_user: User,
+    ) -> SubmissionResponse:
+        """Ishni baholamay rad etadi: talaba yangi javob yuborishi kerak.
+
+        Baho olib tashlanadi — rad etilgan ish jurnalga tushmasligi kerak.
+        Sabab majburiy va talabaga `feedback` sifatida ko'rinadi.
+        """
+        a, sub = await self._load_for_review(session, homework_id, user_id, current_user)
+        if sub.status not in _HANDED_IN:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bu ish allaqachon talabaga qaytarilgan",
+            )
+        sub.status = "rejected"
+        sub.grade = None
+        sub.feedback = data.reason.strip()
+        sub.graded_by_user_id = current_user.id
+        sub.graded_at = _utcnow()
+        await self._notify(
+            session, a, sub.user_id,
+            title=f"Vazifa rad etildi: {a.title}",
+            body=f"Sabab: {sub.feedback}. Javobni qayta yuboring.",
+        )
+        await session.commit()
+        return await self._reload(session, sub.id)
+
+    async def return_submission(
+        self,
+        session: AsyncSession,
+        homework_id: int,
+        user_id: int,
+        data: SubmissionReturnRequest,
+        current_user: User,
+    ) -> SubmissionResponse:
+        """Baholangan ishni qayta topshirishga qaytaradi (odatda past baho uchun).
+
+        Eski baho yangisi qo'yilguncha turadi: talaba qayta yubormasa, jurnalda
+        bo'sh joy emas, avvalgi natija qoladi.
+        """
+        a, sub = await self._load_for_review(session, homework_id, user_id, current_user)
+        if sub.status != "graded":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Qayta topshirishga faqat baholangan ish qaytariladi",
+            )
+        sub.status = "returned"
+        comment = (data.comment or "").strip()
+        if comment:
+            sub.feedback = comment
+        await self._notify(
+            session, a, sub.user_id,
+            title=f"Vazifani qayta topshirishingiz mumkin: {a.title}",
+            body=(
+                f"Joriy baho: {sub.grade} / {a.max_grade}. "
+                + (f"Izoh: {comment}. " if comment else "")
+                + "Yangi javob yuborsangiz, o'qituvchi uni qayta baholaydi."
+            ),
+        )
+        await session.commit()
+        return await self._reload(session, sub.id)
+
+
+def _attempt_snapshot(sub: HomeworkSubmission) -> dict:
+    """Joriy urinish — `attempts` ga yoziladigan ko'rinishda (JSONB uchun satrlar)."""
+    return {
+        "submitted_text": sub.submitted_text,
+        "submitted_files": list(sub.submitted_files or []),
+        "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
+        "status": sub.status,
+        "grade": sub.grade,
+        "feedback": sub.feedback,
+        "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
+    }
 
 
 get_homework_repository = HomeworkRepository()

@@ -316,23 +316,33 @@ function GradeCell({
             <span title={`${homework.title} — muddat ${formatDayMonth(homework.deadline)}`} className="text-muted-foreground/60">·</span>
         );
     }
-    const graded = cell.status === 'graded' && cell.grade != null;
+    // Qayta topshirishga qaytarilgan ishning bahosi yangisi qo'yilguncha turadi.
+    const graded = (cell.status === 'graded' || cell.status === 'returned') && cell.grade != null;
+    const rejected = cell.status === 'rejected';
     return (
         <button
             type="button"
             onClick={() => onOpenHomework(homework.id)}
             title={[
                 homework.title,
-                graded ? `${cell.grade} / ${homework.max_grade}` : 'tekshirilmagan',
+                graded ? `${cell.grade} / ${homework.max_grade}` : rejected ? 'rad etilgan' : 'tekshirilmagan',
+                cell.status === 'returned' ? 'qayta topshirishga qaytarilgan' : null,
                 cell.late ? 'kech topshirilgan' : null,
             ].filter(Boolean).join(' · ')}
             className={cn(
                 BADGE,
                 'relative transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                graded ? gradeClass((cell.grade! * 5) / homework.max_grade) : REVIEW_CLASS.pending,
+                graded
+                    ? gradeClass((cell.grade! * 5) / homework.max_grade)
+                    : rejected
+                        ? REVIEW_CLASS.rejected
+                        : REVIEW_CLASS.pending,
             )}
         >
-            {graded ? cell.grade : '?'}
+            {graded ? cell.grade : rejected ? 'R' : '?'}
+            {cell.status === 'returned' && (
+                <span aria-hidden className="absolute -bottom-1 -right-1 h-2 w-2 rounded-full bg-primary ring-2 ring-card" />
+            )}
             {/* Kechikish holatdan emas, vaqtdan — baholangandan keyin ham ko'rinsin. */}
             {cell.late && <span aria-hidden className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" />}
         </button>
@@ -388,7 +398,9 @@ function rowAverage(row: CourseGradebookRow, columns: Column[]) {
     for (const column of columns) {
         if (column.kind === 'homework') {
             const cell = row.homeworks[String(column.homework.id)];
-            if (cell?.status === 'graded' && cell.grade != null) onFive.push((cell.grade * 5) / column.homework.max_grade);
+            if ((cell?.status === 'graded' || cell?.status === 'returned') && cell.grade != null) {
+                onFive.push((cell.grade * 5) / column.homework.max_grade);
+            }
         } else if (column.kind === 'quiz') {
             const grade = row.quizzes[String(column.quiz.id)]?.grade;
             if (grade != null) onFive.push(grade);
@@ -437,7 +449,8 @@ async function exportExcel(data: Gradebook, groups: ColumnGroup[], groupName: st
                     if (column.kind !== 'homework') return '';
                     const cell = row.homeworks[String(column.homework.id)];
                     if (!cell) return isPastDeadline(column.homework.deadline) ? 'Topshirmagan' : '';
-                    return cell.status === 'graded' ? cell.grade ?? '' : 'Tekshirilmagan';
+                    if (cell.status === 'graded' || cell.status === 'returned') return cell.grade ?? '';
+                    return cell.status === 'rejected' ? 'Rad etilgan' : 'Tekshirilmagan';
                 }),
                 average ? Number(average.value.toFixed(2)) : '',
             ];

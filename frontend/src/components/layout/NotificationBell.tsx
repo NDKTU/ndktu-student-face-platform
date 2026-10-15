@@ -52,7 +52,15 @@ export const NotificationBell = () => {
         if (!notification.is_read) markRead.mutate(notification.id);
         const requestId = notification.payload?.request_id;
         setOpen(false);
-        if (typeof requestId === 'number') navigate(`/requests/${requestId}`);
+        if (typeof requestId === 'number') {
+            navigate(`/requests/${requestId}`);
+            return;
+        }
+        // Uy vazifasi qaytdi (rad etildi / qayta topshirishga) — o'sha dars yoki kurs.
+        const lessonId = notification.payload?.lesson_id;
+        const courseId = notification.payload?.course_id;
+        if (typeof lessonId === 'number') navigate(`/lessons/${lessonId}`);
+        else if (typeof courseId === 'number') navigate(`/courses/${courseId}`);
     };
 
     const items = data?.notifications ?? [];

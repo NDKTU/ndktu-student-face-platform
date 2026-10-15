@@ -8,12 +8,22 @@ import {
     ChevronDown,
     Clock3,
     FileText,
+    History,
     Loader2,
+    RotateCcw,
+    Undo2,
     UserX,
     Users,
+    XCircle,
 } from 'lucide-react';
-import { useAssignment, useGradeSubmission, useSubmissions } from '@/hooks/useAssignments';
-import type { Assignment, Submission, SubmissionFile } from '@/services/assignmentService';
+import {
+    useAssignment,
+    useGradeSubmission,
+    useRejectSubmission,
+    useReturnSubmission,
+    useSubmissions,
+} from '@/hooks/useAssignments';
+import type { Assignment, Submission, SubmissionAttempt, SubmissionFile } from '@/services/assignmentService';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -36,7 +46,10 @@ import { apiErrorMessage } from '@/utils/apiError';
 import { formatDateTime } from '@/utils/date';
 import { cn } from '@/lib/utils';
 
-type Filter = 'pending' | 'graded' | 'missing' | 'all';
+type Filter = 'pending' | 'graded' | 'reopened' | 'missing' | 'all';
+
+/** Shu bahodan past yoki teng bo'lsa «Qayta topshirishga ruxsat» ko'zga tashlanadi. */
+const LOW_GRADE = 3;
 
 export default function HomeworkSubmissionsPage() {
     const { id } = useParams<{ id: string }>();
@@ -59,6 +72,11 @@ export default function HomeworkSubmissionsPage() {
     );
     const gradedList = useMemo(
         () => submissions.filter((item) => reviewState(item.status) === 'graded'),
+        [submissions],
+    );
+    // Rad etilgan va qayta topshirishga qaytarilgan — navbat talabada.
+    const reopenedList = useMemo(
+        () => submissions.filter((item) => ['rejected', 'returned'].includes(reviewState(item.status))),
         [submissions],
     );
 
@@ -92,12 +110,14 @@ export default function HomeworkSubmissionsPage() {
     const visible =
         filter === 'pending' ? pendingList
             : filter === 'graded' ? gradedList
-                : filter === 'all' ? [...pendingList, ...gradedList]
-                    : [];
+                : filter === 'reopened' ? reopenedList
+                    : filter === 'all' ? [...pendingList, ...gradedList, ...reopenedList]
+                        : [];
 
     const filters: { value: Filter; label: string; count: number }[] = [
         { value: 'pending', label: 'Tekshirilmagan', count: pendingList.length },
         { value: 'graded', label: 'Baholangan', count: gradedList.length },
+        { value: 'reopened', label: 'Qaytarilgan', count: reopenedList.length },
         { value: 'missing', label: 'Topshirmagan', count: notSubmitted.length },
         { value: 'all', label: 'Barcha topshirilgan ishlar', count: submissions.length },
     ];
@@ -211,7 +231,9 @@ export default function HomeworkSubmissionsPage() {
                             ? "Hozircha topshirilgan ish yo'q"
                             : filter === 'pending'
                                 ? 'Hamma ish tekshirilgan'
-                                : "Baholangan ish yo'q"
+                                : filter === 'reopened'
+                                    ? "Qaytarilgan ish yo'q"
+                                    : "Baholangan ish yo'q"
                     }
                     description={
                         submissions.length === 0
@@ -317,8 +339,14 @@ function FileList({ files }: { files: SubmissionFile[] }) {
     );
 }
 
+type ReviewAction = 'reject' | 'return' | null;
+
 function SubmissionCard({ submission, homework }: { submission: Submission; homework: Assignment }) {
     const gradeMut = useGradeSubmission(homework.id);
+    const rejectMut = useRejectSubmission(homework.id);
+    const returnMut = useReturnSubmission(homework.id);
+    const [action, setAction] = useState<ReviewAction>(null);
+    const [actionText, setActionText] = useState('');
     const savedGrade = submission.grade != null ? String(submission.grade) : '';
     const savedFeedback = submission.feedback ?? '';
     const [grade, setGrade] = useState(savedGrade);
@@ -326,7 +354,11 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
     const [error, setError] = useState('');
 
     const state = reviewState(submission.status);
-    const late = lateBy(submission.submitted_at, homework.deadline);
+    // Qayta topshirilgan ishda kechikish birinchi urinishdan hisoblanadi.
+    const late = lateBy(submission.first_submitted_at ?? submission.submitted_at, homework.deadline);
+    const reopened = state === 'rejected' || state === 'returned';
+    const isLow = submission.grade != null && submission.grade <= LOW_GRADE;
+    const attempts = submission.attempts ?? [];
     const isDirty = grade !== savedGrade || feedback.trim() !== savedFeedback.trim();
     const isEmptyAnswer = !submission.submitted_text?.trim() && submission.submitted_files.length === 0;
 
@@ -345,6 +377,38 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
             },
         );
     };
+
+    const openAction = (next: ReviewAction) => {
+        setAction(next);
+        setActionText('');
+        setError('');
+    };
+
+    const confirmAction = () => {
+        const text = actionText.trim();
+        if (action === 'reject') {
+            if (text.length < 3) {
+                setError('Rad etish sababini yozing — talaba nimani tuzatishi kerakligini bilsin');
+                return;
+            }
+            rejectMut.mutate(
+                { userId: submission.user_id, reason: text },
+                {
+                    onSuccess: () => toast.success('Ish rad etildi, talabaga xabar yuborildi'),
+                    onError: (cause) => setError(apiErrorMessage(cause, 'Rad etishda xatolik yuz berdi')),
+                },
+            );
+        } else if (action === 'return') {
+            returnMut.mutate(
+                { userId: submission.user_id, comment: text || null },
+                {
+                    onSuccess: () => toast.success('Talabaga qayta topshirishga ruxsat berildi'),
+                    onError: (cause) => setError(apiErrorMessage(cause, 'Qaytarishda xatolik yuz berdi')),
+                },
+            );
+        }
+    };
+    const actionBusy = rejectMut.isPending || returnMut.isPending;
 
     const student = submission.user;
     const name = student?.full_name || student?.username || `Foydalanuvchi #${submission.user_id}`;
@@ -366,10 +430,17 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                                 <AlertTriangle className="h-3 w-3" /> {late} kech
                             </span>
                         )}
+                        {attempts.length > 0 && (
+                            <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
+                                {attempts.length + 1}-urinish
+                            </span>
+                        )}
                         <span className={cn('rounded-full border px-3 py-1 text-xs font-bold', REVIEW_CLASS[state])}>
                             {state === 'graded' && submission.grade != null
                                 ? `Baho: ${submission.grade} / ${homework.max_grade}`
-                                : REVIEW_LABEL[state]}
+                                : state === 'returned' && submission.grade != null
+                                    ? `${REVIEW_LABEL[state]} · baho ${submission.grade}`
+                                    : REVIEW_LABEL[state]}
                         </span>
                     </div>
                 </div>
@@ -386,6 +457,42 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                     )}
                     <FileList files={submission.submitted_files} />
                 </div>
+
+                {reopened && (
+                    <div
+                        className={cn(
+                            'flex gap-2 rounded-2xl border p-3 text-sm',
+                            state === 'rejected'
+                                ? 'border-destructive/25 bg-destructive/5'
+                                : 'border-primary/25 bg-primary/5',
+                        )}
+                    >
+                        {state === 'rejected' ? (
+                            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                        ) : (
+                            <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        )}
+                        <div className="space-y-1">
+                            <p className="font-semibold">
+                                {state === 'rejected'
+                                    ? 'Ish rad etilgan — talaba qayta topshirishini kutmoqda'
+                                    : 'Qayta topshirishga ruxsat berilgan — talaba yangi javob yuborishini kutmoqda'}
+                            </p>
+                            {submission.feedback && (
+                                <p className="text-muted-foreground">
+                                    {state === 'rejected' ? 'Sabab' : 'Izoh'}: {submission.feedback}
+                                </p>
+                            )}
+                            {state === 'returned' && (
+                                <p className="text-xs text-muted-foreground">
+                                    Talaba qayta yubormasa, joriy baho ({submission.grade} / {homework.max_grade}) qoladi.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {attempts.length > 0 && <AttemptHistory attempts={attempts} maxGrade={homework.max_grade} />}
 
                 <div className="space-y-3 border-t border-border/60 pt-4">
                     <div className="grid gap-4 sm:grid-cols-[auto_1fr_auto] sm:items-end">
@@ -432,12 +539,137 @@ function SubmissionCard({ submission, homework }: { submission: Submission; home
                     </div>
                     {state === 'graded' && submission.graded_at && (
                         <p className="text-xs text-muted-foreground">
-                            Baho {formatDateTime(submission.graded_at)} da qo'yilgan. Baholangan ishni talaba qayta topshira olmaydi.
+                            Baho {formatDateTime(submission.graded_at)} da qo'yilgan.
                         </p>
                     )}
+
+                    {!reopened && action === null && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {state === 'graded' && (
+                                <Button
+                                    variant={isLow ? 'primary' : 'outline'}
+                                    size="sm"
+                                    onClick={() => openAction('return')}
+                                    className="gap-1.5"
+                                >
+                                    <Undo2 className="h-4 w-4" /> Qayta topshirishga ruxsat berish
+                                </Button>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openAction('reject')}
+                                className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            >
+                                <XCircle className="h-4 w-4" /> Rad etish
+                            </Button>
+                            {state === 'graded' && isLow && (
+                                <span className="text-xs text-muted-foreground">
+                                    Past baho — talabaga ishni tuzatib qayta yuborish imkonini bering
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {action !== null && (
+                        <div className="space-y-2 rounded-2xl border border-border bg-muted/30 p-3">
+                            <label htmlFor={`action-${submission.id}`} className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                {action === 'reject' ? 'Rad etish sababi (majburiy)' : 'Talabaga izoh (ixtiyoriy)'}
+                            </label>
+                            <textarea
+                                id={`action-${submission.id}`}
+                                value={actionText}
+                                onChange={(event) => { setActionText(event.target.value); setError(''); }}
+                                rows={3}
+                                maxLength={2000}
+                                autoFocus
+                                placeholder={
+                                    action === 'reject'
+                                        ? "Masalan: boshqa vazifaning fayli yuklangan, fayl o'qilmaydi"
+                                        : "Nimani tuzatish kerak? Bo'sh qolsa, baho bilan yozilgan izoh qoladi"
+                                }
+                                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {action === 'reject'
+                                    ? "Baho olib tashlanadi. Talaba xabar oladi va yangi javob yuboradi."
+                                    : "Joriy baho yangisi qo'yilguncha saqlanadi. Talaba xabar oladi va yangi javob yuborishi mumkin."}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    size="sm"
+                                    variant={action === 'reject' ? 'danger' : 'primary'}
+                                    onClick={confirmAction}
+                                    disabled={actionBusy}
+                                >
+                                    {actionBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {action === 'reject' ? 'Rad etish' : 'Ruxsat berish'}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => openAction(null)} disabled={actionBusy}>
+                                    Bekor qilish
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     {error && <p className="text-xs font-semibold text-destructive">{error}</p>}
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+/**
+ * Avvalgi urinishlar: javob, baho va o'qituvchi izohi. Qayta topshirilgan
+ * ishni tekshirayotganda nima o'zgarganini solishtirish uchun.
+ */
+function AttemptHistory({ attempts, maxGrade }: { attempts: SubmissionAttempt[]; maxGrade: number }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="rounded-2xl border border-border/80">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                aria-expanded={open}
+                className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/40"
+            >
+                <History className="h-4 w-4 text-muted-foreground" />
+                Avvalgi urinishlar ({attempts.length})
+                <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', open && 'rotate-180')} />
+            </button>
+            {open && (
+                <ol className="space-y-3 border-t border-border/60 p-4">
+                    {attempts.map((attempt, index) => (
+                        <li key={`${attempt.submitted_at}-${index}`} className="space-y-2 rounded-xl bg-muted/30 p-3 text-sm">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="font-bold">{index + 1}-urinish</span>
+                                <span className="text-muted-foreground">
+                                    {attempt.submitted_at ? formatDateTime(attempt.submitted_at) : '—'}
+                                </span>
+                                <span
+                                    className={cn(
+                                        'rounded-full border px-2 py-0.5 font-semibold',
+                                        REVIEW_CLASS[reviewState(attempt.status)],
+                                    )}
+                                >
+                                    {attempt.status === 'returned' && attempt.grade != null
+                                        ? `Baho ${attempt.grade} / ${maxGrade} · qaytarilgan`
+                                        : REVIEW_LABEL[reviewState(attempt.status)]}
+                                </span>
+                            </div>
+                            {attempt.feedback && (
+                                <p className="text-muted-foreground">
+                                    {attempt.status === 'rejected' ? 'Sabab' : 'Izoh'}: {attempt.feedback}
+                                </p>
+                            )}
+                            {attempt.submitted_text && (
+                                <p className="whitespace-pre-wrap text-foreground">{attempt.submitted_text}</p>
+                            )}
+                            <FileList files={attempt.submitted_files ?? []} />
+                        </li>
+                    ))}
+                </ol>
+            )}
+        </div>
     );
 }

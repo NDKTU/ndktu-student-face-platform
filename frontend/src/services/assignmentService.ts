@@ -1,6 +1,27 @@
 import api from './api';
 
-export type SubmissionStatus = 'draft' | 'submitted' | 'late' | 'graded' | 'returned';
+/**
+ * `rejected` — o'qituvchi ishni baholamay rad etdi (sababi `feedback` da);
+ * `returned` — baholangan ishni qayta topshirishga qaytardi, eski baho turadi.
+ * Ikkalasida ham talaba yangi javob yubora oladi.
+ */
+export type SubmissionStatus = 'draft' | 'submitted' | 'late' | 'graded' | 'returned' | 'rejected';
+
+/** Ish talabaga qaytgan — u qayta topshira oladi. */
+export const isReopened = (status: SubmissionStatus | undefined | null): boolean =>
+    status === 'rejected' || status === 'returned';
+
+/** Avvalgi urinish — talaba qayta topshirgach saqlanadi. */
+export interface SubmissionAttempt {
+    submitted_text?: string | null;
+    submitted_files: SubmissionFile[];
+    submitted_at?: string | null;
+    /** Urinish qanday yopilgan: `rejected` yoki `returned`. */
+    status: SubmissionStatus;
+    grade?: number | null;
+    feedback?: string | null;
+    graded_at?: string | null;
+}
 
 export interface SubmissionFile {
     name: string;
@@ -94,6 +115,10 @@ export interface Submission {
     grade?: number | null;
     feedback?: string | null;
     graded_at?: string | null;
+    /** Kechikish shundan hisoblanadi: qayta topshirishni o'qituvchi so'ragan. */
+    first_submitted_at?: string | null;
+    /** Avvalgi urinishlar, eskisidan yangisiga. */
+    attempts?: SubmissionAttempt[];
     user?: SubmissionUserInfo | null;
     created_at: string;
     updated_at: string;
@@ -172,6 +197,22 @@ export const assignmentService = {
         const response = await api.put<Submission>(
             `/homework/${assignmentId}/submission/${userId}/grade`,
             data,
+        );
+        return response.data;
+    },
+    /** Baholamay rad etish — sabab majburiy, talaba qayta yuboradi. */
+    reject: async (assignmentId: number, userId: number, reason: string) => {
+        const response = await api.put<Submission>(
+            `/homework/${assignmentId}/submission/${userId}/reject`,
+            { reason },
+        );
+        return response.data;
+    },
+    /** Baholangan ishni qayta topshirishga qaytarish; eski baho yangisi qo'yilguncha turadi. */
+    returnForResubmit: async (assignmentId: number, userId: number, comment?: string | null) => {
+        const response = await api.put<Submission>(
+            `/homework/${assignmentId}/submission/${userId}/return`,
+            { comment: comment || null },
         );
         return response.data;
     },
