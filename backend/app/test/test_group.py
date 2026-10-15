@@ -258,6 +258,42 @@ async def test_list_groups_filters_course_and_shape_on_server(auth_client, async
 
 
 @pytest.mark.asyncio
+async def test_list_groups_filters_education_type_via_speciality(
+    auth_client, async_db, make_speciality, test_faculty, test_kafedra
+):
+    """Bakalavr/Magistr guruhda emas, yo'nalishda turadi — filtr shu orqali.
+
+    Yo'nalishsiz guruhning darajasi noma'lum: u hech bir darajaga tushmaydi.
+    """
+    from app.modules.organization_structure.model import Group
+
+    bachelor = (await make_speciality("Dasturiy injiniring", test_kafedra["id"], "Bakalavr"))["id"]
+    master = (await make_speciality("Axborot tizimlari", test_kafedra["id"], "Magistr"))["id"]
+    async_db.add_all(
+        [
+            Group(name="B1-24", faculty_id=test_faculty["id"], speciality_id=bachelor),
+            Group(name="B2-24", faculty_id=test_faculty["id"], speciality_id=bachelor),
+            Group(name="M1-24", faculty_id=test_faculty["id"], speciality_id=master),
+            Group(name="X1-24", faculty_id=test_faculty["id"]),
+        ]
+    )
+    await async_db.commit()
+
+    # Registr ahamiyatsiz, `total` ham filtrlangan.
+    by_bachelor = await auth_client.get("/group/", params={"education_type": "bakalavr"})
+    assert by_bachelor.status_code == 200
+    assert by_bachelor.json()["total"] == 2
+    assert {g["name"] for g in by_bachelor.json()["groups"]} == {"B1-24", "B2-24"}
+
+    by_master = await auth_client.get("/group/", params={"education_type": "Magistr"})
+    assert by_master.json()["total"] == 1
+    assert by_master.json()["groups"][0]["name"] == "M1-24"
+
+    everything = await auth_client.get("/group/", params={"limit": 50})
+    assert everything.json()["total"] == 4
+
+
+@pytest.mark.asyncio
 async def test_list_groups_sorts_on_server_across_pages(auth_client, async_db, test_faculty):
     """Saralash butun tanlov bo'yicha, sahifa ichida emas.
 

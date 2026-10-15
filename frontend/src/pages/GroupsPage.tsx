@@ -35,10 +35,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { IdChip } from '@/components/common/IdChip';
 import { StudentCount } from '@/components/group/StudentCount';
-import { educationShapeKey } from '@/utils/education';
+import { EDUCATION_TYPES, educationShapeKey } from '@/utils/education';
 import { useTranslation } from 'react-i18next';
 
 type EducationFormFilter = 'all' | 'Kunduzgi' | 'Sirtqi' | 'Kechki' | 'Masofaviy';
+type EducationTypeFilter = 'all' | (typeof EDUCATION_TYPES)[number];
 type CourseLevelFilter = 'all' | '1' | '2' | '3' | '4' | '5';
 type SortField = 'name' | 'course' | 'student_count' | 'local_student_count';
 type SortOrder = 'asc' | 'desc';
@@ -74,6 +75,7 @@ export const GroupsPage = () => {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [educationFormFilter, setEducationFormFilter] = useUrlState<EducationFormFilter>('shape', 'all');
     const [courseLevelFilter, setCourseLevelFilter] = useUrlState<CourseLevelFilter>('course', 'all');
+    const [educationTypeFilter, setEducationTypeFilter] = useUrlState<EducationTypeFilter>('degree', 'all');
     // Ko'rinish almashtirgichi asboblar panelidan olib tashlangan,
     // shuning uchun o'zgartiruvchi yo'q — qiymat boshlang'ich holatda qoladi.
     // Telefonda (md dan past) jadval oʻrniga kartochkalar: hooknig oʻzi
@@ -118,6 +120,7 @@ export const GroupsPage = () => {
     } = useGroups(currentPage, pageSize, debouncedSearch, undefined, facultyIdNum, specialityIdNum, true, {
         course: courseLevelFilter === 'all' ? undefined : Number(courseLevelFilter),
         education_shape: educationFormFilter === 'all' ? undefined : educationFormFilter,
+        education_type: educationTypeFilter === 'all' ? undefined : educationTypeFilter,
         sort_by: sortField,
         order: sortOrder,
     });
@@ -161,12 +164,16 @@ export const GroupsPage = () => {
     }, [faculties, t]);
 
     const specialityOptions = useMemo(() => {
-        const options = specialities.map((s) => ({
+        // Daraja tanlangan bo'lsa, boshqa darajadagi yo'nalishlar ro'yxatda
+        // turmasin — ularni tanlash bo'sh jadval beradi.
+        const options = specialities
+            .filter((s) => educationTypeFilter === 'all' || s.education_type?.toLowerCase() === educationTypeFilter.toLowerCase())
+            .map((s) => ({
             value: s.id.toString(),
             label: s.name,
         }));
         return [{ value: 'all', label: t('Barcha mutaxassisliklar') }, ...options];
-    }, [specialities, t]);
+    }, [specialities, educationTypeFilter, t]);
 
     const getFacultyName = (facultyId: number) => {
         const faculty = faculties.find((f) => f.id === facultyId);
@@ -195,6 +202,7 @@ export const GroupsPage = () => {
         (selectedSpecialityFilter !== 'all' ? 1 : 0) +
         (educationFormFilter !== 'all' ? 1 : 0) +
         (courseLevelFilter !== 'all' ? 1 : 0) +
+        (educationTypeFilter !== 'all' ? 1 : 0) +
         (searchTerm ? 1 : 0);
 
     const handleClearFilters = () => {
@@ -202,6 +210,7 @@ export const GroupsPage = () => {
         setSelectedSpecialityFilter('all');
         setEducationFormFilter('all');
         setCourseLevelFilter('all');
+        setEducationTypeFilter('all');
         setSearchTerm('');
         setCurrentPage(1);
         // URL o'zi tozalanadi: har bir filtr boshlang'ich qiymatga qaytganda
@@ -423,6 +432,25 @@ export const GroupsPage = () => {
                 }
                 chips={
                     <div className="flex flex-wrap items-center gap-4 w-full">
+                        {/* Ta'lim darajasi — yo'nalishdan, serverda filtrlanadi. */}
+                        <FilterChipGroup<EducationTypeFilter>
+                            label={t("Ta'lim darajasi")}
+                            value={educationTypeFilter}
+                            onChange={(val) => {
+                                setEducationTypeFilter(val);
+                                // Tanlangan yo'nalish boshqa darajada bo'lsa, u tushib qoladi.
+                                const spec = specialities.find((s) => String(s.id) === selectedSpecialityFilter);
+                                if (val !== 'all' && spec && spec.education_type?.toLowerCase() !== val.toLowerCase()) {
+                                    setSelectedSpecialityFilter('all');
+                                }
+                                setCurrentPage(1);
+                            }}
+                            options={[
+                                { value: 'all', label: t('Barchasi') },
+                                ...EDUCATION_TYPES.map((type) => ({ value: type, label: t(type) })),
+                            ]}
+                        />
+
                         {/* Education Form Chips */}
                         <FilterChipGroup<EducationFormFilter>
                             label={t("Ta'lim shakli")}

@@ -115,6 +115,8 @@ export interface GroupMergeResult {
 export interface GroupListParams {
     course?: number;
     education_shape?: string;
+    /** Bakalavr | Magistr — yo'nalishdan (`specialities.education_type`). */
+    education_type?: string;
     sort_by?: 'name' | 'course' | 'student_count' | 'local_student_count';
     order?: 'asc' | 'desc';
 }
@@ -154,6 +156,7 @@ export const groupService = {
         // filtrlash «683 tadan 3 tasi» degan ro'yxatni berardi.
         if (extra?.course) params.course = extra.course;
         if (extra?.education_shape) params.education_shape = extra.education_shape;
+        if (extra?.education_type) params.education_type = extra.education_type;
         if (extra?.sort_by) {
             params.sort_by = extra.sort_by;
             params.order = extra.order ?? 'asc';

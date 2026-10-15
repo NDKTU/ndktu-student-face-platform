@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 # from app.core.utils.visibility import apply_visibility
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher
-from app.modules.organization_structure.model import Group, TeacherGroup
+from app.modules.organization_structure.model import Group, Speciality, TeacherGroup
 from app.modules.quiz.model import Result
 
 from .schemas import (
@@ -140,6 +140,16 @@ class GroupRepository:
             stmt = stmt.where(Group.course == request.course)
         if request.education_shape:
             stmt = stmt.where(Group.education_shape.ilike(f"%{request.education_shape}%"))
+        if request.education_type:
+            # Yo'nalishsiz guruh bu filtrga tushmaydi: uning turi noma'lum.
+            stmt = stmt.where(
+                select(Speciality.id)
+                .where(
+                    Speciality.id == Group.speciality_id,
+                    Speciality.education_type.ilike(request.education_type),
+                )
+                .exists()
+            )
         return stmt
 
     def _order_by(self, request: GroupListRequest):

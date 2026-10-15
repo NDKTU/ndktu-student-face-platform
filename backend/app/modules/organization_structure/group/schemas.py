@@ -68,6 +68,9 @@ class GroupListRequest(BaseModel):
     #: EPOS satrining yozilishi turlicha ("Kunduzgi"/"kunduzgi"), shuning
     #: uchun taqqoslash registrga bog'liq emas.
     education_shape: Optional[str] = None
+    #: Bakalavr | Magistr. Guruhning o'zida bunday ustun yo'q — u yo'nalishdan
+    #: olinadi (`specialities.education_type`), kurslar filtridagidek.
+    education_type: Optional[str] = None
 
     #: name | course | student_count (EPOS) | local_student_count (haqiqiy).
     #: Saralash ham serverda: aks holda tartib faqat ochilgan sahifa ichida
