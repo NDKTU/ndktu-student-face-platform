@@ -75,6 +75,11 @@ class ZoomSession(Base, IdIntPk, TimestampMixin):
     #: Uchrashuvni bekend Zoom API orqali yaratgan: vaqt/nom o'zgarsa yangilaydi,
     #: seans o'chsa o'chiradi, talabani registrant qilib shaxsiy token bilan kiritadi.
     zoom_managed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
+    #: Takrorlanadigan seanslar seriyasi (har hafta / har 2 haftada) — bir
+    #: martada yaratilgan seanslarda bir xil. Har bir sana baribir alohida seans
+    #: va alohida Zoom uchrashuvi: bitta sanani ko'chirish qolganlariga tegmaydi,
+    #: «shu va keyingilari» esa shu kalit bo'yicha topiladi.
+    series_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     #: Uchrashuv qaysi akkauntda. Bo'sh — `.env` dagi kalitlar («Asosiy (.env)»).
     #: RESTRICT: akkaunt o'chsa, seans qaysi kalit bilan imzolanishini bilmay qolardi.
     zoom_account_id: Mapped[int | None] = mapped_column(

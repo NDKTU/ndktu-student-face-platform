@@ -60,6 +60,10 @@ from .schemas import (
     ZoomCapabilitiesResponse,
     ZoomJoinResponse,
     ZoomOutsider,
+    ZoomSeriesFailure,
+    ZoomSeriesRequest,
+    ZoomSeriesResponse,
+    ZoomSeriesUpdateResponse,
     ZoomSessionListResponse,
     ZoomSessionRequest,
     ZoomSessionResponse,
@@ -229,6 +233,14 @@ def auto_title(subject_name: str, teacher: Teacher | None, group_names: list[str
     return title[:255]
 
 
+def _reason(cause: HTTPException) -> str:
+    """Xatoning matni: `quiz_error` lug'at qaytaradi, oddiy `HTTPException` — satr."""
+    detail = cause.detail
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail.get("code") or cause.status_code)
+    return str(detail)
+
+
 def _account_not_found() -> HTTPException:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_account_not_found", "Zoom akkaunti topilmadi")
 
@@ -344,8 +356,15 @@ class ZoomSessionRepository:
             raise _not_yours()
         return zs
 
-    def _to_response(self, zs: ZoomSession, user: User, now: datetime) -> ZoomSessionResponse:
+    def _to_response(
+        self,
+        zs: ZoomSession,
+        user: User,
+        now: datetime,
+        series: dict[int, tuple[int, int]] | None = None,
+    ) -> ZoomSessionResponse:
         manage = self._can_manage(zs, user)
+        position, total = (series or {}).get(zs.id, (None, None))
         return ZoomSessionResponse(
             id=zs.id,
             title=zs.title,
@@ -369,7 +388,32 @@ class ZoomSessionRepository:
             zoom_managed=zs.zoom_managed,
             zoom_account_id=(zs.zoom_account_id or ENV_ACCOUNT_ID) if manage else None,
             zoom_account_name=(zs.zoom_account.name if zs.zoom_account else ENV_ACCOUNT_NAME) if manage else None,
+            series_id=zs.series_id,
+            series_position=position,
+            series_total=total,
         )
+
+    @staticmethod
+    async def _series_positions(session: AsyncSession, rows: list[ZoomSession]) -> dict[int, tuple[int, int]]:
+        """seans id → (seriyadagi o'rni, jami) — «3 / 8» uchun, bitta so'rovda."""
+        series_ids = {zs.series_id for zs in rows if zs.series_id}
+        if not series_ids:
+            return {}
+        members = (
+            await session.execute(
+                select(ZoomSession.series_id, ZoomSession.id)
+                .where(ZoomSession.series_id.in_(series_ids))
+                .order_by(ZoomSession.series_id, ZoomSession.starts_at, ZoomSession.id)
+            )
+        ).all()
+        by_series: dict[str, list[int]] = {}
+        for series_id, session_id in members:
+            by_series.setdefault(series_id, []).append(session_id)
+        return {
+            session_id: (index, len(ids))
+            for ids in by_series.values()
+            for index, session_id in enumerate(ids, start=1)
+        }
 
     # ── Ro'yxat ──────────────────────────────────────────────────────────────
 
@@ -407,7 +451,8 @@ class ZoomSessionRepository:
         # O'tganlar — eng yangisi yuqorida, qolganlari — eng yaqini yuqorida.
         order = desc(ZoomSession.starts_at) if scope == "past" else ZoomSession.starts_at
         rows = (await session.execute(stmt.order_by(order, ZoomSession.id).limit(300))).scalars().all()
-        return ZoomSessionListResponse(sessions=[self._to_response(zs, user, now) for zs in rows])
+        series = await self._series_positions(session, list(rows))
+        return ZoomSessionListResponse(sessions=[self._to_response(zs, user, now, series) for zs in rows])
 
     async def get_session(self, session: AsyncSession, session_id: int, user: User) -> ZoomSessionResponse:
         zs = await self._get(session, session_id)
@@ -416,7 +461,7 @@ class ZoomSessionRepository:
             group_ids = {link.group_id for link in zs.group_links}
             if not zs.is_active or student is None or student.group_id not in group_ids:
                 raise _not_found()
-        return self._to_response(zs, user, utcnow_naive())
+        return self._to_response(zs, user, utcnow_naive(), await self._series_positions(session, [zs]))
 
     # ── Boshqaruv ────────────────────────────────────────────────────────────
 
@@ -633,10 +678,12 @@ class ZoomSessionRepository:
 
     # ── Boshqaruv (davomi) ───────────────────────────────────────────────────
 
-    async def create_session(self, session: AsyncSession, data: ZoomSessionRequest, user: User) -> ZoomSessionResponse:
+    async def create_session(
+        self, session: AsyncSession, data: ZoomSessionRequest, user: User, series_id: str | None = None
+    ) -> ZoomSessionResponse:
         """Havola bo'lmasa — uchrashuv Zoom API orqali yaratiladi (ro'yxatdan o'tish bilan)."""
         managed = data.link_url is None
-        zs = ZoomSession(created_by_user_id=user.id, group_links=[], zoom_managed=managed)
+        zs = ZoomSession(created_by_user_id=user.id, group_links=[], zoom_managed=managed, series_id=series_id)
         await self._apply(session, zs, data, user)
         meeting_id: int | None = None
         if managed:
@@ -689,7 +736,17 @@ class ZoomSessionRepository:
         session.expire(zs)
         return await self.get_session(session, session_id, user)
 
-    async def delete_session(self, session: AsyncSession, session_id: int, user: User) -> None:
+    async def delete_session(
+        self, session: AsyncSession, session_id: int, user: User, scope: str = "one"
+    ) -> None:
+        if scope == "following":
+            anchor = await self._get_managed(session, session_id, user)
+            for target_id in await self._following_ids(session, anchor):
+                await self._delete_one(session, target_id, user)
+            return
+        await self._delete_one(session, session_id, user)
+
+    async def _delete_one(self, session: AsyncSession, session_id: int, user: User) -> None:
         zs = await self._get_managed(session, session_id, user)
         if zs.zoom_managed and zs.zoom_meeting_id:
             creds = await credentials_by_id(session, zs.zoom_account_id)
@@ -697,6 +754,101 @@ class ZoomSessionRepository:
                 await self._delete_meeting_quietly(creds, zs.zoom_meeting_id)
         await session.delete(zs)
         await session.commit()
+
+    # ── Seriya ───────────────────────────────────────────────────────────────
+
+    async def create_series(
+        self, session: AsyncSession, data: ZoomSeriesRequest, user: User
+    ) -> ZoomSeriesResponse:
+        """Har hafta / har 2 haftada takrorlanadigan seanslar.
+
+        Har bir sana — alohida seans va alohida Zoom uchrashuvi: «bir litsenziya
+        bir vaqtda bitta uchrashuv» va bo'sh akkauntni tanlash o'zgarishsiz
+        ishlaydi, bitta sanani ko'chirish esa qolganlariga tegmaydi.
+
+        O'qituvchi, fan va guruhlar avval bir marta tekshiriladi: xato bo'lsa,
+        hech narsa yaratilmaydi. Keyin sanalar birma-bir — biror sanada barcha
+        akkauntlar band bo'lsa, o'sha sana `failed` ga tushadi, qolganlari yaratiladi.
+        """
+        # Sinov seansi sessiyaga qo'shilmaydi — bazaga hech narsa yozilmaydi.
+        probe = ZoomSession(group_links=[], zoom_managed=data.link_url is None)
+        await self._apply(session, probe, data, user)
+
+        series_id = uuid.uuid4().hex
+        created: list[ZoomSessionResponse] = []
+        failed: list[ZoomSeriesFailure] = []
+        # `model_construct`, qayta tekshiruvsiz: vaqt allaqachon UTC ga o'tgan, zonasiz
+        # qayta tekshirilsa yana Toshkent deb o'qilib, 5 soatga surilardi.
+        base = ZoomSessionRequest.model_construct(**data.model_dump(exclude={"repeat", "repeat_until", "skip_dates"}))
+        for starts_at, ends_at in data.occurrences():
+            occurrence = base.model_copy(update={"starts_at": starts_at, "ends_at": ends_at})
+            try:
+                created.append(await self.create_session(session, occurrence, user, series_id=series_id))
+            except HTTPException as cause:
+                # Rollback kerak emas: `create_session` xatoni seans sessiyaga
+                # qo'shilishidan oldin beradi (band akkaunt, Zoom rad etdi).
+                failed.append(ZoomSeriesFailure(starts_at=starts_at, reason=_reason(cause)))
+        return ZoomSeriesResponse(series_id=series_id, created=created, failed=failed)
+
+    async def _following_ids(self, session: AsyncSession, anchor: ZoomSession) -> list[int]:
+        """Shu seans va seriyadagi keyingilari (boshlanishi bo'yicha). Seriyasiz — faqat o'zi."""
+        if not anchor.series_id:
+            return [anchor.id]
+        return list(
+            (
+                await session.execute(
+                    select(ZoomSession.id)
+                    .where(ZoomSession.series_id == anchor.series_id, ZoomSession.starts_at >= anchor.starts_at)
+                    .order_by(ZoomSession.starts_at, ZoomSession.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    async def update_following(
+        self, session: AsyncSession, session_id: int, data: ZoomSessionRequest, user: User
+    ) -> ZoomSeriesUpdateResponse:
+        """Shu seans va seriyadagi keyingilarini o'zgartiradi.
+
+        Vaqt siljish sifatida qo'llanadi: bu seans 08:00 dan 09:30 ga ko'chsa,
+        keyingilari ham 1,5 soatga suriladi, kun esa har birida o'ziniki qoladi.
+        Har bir seans o'z tranzaksiyasida: biror sanada akkaunt band bo'lsa,
+        o'sha sana `failed` ga tushadi, qolganlari o'zgaradi.
+        """
+        anchor = await self._get_managed(session, session_id, user)
+        shift = data.starts_at - anchor.starts_at
+        duration = data.ends_at - data.starts_at
+        targets = [
+            (target_id, starts_at)
+            for target_id, starts_at in (
+                await session.execute(
+                    select(ZoomSession.id, ZoomSession.starts_at).where(
+                        ZoomSession.id.in_(await self._following_ids(session, anchor))
+                    )
+                )
+            ).all()
+        ]
+        updated = 0
+        failed: list[ZoomSeriesFailure] = []
+        for target_id, starts_at in sorted(targets, key=lambda item: item[1]):
+            new_start = starts_at + shift
+            target_data = data.model_copy(update={"starts_at": new_start, "ends_at": new_start + duration})
+            try:
+                await self.update_session(session, target_id, target_data, user)
+                updated += 1
+            except HTTPException as cause:
+                failed.append(ZoomSeriesFailure(starts_at=new_start, reason=_reason(cause)))
+                # `update_session` xatoda rollback qiladi — u esa sessiyadagi barcha
+                # obyektlarni, jumladan `user` ni eskirtiradi. Qayta o'qimasak,
+                # keyingi sanada `user.id` sinxron yuklanib, MissingGreenlet bilan yiqiladi.
+                await session.refresh(user)
+                await session.refresh(user, attribute_names=["roles"])
+        return ZoomSeriesUpdateResponse(
+            updated=updated,
+            failed=failed,
+            session=await self.get_session(session, session_id, user),
+        )
 
     @staticmethod
     async def _delete_meeting_quietly(creds: ZoomCredentials, meeting_id: int) -> None:

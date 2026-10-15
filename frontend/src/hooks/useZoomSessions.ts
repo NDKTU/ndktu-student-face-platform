@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GroupOptionFilter } from '@/services/generalTestService';
 import {
     zoomSessionService,
+    type ZoomSeriesOptions,
+    type ZoomSeriesScope,
     type ZoomSessionPayload,
     type ZoomSessionScope,
 } from '@/services/zoomSessionService';
@@ -77,5 +79,26 @@ export const useSaveZoomSession = () => {
 
 export const useDeleteZoomSession = () => {
     const invalidate = useInvalidate();
-    return useMutation({ mutationFn: (id: number) => zoomSessionService.remove(id), onSuccess: invalidate });
+    return useMutation({
+        mutationFn: ({ id, scope = 'one' }: { id: number; scope?: ZoomSeriesScope }) =>
+            zoomSessionService.remove(id, scope),
+        onSuccess: invalidate,
+    });
+};
+
+export const useCreateZoomSeries = () => {
+    const invalidate = useInvalidate();
+    return useMutation({
+        mutationFn: (data: ZoomSessionPayload & ZoomSeriesOptions) => zoomSessionService.createSeries(data),
+        onSuccess: invalidate,
+    });
+};
+
+export const useUpdateZoomFollowing = () => {
+    const invalidate = useInvalidate();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: ZoomSessionPayload }) =>
+            zoomSessionService.updateFollowing(id, data),
+        onSuccess: invalidate,
+    });
 };

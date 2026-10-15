@@ -19,6 +19,9 @@ from .schemas import (
     FaceCheckResponse,
     ZoomCapabilitiesResponse,
     ZoomJoinResponse,
+    ZoomSeriesRequest,
+    ZoomSeriesResponse,
+    ZoomSeriesUpdateResponse,
     ZoomSessionListResponse,
     ZoomSessionRequest,
     ZoomSessionResponse,
@@ -124,6 +127,16 @@ async def create_session(
     return await repo.create_session(session=session, data=data, user=user)
 
 
+@router.post("/series", response_model=ZoomSeriesResponse, status_code=status.HTTP_201_CREATED)
+async def create_series(
+    data: ZoomSeriesRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """Har hafta / har 2 haftada takrorlanadigan seanslar — har sana alohida seans."""
+    return await repo.create_series(session=session, data=data, user=user)
+
+
 @router.get("/{session_id}", response_model=ZoomSessionResponse)
 async def get_session(
     session_id: int,
@@ -143,13 +156,26 @@ async def update_session(
     return await repo.update_session(session=session, session_id=session_id, data=data, user=user)
 
 
+@router.put("/{session_id}/following", response_model=ZoomSeriesUpdateResponse)
+async def update_following(
+    session_id: int,
+    data: ZoomSessionRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("update:zoom_session")),
+):
+    """Shu seans va seriyadagi keyingilari: vaqt siljish sifatida qo'llanadi."""
+    return await repo.update_following(session=session, session_id=session_id, data=data, user=user)
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     session_id: int,
+    scope: Literal["one", "following"] = "one",
     session: AsyncSession = Depends(db_helper.session_getter),
     user: User = Depends(PermissionRequired("delete:zoom_session")),
 ):
-    await repo.delete_session(session=session, session_id=session_id, user=user)
+    """`scope=following` — shu seans va seriyadagi keyingilari."""
+    await repo.delete_session(session=session, session_id=session_id, user=user, scope=scope)
 
 
 @router.post(

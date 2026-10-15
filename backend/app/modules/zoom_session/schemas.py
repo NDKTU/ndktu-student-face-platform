@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -58,6 +58,66 @@ class ZoomSessionRequest(BaseModel):
         return self
 
 
+#: Seriyada eng ko'pi bilan shuncha sana: semestr (≈16 hafta) bemalol sig'adi,
+#: xato kiritilgan «yil oxirigacha» esa yuzlab Zoom uchrashuvini yaratmaydi.
+SERIES_MAX_OCCURRENCES = 30
+
+SeriesRepeat = Literal["weekly", "biweekly"]
+
+#: Takrorlash qadami — kunlarda.
+REPEAT_STEP_DAYS = {"weekly": 7, "biweekly": 14}
+
+
+class ZoomSeriesRequest(ZoomSessionRequest):
+    """Takrorlanadigan seanslar: birinchi sana `starts_at`/`ends_at`, keyin har
+    hafta yoki har 2 haftada `repeat_until` gacha. `skip_dates` — bayram va
+    ta'til kunlari (Toshkent sanasi), ular yaratilmaydi."""
+
+    repeat: SeriesRepeat
+    repeat_until: date
+    skip_dates: list[date] = Field(default_factory=list, max_length=SERIES_MAX_OCCURRENCES)
+
+    def occurrences(self) -> list[tuple[datetime, datetime]]:
+        """Barcha sanalar (UTC, naive) — `skip_dates` siz.
+
+        Sana Toshkent bo'yicha solishtiriladi: 08:00 dagi dars UTC da hali
+        kechagi kun (03:00), lekin kalendarda — bugun.
+        """
+        step = timedelta(days=REPEAT_STEP_DAYS[self.repeat])
+        duration = self.ends_at - self.starts_at
+        skip = set(self.skip_dates)
+        result: list[tuple[datetime, datetime]] = []
+        current = self.starts_at
+        while _local_date(current) <= self.repeat_until:
+            if _local_date(current) not in skip:
+                result.append((current, current + duration))
+            current += step
+        return result
+
+    @model_validator(mode="after")
+    def _series_bounds(self):
+        if self.repeat_until < _local_date(self.starts_at):
+            raise ValueError("«Qachongacha» sanasi birinchi darsdan oldin bo'lmasin")
+        dates = self.occurrences()
+        if not dates:
+            raise ValueError("Birorta ham sana qolmadi — o'tkazib yuboriladigan kunlarni tekshiring")
+        if len(dates) > SERIES_MAX_OCCURRENCES:
+            raise ValueError(f"Seriyada {SERIES_MAX_OCCURRENCES} tadan ko'p dars bo'lmasin — sanani yaqinroq qo'ying")
+        return self
+
+
+def _local_date(value: datetime) -> date:
+    """UTC (naive) → Toshkent sanasi."""
+    return (value + timedelta(hours=5)).date()
+
+
+class ZoomSeriesFailure(BaseModel):
+    """Seriyaning yaratilmagan yoki o'zgartirilmagan sanasi va sababi."""
+
+    starts_at: TashkentDatetime
+    reason: str
+
+
 class SessionGroup(BaseModel):
     id: int
     name: str
@@ -90,6 +150,25 @@ class ZoomSessionResponse(BaseModel):
     #: Faqat yaratuvchi va adminga. `0` — `.env` akkaunti.
     zoom_account_id: Optional[int] = None
     zoom_account_name: Optional[str] = None
+    #: Seriyadagi seans: kalit, o'rni va jami soni («3 / 8»).
+    series_id: Optional[str] = None
+    series_position: Optional[int] = None
+    series_total: Optional[int] = None
+
+
+class ZoomSeriesResponse(BaseModel):
+    series_id: str
+    created: List[ZoomSessionResponse] = []
+    #: Yaratilmagan sanalar: masalan, shu vaqtda barcha akkauntlar band.
+    failed: List[ZoomSeriesFailure] = []
+
+
+class ZoomSeriesUpdateResponse(BaseModel):
+    """«Shu va keyingilari»ni o'zgartirish natijasi."""
+
+    updated: int = 0
+    failed: List[ZoomSeriesFailure] = []
+    session: Optional[ZoomSessionResponse] = None
 
 
 class ZoomSessionListResponse(BaseModel):

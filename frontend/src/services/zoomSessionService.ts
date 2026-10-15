@@ -38,7 +38,43 @@ export interface ZoomSession {
     /** Faqat yaratuvchi va adminga. `0` — serverdagi `.env` akkaunti. */
     zoom_account_id?: number | null;
     zoom_account_name?: string | null;
+    /** Takrorlanadigan seanslar seriyasi: kalit, o'rni va jami («3 / 8»). */
+    series_id?: string | null;
+    series_position?: number | null;
+    series_total?: number | null;
 }
+
+/** Har hafta yoki har 2 haftada (numerator/denominator darslari). */
+export type ZoomSeriesRepeat = 'weekly' | 'biweekly';
+
+export interface ZoomSeriesOptions {
+    repeat: ZoomSeriesRepeat;
+    /** Toshkent sanasi `YYYY-MM-DD` — shu kungacha (kiradi). */
+    repeat_until: string;
+    /** Bayram va ta'til kunlari — yaratilmaydi. */
+    skip_dates: string[];
+}
+
+export interface ZoomSeriesFailure {
+    starts_at: string;
+    reason: string;
+}
+
+export interface ZoomSeriesResult {
+    series_id: string;
+    created: ZoomSession[];
+    /** Yaratilmagan sanalar — masalan, shu vaqtda barcha akkauntlar band. */
+    failed: ZoomSeriesFailure[];
+}
+
+export interface ZoomFollowingResult {
+    updated: number;
+    failed: ZoomSeriesFailure[];
+    session?: ZoomSession | null;
+}
+
+/** Seriyadagi seansni o'zgartirish yoki o'chirish doirasi. */
+export type ZoomSeriesScope = 'one' | 'following';
 
 export interface ZoomAccountOption {
     /** `0` — serverdagi `.env` akkaunti. */
@@ -175,9 +211,15 @@ export const zoomSessionService = {
     create: async (data: ZoomSessionPayload) => (await api.post<ZoomSession>('/zoom-sessions/', data)).data,
     update: async (id: number, data: ZoomSessionPayload) =>
         (await api.put<ZoomSession>(`/zoom-sessions/${id}`, data)).data,
-    remove: async (id: number) => {
-        await api.delete(`/zoom-sessions/${id}`);
+    remove: async (id: number, scope: ZoomSeriesScope = 'one') => {
+        await api.delete(`/zoom-sessions/${id}`, { params: { scope } });
     },
+    /** Har sana — alohida seans va alohida Zoom uchrashuvi, umumiy `series_id` bilan. */
+    createSeries: async (data: ZoomSessionPayload & ZoomSeriesOptions) =>
+        (await api.post<ZoomSeriesResult>('/zoom-sessions/series', data)).data,
+    /** Shu seans va seriyadagi keyingilari: vaqt siljish sifatida qo'llanadi. */
+    updateFollowing: async (id: number, data: ZoomSessionPayload) =>
+        (await api.put<ZoomFollowingResult>(`/zoom-sessions/${id}/following`, data)).data,
     /** Zoom API sozlanganmi — havolasiz seans yaratsa bo'ladimi. */
     capabilities: async () =>
         (await api.get<{ auto_create: boolean; accounts: ZoomAccountOption[] }>('/zoom-sessions/capabilities')).data,

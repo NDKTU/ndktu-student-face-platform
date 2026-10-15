@@ -8,7 +8,15 @@ import { GroupChecklist, type GroupSource } from '@/components/generalTest/Group
 import { toggleGroup } from '@/components/generalTest/labels';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useZoomCapabilities, useZoomTeacherOptions, useZoomTeacherSubjects } from '@/hooks/useZoomSessions';
-import { zoomSessionService, type ZoomSession, type ZoomSessionPayload } from '@/services/zoomSessionService';
+import {
+    zoomSessionService,
+    type ZoomSeriesOptions,
+    type ZoomSeriesRepeat,
+    type ZoomSeriesScope,
+    type ZoomSession,
+    type ZoomSessionPayload,
+} from '@/services/zoomSessionService';
+import { formatDate } from '@/utils/date';
 
 /** Guruhlar Zoom seansining o'z endpointidan — elementar test ruxsati talab qilinmasin. */
 const ZOOM_GROUP_SOURCE: GroupSource = {
@@ -50,10 +58,38 @@ const buildAutoTitle = (subject?: string, teacher?: string, groupNames: string[]
     return title.slice(0, 255);
 };
 
+/** Bekend bilan bir xil chegara (`SERIES_MAX_OCCURRENCES`). */
+const SERIES_MAX = 30;
+const REPEAT_STEP: Record<ZoomSeriesRepeat, number> = { weekly: 7, biweekly: 14 };
+
+/** `YYYY-MM-DD` + kunlar → `YYYY-MM-DD`. UTC'da hisoblanadi — mintaqa sanani surmasin. */
+const addDaysIso = (iso: string, days: number) => {
+    const value = new Date(`${iso}T00:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+};
+
+/** Seriyaning barcha sanalari: birinchisidan `until` gacha (kiradi), har `step` kunda. */
+const seriesDates = (first: string, until: string, repeat: ZoomSeriesRepeat): string[] => {
+    const dates: string[] = [];
+    if (!first || !until || until < first) return dates;
+    for (let current = first; current <= until && dates.length <= SERIES_MAX; current = addDaysIso(current, REPEAT_STEP[repeat])) {
+        dates.push(current);
+    }
+    return dates;
+};
+
+export interface ZoomFormExtra {
+    /** Yangi seans takrorlanadi — har sana alohida seans bo'lib yaratiladi. */
+    series?: ZoomSeriesOptions;
+    /** Seriyadagi seansni tahrirlash: faqat shu yoki shu va keyingilari. */
+    scope?: ZoomSeriesScope;
+}
+
 interface Props {
     editing: ZoomSession | null;
     onClose: () => void;
-    onSubmit: (payload: ZoomSessionPayload) => void;
+    onSubmit: (payload: ZoomSessionPayload, extra: ZoomFormExtra) => void;
     isPending: boolean;
     error?: string | null;
 }
@@ -61,8 +97,7 @@ interface Props {
 export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, error }: Props) {
     const start = splitIso(editing?.starts_at);
     const end = splitIso(editing?.ends_at);
-    // Bo'sh nom — server fan, o'qituvchi va guruhlardan o'zi yasaydi.
-    const [title, setTitle] = useState(editing?.title ?? '');
+    // Nom qo'lda yozilmaydi: server uni fan, o'qituvchi va guruhlardan yasaydi.
     const [pickedTeacherId, setTeacherId] = useState<number | null>(editing?.teacher_user_id ?? null);
     const [pickedTeacherName, setTeacherName] = useState(editing?.teacher_name ?? '');
     const [teacherSearch, setTeacherSearch] = useState('');
@@ -77,6 +112,17 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
     const [faceCheck, setFaceCheck] = useState(editing?.face_check_enabled ?? true);
     const [isActive, setIsActive] = useState(editing?.is_active ?? true);
     const [localError, setLocalError] = useState<string | null>(null);
+    // Takrorlash — faqat yangi seansda. «Qachongacha» standart: 8 hafta keyin.
+    const [repeat, setRepeat] = useState<'' | ZoomSeriesRepeat>('');
+    const [repeatUntil, setRepeatUntil] = useState(() => addDaysIso(start.date || todayInTashkent(), 7 * 8));
+    const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
+    const allDates = repeat ? seriesDates(date, repeatUntil, repeat) : [];
+    const chosenDates = allDates.filter((d) => !skipped.has(d));
+    // Tahrirda: seriyadagi seans bo'lsa — faqat shu yoki shu va keyingilari.
+    const inSeries = Boolean(editing?.series_id);
+    const [scope, setScope] = useState<ZoomSeriesScope>('one');
+    const followingCount =
+        editing?.series_position && editing.series_total ? editing.series_total - editing.series_position + 1 : 0;
 
     const { data: teacherData } = useZoomTeacherOptions(useDebouncedValue(teacherSearch));
     // O'qituvchi o'zi yaratyapti — tanlov yo'q, u o'zi (server ham shuni talab qiladi).
@@ -122,9 +168,20 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
         if (!date || !startTime || !endTime) return setLocalError('Sana va vaqtni kiriting');
         if (endTime <= startTime) return setLocalError("Tugash vaqti boshlanishdan keyin bo'lishi kerak");
         if (groups.size === 0) return setLocalError('Kamida bitta guruhni tanlang');
+        if (repeat) {
+            if (allDates.length > SERIES_MAX) {
+                return setLocalError(`Seriyada ${SERIES_MAX} tadan ko'p dars bo'lmasin — «Qachongacha»ni yaqinroq qo'ying`);
+            }
+            if (chosenDates.length === 0) return setLocalError('Kamida bitta sanani belgilang');
+        }
         setLocalError(null);
+        const extra: ZoomFormExtra = editing
+            ? { scope: inSeries ? scope : 'one' }
+            : repeat
+              ? { series: { repeat, repeat_until: repeatUntil, skip_dates: allDates.filter((d) => skipped.has(d)) } }
+              : {};
         onSubmit({
-            title: title.trim() || null,
+            title: null,
             teacher_user_id: teacherId,
             subject_id: subjectId,
             link_url: managed ? null : link.trim(),
@@ -134,7 +191,7 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
             group_ids: [...groups.keys()],
             face_check_enabled: faceCheck,
             is_active: isActive,
-        });
+        }, extra);
     };
 
     return (
@@ -190,17 +247,11 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         </select>
                     </div>
                 </div>
-                <div>
-                    <Input
-                        label="Nomi"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder={autoTitle || "Fan va o'qituvchini tanlang — nom o'zi yasaladi"}
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                        Bo'sh qoldirsangiz, nom fan, o'qituvchi va guruhlardan o'zi yasaladi
-                        {editing && title ? " — o'zingiz yozgan nomni o'chirsangiz, qayta yasaladi" : ''}
-                    </p>
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
+                    <div className="text-xs text-muted-foreground">Nomi (o'zi yasaladi)</div>
+                    <div className="mt-0.5 text-sm font-medium text-foreground">
+                        {autoTitle || "Fan, o'qituvchi va guruhlarni tanlang"}
+                    </div>
                 </div>
                 {!editing && capabilities?.auto_create && (
                     <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
@@ -271,6 +322,122 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         Boshqa guruhlar bu seansni ko'rmaydi.
                     </p>
                 </div>
+                {!editing && (
+                    <div className="space-y-3 rounded-lg border border-border px-3 py-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <label htmlFor="zoom-repeat" className="text-sm font-medium text-foreground">
+                                    Takrorlash
+                                </label>
+                                <select
+                                    id="zoom-repeat"
+                                    value={repeat}
+                                    onChange={(e) => {
+                                        setRepeat(e.target.value as '' | ZoomSeriesRepeat);
+                                        setSkipped(new Set());
+                                    }}
+                                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                                >
+                                    <option value="">Takrorlanmaydi — bitta seans</option>
+                                    <option value="weekly">Har hafta</option>
+                                    <option value="biweekly">Har 2 haftada (numerator / denominator)</option>
+                                </select>
+                            </div>
+                            {repeat && (
+                                <Input
+                                    label="Qachongacha"
+                                    type="date"
+                                    value={repeatUntil}
+                                    min={date}
+                                    onChange={(e) => {
+                                        setRepeatUntil(e.target.value);
+                                        setSkipped(new Set());
+                                    }}
+                                />
+                            )}
+                        </div>
+                        {repeat && (
+                            <div className="space-y-2">
+                                <p className="text-xs text-muted-foreground">
+                                    Har bir sana — alohida seans va alohida Zoom uchrashuvi. Bayram yoki ta'til kunini
+                                    belgidan chiqaring — u yaratilmaydi.
+                                </p>
+                                {allDates.length > SERIES_MAX ? (
+                                    <p className="text-sm text-destructive">
+                                        {SERIES_MAX} tadan ko'p sana — «Qachongacha»ni yaqinroq qo'ying
+                                    </p>
+                                ) : allDates.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">Sana tanlanmagan</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {allDates.map((d) => {
+                                            const on = !skipped.has(d);
+                                            return (
+                                                <label
+                                                    key={d}
+                                                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
+                                                        on
+                                                            ? 'border-primary/30 bg-primary/10 text-primary'
+                                                            : 'border-border text-muted-foreground line-through'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={on}
+                                                        onChange={() =>
+                                                            setSkipped((prev) => {
+                                                                const next = new Set(prev);
+                                                                if (next.has(d)) next.delete(d);
+                                                                else next.add(d);
+                                                                return next;
+                                                            })
+                                                        }
+                                                        className="h-3.5 w-3.5"
+                                                    />
+                                                    {formatDate(d)}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {allDates.length > 0 && allDates.length <= SERIES_MAX && (
+                                    <p className="text-xs font-medium text-foreground">
+                                        Yaratiladi: {chosenDates.length} ta seans
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {editing && inSeries && (
+                    <div className="space-y-2 rounded-lg border border-border px-3 py-3" role="radiogroup" aria-label="O'zgartirish doirasi">
+                        <div className="text-sm font-medium text-foreground">
+                            Seriyadagi seans
+                            {editing.series_position && editing.series_total
+                                ? ` (${editing.series_position} / ${editing.series_total})`
+                                : ''}
+                        </div>
+                        {(['one', 'following'] as const).map((value) => (
+                            <label key={value} className="flex cursor-pointer items-start gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    name="zoom-scope"
+                                    checked={scope === value}
+                                    onChange={() => setScope(value)}
+                                    className="mt-0.5"
+                                />
+                                <span>
+                                    {value === 'one' ? 'Faqat shu seans' : `Shu va keyingi seanslar${followingCount ? ` (${followingCount} ta)` : ''}`}
+                                    {value === 'following' && (
+                                        <span className="block text-xs text-muted-foreground">
+                                            Vaqt o'zgarsa, keyingilari ham shuncha suriladi — har biri o'z kunida qoladi
+                                        </span>
+                                    )}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                )}
                 <div className="space-y-1.5">
                     <span className="text-sm font-medium text-foreground">Guruhlar</span>
                     <GroupChecklist
