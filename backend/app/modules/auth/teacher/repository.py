@@ -28,6 +28,7 @@ from .schemas import (
     TeacherGroupAssignRequest,
     TeacherListRequest,
     TeacherListResponse,
+    TeacherOption,
     TeacherRankingResponse,
     TeacherRankItem,
     TeacherSelfUpdateRequest,
@@ -239,6 +240,20 @@ class TeacherRepository:
 
         await self._attach_courses(session, [teacher])
         return teacher
+
+    async def list_teacher_options(self, session: AsyncSession, full_name: str | None = None) -> list[TeacherOption]:
+        """Tanlash ro'yxati uchun: bitta so'rov, bog'liq jadvallarsiz."""
+        stmt = (
+            select(Teacher.id, Teacher.user_id, Teacher.full_name, User.username)
+            .outerjoin(User, User.id == Teacher.user_id)
+            .order_by(Teacher.full_name, Teacher.id)
+        )
+        if full_name:
+            stmt = stmt.where(Teacher.full_name.ilike(f"%{full_name}%"))
+        return [
+            TeacherOption(id=id_, user_id=user_id, full_name=name, username=username)
+            for id_, user_id, name, username in (await session.execute(stmt)).all()
+        ]
 
     async def list_teachers(self, session: AsyncSession, request: TeacherListRequest) -> TeacherListResponse:
         stmt = select(Teacher).options(*self._eager_load_options())

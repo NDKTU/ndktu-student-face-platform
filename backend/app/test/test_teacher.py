@@ -97,6 +97,25 @@ async def test_get_teacher(auth_client, test_teacher):
 
 
 @pytest.mark.asyncio
+async def test_teacher_options_are_light(auth_client, test_teacher):
+    """Tanlash ro'yxati: faqat id, ism va login — guruh/fan/kurs yo'q.
+
+    `/options` `/{teacher_id}` dan oldin turishi kerak, aks holda 422.
+    """
+    response = await auth_client.get("/teacher/options")
+    assert response.status_code == 200, response.text
+    rows = response.json()
+    mine = next(row for row in rows if row["id"] == test_teacher["id"])
+    assert mine["full_name"] == "Doe John Smith"
+    assert mine["user_id"] == test_teacher["user_id"]
+    assert set(mine) == {"id", "user_id", "full_name", "username"}
+
+    filtered = await auth_client.get("/teacher/options", params={"full_name": "doe"})
+    assert [row["id"] for row in filtered.json()] == [test_teacher["id"]]
+    assert (await auth_client.get("/teacher/options", params={"full_name": "Nobody"})).json() == []
+
+
+@pytest.mark.asyncio
 async def test_list_teachers(auth_client, test_teacher):
     response = await auth_client.get("/teacher/")
     assert response.status_code == 200

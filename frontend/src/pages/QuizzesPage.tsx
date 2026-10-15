@@ -12,7 +12,7 @@ import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz } from '@/hooks
 import { useSubjects } from '@/hooks/useSubjects';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
-import { useTeachers } from '@/hooks/useTeachers';
+import { useTeacherOptions } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
 import type { Subject } from '@/services/subjectService';
@@ -106,7 +106,7 @@ const QuizzesPage = () => {
         hasPermission('read:subject'),
     );
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
-    const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
+    const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     const updateQuizMutation = useUpdateQuiz();
     const deleteQuizMutation = useDeleteQuiz();
@@ -129,7 +129,7 @@ const QuizzesPage = () => {
         selectedSubjectOption,
     );
     const allGroups = useMemo(() => allGroupsData?.groups ?? [], [allGroupsData]);
-    const allTeachers = allTeachersData?.teachers || [];
+    const allTeachers = allTeachersData ?? [];
 
     const handleCreateQuiz = () => {
         setSelectedQuiz(null);

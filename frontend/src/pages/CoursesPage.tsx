@@ -21,7 +21,7 @@ import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useTeachers } from '@/hooks/useTeachers';
+import { useTeacherOptions } from '@/hooks/useTeachers';
 import { useCatalogView } from '@/hooks/useCatalogView';
 import { useRoleView } from '@/hooks/useRoleView';
 import type { Course } from '@/services/courseService';
@@ -159,9 +159,7 @@ export const CoursesPage = () => {
         undefined,
         hasPermission('read:group') && !hideGroups,
     );
-    const { data: allTeachersData } = useTeachers(
-        1,
-        FILTER_PAGE_SIZE,
+    const { data: allTeachersData } = useTeacherOptions(
         debouncedTeacherQuery || undefined,
         isAdmin && hasPermission('read:teacher'),
     );
@@ -181,7 +179,7 @@ export const CoursesPage = () => {
 
     const allSubjects = allSubjectsData?.subjects || [];
     const allGroups = allGroupsData?.groups || [];
-    const allTeachers = allTeachersData?.teachers || [];
+    const allTeachers = allTeachersData ?? [];
 
     const subjectOptions = useMemo(() => {
         const list = allSubjects.map(subjectOption);
@@ -196,7 +194,7 @@ export const CoursesPage = () => {
     const teacherOptions = useMemo(() => {
         const list = allTeachers.map((t) => ({
             value: String(t.user_id),
-            label: t.full_name || t.user?.username || `ID: ${t.id}`,
+            label: t.full_name || t.username || `ID: ${t.id}`,
         }));
         return [
             { value: 'all', label: t("Barcha o'qituvchilar") },

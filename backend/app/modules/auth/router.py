@@ -88,6 +88,7 @@ from .teacher.schemas import (
     TeacherGroupAssignRequest,
     TeacherListRequest,
     TeacherListResponse,
+    TeacherOption,
     TeacherRankingResponse,
     TeacherSelfUpdateRequest,
     TeacherStudentListRequest,
@@ -673,6 +674,20 @@ async def get_my_teacher_dashboard(
 
 
 @teacher_router.get("/{teacher_id}/students", response_model=TeacherStudentListResponse)
+@teacher_router.get("/options", response_model=list[TeacherOption])
+async def list_teacher_options(
+    full_name: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("read:teacher")),
+):
+    """Ochiladigan ro'yxatlar uchun: faqat id, ism va login.
+
+    `/{teacher_id}` dan oldin turishi shart — aks holda «options» id deb
+    o'qiladi.
+    """
+    return await get_teacher_repository.list_teacher_options(session=session, full_name=full_name)
+
+
 async def list_teacher_students(
     teacher_id: int,
     data: TeacherStudentListRequest = Depends(),

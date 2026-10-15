@@ -14,10 +14,10 @@ import { useRoleView } from '@/hooks/useRoleView';
 import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
-import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
+import { useTeacherOptions, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest, QuizType } from '@/services/quizService';
 import { QUIZ_TYPE_LABELS } from '@/services/quizService';
-import type { Teacher } from '@/services/teacherService';
+import type { TeacherOption } from '@/services/teacherService';
 import { logger } from '@/utils/logger';
 import { buildQuizTitle } from '@/utils/generatedNames';
 import { SEMESTER_OPTIONS } from '@/utils/semester';
@@ -30,7 +30,7 @@ interface QuizModalProps {
     isOpen: boolean;
     onClose: () => void;
     quiz: Quiz | null;
-    teachers: Teacher[];
+    teachers: TeacherOption[];
     onSuccess: () => void;
 }
 
@@ -103,7 +103,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
-    const { data: searchTeachersData } = useTeachers(1, 100, debouncedTeacherSearch, hasPermission('read:teacher'));
+    const { data: searchTeachersData } = useTeacherOptions(debouncedTeacherSearch, hasPermission('read:teacher'));
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(
         effectiveUserId ? parseInt(effectiveUserId) : undefined
     );
@@ -147,7 +147,7 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         return options;
     }, [assignedGroupsData, quiz, allGroupsData]);
 
-    const teacherOptions = (searchTeachersData?.teachers || teachers).map(t => ({
+    const teacherOptions = (searchTeachersData ?? teachers).map(t => ({
         value: (t.user_id ?? '').toString(),
         label: t.full_name ?? '',
     }));

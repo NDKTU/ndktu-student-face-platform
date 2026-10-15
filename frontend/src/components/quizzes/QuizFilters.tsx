@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import PermissionGate from '@/components/auth/PermissionGate';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
-import type { Teacher } from '@/services/teacherService';
+import type { TeacherOption } from '@/services/teacherService';
 import type { Faculty } from '@/services/facultyService';
 import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 interface QuizFiltersProps {
     subjects: Subject[];
     groups: Group[];
-    teachers: Teacher[];
+    teachers: TeacherOption[];
     /** Фильтр по факультету — только на странице со сплошным списком тестов. */
     faculties?: Faculty[];
     filterFacultyId?: number | undefined;

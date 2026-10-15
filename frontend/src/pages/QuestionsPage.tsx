@@ -23,7 +23,7 @@ import {
     useDownloadQuestionsExcel,
 } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
-import { useTeachers } from '@/hooks/useTeachers';
+import { useTeacherOptions } from '@/hooks/useTeachers';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { Combobox } from '@/components/ui/Combobox';
@@ -96,7 +96,7 @@ export const QuestionsPage = () => {
     } = useQuestions(currentPage, pageSize, debouncedSearch, parsedSubjectId, effectiveOwnerUserId);
 
     const { data: subjectsData } = useSubjects(1, 500);
-    const { data: teachersData } = useTeachers(1, 500, undefined, !isTeacher && hasPermission('read:teacher'));
+    const { data: teachersData } = useTeacherOptions(undefined, !isTeacher && hasPermission('read:teacher'));
 
     const deleteQuestionMutation = useDeleteQuestion();
     const bulkDeleteMutation = useBulkDeleteQuestions();
@@ -106,7 +106,7 @@ export const QuestionsPage = () => {
     const totalPages = questionsData ? Math.ceil(questionsData.total / pageSize) : 1;
     const totalCount = questionsData?.total ?? questions.length;
     const subjects = subjectsData?.subjects || [];
-    const teachers = teachersData?.teachers || [];
+    const teachers = teachersData ?? [];
 
     const activeFilterCount =
         (selectedSubject !== 'all' ? 1 : 0) + (selectedTeacher !== 'all' ? 1 : 0) + (searchTerm ? 1 : 0);
@@ -154,7 +154,7 @@ export const QuestionsPage = () => {
     const teacherOptions = useMemo(() => {
         const list = teachers.map((t) => ({
             value: String(t.user_id),
-            label: t.full_name || t.user?.username || `ID: ${t.id}`,
+            label: t.full_name || t.username || `ID: ${t.id}`,
         }));
         return [{ value: 'all', label: t("Barcha o'qituvchilar") }, ...list];
     }, [teachers, t]);

@@ -218,6 +218,21 @@ class TeacherListRequest(BaseModel):
         return (self.page - 1) * self.limit
 
 
+class TeacherOption(BaseModel):
+    """O'qituvchi tanlash ro'yxatidagi bitta qator.
+
+    Ochiladigan ro'yxatlar to'liq `GET /teacher/` ni `limit=1000` bilan
+    so'rardi: 577 o'qituvchi barcha guruhlari, fanlari va kurslari bilan
+    (~25 ming bog'liq satr) — har safar 1,3–1,5 s. Ro'yxatga esa faqat ism
+    va id kerak.
+    """
+
+    id: int
+    user_id: Optional[int] = None
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+
+
 class TeacherListResponse(BaseModel):
     total: int
     page: int

@@ -222,7 +222,25 @@ export interface TeacherDashboard {
     homeworks: TeacherDashboardHomework[];
 }
 
+/**
+ * O'qituvchi tanlash ro'yxati uchun yengil qator (`GET /teacher/options`).
+ * To'liq `Teacher` guruhlar, fanlar va kurslar bilan keladi — ochiladigan
+ * ro'yxat uchun bu 1,5 s va o'nlab ming bog'liq satr edi.
+ */
+export interface TeacherOption {
+    id: number;
+    user_id: number | null;
+    full_name: string | null;
+    username: string | null;
+}
+
 export const teacherService = {
+    getTeacherOptions: async (full_name?: string) => {
+        const response = await api.get<TeacherOption[]>('/teacher/options', {
+            params: { full_name: full_name || undefined },
+        });
+        return response.data;
+    },
     getTeachers: async (
         page = 1,
         limit = 10,

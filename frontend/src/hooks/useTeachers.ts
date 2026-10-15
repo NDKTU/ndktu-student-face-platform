@@ -25,6 +25,21 @@ export const useTeachers = (
     });
 };
 
+/**
+ * O'qituvchi tanlash ro'yxati — faqat id, ism va login. Ochiladigan
+ * ro'yxatlar uchun `useTeachers(1, 1000)` o'rniga shu: ro'yxat kun davomida
+ * deyarli o'zgarmaydi, shuning uchun 5 daqiqa keshda turadi.
+ */
+export const useTeacherOptions = (full_name?: string, enabled: boolean = true) => {
+    return useQuery({
+        queryKey: ['teacher-options', full_name ?? ''],
+        queryFn: () => teacherService.getTeacherOptions(full_name),
+        placeholderData: (previousData) => previousData,
+        staleTime: 5 * 60_000,
+        enabled,
+    });
+};
+
 /** O'qituvchining guruhlaridagi talabalar. Sahifalash serverda: bitta
  *  o'qituvchida 800 dan ortiq talaba bo'lishi mumkin. */
 export const useTeacherStudents = (teacherId?: number, params?: TeacherStudentsParams) => {

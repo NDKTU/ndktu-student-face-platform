@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useCreateCourse, useUpdateCourse } from '@/hooks/useCourses';
-import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
+import { useTeacherOptions, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import type { Course, CourseCreateRequest, CourseUpdateRequest } from '@/services/courseService';
 import { logger } from '@/utils/logger';
@@ -62,7 +62,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     const semesterNumber = watch('semester_number');
     const selectedGroupIds = watch('group_ids');
 
-    const { data: teachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
+    const { data: teachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     // Fan va guruh ro'yxati tanlangan o'qituvchiga biriktirilganidan yig'iladi:
     // barcha 754 fan va 206 guruhdan tanlash kursni noto'g'ri bog'lashning eng
@@ -71,7 +71,7 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(teacherUserId);
     const { data: assignedGroupsData, isFetching: isFetchingGroups } = useTeacherAssignedGroups(teacherUserId);
 
-    const teacherOptions = (teachersData?.teachers || []).map(t => ({
+    const teacherOptions = (teachersData ?? []).map(t => ({
         value: (t?.user_id ?? '').toString(),
         label: t?.full_name ?? '',
     }));

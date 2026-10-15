@@ -8,7 +8,7 @@ import { Search } from 'lucide-react';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
-import { useTeachers } from '@/hooks/useTeachers';
+import { useTeacherOptions } from '@/hooks/useTeachers';
 import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
@@ -67,7 +67,7 @@ const ActiveQuizzesPage = () => {
         hasPermission('read:subject'),
     );
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
-    const { data: allTeachersData } = useTeachers(1, 1000, undefined, hasPermission('read:teacher'));
+    const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
@@ -85,7 +85,7 @@ const ActiveQuizzesPage = () => {
         selectedSubjectOption,
     );
     const allGroups = allGroupsData?.groups || [];
-    const allTeachers = allTeachersData?.teachers || [];
+    const allTeachers = allTeachersData ?? [];
 
     const getSubjectName = (id?: number) => allSubjects.find((s: Subject) => s.id === id)?.name || '-';
     const getGroupName = (id?: number) => allGroups.find((g: Group) => g.id === id)?.name || '-';
