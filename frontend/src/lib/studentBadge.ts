@@ -1,9 +1,9 @@
 /**
- * Talaba bejigi — eni 7 sm, bo'yi 9 sm (tik), chop etish uchun 300 DPI.
+ * Talaba bejigi — eni 7,5 sm, bo'yi 10 sm (tik), chop etish uchun 300 DPI.
  *
  * Bejik canvas'da chiziladi: oldindan ko'rish ham, yuklab olinadigan JPG ham
  * aynan shu chizma, shuning uchun ekrandagi va qog'ozdagi natija bir xil.
- * Canvas o'lchami piksellarda (827 × 1063) — sahifada u CSS bilan kichraytirib
+ * Canvas o'lchami piksellarda (886 × 1181) — sahifada u CSS bilan kichraytirib
  * ko'rsatiladi, fayl esa to'liq o'lchamda saqlanadi.
  *
  * Bejikdagi yozuvlar interfeys tiliga bog'liq emas: bu universitet hujjati,
@@ -12,13 +12,25 @@
 
 import qrcode from 'qrcode-generator';
 
-export const BADGE_SIZE_CM = { width: 7, height: 9 } as const;
+export const BADGE_SIZE_CM = { width: 7.5, height: 10 } as const;
 export const BADGE_DPI = 300;
 
 const cmToPx = (cm: number) => Math.round((cm / 2.54) * BADGE_DPI);
 
 export const BADGE_WIDTH = cmToPx(BADGE_SIZE_CM.width);
 export const BADGE_HEIGHT = cmToPx(BADGE_SIZE_CM.height);
+
+/**
+ * Chizma koordinatalari — bejik 7 × 9 sm bo'lgan paytdagi 827 px kenglik.
+ * Hamma o'lcham shu kenglikda tanlangan, shuning uchun bejik kattalashganda
+ * chizma kenglik bo'yicha bir tekis kattalashtiriladi (`LAYOUT_SCALE`), dizayn
+ * esa o'zgarmaydi. Yangi nisbat biroz cho'ziqroq: ortgan balandlik
+ * (`LAYOUT_EXTRA_H`) ism, kartalar va pastki tasma orasiga bo'linadi.
+ */
+const LAYOUT_W = 827;
+const LAYOUT_SCALE = BADGE_WIDTH / LAYOUT_W;
+const LAYOUT_H = BADGE_HEIGHT / LAYOUT_SCALE;
+const LAYOUT_EXTRA_H = LAYOUT_H - 1063;
 
 export interface BadgeContent {
     fullName: string;
@@ -115,12 +127,12 @@ const MONO = '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospa
 const fontOf = (weight: number, size: number, family = SANS) => `${weight} ${size}px ${family}`;
 
 const PAD_X = 60;
-const RIGHT_X = BADGE_WIDTH - PAD_X;
+const RIGHT_X = LAYOUT_W - PAD_X;
 
 // Sarlavhaning past cheti qiya: chapda pastroq, o'ngda balandroq.
 const HEADER_LEFT_Y = 512;
 const HEADER_RIGHT_Y = 398;
-const headerEdgeY = (x: number) => HEADER_LEFT_Y - (x / BADGE_WIDTH) * (HEADER_LEFT_Y - HEADER_RIGHT_Y);
+const headerEdgeY = (x: number) => HEADER_LEFT_Y - (x / LAYOUT_W) * (HEADER_LEFT_Y - HEADER_RIGHT_Y);
 
 const LOGO_R = 56;
 const LOGO_CX = PAD_X + LOGO_R;
@@ -141,14 +153,14 @@ const PILL_TOP = 262;
 const PILL_H = 60;
 const QR_Y = PILL_TOP + PILL_H + 30;
 
-const NAME_TOP = 688;
+const NAME_TOP = 688 + Math.round(LAYOUT_EXTRA_H / 3);
 const NAME_LINE_H = 50;
 
-const CARDS_Y = 814;
+const CARDS_Y = 814 + Math.round((LAYOUT_EXTRA_H * 2) / 3);
 const CARD_H = 102;
 const CARD_GAP = 16;
 
-const FOOTER_TOP = 941;
+const FOOTER_TOP = 941 + Math.round(LAYOUT_EXTRA_H);
 
 // ── Matn ─────────────────────────────────────────────────────────────────────
 
@@ -397,8 +409,8 @@ const drawContours = (ctx: CanvasRenderingContext2D) => {
     for (let line = 0; line < 18; line += 1) {
         const base = 186 + line * 23;
         ctx.beginPath();
-        for (let x = -20; x <= BADGE_WIDTH + 20; x += 10) {
-            const t = x / BADGE_WIDTH;
+        for (let x = -20; x <= LAYOUT_W + 20; x += 10) {
+            const t = x / LAYOUT_W;
             // Ikki to'lqin yig'indisi + qiya chetga mos umumiy og'ish.
             const y = base - t * 52 + Math.sin(t * 7.4 + line * 0.36) * 13 + Math.sin(t * 15.8 + line * 0.85) * 4.5;
             if (x === -20) ctx.moveTo(x, y);
@@ -425,25 +437,25 @@ const drawHeader = (
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(BADGE_WIDTH, 0);
-    ctx.lineTo(BADGE_WIDTH, HEADER_RIGHT_Y);
+    ctx.lineTo(LAYOUT_W, 0);
+    ctx.lineTo(LAYOUT_W, HEADER_RIGHT_Y);
     ctx.lineTo(0, HEADER_LEFT_Y);
     ctx.closePath();
     ctx.clip();
 
     // Yorug'lik o'ng yuqoridan tushgandek: o'sha burchak ochroq.
-    const gradient = ctx.createLinearGradient(BADGE_WIDTH, 0, 0, HEADER_LEFT_Y);
+    const gradient = ctx.createLinearGradient(LAYOUT_W, 0, 0, HEADER_LEFT_Y);
     gradient.addColorStop(0, theme.main);
     gradient.addColorStop(0.5, theme.mid);
     gradient.addColorStop(1, theme.dark);
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, BADGE_WIDTH, HEADER_LEFT_Y);
+    ctx.fillRect(0, 0, LAYOUT_W, HEADER_LEFT_Y);
     drawContours(ctx);
     ctx.restore();
 
     // Qiya chet bo'ylab oltin chiziq.
     ctx.save();
-    const gold = ctx.createLinearGradient(0, HEADER_LEFT_Y, BADGE_WIDTH, HEADER_RIGHT_Y);
+    const gold = ctx.createLinearGradient(0, HEADER_LEFT_Y, LAYOUT_W, HEADER_RIGHT_Y);
     gold.addColorStop(0, '#B98C34');
     gold.addColorStop(0.5, '#F3DC98');
     gold.addColorStop(1, '#C59B3F');
@@ -451,7 +463,7 @@ const drawHeader = (
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(-10, headerEdgeY(-10));
-    ctx.lineTo(BADGE_WIDTH + 10, headerEdgeY(BADGE_WIDTH + 10));
+    ctx.lineTo(LAYOUT_W + 10, headerEdgeY(LAYOUT_W + 10));
     ctx.stroke();
     ctx.restore();
 
@@ -695,7 +707,7 @@ const drawInfoCards = (ctx: CanvasRenderingContext2D, content: BadgeContent, the
 const drawFooter = (ctx: CanvasRenderingContext2D, content: BadgeContent, theme: BadgeTheme) => {
     ctx.save();
     ctx.fillStyle = theme.dark;
-    ctx.fillRect(0, FOOTER_TOP, BADGE_WIDTH, BADGE_HEIGHT - FOOTER_TOP);
+    ctx.fillRect(0, FOOTER_TOP, LAYOUT_W, LAYOUT_H - FOOTER_TOP);
     ctx.textBaseline = 'middle';
 
     // O'ng chet: universitetning qisqa nomi.
@@ -749,13 +761,15 @@ export const drawStudentBadge = (
     canvas.height = BADGE_HEIGHT;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context is not available');
+    // Bundan keyin hamma narsa chizma koordinatalarida (`LAYOUT_W`).
+    ctx.setTransform(LAYOUT_SCALE, 0, 0, LAYOUT_SCALE, 0, 0);
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
     // JPG shaffoflikni saqlamaydi — fon to'liq to'ldiriladi.
     ctx.fillStyle = theme.paper;
-    ctx.fillRect(0, 0, BADGE_WIDTH, BADGE_HEIGHT);
+    ctx.fillRect(0, 0, LAYOUT_W, LAYOUT_H);
 
     drawHeader(ctx, content, theme, assets.logo);
     drawPill(ctx, theme);
@@ -768,7 +782,7 @@ export const drawStudentBadge = (
     // Qirqish chizig'i: tananing och qismi oq qog'ozda chegarasiz qolmasin.
     ctx.strokeStyle = COLOR.edge;
     ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, BADGE_WIDTH - 2, BADGE_HEIGHT - 2);
+    ctx.strokeRect(1, 1, LAYOUT_W - 2, LAYOUT_H - 2);
 };
 
 /**
@@ -821,8 +835,8 @@ export const loadImage = (src: string): Promise<HTMLImageElement> =>
  *
  * Brauzer canvas'dan JPG ni 72/96 DPI belgisi bilan chiqaradi yoki umuman
  * belgisiz. Piksellar o'sha-o'sha, lekin Word, Photoshop va chop etish
- * dasturlari rasm o'lchamini shu belgidan hisoblaydi: 827 px 96 DPI da
- * 22 sm bo'lib ochiladi. 300 yozilgach fayl aniq 7 × 9 sm bo'lib ochiladi.
+ * dasturlari rasm o'lchamini shu belgidan hisoblaydi: 886 px 96 DPI da
+ * 23 sm bo'lib ochiladi. 300 yozilgach fayl aniq 7,5 × 10 sm bo'lib ochiladi.
  *
  * JFIF APP0 bo'lagi: FFD8 | FFE0 | uzunlik(2) | "JFIF\0" | versiya(2) |
  * birlik(1) | X zichlik(2) | Y zichlik(2) | ...
