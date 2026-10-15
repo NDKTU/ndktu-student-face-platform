@@ -30,10 +30,19 @@ from .hemis.schemas import (
     HemisOAuthPortalsResponse,
     HemisPreviewResponse,
     HemisSyncResponse,
+    MyScheduleRequest,
+    MyScheduleResponse,
+    ScheduleFiltersResponse,
+    ScheduleListRequest,
+    ScheduleListResponse,
+    ScheduleSyncRequest,
+    ScheduleSyncResponse,
 )
 from .hemis import data_credentials as hemis_data_credentials
 from .hemis.data_service import hemis_data_service
 from .hemis.oauth import hemis_oauth_service
+from .hemis.schedule_repository import hemis_schedule_repository
+from .hemis.schedule_sync import hemis_schedule_sync
 from .hemis.student_sync import hemis_student_sync
 from .hemis.student_sync_runner import student_sync_runner
 from .hemis.service import hemis_service
@@ -1074,6 +1083,58 @@ async def apply_hemis_students(
     marta yaratardi.
     """
     return await student_sync_runner.run(session, data, triggered_by="api")
+
+
+# ── Dars jadvali (schedule-list) ─────────────────────────────────────────────
+
+
+@hemis_router.post(
+    "/schedule/sync",
+    response_model=ScheduleSyncResponse,
+    dependencies=[Depends(RateLimiter(times=2, seconds=600))],
+)
+async def sync_hemis_schedule(
+    data: ScheduleSyncRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """HEMIS jadvalini to'liq o'qib, `hemis_schedule_lessons` ga yozadi.
+
+    Joriy yil ~191 sahifa, ~4,5 daqiqa. O'tgan yillar (`education_year`)
+    17 daqiqagacha cho'ziladi — ularni CLI orqali yuklang, nginx 900 s da
+    uzadi. Tungi cron bilan bitta qulf.
+    """
+    return await hemis_schedule_sync.run(session, data, triggered_by="api")
+
+
+@hemis_router.get("/schedule", response_model=ScheduleListResponse)
+async def list_hemis_schedule(
+    data: ScheduleListRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Jadval — HEMIS identifikatorlari bo'yicha filtr."""
+    return await hemis_schedule_repository.list(session, data)
+
+
+@hemis_router.get("/schedule/filters", response_model=ScheduleFiltersResponse)
+async def hemis_schedule_filters(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
+):
+    """Filtr variantlari — jadvalning o'zidan, bizning spravochniklarsiz."""
+    return await hemis_schedule_repository.filters(session)
+
+
+@hemis_router.get("/schedule/my", response_model=MyScheduleResponse)
+async def my_hemis_schedule(
+    data: MyScheduleRequest = Depends(),
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(PermissionRequired("user:me")),
+):
+    """O'z jadvali login bo'yicha: o'qituvchi — `employee_id_number`,
+    talaba — `hemis_student_groups` orqali guruhi. Sukut bo'yicha joriy hafta."""
+    return await hemis_schedule_repository.my(session, current_user, data)
 
 
 # ============================================================================

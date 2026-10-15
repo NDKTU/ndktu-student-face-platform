@@ -32,7 +32,8 @@ import secrets
 from datetime import date, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
@@ -42,6 +43,7 @@ from app.modules.organization_structure.model import Faculty, Group
 
 from . import data_credentials
 from .data_client import HemisDataClient
+from .model import HemisStudentGroup
 from .schemas import StudentSyncApplyRequest, StudentSyncApplyResponse, StudentSyncPreviewResponse
 
 logger = logging.getLogger(__name__)
@@ -356,6 +358,47 @@ class HemisStudentSync:
                 insert(UserRole), [{"user_id": uid, "role_id": role_id} for uid in missing]
             )
 
+    async def _save_student_groups(self, session: AsyncSession, items: list[dict]) -> int:
+        """Номер студента → группа HEMIS в `hemis_student_groups`.
+
+        По ней студент находит своё расписание (`schedule_repository.py`).
+        Пишется для **всех** из выдачи, включая тех, кого импорт пропускает
+        из-за непривязанной группы: таблица изолирована от `groups`, и
+        расписание таким студентам всё равно положено.
+        """
+        now = utcnow_naive()
+        rows: dict[str, dict] = {}
+        for item in items:
+            sid = (item.get("student_id_number") or "").strip()
+            group = item.get("group") or {}
+            try:
+                group_hemis_id = int(group.get("id"))
+            except (TypeError, ValueError):
+                continue
+            if sid:
+                rows[sid] = {
+                    "student_id_number": sid[:64],
+                    "group_hemis_id": group_hemis_id,
+                    "group_name": (group.get("name") or "")[:255],
+                    "synced_at": now,
+                }
+
+        batch = list(rows.values())
+        for start in range(0, len(batch), CHUNK):
+            stmt = pg_insert(HemisStudentGroup).values(batch[start : start + CHUNK])
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["student_id_number"],
+                set_={
+                    "group_hemis_id": stmt.excluded.group_hemis_id,
+                    "group_name": stmt.excluded.group_name,
+                    "synced_at": stmt.excluded.synced_at,
+                    "updated_at": func.now(),
+                },
+            )
+            await session.execute(stmt)
+        await session.commit()
+        return len(batch)
+
     async def apply(
         self, session: AsyncSession, data: StudentSyncApplyRequest
     ) -> StudentSyncApplyResponse:
@@ -380,6 +423,7 @@ class HemisStudentSync:
             updated_at_from=int(since.timestamp()) if since else None
         )
         await data_credentials.mark_ok(session)
+        await self._save_student_groups(session, items)
 
         plan = await self._classify(session, items, incremental=since is not None)
         group_map = plan["group_map"]

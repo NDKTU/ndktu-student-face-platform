@@ -1,6 +1,7 @@
+from datetime import date, time
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import TashkentDatetime
 
@@ -187,3 +188,116 @@ class StudentSyncApplyResponse(BaseModel):
     excluded: int = 0
     no_group: int = 0
     missing_locally: int = 0
+
+
+# ── Jadval (schedule-list) ────────────────────────────────────────────────────
+
+
+class ScheduleSyncRequest(BaseModel):
+    #: HEMIS o'quv yili kodi ("2025"). Bo'sh — joriy yil, HEMIS o'zi tanlaydi.
+    education_year: Optional[str] = Field(default=None, pattern=r"^\d{4}$")
+    #: 10% dan ko'p darsni nofaol qilishga ruxsat. HEMIS uzilishda xato emas,
+    #: qisqa ro'yxat bilan 200 qaytaradi — shuning uchun ongli tasdiq kerak.
+    allow_bulk_deactivate: bool = False
+
+
+class ScheduleSyncResponse(BaseModel):
+    education_years: List[str] = []
+    #: HEMIS qaytargan qatorlar (takrorlar bilan).
+    fetched: int = 0
+    #: Noyob darslar — bazaga yozilganlar.
+    saved: int = 0
+    #: Oxirgi sahifadagi `totalCount`.
+    hemis_total: int = 0
+    deactivated: int = 0
+    #: `employee-list` da topilmagan o'qituvchili darslar — saqlangan, lekin
+    #: hech kimning "mening jadvalim"ida ko'rinmaydi.
+    without_employee_number: int = 0
+    #: To'liq o'tildimi. Yo'q bo'lsa, nofaol qilish o'tkazib yuborilgan.
+    complete: bool = False
+    #: Nima uchun nofaol qilish bajarilmagani (bo'lsa).
+    deactivation_skipped: Optional[str] = None
+
+
+class ScheduleLessonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    hemis_id: int
+    education_year: str
+    education_year_name: str
+    semester_code: str
+    semester_name: str
+    group_hemis_id: Optional[int] = None
+    group_name: str
+    education_lang: str
+    subject_hemis_id: Optional[int] = None
+    subject_code: str
+    subject_name: str
+    faculty_hemis_id: Optional[int] = None
+    faculty_name: str
+    department_hemis_id: Optional[int] = None
+    department_name: str
+    auditorium_code: Optional[int] = None
+    auditorium_name: str
+    auditorium_type: str
+    building_name: str
+    training_type_code: str
+    training_type: str
+    lesson_pair: str
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    employee_hemis_id: Optional[int] = None
+    employee_id_number: Optional[str] = None
+    employee_name: str
+    lesson_date: date
+    is_active: bool
+
+
+class ScheduleListRequest(BaseModel):
+    group_hemis_id: Optional[int] = None
+    employee_id_number: Optional[str] = None
+    subject_hemis_id: Optional[int] = None
+    education_year: Optional[str] = None
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    include_inactive: bool = False
+
+    page: int = Field(default=1, ge=1)
+    limit: int = Field(default=50, ge=1, le=500)
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.limit
+
+
+class ScheduleListResponse(BaseModel):
+    items: List[ScheduleLessonOut]
+    total: int
+    page: int
+    limit: int
+
+
+class ScheduleFilterOption(BaseModel):
+    value: str
+    label: str
+
+
+class ScheduleFiltersResponse(BaseModel):
+    education_years: List[ScheduleFilterOption] = []
+    groups: List[ScheduleFilterOption] = []
+    employees: List[ScheduleFilterOption] = []
+    subjects: List[ScheduleFilterOption] = []
+
+
+class MyScheduleRequest(BaseModel):
+    #: Bo'sh bo'lsa — joriy hafta (dushanbadan yakshanbagacha).
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+
+
+class MyScheduleResponse(BaseModel):
+    #: Kim sifatida qidirildi. `None` — o'qituvchi ham, talaba ham emas.
+    as_role: Optional[Literal["teacher", "student"]] = None
+    date_from: date
+    date_to: date
+    items: List[ScheduleLessonOut] = []

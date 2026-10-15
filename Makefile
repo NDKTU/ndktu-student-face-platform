@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply cleanup-files cleanup-files-apply cleanup-files-cron audit-cleanup audit-cleanup-apply audit-cleanup-cron link-answers link-answers-apply restore-dates restore-dates-apply
+.PHONY: help up down restart logs frontend-logs backend-logs face-logs monitoring-logs backup backup-database backup-logs backup-images restore merge deploy eduplan-sync eduplan-workloads eduplan-cron hemis-students hemis-schedule hemis-cron fix-image-urls fix-image-urls-apply import-files import-files-apply cleanup-files cleanup-files-apply cleanup-files-cron audit-cleanup audit-cleanup-apply audit-cleanup-cron link-answers link-answers-apply restore-dates restore-dates-apply
 
 .DEFAULT_GOAL := help
 
@@ -49,7 +49,8 @@ help:
 	@echo "make eduplan-workloads - Sync only teacher workloads"
 	@echo "make eduplan-cron      - Print the crontab line for a nightly 00:00 run"
 	@echo "make hemis-students    - Import students from HEMIS (incremental; ARGS=--full for all)"
-	@echo "make hemis-cron        - Print the crontab lines for HEMIS student import"
+	@echo "make hemis-schedule    - Sync lesson schedule from HEMIS (current year; ARGS='--year 2025' for history)"
+	@echo "make hemis-cron        - Print the crontab lines for HEMIS student import and schedule"
 	@echo ""
 
 # Start development services (localhost, no nginx)
@@ -139,12 +140,18 @@ eduplan-cron-fast:
 hemis-students:
 	@./scripts/hemis_student_sync.sh $(ARGS)
 
-# Print the crontab lines for HEMIS student import
+# Sync the lesson schedule from HEMIS. Current academic year by default.
+hemis-schedule:
+	@./scripts/hemis_schedule_sync.sh $(ARGS)
+
+# Print the crontab lines for HEMIS student import and schedule
 hemis-cron:
 	@echo "# HEMIS students — incremental every night at 01:00"
 	@echo "0 1 * * * $(CURDIR)/scripts/hemis_student_sync.sh >> /dev/null 2>&1"
 	@echo "# full walk once a week, Sunday 02:00 — picks up rows HEMIS didn't mark as changed"
 	@echo "0 2 * * 0 $(CURDIR)/scripts/hemis_student_sync.sh --full >> /dev/null 2>&1"
+	@echo "# HEMIS schedule — current academic year every night at 03:00 (~4.5 min)"
+	@echo "0 3 * * * $(CURDIR)/scripts/hemis_schedule_sync.sh >> /dev/null 2>&1"
 
 # Run database migrations
 migrate:

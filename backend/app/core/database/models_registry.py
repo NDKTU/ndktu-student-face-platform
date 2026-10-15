@@ -11,6 +11,8 @@ __all__ = [
     "AppSetting",
     "AnnouncementRegistration",
     "HemisDataCredential",
+    "HemisScheduleLesson",
+    "HemisStudentGroup",
     "User",
     "Role",
     "UserRole",
@@ -85,6 +87,8 @@ from app.modules.auth.model import (
 )
 from app.modules.auth.hemis.model import (
     HemisDataCredential,
+    HemisScheduleLesson,
+    HemisStudentGroup,
 )
 from app.modules.course.model import (
     Course,

@@ -8,6 +8,7 @@
 """
 
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -63,21 +64,31 @@ class HemisDataClient:
         self._headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
         self._timeout = timeout
 
+    def endpoint(self, name: str) -> str:
+        """Соседний адрес того же API: `.../data/student-list` → `.../data/<name>`.
+
+        Отдельной настройки под каждый справочник нет — все они живут рядом
+        со списком студентов и ходят по тому же токену.
+        """
+        return f"{self._url.rsplit('/', 1)[0]}/{name}"
+
     async def _get(
         self,
         client: httpx.AsyncClient,
         page: int,
         limit: int,
         updated_at_from: int | None = None,
+        url: str | None = None,
+        extra: dict | None = None,
     ) -> tuple[list[dict], dict]:
-        params: dict[str, int] = {"page": page, "limit": limit}
+        params: dict = {**(extra or {}), "page": page, "limit": limit}
         if updated_at_from:
             # Инкрементальный прогон: HEMIS отдаёт только изменившихся с этого
             # момента. 49 страниц каждую ночь ради десятка правок не нужны.
             params["updated_at_from"] = updated_at_from
         try:
             resp = await client.get(
-                self._url,
+                url or self._url,
                 params=params,
                 headers=self._headers,
             )
@@ -139,3 +150,35 @@ class HemisDataClient:
 
         logger.info("HEMIS: %s ta talaba olindi", len(collected))
         return collected
+
+    async def iter_pages(
+        self,
+        name: str,
+        params: dict | None = None,
+        limit: int = PAGE_SIZE,
+        max_pages: int = MAX_PAGES,
+    ) -> AsyncIterator[tuple[list[dict], dict]]:
+        """Постраничный обход справочника `name` (`schedule-list`, `employee-list`…).
+
+        Отдаёт страницы по одной, а не весь список: расписание за прошлый год —
+        это 146 тысяч строк, и держать их разом в памяти незачем. Вместе со
+        страницей идёт её `pagination` — по `totalCount` последней из них
+        вызывающий проверяет, не сдвинулась ли выдача во время обхода.
+        """
+        url = self.endpoint(name)
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            items, pagination = await self._get(client, page=1, limit=limit, url=url, extra=params)
+            page_count = int(pagination.get("pageCount") or 1)
+            if page_count > max_pages:
+                raise HemisDataError(
+                    f"HEMIS {name}: {page_count} sahifa qaytardi — bu kutilganidan ko'p, prognoz to'xtatildi"
+                )
+            yield items, pagination
+
+            for page in range(2, page_count + 1):
+                items, pagination = await self._get(
+                    client, page=page, limit=limit, url=url, extra=params
+                )
+                if not items:
+                    break
+                yield items, pagination
