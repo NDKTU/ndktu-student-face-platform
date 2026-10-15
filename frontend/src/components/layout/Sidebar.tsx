@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { buildSidebar, type IconTone, type SidebarItem, type SidebarSection } from '@/constants/resources';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
+import { roleKey } from '@/utils/roles';
 
 /**
  * Ikonka rangi mavzudagi `--stat-*` tokenidan olinadi — to'q rejimda
@@ -106,7 +107,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }: SidebarProps) => {
 
     const allSections = useMemo(() => {
         // Ko'rinish tanlangan bo'lsa — faqat o'sha rol, aks holda barchasi.
-        const roleNames = (activeRole ? [activeRole] : (user?.roles ?? [])).map((r) => r.name);
+        // Kalitlar (`roleKey`): tizim roli qayta nomlansa ham menyu adashmasin.
+        const roleNames = (activeRole ? [activeRole] : (user?.roles ?? [])).map(roleKey);
         return buildSidebar(permissions, roleNames);
     }, [user, permissions, activeRole]);
 

@@ -13,13 +13,20 @@ import pytest
 from fastapi import HTTPException
 
 from app.core.utils.proctoring import resolve_no_face_finish, validate_no_face_seconds
+from app.core.utils.roles import SYSTEM_ROLE_CODES
 from app.test.test_general_test_access import scene  # noqa: F401 — fixture
 from app.test.test_general_test_proctoring import _prepare
 from app.test.test_student_dashboard import _login
 
 
 def _user(*role_names: str):
-    return SimpleNamespace(roles=[SimpleNamespace(id=10_000 + i, name=n) for i, n in enumerate(role_names)])
+    # `code` — haqiqiy `Role` dagidek: tizim rollarida nomdan, qolganida yo'q.
+    return SimpleNamespace(
+        roles=[
+            SimpleNamespace(id=10_000 + i, name=n, code=n.lower() if n.lower() in SYSTEM_ROLE_CODES else None)
+            for i, n in enumerate(role_names)
+        ]
+    )
 
 
 def test_seconds_bounds():

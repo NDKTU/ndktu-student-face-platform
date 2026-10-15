@@ -39,6 +39,7 @@ from .schemas import (
     SubmissionSubmitRequest,
     SubmissionUserInfo,
 )
+from app.core.utils.roles import user_is_admin, user_is_student
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +104,10 @@ class HomeworkRepository:
         )
 
     async def _is_admin(self, user: User) -> bool:
-        return any(r.name.lower() == "admin" for r in (user.roles or []))
+        return user_is_admin(user)
 
     async def _is_student(self, user: User) -> bool:
-        return any(r.name.lower() == "student" for r in (user.roles or []))
+        return user_is_student(user)
 
     async def _check_course_owner(self, session: AsyncSession, course_id: int, user: User) -> Course:
         stmt = select(Course).where(Course.id == course_id)

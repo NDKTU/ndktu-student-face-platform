@@ -19,6 +19,7 @@ import type { TestResultResponse, TestResultUserInfo } from '@/services/psycholo
 import { DiagnosisCard } from '@/components/psychology/DiagnosisCard';
 import { AnswerRow } from '@/components/psychology/AnswerRow';
 import { formatDateTime } from '@/utils/date';
+import { roleKey } from '@/utils/roles';
 
 /** 1..5 — bazadagi haqiqiy kurslar (`groups.course`). */
 const COURSES = [1, 2, 3, 4, 5];
@@ -134,7 +135,7 @@ export default function PsychologyResultsPage() {
     // Talaba ko'rinishi: bekend faqat o'z natijalarini beradi, tashkiliy
     // filtrlar va kim topshirgani esa unga kerak emas (filtr variantlari
     // talabaga yopiq ham).
-    const isStudentView = activeRole?.name.toLowerCase() === 'student';
+    const isStudentView = (activeRole ? roleKey(activeRole) : '') === 'student';
     const canDelete = !isStudentView && hasPermission('delete:psychology_results');
 
     const { data: methodsData } = useMethods(1, 100);

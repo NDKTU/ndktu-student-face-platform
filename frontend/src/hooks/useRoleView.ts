@@ -1,4 +1,5 @@
 import { useAuth } from '@/context/AuthContext';
+import { roleKey } from '@/utils/roles';
 
 /**
  * Ko'rinishni hal qiluvchi rollar.
@@ -13,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 export const useRoleView = () => {
     const { user, activeRole } = useAuth();
     const scope = activeRole ? [activeRole] : (user?.roles ?? []);
-    const has = (name: string) => scope.some((role) => role.name.toLowerCase() === name);
+    const has = (name: string) => scope.some((role) => roleKey(role) === name);
 
     const isAdmin = has('admin');
     return {

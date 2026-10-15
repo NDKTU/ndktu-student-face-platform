@@ -10,6 +10,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from app.modules.auth.model import Permission, RolePermission, User
 from app.modules.auth.user.service import auth_service
+from app.core.utils.roles import role_keys, user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ async def get_active_role_id(x_active_role: str | None = Header(default=None)) -
 def apply_active_role(user: User, active_role_id: int | None) -> None:
     """`user.roles` ni faol rolga toraytiradi — shu so'rov davomida.
 
-    Shundan keyin kod bazasidagi barcha `role.name == "admin"` tekshiruvlari
+    Shundan keyin kod bazasidagi barcha `user_is_admin` / `role_keys` tekshiruvlari
     faol ko'rinishga qarab ishlaydi. Foydalanuvchida bo'lmagan rol e'tiborga
     olinmaydi: sarlavha huquqni faqat toraytira oladi, kengaytira olmaydi.
 
@@ -84,7 +85,7 @@ class PermissionRequired:
         apply_active_role(user, active_role_id)
 
         # Проверяем, является ли пользователь админом
-        is_admin = any(role.name == "Admin" for role in user.roles)
+        is_admin = user_is_admin(user)
 
         if is_admin:
             return user  # Админ имеет доступ ко всему
@@ -120,7 +121,7 @@ async def user_has_permission(session: AsyncSession, user: User, permission_name
     исключение. Здесь право нужно как ветвление — например, «есть read:student
     → отдаём всех студентов, нет → только свою группу».
     """
-    if any(role.name.lower() == "admin" for role in user.roles):
+    if user_is_admin(user):
         return True
     return await _roles_have_permission(session, user, permission_name)
 
@@ -168,7 +169,7 @@ class AdminRequired:
 
         apply_active_role(user, active_role_id)
 
-        if not any(role.name.lower() == "admin" for role in user.roles):
+        if not user_is_admin(user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: administrator role required",
@@ -208,7 +209,7 @@ class PermissionRequiredExceptRole(PermissionRequired):
     ) -> User:
         user = await super().__call__(user_id=user_id, session=session, active_role_id=active_role_id)
 
-        role_names = {role.name.lower() for role in (user.roles or [])}
+        role_names = role_keys(user)
         if self.BLOCKED_ROLE in role_names and not (role_names & self.EXEMPT_ROLES):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

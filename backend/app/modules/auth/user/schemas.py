@@ -6,6 +6,9 @@ from app.core.schemas import TashkentDatetime
 class RoleResponse(BaseModel):
     id: int
     name: str
+    #: Tizim roli kaliti (`admin`/`teacher`/`student`) yoki `None`.
+    #: Frontend rolni shundan taniydi — nom interfeysdan o'zgaradi.
+    code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,6 +23,7 @@ class PermissionInfo(BaseModel):
 class RoleWithPermissionsResponse(BaseModel):
     id: int
     name: str
+    code: str | None = None
     permissions: list[PermissionInfo] = []
 
     model_config = ConfigDict(from_attributes=True)

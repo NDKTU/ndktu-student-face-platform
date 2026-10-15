@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from core.utils.permission_registry import declare_permission
 from fastapi import HTTPException, status
+from app.core.utils.roles import user_is_admin
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,7 +61,7 @@ async def resolve_no_face_finish(
     target = requested or None
     if target == current:
         return current
-    is_admin = user is not None and any(role.name.lower() == "admin" for role in user.roles)
+    is_admin = user is not None and user_is_admin(user)
     # Kech import: bu modulni sxemalar ham import qiladi (validator), ular esa
     # `role_checker` va modellarni tortib kelmasligi kerak.
     from core.dependencies.role_checker import _roles_have_permission

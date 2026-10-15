@@ -15,6 +15,7 @@ from app.modules.organization_structure.model import Group, Kafedra
 from app.modules.quiz.model import Subject
 
 from .schemas import AssignmentListRequest, AssignmentListResponse, AssignmentRow
+from app.core.utils.roles import user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,7 @@ class TeacherAssignmentRepository:
         Oʻqituvchi faqat oʻzinikini koʻradi: birovning yuklamasi unga kerak
         emas. Admin hammasini koʻradi.
         """
-        roles = {role.name.lower() for role in (current_user.roles or [])}
-        is_admin = "admin" in roles
+        is_admin = user_is_admin(current_user)
 
         stmt = self._apply_filters(self._base_query(), request)
         count_stmt = self._apply_filters(

@@ -21,13 +21,14 @@ from .schemas import (
     LessonListResponse,
     LessonUpdateRequest,
 )
+from app.core.utils.roles import user_has_role
 
 logger = logging.getLogger(__name__)
 
 
 class LessonRepository:
     async def _is_role(self, user: User, role_name: str) -> bool:
-        return any(r.name.lower() == role_name for r in user.roles)
+        return user_has_role(user, role_name)
 
     async def _resolve_course_context(
         self,

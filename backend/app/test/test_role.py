@@ -79,8 +79,14 @@ async def test_update_role_name_not_found(auth_client):
 
 @pytest.mark.asyncio
 async def test_delete_role(auth_client):
-    responnse = await auth_client.delete("/role/1")
+    # Interfeysda yaratilgan rol o'chadi. `/role/1` — Admin, tizim roli:
+    # uni o'chirish endi taqiqlangan (`test_system_roles.py`).
+    created = await auth_client.post("/role/", json={"name": "Vaqtinchalik rol"})
+    assert created.status_code == 201, created.text
+    responnse = await auth_client.delete(f"/role/{created.json()['id']}")
     assert responnse.status_code == 204
+
+    assert (await auth_client.delete("/role/1")).status_code == 400
 
 
 @pytest.mark.asyncio

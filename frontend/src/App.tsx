@@ -16,6 +16,7 @@ import {
     STUDENT_ELEMENTAR_TAKE,
     studentElementarAttempt,
 } from '@/components/generalTest/studentPaths';
+import { roleKey } from '@/utils/roles';
 
 // Code splitting: каждая страница — отдельный чанк, тяжёлые зависимости
 // (jodit, xlsx, recharts) не попадают в начальный бандл.
@@ -319,9 +320,9 @@ const DashboardRedirect = () => {
     const { user, activeRole } = useAuth();
     // Bir nechta roli borlar uchun tanlangan ko'rinish hal qiladi.
     const scope = activeRole ? [activeRole] : (user?.roles ?? []);
-    const isStudent = scope.some(role => role.name.toLowerCase() === 'student');
-    const isTeacher = scope.some(role => role.name.toLowerCase() === 'teacher');
-    const isPsixologik = scope.some(role => role.name.toLowerCase() === 'psixologik');
+    const isStudent = scope.some(role => roleKey(role) === 'student');
+    const isTeacher = scope.some(role => roleKey(role) === 'teacher');
+    const isPsixologik = scope.some(role => roleKey(role) === 'psixologik');
 
     if (isPsixologik) {
         return <Navigate to="/psychology" replace />;

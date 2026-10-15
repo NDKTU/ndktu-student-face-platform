@@ -43,6 +43,7 @@ from app.modules.file.storage import (
     store_upload,
     stored_path_from_url,
 )
+from app.core.utils.roles import role_keys, user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +67,12 @@ def _plain_text(raw: str | None, limit: int = 80) -> str | None:
 
 
 def _is_admin(user: User) -> bool:
-    return any(role.name == "Admin" for role in user.roles)
+    return user_is_admin(user)
 
 
 def _is_teacher_only(user: User) -> bool:
     """Oʻqituvchi roli bor, admin emas — kutubxonadan tanlash qoidasi shunga."""
-    names = {role.name.lower() for role in (user.roles or [])}
+    names = role_keys(user)
     return "teacher" in names and "admin" not in names
 
 

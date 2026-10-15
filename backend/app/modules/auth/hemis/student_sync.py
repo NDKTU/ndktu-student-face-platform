@@ -45,6 +45,7 @@ from . import data_credentials
 from .data_client import HemisDataClient
 from .model import HemisStudentGroup
 from .schemas import StudentSyncApplyRequest, StudentSyncApplyResponse, StudentSyncPreviewResponse
+from app.core.utils.roles import ROLE_STUDENT
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +267,7 @@ class HemisStudentSync:
     async def _student_role_id(self, session: AsyncSession) -> int:
         """id роли `student`; заводим, если её ещё нет."""
         role_id = (
-            await session.execute(select(Role.id).where(Role.name == "student"))
+            await session.execute(select(Role.id).where(Role.code == ROLE_STUDENT))
         ).scalar_one_or_none()
         if role_id is None:
             role = Role(name="student")

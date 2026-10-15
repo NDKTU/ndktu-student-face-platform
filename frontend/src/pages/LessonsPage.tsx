@@ -19,12 +19,13 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Plus, Pencil, Trash2, Loader2, BookOpen, ChevronRight } from 'lucide-react';
 import type { Lesson, LessonCreateRequest, LessonUpdateRequest } from '@/services/lessonService';
+import { roleKey } from '@/utils/roles';
 
 export default function LessonsPage() {
     const navigate = useNavigate();
     const { user, hasPermission } = useAuth();
-    const isAdmin = user?.roles?.some(r => r.name.toLowerCase() === 'admin');
-    const isTeacher = user?.roles?.some(r => r.name.toLowerCase() === 'teacher');
+    const isAdmin = user?.roles?.some(r => roleKey(r) === 'admin');
+    const isTeacher = user?.roles?.some(r => roleKey(r) === 'teacher');
 
     const [page, setPage] = useState(1);
     const [filterGroupId, setFilterGroupId] = useState<string>('');

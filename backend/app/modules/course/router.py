@@ -77,6 +77,7 @@ from .resource.schemas import (
     ResourceResponse,
     ResourceUpdateRequest,
 )
+from app.core.utils.roles import user_is_admin
 
 if TYPE_CHECKING:
     from app.modules.auth.model import User
@@ -85,7 +86,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_admin(user: "User") -> bool:
-    return any(r.name.lower() == "admin" for r in (user.roles or []))
+    return user_is_admin(user)
 
 
 # ============================================================================

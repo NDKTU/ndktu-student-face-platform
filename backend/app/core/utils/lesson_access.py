@@ -16,11 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Teacher, TeacherSubject, User
+from app.core.utils.roles import user_is_admin
 from app.modules.course.model import Course, CourseTeacher, Lesson
 
 
 def is_admin(user: User) -> bool:
-    return any(role.name.lower() == "admin" for role in user.roles)
+    return user_is_admin(user)
 
 
 async def is_lesson_teacher(session: AsyncSession, lesson: Lesson, user: User) -> bool:

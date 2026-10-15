@@ -90,6 +90,7 @@ from .schemas import (
     UserFilter,
     UserListRequest,
 )
+from app.core.utils.roles import user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +295,7 @@ class GeneralTestRepository:
 
     @staticmethod
     def _is_admin(user: User) -> bool:
-        return any(role.name.lower() == "admin" for role in user.roles)
+        return user_is_admin(user)
 
     @staticmethod
     async def _sees_all(session: AsyncSession, user: User) -> bool:

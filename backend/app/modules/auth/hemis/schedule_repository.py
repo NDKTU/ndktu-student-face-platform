@@ -34,6 +34,7 @@ from .schemas import (
     ScheduleListRequest,
     ScheduleListResponse,
 )
+from app.core.utils.roles import role_keys
 
 #: Сколько дней можно запросить в «моём расписании» за раз — семестр с
 #: запасом. Без предела один запрос вытаскивал бы весь год.
@@ -190,7 +191,7 @@ class HemisScheduleRepository:
         login = (user.username or "").strip()
         # `user.roles` уже сужены до активной роли (`apply_active_role`):
         # переключившийся на «студента» админ увидит студенческое.
-        roles = {(role.name or "").lower() for role in user.roles}
+        roles = role_keys(user)
 
         conditions = None
         as_role = None

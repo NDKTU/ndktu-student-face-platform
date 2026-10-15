@@ -96,6 +96,7 @@ from .teacher.schemas import (
     TeacherSubjectAssignRequest,
 #    TeacherUpdateRequest,
 )
+from app.core.utils.roles import user_is_admin
 from .user.repository import get_user_repository
 from .user.schemas import (
     UserChangeCredentialsRequest,
@@ -673,7 +674,6 @@ async def get_my_teacher_dashboard(
     return await build_teacher_dashboard(session=session, user=current_user)
 
 
-@teacher_router.get("/{teacher_id}/students", response_model=TeacherStudentListResponse)
 @teacher_router.get("/options", response_model=list[TeacherOption])
 async def list_teacher_options(
     full_name: str | None = None,
@@ -688,6 +688,7 @@ async def list_teacher_options(
     return await get_teacher_repository.list_teacher_options(session=session, full_name=full_name)
 
 
+@teacher_router.get("/{teacher_id}/students", response_model=TeacherStudentListResponse)
 async def list_teacher_students(
     teacher_id: int,
     data: TeacherStudentListRequest = Depends(),
@@ -795,7 +796,7 @@ async def get_teacher_assigned_subjects(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("user:me")),
 ):
-    is_admin = any(r.name.lower() == "admin" for r in current_user.roles)
+    is_admin = user_is_admin(current_user)
     if not is_admin and user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await get_teacher_repository.get_assigned_subjects_by_user(session=session, user_id=user_id)
@@ -807,7 +808,7 @@ async def get_teacher_assigned_groups(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(PermissionRequired("user:me")),
 ):
-    is_admin = any(r.name.lower() == "admin" for r in current_user.roles)
+    is_admin = user_is_admin(current_user)
     if not is_admin and user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return await get_teacher_repository.get_assigned_groups_by_user(session=session, user_id=user_id)

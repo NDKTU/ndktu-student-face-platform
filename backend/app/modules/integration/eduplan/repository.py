@@ -32,6 +32,7 @@ from app.modules.organization_structure.model import (
 )
 from app.modules.course.model import Course
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, Subject
+from app.core.utils.roles import user_has_role
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +253,7 @@ class EduPlanRepository:
         return f"{base}_{secrets.token_hex(4)}"
 
     async def _ensure_role(self, session: AsyncSession, user: User, role_name: str) -> None:
-        if any(r.name.lower() == role_name for r in user.roles):
+        if user_has_role(user, role_name):
             return
         # Роль заводим, если её ещё нет: на свежей базе строки `roles` может
         # не быть вовсе, и раньше прогон молча оставлял преподавателя вообще

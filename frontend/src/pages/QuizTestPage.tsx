@@ -51,6 +51,7 @@ import { sanitizeHtml } from '@/utils/sanitize';
 import { apiErrorMessage } from '@/utils/apiError';
 import { noCopyHandlers } from '@/utils/antiCopy';
 import { useKeepSessionAlive } from '@/hooks/useKeepSessionAlive';
+import { roleKey } from '@/utils/roles';
 
 type QuizPhase = 'start' | 'quiz' | 'results';
 
@@ -125,7 +126,7 @@ const QuizTestPage = () => {
         setPhase('results');
     }, [quizData]);
 
-    const isAdmin = user?.roles?.some(role => role.name.toLowerCase() === 'admin');
+    const isAdmin = user?.roles?.some(role => roleKey(role) === 'admin');
 
     const startQuizMutation = useStartQuiz();
     const verifyFaceMutation = useVerifyEntryFace();

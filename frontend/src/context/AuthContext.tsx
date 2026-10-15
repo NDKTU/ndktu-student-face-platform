@@ -5,6 +5,7 @@ import { userService } from '@/services/userService';
 import { getToken, setToken, clearToken } from '@/services/tokenStorage';
 import { logger } from '@/utils/logger';
 import type { User, UserRole } from '@/types/auth';
+import { roleKey } from '@/utils/roles';
 
 /** Tanlangan ko'rinish foydalanuvchiga bog'lab saqlanadi: bitta brauzerda
  *  boshqa hisobga kirilganda oldingi tanlov qo'llanib qolmasligi kerak. */
@@ -150,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const availableRoles = useMemo<UserRole[]>(() => {
         const order = ['admin', 'teacher', 'student'];
         const rank = (role: UserRole) => {
-            const index = order.indexOf(role.name.toLowerCase());
+            const index = order.indexOf(roleKey(role));
             return index === -1 ? order.length : index;
         };
         return [...(user?.roles ?? [])].sort(

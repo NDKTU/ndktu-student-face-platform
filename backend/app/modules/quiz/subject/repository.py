@@ -17,6 +17,7 @@ from .schemas import (
     SubjectListRequest,
     SubjectListResponse,
 )
+from app.core.utils.roles import user_is_admin, user_is_teacher
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,8 @@ class SubjectRepository:
         # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
         # stmt = apply_visibility(stmt, Subject, current_user, request.include_hidden)
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
+        is_teacher = user_is_teacher(current_user)
         teacher_filter = None
 
         if is_admin:

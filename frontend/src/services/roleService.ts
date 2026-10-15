@@ -34,6 +34,8 @@ export const dataScopeLabel = (scope?: DataScope) =>
 export interface Role {
     id: number;
     name: string;
+    /** Tizim roli kaliti (`admin`/`teacher`/`student`), boshqalarida `null`. */
+    code?: string | null;
     data_scope?: DataScope;
     created_at?: string;
     updated_at?: string;

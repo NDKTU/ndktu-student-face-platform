@@ -112,10 +112,35 @@ def _default_data_scope(context) -> str:
     return _SYSTEM_ROLE_SCOPES.get(name, "own")
 
 
+# `core/utils/roles.py::SYSTEM_ROLE_CODES` bilan bir xil — u yerdan import
+# qilib bo'lmaydi (sikl emas, lekin model yengil qolsin).
+_SYSTEM_ROLE_CODES = frozenset({"admin", "teacher", "student"})
+
+
+def _default_role_code(context) -> str | None:
+    """Kod berilmagan bo'lsa — nomdan, faqat tizim rollari uchun.
+
+    Seed, sinxronizatsiya va testlar rolni nom bilan yaratadi. Interfeysdagi
+    `create_role` esa `code=None` ni aniq beradi: admin «Student» degan yangi
+    rol ochsa, u tizim roli bo'lib qolmasligi kerak.
+    """
+    name = (context.get_current_parameters().get("name") or "").strip().lower()
+    return name if name in _SYSTEM_ROLE_CODES else None
+
+
 class Role(Base, IdIntPk, TimestampMixin):
     __tablename__ = "roles"
+    __table_args__ = (
+        Index("uq_roles_code", "code", unique=True, postgresql_where=text("code IS NOT NULL")),
+    )
 
     name: Mapped[str] = mapped_column(String(50), unique=True)
+
+    #: Tizim rolining o'zgarmas kaliti: `admin` | `teacher` | `student`
+    #: (`core/utils/roles.py`). Kod rolni shundan taniydi, nomidan emas —
+    #: nomni admin interfeysdan o'zgartira oladi. Interfeysda yaratilgan
+    #: rollarda bo'sh.
+    code: Mapped[str | None] = mapped_column(String(20), nullable=True, default=_default_role_code)
 
     # Rol qaysi ma'lumotni ko'radi: `core/utils/data_scope.py::DATA_SCOPES`.
     # Ruxsatlar «nima qilish mumkin»ni, bu esa «kimning ma'lumotini»

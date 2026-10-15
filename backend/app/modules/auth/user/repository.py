@@ -34,6 +34,7 @@ from .schemas import (
     UserRoleAssignRequest,
     UserUpdateRequest,
 )
+from app.core.utils.roles import SYSTEM_ROLE_CODES
 
 logger = logging.getLogger(__name__)
 
@@ -460,7 +461,15 @@ class UserRepository:
         `user.roles`.
         """
         normalized_name = role_name.strip().lower()
-        role_stmt = select(Role).where(func.lower(Role.name) == normalized_name).options(selectinload(Role.permissions))
+        # Tizim roli kodidan topiladi: admin uni interfeysda qayta nomlagan
+        # bo'lsa ham («teacher» → «O'qituvchi»), sinxronizatsiya yangi
+        # «teacher» rolini yaratib qo'ymasin.
+        condition = (
+            Role.code == normalized_name
+            if normalized_name in SYSTEM_ROLE_CODES
+            else func.lower(Role.name) == normalized_name
+        )
+        role_stmt = select(Role).where(condition).options(selectinload(Role.permissions))
         role = (await session.execute(role_stmt)).scalar_one_or_none()
         if role:
             return role

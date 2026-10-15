@@ -8,6 +8,7 @@ from app.modules.auth.model import User
 from app.modules.quiz.model import Result, UserAnswers
 
 from .schemas import UserAnswersListRequest, UserAnswersListResponse
+from app.core.utils.roles import role_keys
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class UserAnswersRepository:
         """
         if current_user is None:
             return False
-        roles = {role.name.lower() for role in current_user.roles}
+        roles = role_keys(current_user)
         return "student" in roles and not roles & {"admin", "teacher"}
 
     async def get_all(

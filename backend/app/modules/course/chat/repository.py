@@ -10,7 +10,7 @@ O'chirish: muallif o'z xabarini, kurs o'qituvchilari va admin — istalganini
 """
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.course_access import can_manage
@@ -24,6 +24,7 @@ from .schemas import (
     CourseMessageListResponse,
     CourseMessageResponse,
 )
+from app.core.utils.roles import ROLE_ADMIN
 
 DELETED_AUTHOR = "O'chirilgan foydalanuvchi"
 
@@ -70,7 +71,7 @@ class CourseChatRepository:
                     await session.execute(
                         select(UserRole.user_id)
                         .join(Role, Role.id == UserRole.role_id)
-                        .where(UserRole.user_id.in_(user_ids), func.lower(Role.name) == "admin")
+                        .where(UserRole.user_id.in_(user_ids), Role.code == ROLE_ADMIN)
                     )
                 ).scalars()
             )

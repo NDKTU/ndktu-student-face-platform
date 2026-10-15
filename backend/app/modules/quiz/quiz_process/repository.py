@@ -38,6 +38,7 @@ from .schemas import (
     VerifyEntryFaceRequest,
     VerifyEntryFaceResponse,
 )
+from app.core.utils.roles import user_is_admin
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +297,7 @@ class QuizProcessRepository:
         result_student = await session.execute(stmt_student)
         student = result_student.scalar_one_or_none()
 
-        is_admin = any(role.name.lower() == "admin" for role in user.roles)
+        is_admin = user_is_admin(user)
 
         if student:
             # Mandate student image for quiz (Admins take it anyway)

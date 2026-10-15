@@ -19,6 +19,7 @@ import { PermissionGate } from '@/components/auth/PermissionGate';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { formatDate } from '@/utils/date';
+import { roleKey } from '@/utils/roles';
 
 const roleSchema = z.object({
     name: z.string().min(1, 'Rol nomi kiritilishi shart'),
@@ -101,7 +102,7 @@ const RolesPage = () => {
         }
     };
 
-    const visibleRoles = roles.filter((r) => r.name.toLowerCase() !== 'admin');
+    const visibleRoles = roles.filter((r) => roleKey(r) !== 'admin');
 
     const renderPermissions = (role: Role) => (
         <div className="flex flex-wrap gap-1 max-w-[300px] items-center">
@@ -132,11 +133,14 @@ const RolesPage = () => {
                     <Pencil className="h-4 w-4" />
                 </Button>
             </PermissionGate>
-            <PermissionGate permission="delete:role">
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(role); }}>
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </PermissionGate>
+            {/* Tizim rolini (teacher, student) bekend o'chirtirmaydi — tugma ham yo'q. */}
+            {!role.code && (
+                <PermissionGate permission="delete:role">
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(role); }}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </PermissionGate>
+            )}
         </div>
     );
 

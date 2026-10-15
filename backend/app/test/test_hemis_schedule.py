@@ -23,6 +23,7 @@ from app.modules.auth.hemis.schemas import (
     StudentSyncApplyRequest,
 )
 from app.modules.auth.hemis.student_sync import HemisStudentSync, hemis_student_sync
+from app.core.utils.roles import SYSTEM_ROLE_CODES
 
 #: 2026-10-29 00:00 UTC (четверг) — так HEMIS ставит `lesson_date`.
 LESSON_TS = 1793232000
@@ -211,7 +212,8 @@ async def test_mass_disappearance_needs_confirmation(async_db, hemis):
 
 def _user(username: str, role: str):
     """`my()` смотрит только на логин и роли — полноценный User не нужен."""
-    return SimpleNamespace(username=username, roles=[SimpleNamespace(name=role)])
+    code = role.lower() if role.lower() in SYSTEM_ROLE_CODES else None
+    return SimpleNamespace(username=username, roles=[SimpleNamespace(name=role, code=code)])
 
 
 WEEK = MyScheduleRequest(date_from=date(2026, 10, 26), date_to=date(2026, 11, 1))

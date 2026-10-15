@@ -28,6 +28,7 @@ from .schemas import (
     QuestionSubjectSummary,
     QuestionTeacherSummary,
 )
+from app.core.utils.roles import user_is_admin, user_is_teacher
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class QuestionRepository:
             .join(Subject, Subject.id == Question.subject_id)
             .where(Question.is_latest.is_(True), Question.is_active.is_(True))
         )
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin:
             subject_ids = await assigned_subject_ids(session, current_user)
             stmt = stmt.where(self._visible_questions_filter(current_user, subject_ids))
@@ -132,7 +133,7 @@ class QuestionRepository:
         qoʻyishi mumkin edi. Admin uchun esa bu imkoniyat qoladi — u savolni
         kerakli oʻqituvchiga biriktira oladi.
         """
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         author_id = data.user_id if is_admin and data.user_id else current_user.id
 
         midterm = await self._midterm_for_new_question(session, data, current_user)
@@ -284,7 +285,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Koʻrish — oʻz savoli yoki oʻzi dars beradigan fanning savoli.
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             subject_ids = await assigned_subject_ids(session, current_user)
             if question.subject_id not in subject_ids:
@@ -308,8 +309,8 @@ class QuestionRepository:
         )
 
         # Check if user is teacher (not admin)
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_teacher = user_is_teacher(current_user)
+        is_admin = user_is_admin(current_user)
 
         subject_ids: list[int] = []
         # Kurs savollarini kurs huquqi hal qiladi: assistent asosiy
@@ -424,7 +425,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -487,7 +488,7 @@ class QuestionRepository:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -556,7 +557,7 @@ class QuestionRepository:
         from sqlalchemy import update
 
         # Check ownership for teachers
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
         if not is_admin:
             if data.user_id != current_user.id:
                 raise HTTPException(

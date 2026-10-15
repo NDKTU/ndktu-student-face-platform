@@ -31,6 +31,7 @@ import { formatDate, formatDateTime } from '@/utils/date';
 import { subjectOption } from '@/utils/subject';
 import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 import { useTranslation } from 'react-i18next';
+import { roleKey } from '@/utils/roles';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
 // --grade-* хранят полные значения цвета — используем напрямую, без hsl().
@@ -158,9 +159,9 @@ const ResultsPage = () => {
     // Tanlangan ko'rinishga bo'ysunadi: bir nechta roli bor foydalanuvchi
     // «Talaba» ko'rinishida o'zining natijalarini ko'radi.
     const roleScope = activeRole ? [activeRole] : (user?.roles ?? []);
-    const isStudent = roleScope.some(role => role.name.toLowerCase() === 'student');
-    const isAdmin = roleScope.some(role => role.name.toLowerCase() === 'admin');
-    const isTeacher = !isAdmin && roleScope.some(role => role.name.toLowerCase() === 'teacher');
+    const isStudent = roleScope.some(role => roleKey(role) === 'student');
+    const isAdmin = roleScope.some(role => roleKey(role) === 'admin');
+    const isTeacher = !isAdmin && roleScope.some(role => roleKey(role) === 'teacher');
     const isAdminOrTeacher = !isStudent;
     // O'qituvchi faqat o'z testlarining natijalarini ko'radi: ular bitta
     // kafedraga tegishli, talabalar esa istalgan fakultetdan bo'lishi mumkin —

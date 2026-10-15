@@ -31,6 +31,7 @@ from .schemas import (
     CourseTeacherSummaryResponse,
     CourseUpdateRequest,
 )
+from app.core.utils.roles import role_keys
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,9 @@ logger = logging.getLogger(__name__)
 class CourseRepository:
     @staticmethod
     def _role_names(user: User) -> set[str]:
-        return {role.name.lower() for role in (user.roles or [])}
+        # Tizim rollari kodidan (`roles.code`), nomidan emas — nom
+        # interfeysdan o'zgaradi.
+        return set(role_keys(user))
 
     async def _ensure_view_access(self, session: AsyncSession, course: Course, current_user: User) -> None:
         """Allow admins, the owning teacher, and students enrolled in a course group."""

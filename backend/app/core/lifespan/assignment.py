@@ -55,11 +55,11 @@ async def seed_role_permissions(
     """
     for role_name, wanted in SEEDED_ROLE_PERMISSIONS.items():
         role = (
-            await session.execute(select(Role).where(Role.name == role_name))
+            await session.execute(select(Role).where(Role.code == role_name))
         ).scalar_one_or_none()
 
         if role is None:
-            role = Role(name=role_name)
+            role = Role(name=role_name, code=role_name)
             session.add(role)
             await session.flush()
             logger.info("Created role: %s", role_name)

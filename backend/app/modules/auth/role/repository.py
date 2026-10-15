@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,10 +29,19 @@ class RoleRepository:
                 detail=f"Role '{data.name}' already exists",
             )
 
-        new_role = Role(name=data.name)
-        if data.data_scope is not None:
-            new_role.data_scope = data.data_scope
-        session.add(new_role)
+        # Interfeysda yaratilgan rol hech qachon tizim roli emas: admin
+        # «Student» degan rol ochsa ham, kod uni talaba deb tanimasligi kerak.
+        # Core `insert` — ORM `code=None` ni tashlab, nomdan standart kodni
+        # qo'yib yuborardi (va «student» kodi band bo'lsa, unikal indeks
+        # yiqilardi). Doira ham aniq: admin ochgan rol tanlamaguncha `own`.
+        new_role_id = (
+            await session.execute(
+                insert(Role)
+                .values(name=data.name, code=None, data_scope=data.data_scope or "own")
+                .returning(Role.id)
+            )
+        ).scalar_one()
+        new_role = await session.get(Role, new_role_id)
 
         # Auto-assign 'user:me' permission
         stmt_perm = select(Permission).where(Permission.name == "user:me")
@@ -113,9 +122,9 @@ class RoleRepository:
             role.name = data.name
 
         if data.data_scope is not None and data.data_scope != role.data_scope:
-            # Admin hamma narsani ko'radi — `resolve_data_scope` uni nomidan
-            # taniydi. Ustunni o'zgartirish natija bermasdi, faqat chalg'itardi.
-            if role.name.lower() == ADMIN_ROLE and data.data_scope != SCOPE_ALL:
+            # Admin hamma narsani ko'radi — `resolve_data_scope` uni kodidan
+            # (`roles.code`) taniydi. Ustunni o'zgartirish natija bermasdi, faqat chalg'itardi.
+            if role.code == ADMIN_ROLE and data.data_scope != SCOPE_ALL:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Admin role always sees all data",
@@ -133,6 +142,14 @@ class RoleRepository:
 
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+
+        # Tizim rollarini kod kutadi: login, sinxronizatsiya va ruxsatlar shu
+        # rollarga tayanadi. Nomini o'zgartirish mumkin, o'chirish — yo'q.
+        if role.code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tizim rolini o'chirib bo'lmaydi",
+            )
 
         await session.delete(role)
         await session.commit()

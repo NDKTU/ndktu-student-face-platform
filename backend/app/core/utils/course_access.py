@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import User
+from app.core.utils.roles import user_is_admin
 from app.modules.course.model import Course, CourseTeacher
 
 ROLE_MAIN = "main"
@@ -24,9 +25,7 @@ ROLE_ASSISTANT = "assistant"
 
 
 def is_admin(user: User | None) -> bool:
-    if user is None:
-        return False
-    return any(role.name.lower() == "admin" for role in (user.roles or []))
+    return user is not None and user_is_admin(user)
 
 
 async def can_manage(session: AsyncSession, course: Course, user: User) -> bool:

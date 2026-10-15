@@ -21,6 +21,7 @@ from .schemas import (
     GroupListRequest,
     GroupListResponse,
 )
+from app.core.utils.roles import user_is_admin, user_is_student, user_is_teacher
 
 logger = logging.getLogger(__name__)
 
@@ -169,9 +170,9 @@ class GroupRepository:
         # Yashirish funksiyasi 2026-09-11 da kommentga olindi (`core/utils/visibility.py` ga qarang).
         # stmt = apply_visibility(stmt, Group, current_user, request.include_hidden)
 
-        is_admin = any(role.name.lower() == "admin" for role in current_user.roles)
-        is_teacher = any(role.name.lower() == "teacher" for role in current_user.roles)
-        is_student = any(role.name.lower() == "student" for role in current_user.roles)
+        is_admin = user_is_admin(current_user)
+        is_teacher = user_is_teacher(current_user)
+        is_student = user_is_student(current_user)
 
         # Track if we already joined TeacherGroup to avoid duplicate JOINs
         already_joined_group_teacher = False

@@ -60,6 +60,7 @@ from .speciality.schemas import (
     SpecialityStatsResponse,
 #    SpecialityUpdateRequest,
 )
+from app.core.utils.roles import user_is_admin, user_is_teacher
 
 logger = logging.getLogger(__name__)
 
@@ -340,9 +341,7 @@ async def get_group_students(
     ochib ko'ra olardi. Ruxsati bor boshqa rollar (psixolog, tutor) avvalgidek
     istalgan guruhni ochadi.
     """
-    is_teacher = not any(role.name.lower() == "admin" for role in (current_user.roles or [])) and any(
-        role.name.lower() == "teacher" for role in (current_user.roles or [])
-    )
+    is_teacher = not user_is_admin(current_user) and user_is_teacher(current_user)
     if is_teacher or not await user_has_permission(session, current_user, "read:student"):
         if not await get_group_repository.is_group_assigned_to_user(session, current_user, group_id):
             raise HTTPException(

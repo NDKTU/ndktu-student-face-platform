@@ -98,6 +98,8 @@ export interface UserCreateRequest {
 export interface Role {
     id: number;
     name: string;
+    /** Tizim roli kaliti (`admin`/`teacher`/`student`), boshqalarida `null`. */
+    code?: string | null;
     data_scope?: DataScope;
 }
 

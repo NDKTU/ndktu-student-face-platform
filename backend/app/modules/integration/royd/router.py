@@ -12,7 +12,7 @@ from core.dependencies.role_checker import get_current_user_id
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -24,6 +24,7 @@ from app.modules.organization_structure.model import Faculty, Group
 
 from .client import royd_client
 from .schemas import MessageCreateRequest, RequestCreateRequest, ResubmitRequest
+from app.core.utils.roles import ROLE_ADMIN
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,7 @@ async def _is_admin(session: AsyncSession, user_id: int) -> bool:
         await session.execute(
             select(Role.id)
             .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_id, func.lower(Role.name) == "admin")
+            .where(UserRole.user_id == user_id, Role.code == ROLE_ADMIN)
         )
     ).first() is not None
 

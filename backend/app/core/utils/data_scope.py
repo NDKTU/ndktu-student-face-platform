@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.utils.group_scope import teacher_group_ids
 from app.modules.auth.model import Student, User, UserDataScope
 from app.modules.organization_structure.model import Group, Speciality
+from app.core.utils.roles import user_is_admin
 
 SCOPE_ALL = "all"
 SCOPE_FACULTY = "faculty"
@@ -65,10 +66,9 @@ class DataScope:
 
 async def resolve_data_scope(session: AsyncSession, user: User) -> DataScope:
     roles = list(user.roles or [])
-    names = {role.name.lower() for role in roles}
     scopes = {(role.data_scope or SCOPE_OWN) for role in roles}
 
-    if ADMIN_ROLE in names or SCOPE_ALL in scopes:
+    if user_is_admin(user) or SCOPE_ALL in scopes:
         return DataScope(user_id=user.id, unrestricted=True)
 
     bindings = (

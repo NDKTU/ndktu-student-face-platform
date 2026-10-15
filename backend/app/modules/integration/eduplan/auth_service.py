@@ -15,6 +15,7 @@ from app.modules.auth.user.service import auth_service
 from app.modules.organization_structure.model import Kafedra
 
 from .credentials import effective_config
+from app.core.utils.roles import SYSTEM_ROLE_CODES
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,16 @@ class EduPlanAuthService:
                     role_str = str(r.get("name") or r.get("slug") or "").strip().lower()
                 else:
                     role_str = str(r).strip().lower()
-                if role_str and role_str != "teacher":
+                # Tizim rollari (admin, student) EPMOS'dan berilmaydi: u yerda
+                # «admin» bo'lgan odam bizda ham admin bo'lib qolardi. Faqat
+                # `teacher` avtomatik — u yuqorida beriladi.
+                if role_str in SYSTEM_ROLE_CODES:
+                    if role_str != "teacher":
+                        logger.warning(
+                            "EduPlan SSO: %s uchun «%s» tizim roli berilmadi", username, role_str
+                        )
+                    continue
+                if role_str:
                     await get_user_repository.ensure_role(session, user, role_str)
 
         # Привязка / создание записи преподавателя (Teacher)

@@ -28,6 +28,7 @@ from app.modules.app_setting.model import get_setting, set_setting
 from app.modules.auth.model import Role, Teacher, User, UserRole
 from app.modules.file.model import FileBlob, FileQuotaChange, StoredFile
 from app.modules.organization_structure.model import Kafedra
+from app.core.utils.roles import ROLE_ADMIN
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -89,7 +90,7 @@ async def _admin_user_ids(session: AsyncSession, user_ids: list[int]) -> set[int
     rows = await session.scalars(
         select(UserRole.user_id)
         .join(Role, Role.id == UserRole.role_id)
-        .where(UserRole.user_id.in_(user_ids), func.lower(Role.name) == "admin")
+        .where(UserRole.user_id.in_(user_ids), Role.code == ROLE_ADMIN)
     )
     return set(rows.all())
 

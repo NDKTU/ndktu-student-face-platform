@@ -33,6 +33,8 @@ class RolePermissionInfo(BaseModel):
 class RoleCreateResponse(BaseModel):
     id: int
     name: str
+    #: Tizim roli kaliti; interfeysda yaratilgan rollarda `None`.
+    code: str | None = None
     data_scope: DataScopeName
     created_at: TashkentDatetime
     updated_at: TashkentDatetime

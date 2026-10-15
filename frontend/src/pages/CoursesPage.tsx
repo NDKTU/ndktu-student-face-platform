@@ -40,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState } from '@/hooks/useUrlState';
 import { subjectOption } from '@/utils/subject';
 import { EDUCATION_SHAPES, EDUCATION_TYPES } from '@/utils/education';
+import { roleKey } from '@/utils/roles';
 
 type SortField = 'subject' | 'teacher' | 'semester' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -48,7 +49,7 @@ export const CoursesPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { user, hasPermission } = useAuth();
-    const isAdmin = user?.roles?.some((role) => role.name.toLowerCase() === 'admin') ?? false;
+    const isAdmin = user?.roles?.some((role) => roleKey(role) === 'admin') ?? false;
     const { isStudent, isTeacher } = useRoleView();
     // Talaba faqat oʻz guruhi kurslarini koʻradi — guruh ustuni va filtri
     // unga ortiqcha maʼlumot.

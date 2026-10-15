@@ -19,6 +19,7 @@ import {
 } from '@/constants/resources';
 import { permissionDisplay, permissionGroupLabel as labelFor } from '@/constants/permissionDisplay';
 import { useAuth } from '@/context/AuthContext';
+import { roleKey } from '@/utils/roles';
 
 interface PermissionMap {
     // resource -> action -> Permission
@@ -57,7 +58,7 @@ const RolePermissionsPage = () => {
 
     const role = roleQuery.data;
     const allPermissions = permsQuery.data?.permissions ?? [];
-    const isAdminRole = role?.name?.toLowerCase() === 'admin';
+    const isAdminRole = role ? roleKey(role) === 'admin' : false;
 
     // resource -> action -> Permission
     const permMap: PermissionMap = useMemo(() => {
