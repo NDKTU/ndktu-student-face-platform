@@ -603,7 +603,6 @@
   "Kalendar": "Календарь",
   "Ko'rinish": "Вид",
   "Guruh yoki o'qituvchini tanlang": "Выберите группу или преподавателя",
-  "Kalendar bitta guruh yoki o'qituvchining haftasini ko'rsatadi": "Календарь показывает неделю одной группы или преподавателя",
   "{{shown}} / {{total}} dars ko'rsatildi — filtrni toraytiring": "Показано занятий: {{shown}} из {{total}} — сузьте фильтр",
   "Hafta": "Неделя",
   "Oy": "Месяц",
@@ -628,5 +627,7 @@
   "Pa": "Чт",
   "Ju": "Пт",
   "Sh": "Сб",
-  "Ya": "Вс"
+  "Ya": "Вс",
+  "Kafedrani qidirish": "Поиск кафедры",
+  "Kalendar bitta guruh yoki o'qituvchining jadvalini ko'rsatadi": "Календарь показывает расписание одной группы или преподавателя"
 }

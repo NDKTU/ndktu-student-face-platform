@@ -32,6 +32,7 @@ from .hemis.schemas import (
     HemisSyncResponse,
     MyScheduleRequest,
     MyScheduleResponse,
+    ScheduleFiltersRequest,
     ScheduleFiltersResponse,
     ScheduleListRequest,
     ScheduleListResponse,
@@ -1119,11 +1120,14 @@ async def list_hemis_schedule(
 
 @hemis_router.get("/schedule/filters", response_model=ScheduleFiltersResponse)
 async def hemis_schedule_filters(
+    data: ScheduleFiltersRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("hemis_admin_sync")),
 ):
-    """Filtr variantlari — jadvalning o'zidan, bizning spravochniklarsiz."""
-    return await hemis_schedule_repository.filters(session)
+    """Filtr variantlari — jadvalning o'zidan, bizning spravochniklarsiz.
+
+    Fakultet yoki kafedra tanlansa, qolgan ro'yxatlar shunga toraytiriladi."""
+    return await hemis_schedule_repository.filters(session, data)
 
 
 @hemis_router.get("/schedule/my", response_model=MyScheduleResponse)

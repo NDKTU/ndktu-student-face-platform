@@ -28,6 +28,7 @@ from .schemas import (
     MyScheduleRequest,
     MyScheduleResponse,
     ScheduleFilterOption,
+    ScheduleFiltersRequest,
     ScheduleFiltersResponse,
     ScheduleLessonOut,
     ScheduleListRequest,
@@ -68,6 +69,10 @@ class HemisScheduleRepository:
         conditions = []
         if not request.include_inactive:
             conditions.append(HemisScheduleLesson.is_active.is_(True))
+        if request.faculty_hemis_id is not None:
+            conditions.append(HemisScheduleLesson.faculty_hemis_id == request.faculty_hemis_id)
+        if request.department_hemis_id is not None:
+            conditions.append(HemisScheduleLesson.department_hemis_id == request.department_hemis_id)
         if request.group_hemis_id is not None:
             conditions.append(HemisScheduleLesson.group_hemis_id == request.group_hemis_id)
         if request.employee_id_number:
@@ -108,14 +113,34 @@ class HemisScheduleRepository:
             limit=request.limit,
         )
 
-    async def filters(self, session: AsyncSession) -> ScheduleFiltersResponse:
-        """Варианты для фильтров — из этой же таблицы, без наших справочников."""
-        active = HemisScheduleLesson.is_active.is_(True)
+    async def filters(
+        self, session: AsyncSession, request: ScheduleFiltersRequest | None = None
+    ) -> ScheduleFiltersResponse:
+        """Варианты для фильтров — из этой же таблицы, без наших справочников.
 
-        async def _options(value_col, label_col) -> list[ScheduleFilterOption]:
+        Каскад: факультеты — всегда все (иначе выбранный нельзя было бы
+        сменить), кафедры — в пределах факультета, остальное — в пределах
+        обоих. Факультет в строке — это факультет группы (у каждой группы он
+        один), кафедра — та, что ведёт предмет, и она бывает с другого
+        факультета.
+        """
+        request = request or ScheduleFiltersRequest()
+        active = HemisScheduleLesson.is_active.is_(True)
+        by_faculty = (
+            [HemisScheduleLesson.faculty_hemis_id == request.faculty_hemis_id]
+            if request.faculty_hemis_id is not None
+            else []
+        )
+        by_department = (
+            [HemisScheduleLesson.department_hemis_id == request.department_hemis_id]
+            if request.department_hemis_id is not None
+            else []
+        )
+
+        async def _options(value_col, label_col, *scope) -> list[ScheduleFilterOption]:
             result = await session.execute(
                 select(value_col, func.max(label_col))
-                .where(active, value_col.is_not(None))
+                .where(active, value_col.is_not(None), *scope)
                 .group_by(value_col)
                 .order_by(func.max(label_col))
             )
@@ -124,16 +149,27 @@ class HemisScheduleRepository:
                 for value, label in result
             ]
 
+        scoped = (*by_faculty, *by_department)
         return ScheduleFiltersResponse(
-            education_years=await _options(
-                HemisScheduleLesson.education_year, HemisScheduleLesson.education_year_name
+            faculties=await _options(
+                HemisScheduleLesson.faculty_hemis_id, HemisScheduleLesson.faculty_name
             ),
-            groups=await _options(HemisScheduleLesson.group_hemis_id, HemisScheduleLesson.group_name),
+            departments=await _options(
+                HemisScheduleLesson.department_hemis_id,
+                HemisScheduleLesson.department_name,
+                *by_faculty,
+            ),
+            education_years=await _options(
+                HemisScheduleLesson.education_year, HemisScheduleLesson.education_year_name, *scoped
+            ),
+            groups=await _options(
+                HemisScheduleLesson.group_hemis_id, HemisScheduleLesson.group_name, *scoped
+            ),
             employees=await _options(
-                HemisScheduleLesson.employee_id_number, HemisScheduleLesson.employee_name
+                HemisScheduleLesson.employee_id_number, HemisScheduleLesson.employee_name, *scoped
             ),
             subjects=await _options(
-                HemisScheduleLesson.subject_hemis_id, HemisScheduleLesson.subject_name
+                HemisScheduleLesson.subject_hemis_id, HemisScheduleLesson.subject_name, *scoped
             ),
         )
 

@@ -15,7 +15,13 @@ from sqlalchemy import select
 from app.modules.auth.hemis.model import HemisScheduleLesson, HemisStudentGroup
 from app.modules.auth.hemis.schedule_repository import hemis_schedule_repository
 from app.modules.auth.hemis.schedule_sync import HemisScheduleSync, hemis_schedule_sync, lesson_row
-from app.modules.auth.hemis.schemas import MyScheduleRequest, ScheduleSyncRequest, StudentSyncApplyRequest
+from app.modules.auth.hemis.schemas import (
+    MyScheduleRequest,
+    ScheduleFiltersRequest,
+    ScheduleListRequest,
+    ScheduleSyncRequest,
+    StudentSyncApplyRequest,
+)
 from app.modules.auth.hemis.student_sync import HemisStudentSync, hemis_student_sync
 
 #: 2026-10-29 00:00 UTC (четверг) — так HEMIS ставит `lesson_date`.
@@ -267,3 +273,41 @@ async def test_student_finds_schedule_through_group_map(async_db, hemis, monkeyp
     my = await hemis_schedule_repository.my(async_db, _user("319261100725", "student"), WEEK)
     assert my.as_role == "student"
     assert [i.hemis_id for i in my.items] == [1]
+
+
+@pytest.mark.asyncio
+async def test_faculty_filter_narrows_list_and_cascades_options(async_db, hemis):
+    """Факультет — это факультет группы; кафедра предмета бывает с другого.
+
+    Выбранный факультет сужает группы, преподавателей, предметы и кафедры,
+    но список факультетов остаётся полным — иначе выбор нельзя было бы сменить.
+    """
+    energo = {"id": 3, "name": "Energo-mexanika"}
+    hemis["pages"] = [[
+        _lesson(1),
+        _lesson(2, group={"id": 900, "name": "13A-26 ENM"}, faculty=energo,
+                department={"id": 30, "name": "Elektr energetikasi"}),
+        # Группа энергетиков, но предмет ведёт кафедра с горного факультета.
+        _lesson(3, group={"id": 900, "name": "13A-26 ENM"}, faculty=energo),
+    ]]
+    await hemis_schedule_sync.apply(async_db, ScheduleSyncRequest())
+
+    listed = await hemis_schedule_repository.list(async_db, ScheduleListRequest(faculty_hemis_id=3))
+    assert {i.hemis_id for i in listed.items} == {2, 3}
+
+    listed = await hemis_schedule_repository.list(
+        async_db, ScheduleListRequest(faculty_hemis_id=3, department_hemis_id=10)
+    )
+    assert [i.hemis_id for i in listed.items] == [3]
+
+    options = await hemis_schedule_repository.filters(async_db, ScheduleFiltersRequest(faculty_hemis_id=3))
+    assert {o.value for o in options.faculties} == {"2", "3"}
+    assert {o.value for o in options.groups} == {"900"}
+    assert {o.value for o in options.departments} == {"10", "30"}
+
+    options = await hemis_schedule_repository.filters(
+        async_db, ScheduleFiltersRequest(faculty_hemis_id=3, department_hemis_id=30)
+    )
+    assert [o.value for o in options.subjects] == ["4109"]
+    assert {o.value for o in options.departments} == {"10", "30"}
+

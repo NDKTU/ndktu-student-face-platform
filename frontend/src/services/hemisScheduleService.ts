@@ -50,7 +50,15 @@ export interface MySchedule {
     items: ScheduleLesson[];
 }
 
-export interface ScheduleListParams {
+/** Kaskad: fakultet va kafedra qolgan ro'yxatlarni toraytiradi. */
+export interface ScheduleScope {
+    /** Guruhning fakulteti. */
+    faculty_hemis_id?: number;
+    /** Fanni o'qitadigan kafedra (HEMIS `department`). */
+    department_hemis_id?: number;
+}
+
+export interface ScheduleListParams extends ScheduleScope {
     group_hemis_id?: number;
     employee_id_number?: string;
     subject_hemis_id?: number;
@@ -75,6 +83,8 @@ export interface ScheduleFilterOption {
 }
 
 export interface ScheduleFilters {
+    faculties: ScheduleFilterOption[];
+    departments: ScheduleFilterOption[];
     education_years: ScheduleFilterOption[];
     groups: ScheduleFilterOption[];
     employees: ScheduleFilterOption[];
@@ -103,8 +113,8 @@ export const hemisScheduleService = {
         return response.data;
     },
 
-    filters: async () => {
-        const response = await api.get<ScheduleFilters>('/hemis/schedule/filters');
+    filters: async (params: ScheduleScope) => {
+        const response = await api.get<ScheduleFilters>('/hemis/schedule/filters', { params });
         return response.data;
     },
 

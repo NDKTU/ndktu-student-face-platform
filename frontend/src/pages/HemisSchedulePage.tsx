@@ -15,7 +15,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { MonthCalendar } from '@/components/schedule/MonthCalendar';
 import { WeekCalendar } from '@/components/schedule/WeekCalendar';
 import { MonthNav, ViewToggle, WeekNav } from '@/components/schedule/ScheduleControls';
-import { useScheduleView } from '@/hooks/useScheduleView';
 import {
     addDays,
     buildWeek,
@@ -29,6 +28,7 @@ import {
 } from '@/components/schedule/scheduleUtils';
 import { useScheduleFilters, useScheduleList } from '@/hooks/useHemisSchedule';
 import type { ScheduleFilterOption, ScheduleLesson } from '@/services/hemisScheduleService';
+import type { ScheduleView } from '@/components/schedule/scheduleUtils';
 import { formatDate } from '@/utils/date';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -58,6 +58,8 @@ const withAll = (
 const HemisSchedulePage = () => {
     const { t } = useTranslation();
 
+    const [faculty, setFaculty] = useState(ALL);
+    const [department, setDepartment] = useState(ALL);
     const [year, setYear] = useState(ALL);
     const [group, setGroup] = useState(ALL);
     const [employee, setEmployee] = useState(ALL);
@@ -66,7 +68,10 @@ const HemisSchedulePage = () => {
     const [dateTo, setDateTo] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-    const [view, setView] = useScheduleView('hemis-schedule:view');
+    // Ko'rinish eslab qolinmaydi: sahifa doim ro'yxatda ochiladi. Kalendar
+    // guruh yoki o'qituvchi tanlanmaguncha bo'sh — eslab qolingan «Oy» bilan
+    // kirgan admin birinchi bo'lib bo'sh sahifani ko'rardi.
+    const [view, setView] = useState<ScheduleView>('list');
     const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
     const [monthStart, setMonthStart] = useState(() => monthStartOf(new Date()));
 
@@ -80,6 +85,8 @@ const HemisSchedulePage = () => {
         () => ({
             page: isCalendar ? 1 : page,
             limit: isCalendar ? CALENDAR_LIMIT : pageSize,
+            faculty_hemis_id: faculty !== ALL ? Number(faculty) : undefined,
+            department_hemis_id: department !== ALL ? Number(department) : undefined,
             education_year: year !== ALL ? year : undefined,
             group_hemis_id: group !== ALL ? Number(group) : undefined,
             employee_id_number: employee !== ALL ? employee : undefined,
@@ -87,7 +94,7 @@ const HemisSchedulePage = () => {
             date_from: isCalendar ? calendarFrom : dateFrom || undefined,
             date_to: isCalendar ? calendarTo : dateTo || undefined,
         }),
-        [isCalendar, page, pageSize, year, group, employee, subject, dateFrom, dateTo, calendarFrom, calendarTo],
+        [isCalendar, page, pageSize, faculty, department, year, group, employee, subject, dateFrom, dateTo, calendarFrom, calendarTo],
     );
 
     const { data, isLoading, isError, refetch, isFetching } = useScheduleList(
@@ -102,16 +109,38 @@ const HemisSchedulePage = () => {
         () => buildWeek(view === 'week' ? (data?.items ?? []) : [], weekStart, calendarShow === 'groups'),
         [view, data, weekStart, calendarShow],
     );
-    const { data: filters } = useScheduleFilters();
+    const { data: filters } = useScheduleFilters({
+        faculty_hemis_id: faculty !== ALL ? Number(faculty) : undefined,
+        department_hemis_id: department !== ALL ? Number(department) : undefined,
+    });
 
     const resetPage = <T,>(setter: (value: T) => void) => (value: T) => {
         setter(value);
         setPage(1);
     };
 
+    // Kaskad: fakultet yoki kafedra almashsa, unga bog'liq tanlovlar
+    // tashlanadi — boshqa fakultetning guruhi tanlangan holda qolsa, ro'yxat
+    // jimgina bo'sh chiqardi va admin sababini topolmasdi.
+    const changeFaculty = (value: string) => {
+        setFaculty(value);
+        setDepartment(ALL);
+        setGroup(ALL);
+        setEmployee(ALL);
+        setSubject(ALL);
+        setPage(1);
+    };
+    const changeDepartment = (value: string) => {
+        setDepartment(value);
+        setGroup(ALL);
+        setEmployee(ALL);
+        setSubject(ALL);
+        setPage(1);
+    };
+
     const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
     const activeFilters =
-        [year, group, employee, subject].filter((v) => v !== ALL).length +
+        [faculty, department, year, group, employee, subject].filter((v) => v !== ALL).length +
         (!isCalendar && dateFrom ? 1 : 0) +
         (!isCalendar && dateTo ? 1 : 0);
 
@@ -213,6 +242,23 @@ const HemisSchedulePage = () => {
             />
 
             <div className="flex flex-wrap items-center gap-3">
+                <div className="w-full sm:w-[220px]">
+                    <Combobox
+                        options={withAll(t('Barcha fakultetlar'), filters?.faculties)}
+                        value={faculty}
+                        onChange={changeFaculty}
+                        placeholder={t('Fakultet')}
+                    />
+                </div>
+                <div className="w-full sm:w-[240px]">
+                    <Combobox
+                        options={withAll(t('Barcha kafedralar'), filters?.departments)}
+                        value={department}
+                        onChange={changeDepartment}
+                        placeholder={t('Kafedra')}
+                        searchPlaceholder={t('Kafedrani qidirish')}
+                    />
+                </div>
                 <div className="w-full sm:w-[160px]">
                     <Combobox
                         options={withAll(t("Barcha o'quv yillari"), filters?.education_years)}
@@ -268,7 +314,7 @@ const HemisSchedulePage = () => {
                     </div>
                 )}
 
-                {data && (
+                {data && (!isCalendar || calendarReady) && (
                     <span className="text-sm text-muted-foreground tabular-nums">
                         {t('Jami')}: {data.total}
                     </span>
@@ -278,6 +324,8 @@ const HemisSchedulePage = () => {
                     className="ml-auto"
                     count={activeFilters}
                     onClick={() => {
+                        setFaculty(ALL);
+                        setDepartment(ALL);
                         setYear(ALL);
                         setGroup(ALL);
                         setEmployee(ALL);
@@ -294,7 +342,7 @@ const HemisSchedulePage = () => {
                     <EmptyState
                         icon={<CalendarSearch className="h-8 w-8" />}
                         title={t("Guruh yoki o'qituvchini tanlang")}
-                        description={t("Kalendar bitta guruh yoki o'qituvchining haftasini ko'rsatadi")}
+                        description={t("Kalendar bitta guruh yoki o'qituvchining jadvalini ko'rsatadi")}
                     />
                 ) : isLoading ? (
                     <Skeleton className="h-96 rounded-2xl" />

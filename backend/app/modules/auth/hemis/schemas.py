@@ -254,6 +254,10 @@ class ScheduleLessonOut(BaseModel):
 
 
 class ScheduleListRequest(BaseModel):
+    #: Guruhning fakulteti: jadvalda har bir guruh bitta fakultetga tegishli.
+    faculty_hemis_id: Optional[int] = None
+    #: Fanni o'qitadigan kafedra (HEMIS `department`).
+    department_hemis_id: Optional[int] = None
     group_hemis_id: Optional[int] = None
     employee_id_number: Optional[str] = None
     subject_hemis_id: Optional[int] = None
@@ -282,7 +286,16 @@ class ScheduleFilterOption(BaseModel):
     label: str
 
 
+class ScheduleFiltersRequest(BaseModel):
+    """Kaskad: tanlangan fakultet/kafedra qolgan ro'yxatlarni toraytiradi."""
+
+    faculty_hemis_id: Optional[int] = None
+    department_hemis_id: Optional[int] = None
+
+
 class ScheduleFiltersResponse(BaseModel):
+    faculties: List[ScheduleFilterOption] = []
+    departments: List[ScheduleFilterOption] = []
     education_years: List[ScheduleFilterOption] = []
     groups: List[ScheduleFilterOption] = []
     employees: List[ScheduleFilterOption] = []
