@@ -24,7 +24,7 @@ from collections import defaultdict
 from core.mixins.external_ref import SOURCE_EDUPLAN
 from core.mixins.time_stamp_mixin import utcnow_naive
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Teacher, TeacherAssignment, TeacherSubject
@@ -154,6 +154,7 @@ class EduPlanWorkloadService:
             {(teacher_id, group_id) for teacher_id, _, group_id in collapsed},
             set(collapsed),
         )
+        await self._touch_synced(session)
 
         if dry_run:
             await session.rollback()
@@ -225,63 +226,86 @@ class EduPlanWorkloadService:
             b["semester_types"] |= bucket["semester_types"]
             pairs_group.add((teacher_id, group_id))
 
+        # Satr faqat haqiqatan o'zgarganda yoziladi va «yangilandi» ga
+        # sanaladi. Ilgari har satrga yangi `synced_at` qo'yilardi — ya'ni
+        # EPMOS'da hech narsa o'zgarmasa ham ~24 ming alohida UPDATE ketardi
+        # (progon 30 s) va hisobot «yangilandi: 24378» deb yolg'on gapirardi.
+        # `synced_at` endi oxirida bitta so'rov bilan qo'yiladi (`_touch_synced`).
         created = updated = 0
         now = utcnow_naive()
 
         for (teacher_id, subject_id, group_id), bucket in collapsed.items():
             row = existing_ta.get((teacher_id, subject_id, group_id))
+            values = {
+                "load_types": sorted(bucket["load_types"]),
+                "semester_type": ", ".join(sorted(bucket["semester_types"])) or None,
+                "academic_year_id": academic_year_id,
+                # external_id boʻsh: bitta biriktirma bir nechta yuklama satridan
+                # yigʻiladi va yagona tashqi id'ga ega emas.
+                "external_source": SOURCE_EDUPLAN,
+                "is_active": True,
+            }
             if row is None:
-                row = TeacherAssignment(teacher_id=teacher_id, subject_id=subject_id, group_id=group_id)
+                session.add(
+                    TeacherAssignment(
+                        teacher_id=teacher_id, subject_id=subject_id, group_id=group_id, synced_at=now, **values
+                    )
+                )
                 created += 1
-            else:
+            elif _assign(row, values):
                 updated += 1
-            row.load_types = sorted(bucket["load_types"])
-            row.semester_type = ", ".join(sorted(bucket["semester_types"])) or None
-            row.academic_year_id = academic_year_id
-            # external_id boʻsh: bitta biriktirma bir nechta yuklama satridan
-            # yigʻiladi va yagona tashqi id'ga ega emas.
-            row.external_source = SOURCE_EDUPLAN
-            row.synced_at = now
-            row.is_active = True
-            session.add(row)
 
         existing_ts = {
             (r.teacher_id, r.subject_id): r for r in (await session.execute(select(TeacherSubject))).scalars().all()
         }
         for key, bucket in by_subject.items():
             row = existing_ts.get(key)
+            values = {
+                "load_types": sorted(bucket["load_types"]),
+                "semester_type": ", ".join(sorted(bucket["semester_types"])) or None,
+                # external_id намеренно не заполняем: одна связка собрана из
+                # нескольких строк нагрузки и одного внешнего id не имеет.
+                # Источник фиксируем, чтобы отличать импортированное от ручного.
+                "external_source": SOURCE_EDUPLAN,
+                "is_active": True,
+            }
             if row is None:
-                row = TeacherSubject(teacher_id=key[0], subject_id=key[1])
+                session.add(TeacherSubject(teacher_id=key[0], subject_id=key[1], synced_at=now, **values))
                 created += 1
-            else:
+            elif _assign(row, values):
                 updated += 1
-            row.load_types = sorted(bucket["load_types"])
-            row.semester_type = ", ".join(sorted(bucket["semester_types"])) or None
-            # external_id намеренно не заполняем: одна связка собрана из
-            # нескольких строк нагрузки и одного внешнего id не имеет.
-            # Источник фиксируем, чтобы отличать импортированное от ручного.
-            row.external_source = SOURCE_EDUPLAN
-            row.synced_at = now
-            row.is_active = True
-            session.add(row)
 
         existing_tg = {
             (r.teacher_id, r.group_id): r for r in (await session.execute(select(TeacherGroup))).scalars().all()
         }
         for key in pairs_group:
             row = existing_tg.get(key)
+            values = {"external_source": SOURCE_EDUPLAN, "is_active": True}
             if row is None:
-                row = TeacherGroup(teacher_id=key[0], group_id=key[1])
+                session.add(TeacherGroup(teacher_id=key[0], group_id=key[1], synced_at=now, **values))
                 created += 1
-            else:
+            elif _assign(row, values):
                 updated += 1
-            row.external_source = SOURCE_EDUPLAN
-            row.synced_at = now
-            row.is_active = True
-            session.add(row)
 
         await session.flush()
         return created, updated
+
+    @staticmethod
+    async def _touch_synced(session: AsyncSession) -> None:
+        """Yuklamada bor hamma bog'lanishga `synced_at` — har jadvalga bitta so'rov.
+
+        `_deactivate_missing` dan keyin chaqiriladi: shu paytda faol EPMOS
+        satrlari aynan yuklamada borlari, yo'qolganlari esa allaqachon
+        o'chirilgan va o'z vaqtini olgan.
+        """
+        now = utcnow_naive()
+        for model in (TeacherAssignment, TeacherSubject, TeacherGroup):
+            await session.execute(
+                update(model)
+                .where(model.external_source == SOURCE_EDUPLAN, model.is_active.is_(True))
+                .values(synced_at=now)
+                .execution_options(synchronize_session=False)
+            )
 
     @staticmethod
     async def _deactivate_missing(
@@ -366,3 +390,15 @@ class EduPlanWorkloadService:
 
 
 eduplan_workload_service = EduPlanWorkloadService()
+
+
+def _assign(row, values: dict) -> bool:
+    """Faqat farq qiladigan maydonlarni yozadi; biror narsa o'zgardimi — qaytaradi."""
+    changed = False
+    for field, value in values.items():
+        if getattr(row, field) != value:
+            setattr(row, field, value)
+            changed = True
+    if changed:
+        row.synced_at = utcnow_naive()
+    return changed

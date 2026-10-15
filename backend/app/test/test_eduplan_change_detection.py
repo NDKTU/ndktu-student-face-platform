@@ -135,3 +135,45 @@ def test_inactive_row_is_always_a_change():
     row.is_active = False
 
     assert not _up_to_date(row, {"name": "101B-23", "hemis_group_id": "412"})
+
+
+# ── Bog'lanish: o'quv reja ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_subject_with_curriculum_is_unchanged(async_db, test_kafedra):
+    """O'zgarmagan fan `unchanged` — o'quv rejasi bo'lsa ham.
+
+    Ota-ona xaritasida o'quv reja yo'q edi: `_is_up_to_date` fanning
+    `curriculum_external_id` ini «bog'lanish yo'q» bilan solishtirib, har
+    progonda 3051 fanni `update` qilardi va qayta yozardi.
+    """
+    from app.modules.integration.eduplan.schemas import EduPlanEntity
+    from app.modules.organization_structure.model import Curriculum, Kafedra
+    from app.modules.quiz.model import Subject
+
+    kafedra = await async_db.get(Kafedra, test_kafedra["id"])
+    kafedra.external_source, kafedra.external_id = "eduplan", "10"
+    curriculum = Curriculum(name="Reja 2025", kafedra_id=kafedra.id, external_source="eduplan", external_id="77")
+    async_db.add(curriculum)
+    await async_db.flush()
+    async_db.add(
+        Subject(
+            name="Oliy matematika",
+            kafedra_id=kafedra.id,
+            curriculum_id=curriculum.id,
+            semester="1",
+            external_source="eduplan",
+            external_id="500",
+        )
+    )
+    await async_db.commit()
+
+    raw = {"id": 500, "name": "Oliy matematika", "department_id": 10, "edu_plan_id": 77, "semester": "1"}
+    proposals = await svc._build_proposals(async_db, {"subjects": [raw]}, [EduPlanEntity.subject])
+    assert [p.action.value for p in proposals] == ["unchanged"]
+
+    # Boshqa rejaga o'tgan fan esa haqiqiy o'zgarish.
+    moved = {**raw, "edu_plan_id": 78}
+    proposals = await svc._build_proposals(async_db, {"subjects": [moved]}, [EduPlanEntity.subject])
+    assert [p.action.value for p in proposals] == ["update"]

@@ -396,12 +396,17 @@ class EduPlanSyncService:
 
         # Карта «локальный id родителя → его внешний id»: без неё нельзя
         # понять, изменилась ли привязка (в снимке — внешний id, в строке —
-        # локальный FK). Три дешёвых индекса, строятся один раз на прогон.
+        # локальный FK). Дешёвые индексы, строятся один раз на прогон.
+        # Здесь должен быть КАЖДЫЙ `*_external_id`, который встречается в
+        # `changes`: для отсутствующего `_is_up_to_date` видит «привязки нет»
+        # и держит строку в вечном `update` — так было с учебным планом
+        # у предметов (3051 «обновлённый» предмет на каждом прогоне).
         parent_external: dict[str, dict[int, str]] = {}
         for field, parent_entity in (
             ("faculty_external_id", EduPlanEntity.faculty),
             ("kafedra_external_id", EduPlanEntity.kafedra),
             ("speciality_external_id", EduPlanEntity.speciality),
+            ("curriculum_external_id", EduPlanEntity.curriculum),
         ):
             index = await eduplan_repository.index_by_external(session, ENTITY_MODEL[parent_entity])
             parent_external[field] = {row.id: ext_id for ext_id, row in index.items()}
