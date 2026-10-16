@@ -15,11 +15,11 @@ TTL блокировки — час: полный обход это 49 стра�
 import logging
 
 from core.redis_client import redis_client
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import StudentSyncApplyRequest, StudentSyncApplyResponse
 from .student_sync import hemis_student_sync
+from app.core.errors import Conflict
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +27,12 @@ LOCK_KEY = "hemis:student-sync:lock"
 LOCK_TTL_SECONDS = 60 * 60
 
 
-class StudentSyncBusy(HTTPException):
+class StudentSyncBusy(Conflict):
     """Другой прогон уже идёт. Отдельный класс — чтобы cron отличил это от
     настоящей ошибки и вышел с кодом «занято», а не «провалилось»."""
 
     def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Import allaqachon ketmoqda — tugashini kuting",
-        )
+        super().__init__("sync_in_progress", "Import allaqachon ketmoqda — tugashini kuting")
 
 
 class StudentSyncRunner:

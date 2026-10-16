@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import app.core.database.models_registry  # noqa: F401 — ensures every model is imported before SQLAlchemy resolves relationships
 import app.core.logging  # Trigger logging configuration
 from app.core.config import settings
+from app.core.errors import install_error_handlers
 from app.core.lifespan import lifespan
 from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.modules.router import router
@@ -26,6 +27,10 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+
+# `AppError` (repozitoriy, servis, sinxronizatsiya) → HTTP javobi. Yagona joy:
+# holat kodi va javob shakli shu yerda tanlanadi (`core/errors.py`).
+install_error_handlers(app)
 
 # Ensure upload directory (and its purpose-based subfolders) exist
 os.makedirs(settings.absolute_upload_dir, exist_ok=True)

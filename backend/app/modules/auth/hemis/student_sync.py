@@ -31,7 +31,6 @@ import logging
 import secrets
 from datetime import date, datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +45,7 @@ from .data_client import HemisDataClient
 from .model import HemisStudentGroup
 from .schemas import StudentSyncApplyRequest, StudentSyncApplyResponse, StudentSyncPreviewResponse
 from app.core.utils.roles import ROLE_STUDENT
+from app.core.errors import Conflict, Invalid
 
 logger = logging.getLogger(__name__)
 
@@ -407,9 +407,9 @@ class HemisStudentSync:
         # aylanib chiqib, keyin hammasini tashlab yuborish bir necha daqiqani
         # behuda sarflardi.
         if not (data.include_create or data.include_update):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Hech bo'lmasa bitta toifa tanlanishi kerak: yangilar yoki yangilanadiganlar",
+            raise Invalid(
+                "nothing_selected",
+                "Hech bo'lmasa bitta toifa tanlanishi kerak: yangilar yoki yangilanadiganlar",
             )
 
         client = await self._client(session)
@@ -443,12 +443,11 @@ class HemisStudentSync:
             plan["update"] = []
 
         if len(plan["create"]) > BULK_CREATE_THRESHOLD and not data.allow_bulk_create:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"{len(plan['create'])} ta yangi talaba yaratiladi — bu ommaviy o'zgarish. "
-                    "Tasdiqlash uchun 'allow_bulk_create' bilan yuboring."
-                ),
+            raise Conflict(
+                "bulk_create_blocked",
+                f"{len(plan['create'])} ta yangi talaba yaratiladi — bu ommaviy o'zgarish. "
+                "Tasdiqlash uchun 'allow_bulk_create' bilan yuboring.",
+                count=len(plan["create"]),
             )
 
         # Пароля у нас нет и быть не может: вход этих людей идёт проверкой в

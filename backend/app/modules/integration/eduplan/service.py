@@ -18,7 +18,6 @@ from typing import Any, Iterable, Sequence
 
 from core.mixins.time_stamp_mixin import utcnow_naive
 from core.redis_client import redis_client
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,6 +56,7 @@ from .schemas import (
     ProposalAction,
     SyncFailure,
 )
+from app.core.errors import Conflict, Gone
 
 logger = logging.getLogger(__name__)
 
@@ -585,10 +585,7 @@ class EduPlanSyncService:
     async def apply(self, session: AsyncSession, request: ApplyRequest) -> ApplyResponse:
         raw = await redis_client.get(_snapshot_key(request.run_id))
         if not raw:
-            raise HTTPException(
-                status_code=status.HTTP_410_GONE,
-                detail="Снимок предпросмотра истёк или не найден. Запустите предпросмотр заново.",
-            )
+            raise Gone("preview_expired", "Снимок предпросмотра истёк или не найден. Запустите предпросмотр заново.")
 
         stored = json.loads(raw)
         proposals = [Proposal.model_validate(p) for p in stored["proposals"]]
@@ -705,14 +702,13 @@ class EduPlanSyncService:
 
         share = to_delete / len(teacher_proposals)
         if share > DELETE_SHARE_THRESHOLD:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"EPMOS {len(teacher_proposals) - to_delete} ta oʻqituvchini qaytardi, "
-                    f"{to_delete} tasi esa yoʻq ({share:.0%}). Bu EPMOS tomonidagi nosozlikka "
-                    "oʻxshaydi. Haqiqatan oʻchirish kerak boʻlsa, «ommaviy oʻchirishga ruxsat» "
-                    "bilan qayta yuboring."
-                ),
+            raise Conflict(
+                "bulk_delete_blocked",
+                f"EPMOS {len(teacher_proposals) - to_delete} ta oʻqituvchini qaytardi, "
+                f"{to_delete} tasi esa yoʻq ({share:.0%}). Bu EPMOS tomonidagi nosozlikka "
+                "oʻxshaydi. Haqiqatan oʻchirish kerak boʻlsa, «ommaviy oʻchirishga ruxsat» "
+                "bilan qayta yuboring.",
+                to_delete=to_delete,
             )
 
     @staticmethod

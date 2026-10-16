@@ -15,16 +15,24 @@ from typing import Any
 
 import httpx
 from core.config import EduPlanConfig, settings
-from fastapi import HTTPException, status
+from fastapi import status
+from app.core.errors import KIND_BY_STATUS, AppError
 
 logger = logging.getLogger(__name__)
 
 
-class EduPlanError(HTTPException):
-    """Ошибка обращения к EduPlan, пригодная для отдачи наружу."""
+class EduPlanError(AppError):
+    """Ошибка обращения к EduPlan.
 
-    def __init__(self, detail: str, status_code: int = status.HTTP_502_BAD_GATEWAY):
-        super().__init__(status_code=status_code, detail=detail)
+    Не `HTTPException`: клиент вызывают и cron-скрипт, и фоновая задача.
+    HTTP-ответом её делает общий обработчик (`core/errors.py`); статус
+    здесь лишь выбирает вид ошибки — 502 «EPMOS ответил ошибкой»,
+    503 «не ответил / не настроен», 403 «не хватает прав».
+    """
+
+    def __init__(self, detail: str, status_code: int = status.HTTP_502_BAD_GATEWAY, code: str = "eduplan_error"):
+        super().__init__(code, detail)
+        self.kind = KIND_BY_STATUS.get(status_code, "upstream")
 
 
 class EduPlanClient:

@@ -20,34 +20,39 @@ baribir mazmunli matn ko'radi. Shu shakl loyihada allaqachon ishlatiladi —
 `quiz/repository.py::_not_enough_questions` ga qarang.
 """
 
-from fastapi import HTTPException, status
+from fastapi import status
+
+from app.core.errors import KIND_BY_STATUS, AppError
 
 
-def quiz_error(status_code: int, code: str, message: str, **extra) -> HTTPException:
-    """Kod va matnli `HTTPException`.
+def quiz_error(status_code: int, code: str, message: str, **extra) -> AppError:
+    """Kod va matnli xato (`core/errors.py::AppError`).
+
+    HTTP javobiga uni `main.py` dagi umumiy ishlovchi aylantiradi — javob
+    shakli avvalgidek. Holat kodi bu yerda faqat xato turini tanlash uchun:
+    chaqiruvchilar uni shu imzo bilan yozib bo'lgan.
 
     `extra` — xabarni tuzish uchun kerakli sonlar (masalan, qolgan urinishlar):
     frontend ularni tarjimaga qo'yadi, matnni qayta yig'ishga hojat qolmaydi.
     """
-    return HTTPException(
-        status_code=status_code,
-        detail={"code": code, "message": message, **extra},
-    )
+    error = AppError(code, message, **extra)
+    error.kind = KIND_BY_STATUS.get(status_code, "bad_request")
+    return error
 
 
-def quiz_not_found() -> HTTPException:
+def quiz_not_found() -> AppError:
     return quiz_error(status.HTTP_404_NOT_FOUND, "quiz_not_found", "Test topilmadi")
 
 
-def quiz_not_active() -> HTTPException:
+def quiz_not_active() -> AppError:
     return quiz_error(status.HTTP_400_BAD_REQUEST, "quiz_not_active", "Test faol emas")
 
 
-def invalid_pin() -> HTTPException:
+def invalid_pin() -> AppError:
     return quiz_error(status.HTTP_403_FORBIDDEN, "invalid_pin", "PIN kod noto'g'ri")
 
 
-def quiz_not_for_your_group() -> HTTPException:
+def quiz_not_for_your_group() -> AppError:
     return quiz_error(
         status.HTTP_403_FORBIDDEN,
         "quiz_not_for_your_group",
@@ -55,7 +60,7 @@ def quiz_not_for_your_group() -> HTTPException:
     )
 
 
-def quiz_has_no_questions() -> HTTPException:
+def quiz_has_no_questions() -> AppError:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,
         "quiz_has_no_questions",
@@ -63,7 +68,7 @@ def quiz_has_no_questions() -> HTTPException:
     )
 
 
-def student_photo_missing() -> HTTPException:
+def student_photo_missing() -> AppError:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,
         "student_photo_missing",
@@ -71,7 +76,7 @@ def student_photo_missing() -> HTTPException:
     )
 
 
-def attempt_expired(*, ask_teacher: bool = False) -> HTTPException:
+def attempt_expired(*, ask_teacher: bool = False) -> AppError:
     """Vaqt tugadi. `ask_teacher` — urinish shu yerda yopilgan holat uchun."""
     if ask_teacher:
         return quiz_error(
@@ -82,15 +87,15 @@ def attempt_expired(*, ask_teacher: bool = False) -> HTTPException:
     return quiz_error(status.HTTP_400_BAD_REQUEST, "attempt_expired", "Urinish vaqti tugagan")
 
 
-def attempt_not_found() -> HTTPException:
+def attempt_not_found() -> AppError:
     return quiz_error(status.HTTP_404_NOT_FOUND, "attempt_not_found", "Urinish topilmadi")
 
 
-def not_your_attempt() -> HTTPException:
+def not_your_attempt() -> AppError:
     return quiz_error(status.HTTP_403_FORBIDDEN, "not_your_attempt", "Bu sizning urinishingiz emas")
 
 
-def attempt_already_finished() -> HTTPException:
+def attempt_already_finished() -> AppError:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,
         "attempt_already_finished",
@@ -98,7 +103,7 @@ def attempt_already_finished() -> HTTPException:
     )
 
 
-def attempt_closed_left_page(reason: str = "Sahifadan chiqdi") -> HTTPException:
+def attempt_closed_left_page(reason: str = "Sahifadan chiqdi") -> AppError:
     """Qat'iy testda talaba sahifadan chiqqani uchun urinish yopildi."""
     return quiz_error(
         status.HTTP_409_CONFLICT,
@@ -108,7 +113,7 @@ def attempt_closed_left_page(reason: str = "Sahifadan chiqdi") -> HTTPException:
     )
 
 
-def strict_mode_disabled() -> HTTPException:
+def strict_mode_disabled() -> AppError:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,
         "strict_mode_disabled",
@@ -116,7 +121,7 @@ def strict_mode_disabled() -> HTTPException:
     )
 
 
-def question_not_in_attempt() -> HTTPException:
+def question_not_in_attempt() -> AppError:
     return quiz_error(
         status.HTTP_400_BAD_REQUEST,
         "question_not_in_attempt",
@@ -124,15 +129,15 @@ def question_not_in_attempt() -> HTTPException:
     )
 
 
-def question_not_found() -> HTTPException:
+def question_not_found() -> AppError:
     return quiz_error(status.HTTP_404_NOT_FOUND, "question_not_found", "Savol topilmadi")
 
 
-def invalid_option_index() -> HTTPException:
+def invalid_option_index() -> AppError:
     return quiz_error(status.HTTP_400_BAD_REQUEST, "invalid_option_index", "Variant raqami noto'g'ri")
 
 
-def face_verification_required() -> HTTPException:
+def face_verification_required() -> AppError:
     return quiz_error(
         status.HTTP_403_FORBIDDEN,
         "face_verification_required",
@@ -140,7 +145,7 @@ def face_verification_required() -> HTTPException:
     )
 
 
-def face_entry_not_required() -> HTTPException:
+def face_entry_not_required() -> AppError:
     return quiz_error(
         status.HTTP_409_CONFLICT,
         "face_entry_not_required",
@@ -148,7 +153,7 @@ def face_entry_not_required() -> HTTPException:
     )
 
 
-def face_service_unavailable() -> HTTPException:
+def face_service_unavailable() -> AppError:
     return quiz_error(
         status.HTTP_503_SERVICE_UNAVAILABLE,
         "face_service_unavailable",

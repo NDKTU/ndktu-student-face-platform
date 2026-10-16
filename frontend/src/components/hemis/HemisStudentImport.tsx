@@ -10,6 +10,7 @@ import {
     type StudentSyncResult,
     type StudentSyncSelection,
 } from '@/services/hemisService';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /** Sukut bo'yicha hammasi tanlangan: odatiy import aynan shunday. */
 const ALL_SELECTED: StudentSyncSelection = {
@@ -113,9 +114,7 @@ export const HemisStudentImport = () => {
             void runPreview.mutateAsync();
         },
         onError: (error: unknown) => {
-            const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-                ?.detail;
-            toast.error(detail || "Importni bajarib bo'lmadi");
+            toast.error(apiErrorMessage(error, "Importni bajarib bo'lmadi"));
         },
     });
 

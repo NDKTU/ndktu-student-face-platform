@@ -36,6 +36,8 @@ import app.core.database.models_registry  # noqa: E402,F401 — регистри
 from core.database.db_helper import db_helper  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
+from app.core.errors import AppError, error_text  # noqa: E402
+
 from app.modules.auth.hemis.schemas import StudentSyncApplyRequest  # noqa: E402
 from app.modules.auth.hemis.student_sync_runner import (  # noqa: E402
     StudentSyncBusy,
@@ -75,8 +77,11 @@ async def _run(args: argparse.Namespace) -> int:
     except StudentSyncBusy:
         logger.warning("Boshqa prognoz ketmoqda — o'tkazib yuborildi")
         return EXIT_BUSY
+    except AppError as error:
+        logger.error("Prognoz bajarilmadi: %s — %s", error.code, error.message)
+        return EXIT_FAILED
     except HTTPException as error:
-        logger.error("Prognoz bajarilmadi: HTTP %s — %s", error.status_code, error.detail)
+        logger.error("Prognoz bajarilmadi: HTTP %s — %s", error.status_code, error_text(error))
         return EXIT_FAILED
     except Exception:  # noqa: BLE001
         logger.exception("Prognoz kutilmagan xato bilan tugadi")

@@ -65,4 +65,7 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     zoom_account_in_use: "Akkauntga seanslar bog'langan — o'chirish o'rniga uni faolsizlantiring",
     zoom_account_incomplete_api: "Zoom API uchun Account ID, Client ID, Client Secret va host email to'rttasi ham kerak",
     zoom_account_sdk_secret_required: "Meeting SDK Client Secret kerak",
+    // Sinxronizatsiyalar (`core/errors.py`): EPMOS, HEMIS talabalar, jadval.
+    sync_in_progress: 'Sinxronizatsiya allaqachon ketmoqda — tugashini kuting',
+    preview_expired: "Ko'rib chiqish muddati tugagan — preview'ni qaytadan ishga tushiring",
 };

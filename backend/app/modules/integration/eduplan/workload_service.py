@@ -23,7 +23,6 @@ from collections import defaultdict
 
 from core.mixins.external_ref import SOURCE_EDUPLAN
 from core.mixins.time_stamp_mixin import utcnow_naive
-from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +33,7 @@ from app.modules.quiz.model import Subject
 from .client import EduPlanClient
 from .credentials import effective_config
 from .schemas import EduPlanStream, EduPlanWorkload
+from app.core.errors import Conflict
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,9 @@ class EduPlanWorkloadService:
                 years = await client.academic_years()
                 active = next((y for y in years if y.get("is_active")), None)
                 if active is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="В EduPlan нет активного учебного года — укажите academic_year_id явно",
+                    raise Conflict(
+                        "no_active_academic_year",
+                        "В EduPlan нет активного учебного года — укажите academic_year_id явно",
                     )
                 academic_year_id = active["id"]
 

@@ -131,11 +131,11 @@ def test_mass_deletion_is_blocked_above_threshold():
 
     582 dan 263 tasi yoʻqolishi — bu kadrlar emas, nosozlik koʻrinishi.
     """
-    from fastapi import HTTPException
+    from app.core.errors import Conflict
 
     request = ApplyRequest(run_id="x", apply_deletions=True)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(Conflict) as exc:
         eduplan_sync_service._guard_mass_deletion(_proposals(total=582, missing=263), request)
 
     assert exc.value.status_code == 409
@@ -252,9 +252,9 @@ async def test_empty_epmos_response_deletes_nobody(async_db, empty_epmos, teache
     Chegara shu yerda ishlaydi: 100% yoʻqolgan — progon 409 bilan
     toʻxtaydi va hech narsa yozilmaydi.
     """
-    from fastapi import HTTPException
+    from app.core.errors import Conflict
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(Conflict) as exc:
         await eduplan_sync_service.sync_entity(
             async_db, EduPlanEntity.teacher, apply_deletions=True
         )

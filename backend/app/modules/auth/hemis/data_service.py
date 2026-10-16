@@ -8,7 +8,6 @@ import json
 import logging
 import uuid
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +24,7 @@ from .schemas import (
     GroupMatchProposal,
     HemisDataProbeResponse,
 )
+from app.core.errors import Conflict
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class HemisDataService:
             client = await self._client(session)
             result = await client.probe()
         except HemisDataError as error:
-            return HemisDataProbeResponse(ok=False, detail=str(error.detail))
+            return HemisDataProbeResponse(ok=False, detail=error.message)
 
         await data_credentials.mark_ok(session)
         return HemisDataProbeResponse(ok=True, total=result["total"])
@@ -98,10 +98,7 @@ class HemisDataService:
     ) -> GroupMatchApplyResponse:
         raw = await redis_client.get(_run_key(data.run_id))
         if not raw:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Taklif muddati tugagan — qaytadan preview qiling",
-            )
+            raise Conflict("preview_expired", "Taklif muddati tugagan — qaytadan preview qiling")
         proposals = [GroupMatchProposal(**item) for item in json.loads(raw)]
 
         # Ручные решения перекрывают автоматические: администратор видел список.

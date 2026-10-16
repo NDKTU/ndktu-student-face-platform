@@ -20,13 +20,10 @@ import {
     type PreviewResponse,
     type WorkloadSyncResult,
 } from '@/services/eduplanService';
+import { apiErrorMessage } from '@/utils/apiError';
 
-/** Xato matni: API `detail` i, bo'lmasa istisno xabari. */
-const errorText = (e: unknown) => {
-    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-    return (e as Error)?.message ?? "Noma'lum xatolik";
-};
+/** Xato matni: API `detail` i (satr yoki `{code, message}`), bo'lmasa istisno xabari. */
+const errorText = (e: unknown) => apiErrorMessage(e, (e as Error)?.message ?? "Noma'lum xatolik");
 
 /** `deleted_related` kalitlari — hisobotdagi inson o'qiydigan nomlar. */
 const RELATED_LABEL: Record<string, string> = {

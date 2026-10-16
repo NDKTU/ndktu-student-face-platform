@@ -365,11 +365,11 @@ async def test_nothing_selected_is_rejected(async_db, hemis_items, linked_group)
     49 sahifani aylanib chiqib, keyin hammasini tashlash bir necha daqiqani
     behuda sarflardi.
     """
-    from fastapi import HTTPException
+    from app.core.errors import Invalid
 
     hemis_items.append(_item())
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(Invalid) as exc:
         await hemis_student_sync.apply(
             async_db,
             StudentSyncApplyRequest(include_create=False, include_update=False),

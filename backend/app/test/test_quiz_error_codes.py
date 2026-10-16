@@ -75,7 +75,7 @@ def test_all_error_factories_are_covered():
         if not name.startswith("_") and callable(getattr(errors, name)) and name != "quiz_error"
     }
     # `HTTPException` va `status` — import qilingan nomlar, xato fabrikasi emas.
-    factories -= {"HTTPException", "status"}
+    factories -= {"HTTPException", "status", "AppError", "KIND_BY_STATUS"}
     listed = {factory.__name__ for _, factory, _ in ALL_ERRORS}
 
     assert factories == listed, f"ALL_ERRORS ga qo'shilmagan: {factories - listed}"

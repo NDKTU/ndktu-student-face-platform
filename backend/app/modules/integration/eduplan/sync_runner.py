@@ -20,12 +20,13 @@ from core.config import settings
 from core.database.db_helper import db_helper
 from core.redis_client import redis_client
 from core.schemas import TASHKENT_TZ
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import ApplyRequest
 from .service import eduplan_sync_service
 from .workload_service import eduplan_workload_service
+from app.core.errors import AppError, Conflict, error_text
 
 logger = logging.getLogger(__name__)
 
@@ -61,24 +62,19 @@ class EduPlanSyncRunner:
     ) -> dict:
         acquired = await redis_client.set(LOCK_KEY, triggered_by, nx=True, ex=LOCK_TTL_SECONDS)
         if not acquired:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Синхронизация с EduPlan уже выполняется",
-            )
+            raise Conflict("sync_in_progress", "Синхронизация с EduPlan уже выполняется")
 
         try:
             preview = await eduplan_sync_service.build_preview(session)
 
             risky = self._bulk_create_risk(preview)
             if risky and not allow_bulk_create:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "Прогон остановлен: он создал бы много новых записей вместо связывания "
-                        f"с существующими ({'; '.join(risky)}). Похоже, первичное сопоставление "
-                        "ещё не сделано — выполните его на экране синхронизации. Если это "
-                        "ожидаемо, запустите скрипт с --allow-bulk-create."
-                    ),
+                raise Conflict(
+                    "bulk_create_blocked",
+                    "Прогон остановлен: он создал бы много новых записей вместо связывания "
+                    f"с существующими ({'; '.join(risky)}). Похоже, первичное сопоставление "
+                    "ещё не сделано — выполните его на экране синхронизации. Если это "
+                    "ожидаемо, запустите скрипт с --allow-bulk-create.",
                 )
 
             applied = await eduplan_sync_service.apply(
@@ -109,11 +105,11 @@ class EduPlanSyncRunner:
             try:
                 if not skip_workloads:
                     workloads = await eduplan_workload_service.sync(session)
-            except HTTPException as e:
+            except (HTTPException, AppError) as e:
                 # Нагрузка может быть недоступна сервисному аккаунту или в
                 # EduPlan может не быть активного учебного года — справочники
                 # при этом уже синхронизированы, и терять их незачем.
-                workload_error = str(e.detail)
+                workload_error = error_text(e)
                 logger.warning("EduPlan: импорт нагрузки пропущен: %s", workload_error)
 
             summary = {
@@ -177,7 +173,7 @@ class EduPlanSyncRunner:
                     "error": None,
                 }
             )
-        except HTTPException as e:
+        except (HTTPException, AppError) as e:
             await self._write_state(
                 {
                     "status": "failed",
@@ -185,7 +181,7 @@ class EduPlanSyncRunner:
                     "started_at": started_at,
                     "finished_at": datetime.now(TASHKENT_TZ).isoformat(),
                     "summary": None,
-                    "error": str(e.detail),
+                    "error": error_text(e),
                 }
             )
         except Exception as e:  # noqa: BLE001 — xato yoʻqolib ketmasligi kerak
@@ -209,10 +205,7 @@ class EduPlanSyncRunner:
         keyin holatda «allaqachon ketyapti» degan xatoni koʻrardi.
         """
         if await redis_client.get(LOCK_KEY):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Sinxronizatsiya allaqachon ketyapti",
-            )
+            raise Conflict("sync_in_progress", "Sinxronizatsiya allaqachon ketyapti")
 
         state = {
             "status": "running",
@@ -273,9 +266,9 @@ class EduPlanSyncRunner:
             try:
                 async with db_helper.session_factory() as session:
                     await self.run(session, triggered_by="schedule")
-            except HTTPException as e:
+            except (HTTPException, AppError) as e:
                 # 409 — параллельный прогон, это штатная ситуация при нескольких репликах.
-                logger.info("EduPlan: ночной прогон пропущен: %s", e.detail)
+                logger.info("EduPlan: ночной прогон пропущен: %s", error_text(e))
             except asyncio.CancelledError:
                 raise
             except Exception:

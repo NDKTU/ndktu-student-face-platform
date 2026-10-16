@@ -51,16 +51,13 @@ import {
     type RunState,
 } from '@/services/eduplanService';
 import { COURSE_TYPE_OPTIONS, courseTypeLabel } from '@/services/courseTypes';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /** Выбор администратора по конфликту: id локальной строки либо «создать новую». */
 type ConflictChoice = number | 'create' | undefined;
 
-/** Текст ошибки API для уведомлений: detail из ответа либо message исключения. */
-const errorText = (e: unknown) => {
-    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-    return (e as Error)?.message ?? "Noma'lum xatolik";
-};
+/** Текст ошибки API для уведомлений: detail (строка или `{code, message}`) либо message исключения. */
+const errorText = (e: unknown) => apiErrorMessage(e, (e as Error)?.message ?? "Noma'lum xatolik");
 
 const EduPlanSyncPage = () => {
     // `status` hali ham kerak: «Bo'limlar bo'yicha sinxronlash» EPMOS bilan aloqa

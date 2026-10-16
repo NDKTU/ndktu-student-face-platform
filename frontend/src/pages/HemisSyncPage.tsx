@@ -18,6 +18,7 @@ import { GroupDuplicates } from '@/components/hemis/GroupDuplicates';
 import { HemisStudentImport } from '@/components/hemis/HemisStudentImport';
 import { HemisScheduleSync } from '@/components/hemis/HemisScheduleSync';
 import { formatDate } from '@/utils/date';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /* Шаги мастера: проверка данных → синхронизация → готово. */
 const STEPS = ['Tekshirish', 'Sinxronlash', 'Yakun'];
@@ -110,7 +111,7 @@ const HemisSyncPage = () => {
         },
         onError: (err: any) => {
             setIsSyncing(false);
-            toast.error(err?.response?.data?.detail || err?.message || 'Sinxronlashda xatolik');
+            toast.error(apiErrorMessage(err, err?.message || 'Sinxronlashda xatolik'));
         }
     });
 
@@ -170,7 +171,7 @@ const HemisSyncPage = () => {
                         </div>
                         <h2 className="text-2xl font-bold mb-3">Yuklashda xatolik yuz berdi</h2>
                         <div className="bg-destructive/5 text-destructive border border-destructive/10 p-4 rounded-xl w-full mb-8 font-mono text-sm">
-                            {(previewError as any)?.response?.data?.detail || previewError?.message || 'Noma\'lum xatolik'}
+                            {apiErrorMessage(previewError, previewError?.message || 'Noma\'lum xatolik')}
                         </div>
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={() => navigate('/students')} size="lg">

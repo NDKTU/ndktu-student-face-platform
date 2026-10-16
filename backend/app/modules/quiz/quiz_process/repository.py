@@ -39,6 +39,7 @@ from .schemas import (
     VerifyEntryFaceResponse,
 )
 from app.core.utils.roles import user_is_admin
+from app.core.errors import AppError
 
 logger = logging.getLogger(__name__)
 
@@ -750,7 +751,7 @@ class QuizProcessRepository:
                 message="Cheating evidence saved successfully",
             )
 
-        except HTTPException:
+        except (HTTPException, AppError):
             raise
         except Exception as e:
             logger.error(f"Error saving cheating evidence: {e}", exc_info=True)

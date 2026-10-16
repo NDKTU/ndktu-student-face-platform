@@ -22,7 +22,6 @@ yuzlab kurs yaratish — «206 guruh dublikat» tuzogʻining aynan oʻzi.
 import logging
 from collections import defaultdict
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +32,7 @@ from app.modules.organization_structure.model import Group
 from app.modules.quiz.model import Subject
 
 from .schemas import CourseArchiveRow, CoursePlan, CoursePreviewResponse
+from app.core.errors import Conflict
 
 logger = logging.getLogger(__name__)
 
@@ -356,13 +356,12 @@ class EduPlanCourseBuilder:
         # belgisi. Hech nima yozilmasdan toʻxtaydi: yaratishni ham qilib
         # qoʻyib keyin toʻxtash yarim bajarilgan progon boʻlardi.
         if archive and plan_set.archive and plan_set.archive_blocked:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"{len(plan_set.archive)} ta kurs arxivga tushmoqchi — bu juda koʻp. "
-                    "Odatda bu yuklama toʻliq yuklanmaganini bildiradi. Avval yuklamani "
-                    "qayta import qiling."
-                ),
+            raise Conflict(
+                "bulk_archive_blocked",
+                f"{len(plan_set.archive)} ta kurs arxivga tushmoqchi — bu juda koʻp. "
+                "Odatda bu yuklama toʻliq yuklanmaganini bildiradi. Avval yuklamani "
+                "qayta import qiling.",
+                count=len(plan_set.archive),
             )
 
         created = 0

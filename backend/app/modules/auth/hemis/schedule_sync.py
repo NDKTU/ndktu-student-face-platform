@@ -30,7 +30,6 @@
 import logging
 from datetime import date, datetime, time, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +42,7 @@ from . import data_credentials
 from .data_client import HemisDataClient
 from .model import HemisScheduleLesson
 from .schemas import ScheduleSyncRequest, ScheduleSyncResponse
+from app.core.errors import Conflict
 
 logger = logging.getLogger(__name__)
 
@@ -198,15 +198,12 @@ _UPDATABLE = [
 # ── Синк ──────────────────────────────────────────────────────────────────────
 
 
-class ScheduleSyncBusy(HTTPException):
+class ScheduleSyncBusy(Conflict):
     """Другой прогон уже идёт. Отдельный класс — чтобы cron отличил это от
     настоящей ошибки и вышел с кодом «занято», а не «провалилось»."""
 
     def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Jadval sinxronizatsiyasi allaqachon ketmoqda — tugashini kuting",
-        )
+        super().__init__("sync_in_progress", "Jadval sinxronizatsiyasi allaqachon ketmoqda — tugashini kuting")
 
 
 class HemisScheduleSync:

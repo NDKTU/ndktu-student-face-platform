@@ -74,6 +74,7 @@ from .schemas import (
     ZoomTeacherOptionListResponse,
 )
 from .zoom_api import ZoomApiError, api_error, registrant_join_url, registrant_token, zak_token, zoom_api
+from app.core.errors import AppError, error_text
 
 logger = logging.getLogger(__name__)
 
@@ -125,21 +126,21 @@ def _face_ok_key(session_id: int, user_id: int) -> str:
 # ── Xatolar (`{code, message}` — frontend `errorCodes.ts` bo'yicha tarjima qiladi) ──
 
 
-def _not_found() -> HTTPException:
+def _not_found() -> AppError:
     return quiz_error(status.HTTP_404_NOT_FOUND, "zoom_session_not_found", "Seans topilmadi")
 
 
-def _not_yours() -> HTTPException:
+def _not_yours() -> AppError:
     return quiz_error(status.HTTP_403_FORBIDDEN, "zoom_session_not_yours", "Bu seans sizniki emas")
 
 
-def _not_your_group() -> HTTPException:
+def _not_your_group() -> AppError:
     return quiz_error(
         status.HTTP_403_FORBIDDEN, "zoom_not_your_group", "Bu seans sizning guruhingiz uchun emas"
     )
 
 
-def _not_open(opens_at: datetime) -> HTTPException:
+def _not_open(opens_at: datetime) -> AppError:
     return quiz_error(
         status.HTTP_403_FORBIDDEN,
         "zoom_session_not_open",
@@ -148,25 +149,25 @@ def _not_open(opens_at: datetime) -> HTTPException:
     )
 
 
-def _closed() -> HTTPException:
+def _closed() -> AppError:
     return quiz_error(status.HTTP_403_FORBIDDEN, "zoom_session_closed", "Seans vaqti tugagan — kirib bo'lmaydi")
 
 
-def _face_check_disabled() -> HTTPException:
+def _face_check_disabled() -> AppError:
     return quiz_error(status.HTTP_409_CONFLICT, "zoom_face_check_disabled", "Bu seansda yuz nazorati o'chirilgan")
 
 
-def _not_configured() -> HTTPException:
+def _not_configured() -> AppError:
     return quiz_error(
         status.HTTP_503_SERVICE_UNAVAILABLE, "zoom_not_configured", "Zoom integratsiyasi sozlanmagan"
     )
 
 
-def _bad_link(cause: Exception) -> HTTPException:
+def _bad_link(cause: Exception) -> AppError:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_bad_link", str(cause))
 
 
-def _link_required() -> HTTPException:
+def _link_required() -> AppError:
     return quiz_error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "zoom_link_required",
@@ -174,25 +175,25 @@ def _link_required() -> HTTPException:
     )
 
 
-def _teacher_required() -> HTTPException:
+def _teacher_required() -> AppError:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_teacher_required", "O'qituvchini tanlang")
 
 
-def _teacher_not_found() -> HTTPException:
+def _teacher_not_found() -> AppError:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_teacher_not_found", "O'qituvchi topilmadi")
 
 
-def _teacher_locked() -> HTTPException:
+def _teacher_locked() -> AppError:
     return quiz_error(
         status.HTTP_403_FORBIDDEN, "zoom_teacher_locked", "O'qituvchi faqat o'zi uchun seans yarata oladi"
     )
 
 
-def _subject_required() -> HTTPException:
+def _subject_required() -> AppError:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_subject_required", "Fanni tanlang")
 
 
-def _subject_not_teachers() -> HTTPException:
+def _subject_not_teachers() -> AppError:
     return quiz_error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "zoom_subject_not_teachers",
@@ -233,19 +234,16 @@ def auto_title(subject_name: str, teacher: Teacher | None, group_names: list[str
     return title[:255]
 
 
-def _reason(cause: HTTPException) -> str:
-    """Xatoning matni: `quiz_error` lug'at qaytaradi, oddiy `HTTPException` — satr."""
-    detail = cause.detail
-    if isinstance(detail, dict):
-        return str(detail.get("message") or detail.get("code") or cause.status_code)
-    return str(detail)
+def _reason(cause: HTTPException | AppError) -> str:
+    """Xatoning matni: `quiz_error` — `AppError`, oddiy `HTTPException` — satr."""
+    return error_text(cause)
 
 
-def _account_not_found() -> HTTPException:
+def _account_not_found() -> AppError:
     return quiz_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "zoom_account_not_found", "Zoom akkaunti topilmadi")
 
 
-def _account_cannot_create() -> HTTPException:
+def _account_cannot_create() -> AppError:
     return quiz_error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "zoom_account_cannot_create",
@@ -253,7 +251,7 @@ def _account_cannot_create() -> HTTPException:
     )
 
 
-def _account_busy() -> HTTPException:
+def _account_busy() -> AppError:
     return quiz_error(
         status.HTTP_409_CONFLICT,
         "zoom_account_busy",
@@ -261,7 +259,7 @@ def _account_busy() -> HTTPException:
     )
 
 
-def _no_free_account() -> HTTPException:
+def _no_free_account() -> AppError:
     return quiz_error(
         status.HTTP_409_CONFLICT,
         "zoom_no_free_account",
@@ -269,7 +267,7 @@ def _no_free_account() -> HTTPException:
     )
 
 
-def _account_required() -> HTTPException:
+def _account_required() -> AppError:
     return quiz_error(
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "zoom_account_required",
@@ -277,7 +275,7 @@ def _account_required() -> HTTPException:
     )
 
 
-def _not_managed() -> HTTPException:
+def _not_managed() -> AppError:
     return quiz_error(
         status.HTTP_409_CONFLICT,
         "zoom_not_managed",
@@ -784,7 +782,7 @@ class ZoomSessionRepository:
             occurrence = base.model_copy(update={"starts_at": starts_at, "ends_at": ends_at})
             try:
                 created.append(await self.create_session(session, occurrence, user, series_id=series_id))
-            except HTTPException as cause:
+            except (HTTPException, AppError) as cause:
                 # Rollback kerak emas: `create_session` xatoni seans sessiyaga
                 # qo'shilishidan oldin beradi (band akkaunt, Zoom rad etdi).
                 failed.append(ZoomSeriesFailure(starts_at=starts_at, reason=_reason(cause)))
@@ -837,7 +835,7 @@ class ZoomSessionRepository:
             try:
                 await self.update_session(session, target_id, target_data, user)
                 updated += 1
-            except HTTPException as cause:
+            except (HTTPException, AppError) as cause:
                 failed.append(ZoomSeriesFailure(starts_at=new_start, reason=_reason(cause)))
                 # `update_session` xatoda rollback qiladi — u esa sessiyadagi barcha
                 # obyektlarni, jumladan `user` ni eskirtiradi. Qayta o'qimasak,

@@ -12,7 +12,8 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from fastapi import HTTPException, status
+from fastapi import status
+from app.core.errors import KIND_BY_STATUS, AppError
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,13 @@ PAGE_SIZE = 200
 MAX_PAGES = 200
 
 
-class HemisDataError(HTTPException):
-    def __init__(self, detail: str, status_code: int = status.HTTP_502_BAD_GATEWAY):
-        super().__init__(status_code=status_code, detail=detail)
+class HemisDataError(AppError):
+    """Ошибка HEMIS data API (сервисный токен). Как `EduPlanError` — не
+    `HTTPException`, потому что её получают и cron-скрипты импорта."""
+
+    def __init__(self, detail: str, status_code: int = status.HTTP_502_BAD_GATEWAY, code: str = "hemis_data_error"):
+        super().__init__(code, detail)
+        self.kind = KIND_BY_STATUS.get(status_code, "upstream")
 
 
 def _unwrap(payload: dict) -> tuple[list[dict], dict]:

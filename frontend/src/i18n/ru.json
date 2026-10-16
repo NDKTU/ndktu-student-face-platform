@@ -630,5 +630,7 @@
   "Sh": "Сб",
   "Ya": "Вс",
   "Kafedrani qidirish": "Поиск кафедры",
-  "Kalendar bitta guruh yoki o'qituvchining jadvalini ko'rsatadi": "Календарь показывает расписание одной группы или преподавателя"
+  "Kalendar bitta guruh yoki o'qituvchining jadvalini ko'rsatadi": "Календарь показывает расписание одной группы или преподавателя",
+  "Sinxronizatsiya allaqachon ketmoqda — tugashini kuting": "Синхронизация уже выполняется — дождитесь завершения",
+  "Ko'rib chiqish muddati tugagan — preview'ni qaytadan ishga tushiring": "Срок предпросмотра истёк — запустите предпросмотр заново"
 }

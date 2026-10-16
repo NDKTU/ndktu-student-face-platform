@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useScheduleSync } from '@/hooks/useHemisSchedule';
 import type { ScheduleSyncResult } from '@/services/hemisScheduleService';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (
     <div className="rounded-xl border border-border p-3">
@@ -44,8 +45,7 @@ export const HemisScheduleSync = () => {
                 toast.success(t('Jadval yangilandi: {{count}} ta dars', { count: data.saved }));
             },
             onError: (error: unknown) => {
-                const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                toast.error(detail || t("Jadvalni sinxronlab bo'lmadi"));
+                toast.error(apiErrorMessage(error, t("Jadvalni sinxronlab bo'lmadi")));
             },
         });
 

@@ -36,6 +36,8 @@ from core.database.db_helper import db_helper  # noqa: E402
 from core.redis_client import redis_client  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
+from app.core.errors import AppError, error_text  # noqa: E402
+
 from app.modules.integration.eduplan.credentials import effective_config  # noqa: E402
 from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner  # noqa: E402
 from app.modules.integration.eduplan.workload_service import (  # noqa: E402
@@ -81,12 +83,18 @@ async def _run(args: argparse.Namespace) -> int:
                     allow_bulk_create=args.allow_bulk_create,
                     skip_workloads=args.skip_workloads,
                 )
-    except HTTPException as e:
-        detail = e.detail if isinstance(e.detail, str) else json.dumps(e.detail, ensure_ascii=False)
-        if e.status_code == 409 and "уже выполняется" in str(detail):
-            logger.warning("Прогон пропущен: %s", detail)
+    except AppError as e:
+        # По коду, а не по тексту: раньше здесь стояло
+        # `"уже выполняется" in str(detail)`, и правка формулировки
+        # превращала штатное «занято» в провал cron'а.
+        if e.code == "sync_in_progress":
+            logger.warning("Прогон пропущен: %s", e.message)
             return EXIT_BUSY
-        logger.error("Прогон не выполнен (HTTP %s): %s", e.status_code, detail)
+        logger.error("Прогон не выполнен (%s): %s", e.code, e.message)
+        return EXIT_FAILED
+    except HTTPException as e:
+        # Ещё не переведённые на `AppError` модули (переходный период).
+        logger.error("Прогон не выполнен (HTTP %s): %s", e.status_code, error_text(e))
         return EXIT_FAILED
     except Exception:
         logger.exception("Прогон завершился необработанной ошибкой")
