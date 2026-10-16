@@ -1,7 +1,6 @@
 import logging
 
 from core.utils.external_guard import ensure_editable
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +18,7 @@ from .schemas import (
     SpecialityStatsResponse,
     SpecialityUpdateRequest,
 )
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +74,7 @@ class SpecialityRepository:
             Speciality.name == data.name,
         )
         if (await session.execute(stmt_check)).scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Speciality '{data.name}' already exists in this kafedra",
-            )
+            raise Invalid("speciality_already_exists", f"Speciality '{data.name}' already exists in this kafedra")
 
         new_speciality = Speciality(
             name=data.name,
@@ -92,24 +89,23 @@ class SpecialityRepository:
         except IntegrityError as e:
             await session.rollback()
             logger.warning("Integrity error creating speciality %r: %s", data.name, e)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Speciality '{data.name}' conflicts with an existing record or invalid kafedra_id",
+            raise Conflict(
+                "speciality_conflict",
+                f"Speciality '{data.name}' conflicts with an existing record or invalid kafedra_id",
             )
         except SQLAlchemyError:
             await session.rollback()
             logger.exception("Database error creating speciality %r", data.name)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return new_speciality
 
     async def get_speciality(self, session: AsyncSession, speciality_id: int) -> Speciality:
         stmt = select(Speciality).where(Speciality.id == speciality_id)
         speciality = (await session.execute(stmt)).scalar_one_or_none()
         if not speciality:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Speciality not found")
+            raise NotFound("speciality_not_found", "Speciality not found")
         return speciality
 
     async def list_specialities(
@@ -166,10 +162,7 @@ class SpecialityRepository:
                 Speciality.id != speciality_id,
             )
             if (await session.execute(stmt_check)).scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Speciality name already taken in this kafedra",
-                )
+                raise Invalid("speciality_name_taken", "Speciality name already taken in this kafedra")
 
         speciality.name = target_name
         speciality.kafedra_id = target_kafedra_id
@@ -185,10 +178,7 @@ class SpecialityRepository:
         except IntegrityError as e:
             await session.rollback()
             logger.warning("Integrity error updating speciality %d: %s", speciality_id, e)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Update conflicts with existing record or invalid kafedra_id",
-            )
+            raise Conflict("speciality_conflict", "Update conflicts with existing record or invalid kafedra_id")
         return speciality
 
     async def delete_speciality(self, session: AsyncSession, speciality_id: int, force: bool = False) -> None:
@@ -204,13 +194,10 @@ class SpecialityRepository:
                 await session.execute(select(func.count(Group.id)).where(Group.speciality_id == speciality_id))
             ).scalar() or 0
             if group_count > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu mutaxassislikni o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
-                        "warnings": [f"{group_count} ta guruh mutaxassisliksiz qoladi (guruhlar o'chmaydi)"],
-                    },
+                raise Conflict(
+                    "speciality_has_related_data",
+                    "Ushbu mutaxassislikni o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True, warnings=[f"{group_count} ta guruh mutaxassisliksiz qoladi (guruhlar o'chmaydi)"],
                 )
 
         try:
@@ -218,10 +205,7 @@ class SpecialityRepository:
             await session.commit()
         except IntegrityError:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot delete: speciality is referenced by other records",
-            )
+            raise Conflict("speciality_referenced", "Cannot delete: speciality is referenced by other records")
 
 
 get_speciality_repository = SpecialityRepository()

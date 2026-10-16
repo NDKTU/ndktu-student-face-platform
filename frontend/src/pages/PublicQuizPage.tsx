@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { publicQuizService, type PublicFinishResponse, type PublicStartResponse } from '@/services/publicQuizService';
 import { sanitizeHtml } from '@/utils/sanitize';
+import { apiErrorMessage } from '@/utils/apiError';
 import { BRAND } from '@/config/branding';
 import logo from '@/assets/logo.png';
 
@@ -65,8 +66,7 @@ export default function PublicQuizPage() {
             setSession(data);
             setRemaining(data.remaining_seconds || data.duration * 60);
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || "Testni boshlab bo'lmadi");
+            setError(apiErrorMessage(cause, "Testni boshlab bo'lmadi"));
         } finally {
             setBusy(false);
         }
@@ -77,8 +77,7 @@ export default function PublicQuizPage() {
         try {
             await publicQuizService.answer(session.guest_token, questionId, payload);
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || "Javobni saqlab bo'lmadi");
+            setError(apiErrorMessage(cause, "Javobni saqlab bo'lmadi"));
         }
     };
 
@@ -136,8 +135,7 @@ export default function PublicQuizPage() {
             );
             setResult(await publicQuizService.finish(session.guest_token));
         } catch (cause) {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || "Testni yakunlab bo'lmadi");
+            setError(apiErrorMessage(cause, "Testni yakunlab bo'lmadi"));
         } finally {
             setBusy(false);
         }

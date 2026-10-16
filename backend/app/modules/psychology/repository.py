@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +31,7 @@ from .schemas import (
     TestSubmitRequest,
 )
 from .scoring import compute_diagnosis
+from app.core.errors import Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +60,13 @@ class PsychologyRepository:
             await session.refresh(method)
         except IntegrityError:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Bunday nomdagi metod allaqachon mavjud: '{data.name}'",
-            )
+            raise Invalid("psychology_method_exists", f"Bunday nomdagi metod allaqachon mavjud: '{data.name}'")
         except Exception as e:
             await session.rollback()
             logger.error(f"Error creating psychology method: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return await self.get_method(session=session, method_id=method.id)
 
     async def get_method(self, session: AsyncSession, method_id: int) -> PsychologyMethod:
@@ -82,10 +78,7 @@ class PsychologyRepository:
         result = await session.execute(stmt)
         method = result.scalar_one_or_none()
         if not method:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Psychology method not found",
-            )
+            raise NotFound("psychology_method_not_found", "Psychology method not found")
         return method
 
     async def list_methods(self, session: AsyncSession, request: MethodListRequest) -> MethodListResponse:
@@ -124,17 +117,13 @@ class PsychologyRepository:
             await session.refresh(method)
         except IntegrityError:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Bunday nomdagi metod allaqachon mavjud: '{data.name}'",
-            )
+            raise Invalid("psychology_method_exists", f"Bunday nomdagi metod allaqachon mavjud: '{data.name}'")
         except Exception as e:
             await session.rollback()
             logger.error(f"Error updating psychology method: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return method
 
     async def delete_method(self, session: AsyncSession, method_id: int) -> None:
@@ -163,10 +152,9 @@ class PsychologyRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error creating psychology question: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return question
 
     async def get_question(self, session: AsyncSession, question_id: int) -> PsychologyQuestion:
@@ -174,10 +162,7 @@ class PsychologyRepository:
         result = await session.execute(stmt)
         question = result.scalar_one_or_none()
         if not question:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Psychology question not found",
-            )
+            raise NotFound("psychology_question_not_found", "Psychology question not found")
         return question
 
     async def update_question(
@@ -202,10 +187,9 @@ class PsychologyRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error updating psychology question: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return question
 
     async def delete_question(self, session: AsyncSession, question_id: int) -> None:
@@ -239,10 +223,9 @@ class PsychologyRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error submitting psychology test: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return await self.get_result(session=session, result_id=result.id)
 
     async def delete_result(self, session: AsyncSession, result_id: int) -> None:
@@ -261,7 +244,7 @@ class PsychologyRepository:
         )
         result = (await session.execute(stmt)).scalar_one_or_none()
         if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+            raise NotFound("result_not_found", "Result not found")
         return result
 
     async def list_results(

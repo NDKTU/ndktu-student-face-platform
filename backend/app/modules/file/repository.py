@@ -10,8 +10,7 @@ import logging
 import re
 from collections.abc import Iterable
 
-from core.config import settings
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import and_, delete, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -44,6 +43,7 @@ from app.modules.file.storage import (
     stored_path_from_url,
 )
 from app.core.utils.roles import role_keys, user_is_admin
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -135,10 +135,7 @@ class FileRepository:
                     .limit(1)
                 )
             if found is None:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Faylni «Fayllar kutubxonasi»dan tanlang",
-                )
+                raise Forbidden("file_not_from_library", "Faylni «Fayllar kutubxonasi»dan tanlang")
 
     async def _get_visible(self, session: AsyncSession, file_id: int, user: User) -> StoredFile:
         """Koʻrish va ishlatish uchun. Oʻzgartirish uchun ``_get_owned``."""
@@ -148,7 +145,7 @@ class FileRepository:
             .options(selectinload(StoredFile.blob), selectinload(StoredFile.usages))
         )
         if not stored:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+            raise NotFound("file_not_found", "Fayl topilmadi")
 
         if _is_admin(user) or stored.owner_user_id == user.id:
             return stored
@@ -167,10 +164,7 @@ class FileRepository:
             if in_my_subjects:
                 return stored
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bu fayl sizning fanlaringizga tegishli emas",
-        )
+        raise Forbidden("file_not_in_your_subjects", "Bu fayl sizning fanlaringizga tegishli emas")
 
     async def _get_owned(self, session: AsyncSession, file_id: int, user: User) -> StoredFile:
         stored = await session.scalar(
@@ -179,17 +173,17 @@ class FileRepository:
             .options(selectinload(StoredFile.blob), selectinload(StoredFile.usages))
         )
         if not stored:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fayl topilmadi")
+            raise NotFound("file_not_found", "Fayl topilmadi")
         if not _is_admin(user) and stored.owner_user_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu fayl sizniki emas")
+            raise Forbidden("file_not_yours", "Bu fayl sizniki emas")
         return stored
 
     async def _get_owned_folder(self, session: AsyncSession, folder_id: int, user: User) -> FileFolder:
         folder = await session.get(FileFolder, folder_id)
         if not folder:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Papka topilmadi")
+            raise NotFound("folder_not_found", "Papka topilmadi")
         if not _is_admin(user) and folder.owner_user_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu papka sizniki emas")
+            raise Forbidden("folder_not_yours", "Bu papka sizniki emas")
         return folder
 
     async def _usage_count(self, session: AsyncSession, file_id: int) -> int:
@@ -545,10 +539,7 @@ class FileRepository:
         if usages:
             where = ", ".join(u.label or f"{u.entity_type}:{u.entity_id}" for u in usages[:3])
             more = f" va yana {len(usages) - 3} ta joy" if len(usages) > 3 else ""
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Fayl ishlatilyapti: {where}{more}. Avval oʻsha joylardan olib tashlang.",
-            )
+            raise Conflict("file_in_use", f"Fayl ishlatilyapti: {where}{more}. Avval oʻsha joylardan olib tashlang.")
 
         # Baytlar qolaveradi: ularni tozalash vazifasi oladi, chunki shu blobga
         # boshqa foydalanuvchining yozuvi ham ishora qilayotgan boʻlishi mumkin.
@@ -657,10 +648,7 @@ class FileRepository:
             folder.name = data.name
         if data.parent_id is not None:
             if data.parent_id == folder.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Papkani oʻzining ichiga koʻchirib boʻlmaydi",
-                )
+                raise Invalid("folder_into_itself", "Papkani oʻzining ichiga koʻchirib boʻlmaydi")
             await self._get_owned_folder(session, data.parent_id, user)
             folder.parent_id = data.parent_id
 

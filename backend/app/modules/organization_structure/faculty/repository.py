@@ -2,7 +2,6 @@ import logging
 
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +18,7 @@ from .schemas import (
     FacultyStatsItem,
     FacultyStatsResponse,
 )
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,7 @@ class FacultyRepository:
         stmt_check = select(Faculty).where(Faculty.name == data.name)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Faculty '{data.name}' already exists",
-            )
+            raise Invalid("faculty_already_exists", f"Faculty '{data.name}' already exists")
 
         new_faculty = Faculty(name=data.name)
         session.add(new_faculty)
@@ -42,17 +39,13 @@ class FacultyRepository:
         except IntegrityError as e:
             await session.rollback()
             logger.warning("Integrity error creating faculty %r: %s", data.name, e)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Faculty '{data.name}' conflicts with an existing record",
-            )
+            raise Conflict("faculty_conflict", f"Faculty '{data.name}' conflicts with an existing record")
         except SQLAlchemyError:
             await session.rollback()
             logger.exception("Database error creating faculty %r", data.name)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return new_faculty
 
     async def get_faculty(self, session: AsyncSession, faculty_id: int) -> Faculty:
@@ -61,7 +54,7 @@ class FacultyRepository:
         faculty = result.scalar_one_or_none()
 
         if not faculty:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
+            raise NotFound("faculty_not_found", "Faculty not found")
 
         return faculty
 
@@ -98,7 +91,7 @@ class FacultyRepository:
         faculty = result.scalar_one_or_none()
 
         if not faculty:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
+            raise NotFound("faculty_not_found", "Faculty not found")
 
         ensure_editable(faculty, "факультета")
 
@@ -106,10 +99,7 @@ class FacultyRepository:
             stmt_check = select(Faculty).where(Faculty.name == data.name, Faculty.id != faculty_id)
             existing_faculty = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_faculty:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Faculty name already taken",
-                )
+                raise Invalid("faculty_name_taken", "Faculty name already taken")
             faculty.name = data.name
 
         await session.commit()
@@ -180,13 +170,10 @@ class FacultyRepository:
                 if stranded_count > 0:
                     warnings.append(f"{stranded_count} ta kurs darsi guruhsiz qoladi va talabalarga ko'rinmaydi")
 
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu fakultetni o'chirish quyidagi jiddiy oqibatlarga olib keladi:",
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "faculty_has_related_data",
+                    "Ushbu fakultetni o'chirish quyidagi jiddiy oqibatlarga olib keladi:",
+                    requires_confirmation=True, warnings=warnings,
                 )
 
         # Proceed with forced aggressive cascade delete
@@ -225,7 +212,7 @@ class FacultyRepository:
         faculty = result.scalar_one_or_none()
 
         if not faculty:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Faculty not found")
+            raise NotFound("faculty_not_found", "Faculty not found")
 
         await session.delete(faculty)
         await session.commit()

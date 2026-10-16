@@ -55,6 +55,7 @@ import { MoveFileModal } from '@/components/file/MoveFileModal';
 import { QuotaBar } from '@/components/file/QuotaBar';
 import { cn } from '@/lib/utils';
 import { formatSize } from '@/utils/fileSize';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const DEFAULT_PAGE_SIZE = 24;
 
@@ -221,8 +222,7 @@ export const FilesPage = () => {
                 else if (remaining !== null) remaining -= result.size_bytes;
                 uploaded += 1;
             } catch (error) {
-                const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                toast.error(typeof detail === 'string' ? detail : `${file.name}: yuklab boʻlmadi`);
+                toast.error(apiErrorMessage(error, `${file.name}: yuklab boʻlmadi`));
             }
         }
 
@@ -271,8 +271,7 @@ export const FilesPage = () => {
             toast.success('Fayl oʻchirildi');
             setDeletingFile(null);
         } catch (error) {
-            const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            toast.error(typeof detail === 'string' ? detail : 'Faylni oʻchirib boʻlmadi');
+            toast.error(apiErrorMessage(error, 'Faylni oʻchirib boʻlmadi'));
             setDeletingFile(null);
         }
     };

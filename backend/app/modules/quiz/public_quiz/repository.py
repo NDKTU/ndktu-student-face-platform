@@ -14,17 +14,15 @@ import random
 
 import jwt
 from core.security import create_guest_quiz_token, decode_guest_quiz_token
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.enums import QuizType
-from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
+from app.modules.quiz.model import Quiz, QuizQuestion, Result, UserAnswers
 from app.modules.quiz.quiz_process.attempt import is_expired, remaining_seconds
 from app.modules.quiz.quiz_process.question_view import grade_answer, question_options, to_dto
 from app.modules.quiz.quiz_process.repository import get_quiz_process_repository
-from app.modules.quiz.quiz_process.schemas import QuestionDTO
 
 from .schemas import (
     PublicAnswerRequest,
@@ -33,6 +31,7 @@ from .schemas import (
     PublicStartRequest,
     PublicStartResponse,
 )
+from app.core.errors import Forbidden, Invalid, NotFound, Unauthorized
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +64,7 @@ class PublicQuizRepository:
             .first()
         )
         if quiz is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bunday PIN bilan faol ochiq test topilmadi",
-            )
+            raise NotFound("public_quiz_not_found", "Bunday PIN bilan faol ochiq test topilmadi")
         return quiz
 
     async def start(self, session: AsyncSession, data: PublicStartRequest) -> PublicStartResponse:
@@ -76,7 +72,7 @@ class PublicQuizRepository:
 
         questions = [qq.question for qq in quiz.quiz_questions if qq.question and qq.question.is_active]
         if not questions:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda savollar yo'q")
+            raise Invalid("quiz_has_no_questions", "Bu testda savollar yo'q")
 
         random.shuffle(questions)
         questions = questions[: quiz.question_number]
@@ -124,36 +120,33 @@ class PublicQuizRepository:
     async def _attempt_from_token(self, session: AsyncSession, token: str) -> tuple[Result, Quiz]:
         try:
             payload = decode_guest_quiz_token(token)
-        except jwt.PyJWTError as cause:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Sessiya tugadi yoki yaroqsiz",
-            ) from cause
+        except jwt.PyJWTError:
+            raise Unauthorized("public_session_invalid", "Sessiya tugadi yoki yaroqsiz")
 
         attempt = (
             await session.execute(select(Result).where(Result.id == payload.get("result_id")))
         ).scalar_one_or_none()
         if attempt is None or attempt.quiz_id != payload.get("quiz_id"):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Urinish topilmadi")
+            raise NotFound("attempt_not_found", "Urinish topilmadi")
         # Token faqat mehmon urinishiga tegishli: hisobli urinishga tegib
         # bo'lmasligi kerak.
         if attempt.user_id is not None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu urinish sizga tegishli emas")
+            raise Forbidden("not_your_attempt", "Bu urinish sizga tegishli emas")
 
         quiz = (await session.execute(select(Quiz).where(Quiz.id == attempt.quiz_id))).scalar_one_or_none()
         if quiz is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test topilmadi")
+            raise NotFound("quiz_not_found", "Test topilmadi")
         return attempt, quiz
 
     async def answer(self, session: AsyncSession, token: str, data: PublicAnswerRequest) -> PublicAnswerResponse:
         attempt, quiz = await self._attempt_from_token(session, token)
 
         if attempt.status != "in_progress":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinish yakunlangan")
+            raise Invalid("attempt_already_finished", "Urinish yakunlangan")
 
         if is_expired(attempt, quiz):
             await get_quiz_process_repository.finalize_attempt(session, attempt, reason="Vaqt tugadi")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinish vaqti tugadi")
+            raise Invalid("attempt_expired", "Urinish vaqti tugadi")
 
         reserved = (
             await session.execute(
@@ -163,7 +156,7 @@ class PublicQuizRepository:
             )
         ).scalar_one_or_none()
         if reserved is None or reserved.question is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu savol sizga berilmagan")
+            raise Invalid("question_not_in_attempt", "Bu savol sizga berilmagan")
 
         question = reserved.question
         if data.text_answer is not None:
@@ -174,7 +167,7 @@ class PublicQuizRepository:
             positions = data.answer_indexes if data.answer_indexes else [data.answer_index]
             option_count = len(question_options(question))
             if not positions or any(position < 0 or position >= option_count for position in positions):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant noto'g'ri")
+                raise Invalid("invalid_option_index", "Variant noto'g'ri")
             is_correct, chosen_text, correct_text = grade_answer(attempt.id, question, positions)
         reserved.answer = chosen_text
         reserved.correct_answer = correct_text

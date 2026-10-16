@@ -2,7 +2,6 @@ import logging
 import re
 
 from core.utils.external_guard import ensure_editable
-from fastapi import HTTPException, status
 from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +21,7 @@ from .schemas import (
     GroupListResponse,
 )
 from app.core.utils.roles import user_is_admin, user_is_student, user_is_teacher
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +64,7 @@ class GroupRepository:
         stmt_check = select(Group).where(Group.name == data.name)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Group '{data.name}' already exists",
-            )
+            raise Invalid("group_already_exists", f"Group '{data.name}' already exists")
 
         new_group = Group(name=data.name, faculty_id=data.faculty_id)
         session.add(new_group)
@@ -78,17 +75,16 @@ class GroupRepository:
         except IntegrityError as e:
             await session.rollback()
             logger.warning("Integrity error creating group %r: %s", data.name, e)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Group '{data.name}' conflicts with an existing record or invalid faculty_id",
+            raise Conflict(
+                "group_conflict",
+                f"Group '{data.name}' conflicts with an existing record or invalid faculty_id",
             )
         except SQLAlchemyError:
             await session.rollback()
             logger.exception("Database error creating group %r", data.name)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return new_group
 
     async def get_group(self, session: AsyncSession, group_id: int) -> Group:
@@ -99,7 +95,7 @@ class GroupRepository:
         group = result.scalar_one_or_none()
 
         if not group:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+            raise NotFound("group_not_found", "Group not found")
 
         return group
 
@@ -275,7 +271,7 @@ class GroupRepository:
         group = result.scalar_one_or_none()
 
         if not group:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+            raise NotFound("group_not_found", "Group not found")
 
         ensure_editable(group, "группы")
 
@@ -284,10 +280,7 @@ class GroupRepository:
             stmt_check = select(Group).where(Group.name == data.name, Group.id != group_id)
             existing = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Group name already taken",
-                )
+                raise Invalid("group_name_taken", "Group name already taken")
             group.name = data.name
 
         if data.faculty_id is not None:
@@ -307,7 +300,7 @@ class GroupRepository:
         group = result.scalar_one_or_none()
 
         if not group:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+            raise NotFound("group_not_found", "Group not found")
 
         ensure_editable(group, "группы")
 
@@ -372,13 +365,10 @@ class GroupRepository:
                 if stranded_count > 0:
                     warnings.append(f"{stranded_count} ta kurs darsi guruhsiz qoladi va talabalarga ko'rinmaydi")
 
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu guruhni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "group_has_related_data",
+                    "Ushbu guruhni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True, warnings=warnings,
                 )
 
         # FK ondelete="SET NULL" on Student.group_id and Result.group_id means

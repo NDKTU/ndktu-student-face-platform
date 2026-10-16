@@ -3,7 +3,6 @@ import logging
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.sorting import order_by_clause
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +19,7 @@ from .schemas import (
     KafedraStatsItem,
     KafedraStatsResponse,
 )
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,7 @@ class KafedraRepository:
         stmt_check = select(Kafedra).where(Kafedra.name == data.name)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Kafedra '{data.name}' already exists",
-            )
+            raise Invalid("kafedra_already_exists", f"Kafedra '{data.name}' already exists")
 
         # Ideally verify faculty_id exists here, but FK constraint will handle it (though with 500 err)
         # For now, let's rely on basic creation.
@@ -85,17 +82,16 @@ class KafedraRepository:
         except IntegrityError as e:
             await session.rollback()
             logger.warning("Integrity error creating kafedra %r: %s", data.name, e)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Kafedra '{data.name}' conflicts with an existing record or invalid faculty_id",
+            raise Conflict(
+                "kafedra_conflict",
+                f"Kafedra '{data.name}' conflicts with an existing record or invalid faculty_id",
             )
         except SQLAlchemyError:
             await session.rollback()
             logger.exception("Database error creating kafedra %r", data.name)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return new_kafedra
 
     async def get_kafedra(self, session: AsyncSession, kafedra_id: int) -> Kafedra:
@@ -104,7 +100,7 @@ class KafedraRepository:
         kafedra = result.scalar_one_or_none()
 
         if not kafedra:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kafedra not found")
+            raise NotFound("kafedra_not_found", "Kafedra not found")
 
         return kafedra
 
@@ -163,7 +159,7 @@ class KafedraRepository:
         kafedra = result.scalar_one_or_none()
 
         if not kafedra:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kafedra not found")
+            raise NotFound("kafedra_not_found", "Kafedra not found")
 
         ensure_editable(kafedra, "кафедры")
 
@@ -172,10 +168,7 @@ class KafedraRepository:
             stmt_check = select(Kafedra).where(Kafedra.name == data.name, Kafedra.id != kafedra_id)
             existing = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Kafedra name already taken",
-                )
+                raise Invalid("kafedra_name_taken", "Kafedra name already taken")
             kafedra.name = data.name
 
         if data.faculty_id is not None:
@@ -195,7 +188,7 @@ class KafedraRepository:
         kafedra = result.scalar_one_or_none()
 
         if not kafedra:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kafedra not found")
+            raise NotFound("kafedra_not_found", "Kafedra not found")
 
         ensure_editable(kafedra, "кафедры")
 
@@ -204,15 +197,12 @@ class KafedraRepository:
                 await session.execute(select(func.count(Teacher.id)).where(Teacher.kafedra_id == kafedra_id))
             ).scalar() or 0
             if teacher_count > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu kafedrani o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
-                        "warnings": [
+                raise Conflict(
+                    "kafedra_has_related_data",
+                    "Ushbu kafedrani o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True, warnings=[
                             f"{teacher_count} ta o'qituvchi(lar) va ularning barcha guruh/fan biriktirmalari o'chiladi"
                         ],
-                    },
                 )
 
         # Aggressive delete Teachers and their links

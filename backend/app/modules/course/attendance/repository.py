@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +27,7 @@ from .schemas import (
     MyAttendanceItem,
     MyAttendanceResponse,
 )
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class AttendanceRepository:
     async def _get_lesson(self, session: AsyncSession, lesson_id: int) -> Lesson:
         lesson = (await session.execute(select(Lesson).where(Lesson.id == lesson_id))).scalar_one_or_none()
         if lesson is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
+            raise NotFound("lesson_not_found", "Dars topilmadi")
         return lesson
 
     async def _lesson_group_ids(self, session: AsyncSession, lesson: Lesson) -> list[int]:
@@ -71,12 +71,11 @@ class AttendanceRepository:
 
     def _ensure_editable(self, lesson: Lesson) -> None:
         if not self._is_editable(lesson):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Jurnal yopilgan: dars sanasidan keyin "
-                    f"{settings.attendance.edit_window_days} kun o'tdi"
-                ),
+            raise Conflict(
+                "attendance_locked",
+                f"Jurnal yopilgan: dars sanasidan keyin "
+                f"{settings.attendance.edit_window_days} kun o'tdi",
+                edit_window_days=settings.attendance.edit_window_days,
             )
 
     async def _groups_info(
@@ -204,10 +203,7 @@ class AttendanceRepository:
 
         if group_id is not None:
             if group_id not in group_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Bu guruh darsga tegishli emas",
-                )
+                raise NotFound("group_not_in_lesson", "Bu guruh darsga tegishli emas")
             selected = group_id
         elif len(group_ids) == 1:
             selected = group_ids[0]
@@ -270,9 +266,10 @@ class AttendanceRepository:
         }
         unknown = set(student_ids) - set(students)
         if unknown:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Talabalar bu darsning guruhlariga kirmaydi: {sorted(unknown)}",
+            raise Invalid(
+                "students_not_in_lesson",
+                f"Talabalar bu darsning guruhlariga kirmaydi: {sorted(unknown)}",
+                student_ids=sorted(unknown),
             )
 
         existing = {
@@ -399,12 +396,9 @@ class AttendanceRepository:
     ) -> CourseAttendanceResponse:
         course = (await session.execute(select(Course).where(Course.id == course_id))).scalar_one_or_none()
         if course is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kurs topilmadi")
+            raise NotFound("course_not_found", "Kurs topilmadi")
         if not await can_manage_course(session, course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Jurnal faqat kurs o'qituvchilariga ochiq",
-            )
+            raise Forbidden("gradebook_forbidden", "Jurnal faqat kurs o'qituvchilariga ochiq")
 
         group_ids = [
             row[0]
@@ -438,9 +432,7 @@ class AttendanceRepository:
 
         if group_id is not None:
             if group_id not in group_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Bu guruh kursga tegishli emas"
-                )
+                raise NotFound("group_not_in_course", "Bu guruh kursga tegishli emas")
             selected = group_id
         elif len(group_ids) == 1:
             selected = group_ids[0]
@@ -529,10 +521,7 @@ class AttendanceRepository:
             await session.execute(select(Student).where(Student.user_id == current_user.id))
         ).scalar_one_or_none()
         if student is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bu hisob talabaga bog'lanmagan",
-            )
+            raise NotFound("student_profile_missing", "Bu hisob talabaga bog'lanmagan")
 
         group_name = None
         if student.group_id:
