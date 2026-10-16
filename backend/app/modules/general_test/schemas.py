@@ -56,7 +56,7 @@ class SubjectSummary(SubjectRef):
     can_manage: bool = False
 
 
-class SubjectListResponse(BaseModel):
+class GeneralTestSubjectListResponse(BaseModel):
     total: int
     page: int
     limit: int
@@ -232,7 +232,7 @@ class GeneralTestListResponse(BaseModel):
 # ─── Вопросы ─────────────────────────────────────────────────────────────────
 
 
-class QuestionCreateRequest(_LowerLetter):
+class GeneralTestQuestionCreateRequest(_LowerLetter):
     text: str = Field(min_length=1)
     option_a: str = Field(min_length=1)
     option_b: str = Field(min_length=1)
@@ -242,7 +242,7 @@ class QuestionCreateRequest(_LowerLetter):
     order: int | None = None
 
 
-class QuestionUpdateRequest(_LowerLetter):
+class GeneralTestQuestionUpdateRequest(_LowerLetter):
     text: str | None = Field(default=None, min_length=1)
     option_a: str | None = Field(default=None, min_length=1)
     option_b: str | None = Field(default=None, min_length=1)
@@ -252,7 +252,7 @@ class QuestionUpdateRequest(_LowerLetter):
     order: int | None = None
 
 
-class QuestionResponse(BaseModel):
+class GeneralTestQuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -267,7 +267,7 @@ class QuestionResponse(BaseModel):
 
 
 class SubjectQuestionListResponse(BaseModel):
-    questions: list[QuestionResponse]
+    questions: list[GeneralTestQuestionResponse]
 
 
 class TestGroup(GroupOption):
@@ -354,7 +354,7 @@ class AttemptState(BaseModel):
     image_url: str | None = None
 
 
-class VerifyEntryFaceRequest(BaseModel):
+class GeneralTestVerifyEntryFaceRequest(BaseModel):
     """`face_entry` testiga kirishdagi yuz tekshiruvi: PIN (bo'lsa) va kadr."""
 
     pin: str | None = Field(default=None, max_length=16)
@@ -461,7 +461,7 @@ class ResultRow(BaseModel):
     cheating_image_url: str | None = None
 
 
-class ResultListResponse(BaseModel):
+class GeneralTestResultListResponse(BaseModel):
     total: int
     page: int
     limit: int

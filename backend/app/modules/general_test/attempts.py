@@ -42,7 +42,7 @@ from .schemas import (
     LeaveRequest,
     TakeOption,
     TakeQuestion,
-    VerifyEntryFaceRequest,
+    GeneralTestVerifyEntryFaceRequest,
 )
 from app.core.errors import Conflict, Forbidden, Invalid
 from app.core.config import settings as app_settings
@@ -397,7 +397,7 @@ class AttemptsMixin:
         await redis_client.set(_face_grant_key(attempt_id), "1", ex=FACE_GRANT_TTL_SECONDS)
 
     async def verify_entry_face(
-        self, session: AsyncSession, test_id: int, data: VerifyEntryFaceRequest, user: User
+        self, session: AsyncSession, test_id: int, data: GeneralTestVerifyEntryFaceRequest, user: User
     ) -> VerifyEntryFaceResponse:
         """`face_entry` testiga kirishdan oldin yuzni etalon surat bilan solishtiradi.
 

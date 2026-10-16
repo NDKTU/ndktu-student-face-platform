@@ -22,9 +22,9 @@ from .schemas import (
     MethodResponse,
     MethodStatsResponse,
     MethodUpdateRequest,
-    QuestionCreateRequest,
-    QuestionResponse,
-    QuestionUpdateRequest,
+    PsychologyQuestionCreateRequest,
+    PsychologyQuestionResponse,
+    PsychologyQuestionUpdateRequest,
     ResultFilterOptionsResponse,
     RiskListResponse,
     StatsFilter,
@@ -112,19 +112,19 @@ async def delete_method(
 
 @router.post(
     "/question/",
-    response_model=QuestionResponse,
+    response_model=PsychologyQuestionResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
 async def create_question(
-    data: QuestionCreateRequest,
+    data: PsychologyQuestionCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("create:psychology")),
 ):
     return await get_psychology_service.create_question(session=session, data=data)
 
 
-@router.get("/question/{question_id}", response_model=QuestionResponse)
+@router.get("/question/{question_id}", response_model=PsychologyQuestionResponse)
 async def get_question(
     question_id: int,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -135,12 +135,12 @@ async def get_question(
 
 @router.put(
     "/question/{question_id}",
-    response_model=QuestionResponse,
+    response_model=PsychologyQuestionResponse,
     dependencies=[Depends(RateLimiter(times=20, seconds=60))],
 )
 async def update_question(
     question_id: int,
-    data: QuestionUpdateRequest,
+    data: PsychologyQuestionUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("update:psychology")),
 ):

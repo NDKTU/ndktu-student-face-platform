@@ -15,8 +15,8 @@ from .schemas import (
     MethodListRequest,
     MethodListResponse,
     MethodUpdateRequest,
-    QuestionCreateRequest,
-    QuestionUpdateRequest,
+    PsychologyQuestionCreateRequest,
+    PsychologyQuestionUpdateRequest,
     TestResultListRequest,
     ResultFilterOptionsResponse,
     TestResultListResponse,
@@ -40,14 +40,14 @@ class PsychologyService:
     async def delete_method(self, session: AsyncSession, method_id: int) -> None:
         await get_psychology_repository.delete_method(session=session, method_id=method_id)
 
-    async def create_question(self, session: AsyncSession, data: QuestionCreateRequest) -> PsychologyQuestion:
+    async def create_question(self, session: AsyncSession, data: PsychologyQuestionCreateRequest) -> PsychologyQuestion:
         return await get_psychology_repository.create_question(session=session, data=data)
 
     async def get_question(self, session: AsyncSession, question_id: int) -> PsychologyQuestion:
         return await get_psychology_repository.get_question(session=session, question_id=question_id)
 
     async def update_question(
-        self, session: AsyncSession, question_id: int, data: QuestionUpdateRequest
+        self, session: AsyncSession, question_id: int, data: PsychologyQuestionUpdateRequest
     ) -> PsychologyQuestion:
         return await get_psychology_repository.update_question(session=session, question_id=question_id, data=data)
 

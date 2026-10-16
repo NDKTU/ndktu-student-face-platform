@@ -13,7 +13,7 @@ QUESTION_TYPES = Literal["text", "true_false", "scale", "image_stimulus", "image
 # ─── Question ────────────────────────────────────────────────────────────────
 
 
-class QuestionResponse(BaseModel):
+class PsychologyQuestionResponse(BaseModel):
     id: int
     method_id: int
     question_type: str
@@ -27,7 +27,7 @@ class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class QuestionCreateRequest(BaseModel):
+class PsychologyQuestionCreateRequest(BaseModel):
     method_id: int
     question_type: QUESTION_TYPES
     content: dict[str, Any]
@@ -54,7 +54,7 @@ class QuestionCreateRequest(BaseModel):
         return v
 
 
-class QuestionUpdateRequest(BaseModel):
+class PsychologyQuestionUpdateRequest(BaseModel):
     question_type: Optional[QUESTION_TYPES] = None
     content: Optional[dict[str, Any]] = None
     options: Optional[list[dict[str, Any]]] = None
@@ -84,7 +84,7 @@ class MethodResponse(BaseModel):
     instruction: dict[str, Any]
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
-    questions: list[QuestionResponse] = []
+    questions: list[PsychologyQuestionResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 

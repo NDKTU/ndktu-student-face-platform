@@ -23,7 +23,7 @@ from .schemas import (
     GroupOption,
     GroupOptionListResponse,
     SubjectCreateRequest,
-    SubjectListResponse,
+    GeneralTestSubjectListResponse,
     SubjectSummary,
     SubjectUpdateRequest,
     SubjectUserListResponse,
@@ -131,7 +131,7 @@ class SubjectsMixin:
 
     async def list_subjects(
         self, session: AsyncSession, page: int, limit: int, search: str | None, user: User
-    ) -> SubjectListResponse:
+    ) -> GeneralTestSubjectListResponse:
         stmt = select(GeneralTestSubject)
         manages_all = await self._manages_all(session, user)
         if not manages_all and not await self._sees_all(session, user):
@@ -154,7 +154,7 @@ class SubjectsMixin:
             .all()
         )
         counts = await self._subject_counts(session, [s.id for s in subjects])
-        return SubjectListResponse(
+        return GeneralTestSubjectListResponse(
             total=total,
             page=page,
             limit=limit,

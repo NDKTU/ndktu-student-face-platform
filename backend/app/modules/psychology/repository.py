@@ -21,8 +21,8 @@ from .schemas import (
     MethodListRequest,
     MethodListResponse,
     MethodUpdateRequest,
-    QuestionCreateRequest,
-    QuestionUpdateRequest,
+    PsychologyQuestionCreateRequest,
+    PsychologyQuestionUpdateRequest,
     ResultFilterFaculty,
     ResultFilterGroup,
     ResultFilterOptionsResponse,
@@ -133,7 +133,7 @@ class PsychologyRepository:
 
     # ── Question ──────────────────────────────────────────────────────────────
 
-    async def create_question(self, session: AsyncSession, data: QuestionCreateRequest) -> PsychologyQuestion:
+    async def create_question(self, session: AsyncSession, data: PsychologyQuestionCreateRequest) -> PsychologyQuestion:
         # Verify method exists
         await self.get_method(session=session, method_id=data.method_id)
 
@@ -166,7 +166,7 @@ class PsychologyRepository:
         return question
 
     async def update_question(
-        self, session: AsyncSession, question_id: int, data: QuestionUpdateRequest
+        self, session: AsyncSession, question_id: int, data: PsychologyQuestionUpdateRequest
     ) -> PsychologyQuestion:
         question = await self.get_question(session=session, question_id=question_id)
 

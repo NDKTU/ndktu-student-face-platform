@@ -19,8 +19,8 @@ from .model import (
     GeneralTestQuestion,
 )
 from .schemas import (
-    QuestionCreateRequest,
-    QuestionUpdateRequest,
+    GeneralTestQuestionCreateRequest,
+    GeneralTestQuestionUpdateRequest,
     SubjectQuestionListResponse,
     UploadResponse,
 )
@@ -58,7 +58,7 @@ class QuestionsMixin:
         return SubjectQuestionListResponse(questions=questions)
 
     async def create_question(
-        self, session: AsyncSession, subject_id: int, data: QuestionCreateRequest, user: User
+        self, session: AsyncSession, subject_id: int, data: GeneralTestQuestionCreateRequest, user: User
     ) -> GeneralTestQuestion:
         await self._get_subject(session, subject_id, user, member=True)
         payload = data.model_dump()
@@ -103,7 +103,7 @@ class QuestionsMixin:
         return sum(1 for attempt in attempts if not _is_expired(attempt, attempt.test))
 
     async def update_question(
-        self, session: AsyncSession, question_id: int, data: QuestionUpdateRequest, user: User
+        self, session: AsyncSession, question_id: int, data: GeneralTestQuestionUpdateRequest, user: User
     ) -> GeneralTestQuestion:
         question = await self._get_question(session, question_id, user)
         changes = {

@@ -26,7 +26,7 @@ from .schemas import (
     MyReviewQuestion,
     MyResultListResponse,
     ResultListRequest,
-    ResultListResponse,
+    GeneralTestResultListResponse,
     ResultRow,
     ReviewQuestion,
     TakeOption,
@@ -181,7 +181,7 @@ class ResultsMixin:
 
     async def list_results(
         self, session: AsyncSession, request: ResultListRequest, user: User
-    ) -> ResultListResponse:
+    ) -> GeneralTestResultListResponse:
         await self._close_expired(session)
         scope = await resolve_data_scope(session, user)
         stmt = self._results_stmt(request, scope)
@@ -193,7 +193,7 @@ class ResultsMixin:
                 .limit(request.limit)
             )
         ).all()
-        return ResultListResponse(
+        return GeneralTestResultListResponse(
             total=total,
             page=request.page,
             limit=request.limit,

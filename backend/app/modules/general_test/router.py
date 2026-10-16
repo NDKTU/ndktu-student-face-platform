@@ -51,14 +51,14 @@ from .schemas import (
     HeartbeatResponse,
     LeaveRequest,
     MyResultListResponse,
-    QuestionCreateRequest,
-    QuestionResponse,
-    QuestionUpdateRequest,
+    GeneralTestQuestionCreateRequest,
+    GeneralTestQuestionResponse,
+    GeneralTestQuestionUpdateRequest,
     ResultListRequest,
-    ResultListResponse,
+    GeneralTestResultListResponse,
     SubjectCreateRequest,
     SubjectQuestionListResponse,
-    SubjectListResponse,
+    GeneralTestSubjectListResponse,
     SubjectSummary,
     SubjectUpdateRequest,
     SubjectUserListResponse,
@@ -67,7 +67,7 @@ from .schemas import (
     TestGroupsAddRequest,
     TestGroupUpdateRequest,
     UploadResponse,
-    VerifyEntryFaceRequest,
+    GeneralTestVerifyEntryFaceRequest,
     UserListRequest,
 )
 
@@ -134,7 +134,7 @@ async def start(
 )
 async def verify_entry_face(
     test_id: int,
-    data: VerifyEntryFaceRequest,
+    data: GeneralTestVerifyEntryFaceRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: "User" = Depends(_take),
 ):
@@ -221,7 +221,7 @@ async def finish(
 # ─── Результаты (администратор) ──────────────────────────────────────────────
 
 
-@router.get("/results", response_model=ResultListResponse)
+@router.get("/results", response_model=GeneralTestResultListResponse)
 async def list_results(
     request: ResultListRequest = Depends(),
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -266,7 +266,7 @@ async def delete_result(
 # ─── Fanlar ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/subject", response_model=SubjectListResponse)
+@router.get("/subject", response_model=GeneralTestSubjectListResponse)
 async def list_subjects(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=500),
@@ -422,10 +422,10 @@ async def excel_template(_: "User" = Depends(PermissionRequired("create:general_
     )
 
 
-@router.put("/question/{question_id}", response_model=QuestionResponse)
+@router.put("/question/{question_id}", response_model=GeneralTestQuestionResponse)
 async def update_question(
     question_id: int,
-    data: QuestionUpdateRequest,
+    data: GeneralTestQuestionUpdateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: "User" = Depends(PermissionRequired("update:general_test_question")),
 ):
@@ -451,11 +451,11 @@ async def list_subject_questions(
 
 
 @router.post(
-    "/subject/{subject_id}/question", response_model=QuestionResponse, status_code=status.HTTP_201_CREATED
+    "/subject/{subject_id}/question", response_model=GeneralTestQuestionResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_question(
     subject_id: int,
-    data: QuestionCreateRequest,
+    data: GeneralTestQuestionCreateRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: "User" = Depends(PermissionRequired("create:general_test_question")),
 ):
