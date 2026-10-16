@@ -11,7 +11,7 @@ Serverdan ikki narsa olinadi:
   canvas'ga chizilgach uni JPG qilib saqlashga ruxsat bermaydi («tainted
   canvas»). Shuning uchun surat backend orqali oʻtadi.
 
-Ikkala endpoint ham faqat adminga ochiq (`AdminRequired`, `auth/router.py`).
+Ikkala endpoint ham faqat adminga ochiq (`AdminRequired`, `auth/student/router.py`).
 """
 
 import asyncio
