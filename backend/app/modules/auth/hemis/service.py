@@ -11,7 +11,7 @@ from app.modules.auth.model import Teacher, User
 from app.modules.auth.student.repository import student_repository
 from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
-from app.modules.auth.user.service import auth_service
+from app.modules.auth.session import session_service
 from app.modules.organization_structure.faculty.repository import get_faculty_repository
 from app.modules.organization_structure.group.repository import get_group_repository
 from app.modules.quiz.result.repository import get_result_repository
@@ -42,7 +42,7 @@ class HemisLoginService:
                 if upgraded_hash:
                     user.password = upgraded_hash
                     await session.commit()
-                access_token = await auth_service.create_session_token(user.id)
+                access_token = await session_service.create_session_token(user.id)
                 return HemisLoginResponse(access_token=access_token)
             else:
                 logger.warning(
@@ -107,7 +107,7 @@ class HemisLoginService:
 
         ensure_user_active(user)
 
-        access_token = await auth_service.create_session_token(user.id)
+        access_token = await session_service.create_session_token(user.id)
         logger.info("Преподаватель %s вошёл через Hemis (hemis_id=%s)", user.username, hemis_id)
         return HemisLoginResponse(access_token=access_token)
 
@@ -279,7 +279,7 @@ class HemisLoginService:
         me_data = await self._fetch_hemis_data(data.login, data.password)
         user = await self.save_user_data(session, data.login, data.password, me_data)
 
-        access_token = await auth_service.create_session_token(user.id)
+        access_token = await session_service.create_session_token(user.id)
 
         return HemisLoginResponse(access_token=access_token)
 

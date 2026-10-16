@@ -19,6 +19,9 @@ from .schemas import (
     SpecialityUpdateRequest,
 )
 from app.core.errors import Conflict, Invalid, NotFound
+from app.modules.auth.model import Student
+from app.modules.organization_structure.model import Group
+from app.modules.organization_structure.model import Kafedra
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +31,6 @@ class SpecialityRepository:
         self, session: AsyncSession, kafedra_id: int | None = None
     ) -> SpecialityStatsResponse:
         """Return group and student totals for speciality cards."""
-        from app.modules.auth.model import Student
-        from app.modules.organization_structure.model import Group
 
         speciality_stmt = select(Speciality.id)
         if kafedra_id is not None:
@@ -111,7 +112,6 @@ class SpecialityRepository:
     async def list_specialities(
         self, session: AsyncSession, request: SpecialityListRequest, current_user: User
     ) -> SpecialityListResponse:
-        from app.modules.organization_structure.model import Kafedra
 
         stmt = select(Speciality)
         count_stmt = select(func.count()).select_from(Speciality)
@@ -182,7 +182,6 @@ class SpecialityRepository:
         return speciality
 
     async def delete_speciality(self, session: AsyncSession, speciality_id: int, force: bool = False) -> None:
-        from app.modules.organization_structure.model import Group
 
         speciality = await self.get_speciality(session, speciality_id)
         ensure_editable(speciality, "специальности")

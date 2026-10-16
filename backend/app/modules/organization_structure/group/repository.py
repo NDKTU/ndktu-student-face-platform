@@ -22,6 +22,8 @@ from .schemas import (
 )
 from app.core.utils.roles import user_is_admin, user_is_student, user_is_teacher
 from app.core.errors import Conflict, Invalid, NotFound
+from app.modules.course.model import Lesson
+from app.modules.quiz.model import Quiz
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +185,6 @@ class GroupRepository:
             )
             already_joined_group_teacher = True
         elif is_student:
-            from app.modules.auth.model import Student
 
             student_stmt = select(Student.group_id).where(Student.user_id == current_user.id)
             student_result = await session.execute(student_stmt)
@@ -291,9 +292,6 @@ class GroupRepository:
         return group
 
     async def delete_group(self, session: AsyncSession, group_id: int, force: bool = False) -> None:
-        from app.modules.auth.model import Student
-        from app.modules.course.model import CourseGroup, Lesson
-        from app.modules.quiz.model import Quiz
 
         stmt = select(Group).where(Group.id == group_id)
         result = await session.execute(stmt)

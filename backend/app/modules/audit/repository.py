@@ -6,12 +6,13 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.model import AuditEvent, AuditLog
-from app.modules.auth.model import Student, Teacher, User
+from app.modules.auth.model import Student, Teacher
 
 from app.core.mixins.time_stamp_mixin import to_naive_utc
 from app.core.schemas import TASHKENT_TZ
 
 from .schemas import AuditEventOption, AuditListRequest, AuditListResponse, AuditLogResponse
+from sqlalchemy import delete
 
 
 def _tashkent_midnight(day: date) -> datetime:
@@ -115,7 +116,6 @@ async def purge_older_than(session: AsyncSession, *, days: int) -> int:
     `DELETE` ni SQL bilan qilamiz: ORM orqali million qatorni o'chirish
     ularni xotiraga yuklardi.
     """
-    from sqlalchemy import delete
 
     cutoff = datetime.now() - timedelta(days=days)
     result = await session.execute(delete(AuditLog).where(AuditLog.created_at < cutoff))

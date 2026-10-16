@@ -17,6 +17,8 @@ from .schemas import (
     StudentWithUserListResponse,
 )
 from app.core.errors import Conflict, Invalid, NotFound
+from sqlalchemy import delete
+from app.modules.quiz.model import Result
 
 logger = logging.getLogger(__name__)
 
@@ -247,9 +249,7 @@ class StudentRepository:
         return student
 
     async def delete_student(self, session: AsyncSession, student_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete
 
-        from app.modules.quiz.model import Result
 
         student = await self.get_student(session, student_id)
 

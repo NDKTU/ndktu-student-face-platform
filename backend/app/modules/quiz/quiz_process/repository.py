@@ -14,6 +14,7 @@ from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.core.utils.lesson_scope import covers_group
+from app.core.config import settings as app_settings
 from app.modules.auth.model import Student, User
 from app.modules.course.model import CourseGroup, Lesson
 from app.modules.quiz.model import Question, Quiz, QuizQuestion, Result, UserAnswers
@@ -712,8 +713,6 @@ class QuizProcessRepository:
             # Bug#4 fix: use settings.evidence_dir (absolute path mapped to Docker volume)
             # so files survive container restarts. /evidence/ and /uploads/cheating_evidence/
             # are both mounted in main.py.
-            from app.core.config import settings as app_settings
-
             evidence_dir = app_settings.evidence_dir
             evidence_dir.mkdir(parents=True, exist_ok=True)
 

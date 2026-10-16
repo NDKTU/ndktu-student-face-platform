@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass, field
+import pandas as pd
 
 #: Maydonlar tartibi — shablon ustunlari aynan shunday joylashadi.
 #:
@@ -240,7 +241,6 @@ def read_question_sheet(contents: bytes) -> QuestionSheet:
 
     Qator raqamlari — Excel'dagi haqiqiy raqamlar (1 dan).
     """
-    import pandas as pd
 
     frame = pd.read_excel(io.BytesIO(contents), header=None, dtype=object)
     raw = [[None if _is_blank(v) else v for v in row] for row in frame.itertuples(index=False, name=None)]

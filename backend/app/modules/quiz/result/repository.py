@@ -14,6 +14,8 @@ from .schemas import (
     ResultListResponse,
 )
 from app.core.errors import NotFound
+from sqlalchemy import delete
+from app.modules.quiz.model import UserAnswers
 
 logger = logging.getLogger(__name__)
 
@@ -236,9 +238,7 @@ class ResultRepository:
         return ResultListResponse(total=total, page=request.page, limit=request.limit, results=results)
 
     async def delete_result(self, session: AsyncSession, result_id: int) -> None:
-        from sqlalchemy import delete
 
-        from app.modules.quiz.model import UserAnswers
 
         stmt = select(Result).where(Result.id == result_id)
         result = await session.execute(stmt)

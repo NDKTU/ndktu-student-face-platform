@@ -30,6 +30,8 @@ from .schemas import (
 )
 from app.core.utils.roles import user_is_admin, user_is_student, user_is_teacher
 from app.core.errors import AppError, Conflict, Forbidden, NotFound, Unprocessable
+from sqlalchemy import delete as sa_delete
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -1027,9 +1029,7 @@ class QuizRepository:
         await session.commit()
 
     async def delete_quiz(self, session: AsyncSession, quiz_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete as sa_delete
 
-        from app.modules.quiz.model import Result
 
         stmt = select(Quiz).where(Quiz.id == quiz_id)
         result = await session.execute(stmt)
@@ -1059,7 +1059,6 @@ class QuizRepository:
         await session.commit()
 
     async def repeat_quiz(self, session: AsyncSession, quiz_id: int, created_by_user_id: int) -> Quiz:
-        import random
 
         stmt = (
             select(Quiz)

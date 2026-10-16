@@ -18,6 +18,8 @@ from .schemas import (
 )
 from app.core.utils.roles import user_is_admin, user_is_teacher
 from app.core.errors import Conflict, Invalid, NotFound
+from sqlalchemy import delete
+from app.modules.quiz.model import Question, Quiz
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +149,7 @@ class SubjectRepository:
         return subject
 
     async def delete_subject(self, session: AsyncSession, subject_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete, func
 
-        from app.modules.quiz.model import Question, Quiz
 
         # Admin requested to aggressively delete the subject and its dependencies.
         ensure_editable(await self.get_subject(session, subject_id), "предмета")

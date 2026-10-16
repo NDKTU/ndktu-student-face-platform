@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Student, Teacher, User
 from app.modules.auth.user.active_check import ensure_user_active
-from app.modules.auth.user.service import auth_service
+from app.modules.auth.session import session_service
 
 from .schemas import HemisLoginResponse
 from .service import HemisLoginService
@@ -91,7 +91,7 @@ class HemisOAuthService:
             user = await self._find_student(session, profile)
 
         ensure_user_active(user)
-        access_token = await auth_service.create_session_token(user.id)
+        access_token = await session_service.create_session_token(user.id)
         logger.info("HEMIS OAuth (%s): вошёл %s", portal, user.username)
         return user, HemisLoginResponse(access_token=access_token)
 

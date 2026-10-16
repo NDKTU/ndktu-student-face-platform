@@ -10,7 +10,7 @@ from app.core.utils.password_hash import hash_password_async
 from app.modules.auth.model import Teacher, User
 from app.modules.auth.user.active_check import ensure_user_active
 from app.modules.auth.user.repository import get_user_repository
-from app.modules.auth.user.service import auth_service
+from app.modules.auth.session import session_service
 from app.modules.organization_structure.model import Kafedra
 
 from .credentials import effective_config
@@ -84,7 +84,7 @@ class EduPlanAuthService:
         ensure_user_active(user)
 
         # 5. Создание сессии в Redis и выдача JWT платформы
-        access_token = await auth_service.create_session_token(user.id)
+        access_token = await session_service.create_session_token(user.id)
         logger.info("Foydalanuvchi %s EduPlan orqali muvaffaqiyatli kirdi (user_id=%s)", username, user.id)
         return access_token
 

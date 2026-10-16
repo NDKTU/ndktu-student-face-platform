@@ -36,6 +36,14 @@ from .schemas import (
 )
 from app.core.utils.roles import SYSTEM_ROLE_CODES
 from app.core.errors import Conflict, Invalid, NotFound
+from app.modules.auth.session import session_service
+from sqlalchemy import delete
+from app.modules.auth.model import Student as StudentModel
+from app.modules.auth.model import Teacher as TeacherModel
+from app.modules.quiz.model import Quiz as QuizModel
+from app.modules.quiz.model import Result
+from app.core.utils.password_hash import verify_password_async
+from app.modules.quiz.model import QuizQuestion
 
 logger = logging.getLogger(__name__)
 
@@ -180,12 +188,7 @@ class UserRepository:
         return user
 
     async def delete_user(self, session: AsyncSession, user_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete
 
-        from app.modules.auth.model import Student as StudentModel
-        from app.modules.auth.model import Teacher as TeacherModel
-        from app.modules.quiz.model import Quiz as QuizModel
-        from app.modules.quiz.model import Result
 
         stmt = select(User).where(User.id == user_id)
         result = await session.execute(stmt)
@@ -248,7 +251,6 @@ class UserRepository:
         # But here we delete the User directly.
         quiz_ids = (await session.execute(select(QuizModel.id).where(QuizModel.lecturer_id == user_id))).scalars().all()
         if quiz_ids:
-            from app.modules.quiz.model import QuizQuestion
 
             await session.execute(delete(Result).where(Result.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))
@@ -356,7 +358,6 @@ class UserRepository:
     _EXTERNAL_SOURCE_LABEL = {"eduplan": "EPOS", "hemis": "HEMIS"}
 
     async def change_my_credentials(self, session: AsyncSession, current_user: User, data) -> User:
-        from app.core.utils.password_hash import verify_password_async
 
         # Parolni tashqi tizimdagi hisob uchun bu yerda almashtirib bo'lmaydi:
         # keyingi kirishda u baribir tashqi tizimdagi parol bilan yangilanadi,
@@ -389,12 +390,9 @@ class UserRepository:
 
         # Отзываем текущую сессию: старые токены инвалидируются, пользователь
         # перелогинивается с обновлёнными учётными данными.
-        from .service import auth_service
-
-        await auth_service.logout(current_user.id)
+        await session_service.logout(current_user.id)
 
         # Re-fetch the user to avoid MissingGreenlet errors on response serialization
-        from sqlalchemy.orm import selectinload
 
         stmt_refresh = select(User).where(User.id == current_user.id).options(selectinload(User.roles))
         result_refresh = await session.execute(stmt_refresh)

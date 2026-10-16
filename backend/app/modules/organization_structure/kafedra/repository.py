@@ -20,6 +20,9 @@ from .schemas import (
     KafedraStatsResponse,
 )
 from app.core.errors import Conflict, Invalid, NotFound
+from sqlalchemy import delete
+from app.modules.auth.model import TeacherSubject
+from app.modules.organization_structure.model import TeacherGroup
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +30,6 @@ logger = logging.getLogger(__name__)
 class KafedraRepository:
     async def get_kafedra_stats(self, session: AsyncSession, faculty_id: int | None = None) -> KafedraStatsResponse:
         """Return catalogue counters without downloading all related rows."""
-        from app.modules.auth.model import Teacher
-        from app.modules.organization_structure.model import Speciality
 
         kafedra_stmt = select(Kafedra.id)
         if faculty_id is not None:
@@ -179,9 +180,7 @@ class KafedraRepository:
         return kafedra
 
     async def delete_kafedra(self, session: AsyncSession, kafedra_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete
 
-        from app.modules.auth.model import Teacher
 
         stmt = select(Kafedra).where(Kafedra.id == kafedra_id)
         result = await session.execute(stmt)
@@ -210,8 +209,6 @@ class KafedraRepository:
             (await session.execute(select(Teacher.id).where(Teacher.kafedra_id == kafedra_id))).scalars().all()
         )
         if teacher_ids:
-            from app.modules.auth.model import TeacherSubject
-            from app.modules.organization_structure.model import TeacherGroup
 
             await ensure_no_lessons(session, "Bu kafedra o'qituvchilari", TeacherSubject.teacher_id.in_(teacher_ids))
             await session.execute(delete(TeacherSubject).where(TeacherSubject.teacher_id.in_(teacher_ids)))

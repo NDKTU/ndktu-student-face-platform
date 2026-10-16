@@ -15,6 +15,8 @@ from .discovery import discover_permissions
 from .permissions import sync_permissions
 from .roles import sync_admin_role
 from .sequences import reset_sequences
+from app.core.redis_client import redis_client
+from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +82,6 @@ async def _seed_admin(app: FastAPI) -> None:
     Seed the Admin role/permissions and the bootstrap admin user using dynamic
     route discovery. Teacher/student baselines are also seeded — see defaults.py.
     """
-    from app.core.redis_client import redis_client
 
     acquired = await _hold_seed_lock(redis_client)
     if not acquired:
@@ -157,14 +158,12 @@ def _start_eduplan_schedule() -> "asyncio.Task | None":
     if not cfg.schedule_enabled:
         return None
 
-    from app.modules.integration.eduplan.sync_runner import eduplan_sync_runner
 
     return asyncio.create_task(eduplan_sync_runner.nightly_loop())
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.core.redis_client import redis_client
 
     await _connect_database()
     await _connect_redis(redis_client)

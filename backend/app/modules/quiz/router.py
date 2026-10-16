@@ -71,6 +71,7 @@ from .subject.schemas import (
 )
 from .user_answers.repository import user_answers_repository
 from .user_answers.schemas import UserAnswersListRequest
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,6 @@ async def download_questions_excel_template(
     Ruxsat `create:question` — shablon yuklaydiganlarga kerak, o'qish
     huquqining o'zi yetarli emas.
     """
-    import io
 
     return StreamingResponse(
         io.BytesIO(get_question_repository.build_excel_template()),
@@ -190,7 +190,6 @@ async def download_questions_excel(
     session: AsyncSession = Depends(db_helper.session_getter),
     _: PermissionRequired = Depends(PermissionRequired("read:question")),
 ):
-    import io
 
     excel_bytes = await get_question_repository.download_questions_excel(
         session=session,

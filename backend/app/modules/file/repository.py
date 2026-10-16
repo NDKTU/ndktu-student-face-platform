@@ -44,6 +44,7 @@ from app.modules.file.storage import (
 )
 from app.core.utils.roles import role_keys, user_is_admin
 from app.core.errors import Conflict, Forbidden, Invalid, NotFound
+from app.modules.auth.model import Teacher
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +220,6 @@ class FileRepository:
         aniqlanadi, shuning uchun bir xil ismli ikki xodim bir-birining
         papkasiga tushib qolmaydi.
         """
-        from app.modules.auth.model import Teacher
 
         existing = await session.scalar(
             select(FileFolder.id).where(

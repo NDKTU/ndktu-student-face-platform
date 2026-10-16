@@ -15,6 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 from app.core.errors import Conflict
+from app.modules.auth.model import TeacherSubject
+from app.modules.course.model import Lesson
 
 
 async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject_filters: ColumnElement[bool]) -> None:
@@ -26,8 +28,6 @@ async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject
     """
     # Импорт внутри функции: модели тянут за собой половину приложения, а
     # core-утилита не должна навязывать этот порядок импорта.
-    from app.modules.auth.model import TeacherSubject
-    from app.modules.course.model import Lesson
 
     lesson_count = (
         await session.execute(

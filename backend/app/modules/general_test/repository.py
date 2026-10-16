@@ -92,6 +92,10 @@ from .schemas import (
 )
 from app.core.utils.roles import user_is_admin
 from app.core.errors import AppError, Conflict, Forbidden, Gone, Invalid, NotFound
+from app.core.config import settings as app_settings
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from app.core.schemas import TASHKENT_TZ
 
 logger = logging.getLogger(__name__)
 
@@ -1575,7 +1579,6 @@ class GeneralTestRepository:
         """Qoidabuzarlik kadrini saqlaydi; buzuq yoki bo'sh kadr — `None` (belgi baribir qoladi)."""
         if not image_data:
             return None
-        from app.core.config import settings as app_settings
 
         raw = image_data.split(",", 1)[1] if "," in image_data else image_data
         try:
@@ -1963,10 +1966,7 @@ class GeneralTestRepository:
         ]
 
     async def export_results(self, session: AsyncSession, request: ResultListRequest, user: User) -> bytes:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font
 
-        from app.core.schemas import TASHKENT_TZ
 
         await self._close_expired(session)
         rows = (

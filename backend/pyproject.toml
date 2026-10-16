@@ -54,8 +54,10 @@ line-length = 120
 
 [tool.ruff.lint]
 # E/W = pycodestyle, F = Pyflakes, I = isort (import sorting),
-# TID251 = taqiqlangan importlar (pastda).
-select = ["E", "W", "F", "I", "TID251"]
+# TID251 = taqiqlangan importlar (pastda),
+# PLC0415 = funksiya ichidagi import: u modulning bog'liqliklarini yashiradi
+# va import siklini «yamaydi». Asosli istisno — `# noqa: PLC0415 — sabab`.
+select = ["E", "W", "F", "I", "TID251", "PLC0415"]
 ignore = []
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
@@ -66,7 +68,9 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 # Tests often contain long URLs, payloads, fixtures — line length is not useful here.
-"app/test/*" = ["E501"]
+"app/test/*" = ["E501", "PLC0415"]
+# Migratsiyalar o'z vaqtidagi holatni import qiladi — yuqoriga ko'tarish ma'nosiz.
+"app/migrations/*" = ["PLC0415"]
 # init_db.py contains long SQL string literals; will be rewritten in upcoming RBAC simplification.
 "app/core/init_db.py" = ["E501"]
 

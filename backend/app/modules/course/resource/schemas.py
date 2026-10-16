@@ -3,6 +3,8 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.schemas import TashkentDatetime
+from app.core.utils.youtube_link import parse_youtube_link
+from app.core.utils.safe_url import normalize_url
 
 RESOURCE_TYPES = Literal["file", "link", "text", "video", "zoom"]
 #: Yangi resurs turlari. `zoom` faqat o'qish uchun qoldi (eski yozuvlar): jonli
@@ -44,7 +46,6 @@ class ResourceCreateRequest(BaseModel):
         if not field_by_type[self.resource_type]:
             raise ValueError(f"{self.resource_type} resource requires the matching content field to be set")
         if self.resource_type == "video":
-            from app.core.utils.youtube_link import parse_youtube_link
 
             parse_youtube_link(self.link_url or "")
         if self.resource_type == "link":
@@ -53,7 +54,6 @@ class ResourceCreateRequest(BaseModel):
             # `javascript:` shu yerda to'xtatilmasa, bazaga tushadi va uni faqat
             # React render paytida to'sadi; eksport yoki pochta xabarida esa
             # hech kim to'smaydi.
-            from app.core.utils.safe_url import normalize_url
 
             self.link_url = normalize_url(self.link_url or "")
         return self

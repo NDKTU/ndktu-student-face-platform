@@ -56,7 +56,7 @@ async def test_eduplan_login_success_mocked():
         patch.object(service, "_save_eduplan_user") as mock_save,
         patch("app.modules.integration.eduplan.auth_service.ensure_user_active") as mock_active,
         patch(
-            "app.modules.integration.eduplan.auth_service.auth_service.create_session_token",
+            "app.modules.integration.eduplan.auth_service.session_service.create_session_token",
             return_value="platform_jwt_token",
         ) as mock_token,
     ):

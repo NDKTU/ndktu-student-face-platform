@@ -40,6 +40,9 @@ from .schemas import (
     TeacherUpdateRequest,
 )
 from app.core.errors import Conflict, Invalid, NotFound
+from sqlalchemy import delete
+from app.modules.quiz.model import Question, Quiz
+from app.modules.quiz.model import QuizQuestion
 
 logger = logging.getLogger(__name__)
 
@@ -361,9 +364,7 @@ class TeacherRepository:
         return teacher
 
     async def delete_teacher(self, session: AsyncSession, teacher_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete
 
-        from app.modules.quiz.model import Question, Quiz
 
         stmt = select(Teacher).where(Teacher.id == teacher_id)
         result = await session.execute(stmt)
@@ -420,7 +421,6 @@ class TeacherRepository:
         # 1. Quizzes (this will trigger result deletion if we use the repository method or if we do it here)
         quiz_ids = (await session.execute(select(Quiz.id).where(Quiz.lecturer_id == teacher_user_id))).scalars().all()
         if quiz_ids:
-            from app.modules.quiz.model import QuizQuestion, Result
 
             await session.execute(delete(Result).where(Result.quiz_id.in_(quiz_ids)))
             await session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids)))

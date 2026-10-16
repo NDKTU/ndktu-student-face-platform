@@ -19,6 +19,14 @@ from .schemas import (
     FacultyStatsResponse,
 )
 from app.core.errors import Conflict, Invalid, NotFound
+from sqlalchemy import delete
+from app.modules.course.model import CourseGroup, Lesson
+from app.modules.organization_structure.model import Group, Kafedra
+from app.modules.auth.model import Student
+from app.modules.organization_structure.model import Speciality
+from app.modules.auth.model import Teacher
+from app.modules.organization_structure.model import TeacherGroup
+from app.modules.auth.model import TeacherSubject
 
 logger = logging.getLogger(__name__)
 
@@ -107,10 +115,7 @@ class FacultyRepository:
         return faculty
 
     async def delete_faculty(self, session: AsyncSession, faculty_id: int, force: bool = False) -> None:
-        from sqlalchemy import delete, func, select
 
-        from app.modules.course.model import CourseGroup, Lesson
-        from app.modules.organization_structure.model import Group, Kafedra
 
         ensure_editable(await self.get_faculty(session, faculty_id), "факультета")
 
@@ -183,14 +188,11 @@ class FacultyRepository:
             (await session.execute(select(Kafedra.id).where(Kafedra.faculty_id == faculty_id))).scalars().all()
         )
         if kafedra_ids:
-            from app.modules.auth.model import Teacher
 
             teacher_ids = (
                 (await session.execute(select(Teacher.id).where(Teacher.kafedra_id.in_(kafedra_ids)))).scalars().all()
             )
             if teacher_ids:
-                from app.modules.auth.model import TeacherSubject
-                from app.modules.organization_structure.model import TeacherGroup
 
                 ts_of_faculty = TeacherSubject.teacher_id.in_(teacher_ids)
                 await ensure_no_lessons(session, "Bu fakultet o'qituvchilari", ts_of_faculty)
@@ -202,7 +204,6 @@ class FacultyRepository:
         # 2. Cascade delete Groups
         group_ids = (await session.execute(select(Group.id).where(Group.faculty_id == faculty_id))).scalars().all()
         if group_ids:
-            from app.modules.organization_structure.model import TeacherGroup
 
             await session.execute(delete(TeacherGroup).where(TeacherGroup.group_id.in_(group_ids)))
             await session.execute(delete(Group).where(Group.faculty_id == faculty_id))
@@ -223,8 +224,6 @@ class FacultyRepository:
         Студенты считаются через группу: у групп есть прямой faculty_id,
         а у студентов — group_id (студенты без группы не попадают в счёт).
         """
-        from app.modules.auth.model import Student
-        from app.modules.organization_structure.model import Group, Kafedra, Speciality
 
         kafedra_rows = (
             await session.execute(select(Kafedra.faculty_id, func.count(Kafedra.id)).group_by(Kafedra.faculty_id))

@@ -28,6 +28,12 @@ from .schemas import (
 )
 from app.core.utils.roles import user_is_admin, user_is_teacher
 from app.core.errors import Conflict, Forbidden, Invalid, NotFound, Unprocessable
+from sqlalchemy import update
+import io
+import re
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from .excel_format import HEADERS, TEMPLATE_HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -535,7 +541,6 @@ class QuestionRepository:
     async def bulk_delete_questions(
         self, session: AsyncSession, data: QuestionBulkDeleteRequest, current_user: User
     ) -> int:
-        from sqlalchemy import update
 
         # Check ownership for teachers
         is_admin = user_is_admin(current_user)
@@ -705,11 +710,7 @@ class QuestionRepository:
         user_id: int | None = None,
         text: str | None = None,
     ) -> bytes:
-        import io
-        import re
 
-        from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
         def strip_html(html: str) -> str:
             """Remove HTML tags and return plain text."""
@@ -836,12 +837,8 @@ class QuestionRepository:
         varaqni o'qiydi (`pd.read_excel` standart holati), shuning uchun
         o'qituvchi namunani o'chirishni unutsa ham u bazaga tushmaydi.
         """
-        import io
 
-        from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-        from .excel_format import HEADERS, TEMPLATE_HEADERS
 
         header_font = Font(bold=True, color="FFFFFF", size=11)
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")

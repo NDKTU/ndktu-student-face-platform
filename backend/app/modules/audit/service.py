@@ -15,6 +15,7 @@ noto'g'ri), lekin urinishning o'zi qayd etilishi kerak.
 
 import logging
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
@@ -25,6 +26,7 @@ from starlette.requests import Request
 # yozuv boshqa bazaga tushib ketadi.
 from app.core.database.db_helper import db_helper
 from app.modules.audit.model import AuditLog
+from app.modules.auth.model import User
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +146,6 @@ async def record_standalone(
                 # chiqarilganda faqat `user_id` ma'lum). Yozuvda login
                 # bo'lmasa, ro'yxatda kim ekani ko'rinmasdi. Bu yerda
                 # so'rash arzon: bunday hodisalar kam.
-                from sqlalchemy import select
-
-                from app.modules.auth.model import User
-
                 username = (
                     await session.execute(select(User.username).where(User.id == user_id))
                 ).scalar_one_or_none()

@@ -33,6 +33,7 @@ from app.modules.quiz.model import Subject
 
 from .schemas import CourseArchiveRow, CoursePlan, CoursePreviewResponse
 from app.core.errors import Conflict
+from app.modules.course.course.repository import get_course_repository
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +281,6 @@ class EduPlanCourseBuilder:
 
         Qaytgan son — koʻchirilgan guruhlar.
         """
-        from app.modules.course.course.repository import get_course_repository
 
         base = await session.scalar(
             select(Course).where(
@@ -348,7 +348,6 @@ class EduPlanCourseBuilder:
         Arxivlash faqat ``archive=True`` bilan: adminning tasdigʻisiz kursni
         koʻzdan yoʻqotish jurnalni ham yashiradi.
         """
-        from app.modules.course.course.repository import get_course_repository
 
         plan_set = await self.build(session)
 
