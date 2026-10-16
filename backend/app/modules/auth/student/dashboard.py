@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.lesson_scope import visible_to_group
+from app.modules.course.lesson_scope import visible_to_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import (
     Course,

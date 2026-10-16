@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.enums import ControlType, QuizType
-from app.core.utils.course_access import can_manage
-from app.core.utils.teacher_scope import assigned_subject_ids
+from app.modules.course.access import can_manage
+from app.modules.auth.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import Teacher, User
 from app.modules.course.model import Course, Lesson
 from app.modules.organization_structure.model import Kafedra

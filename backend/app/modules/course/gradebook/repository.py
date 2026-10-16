@@ -10,9 +10,9 @@ from collections.abc import Sequence
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.course_access import can_manage as can_manage_course
-from app.core.utils.lesson_access import ensure_can_manage_lesson
-from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
+from app.modules.course.access import can_manage as can_manage_course
+from app.modules.course.lesson_access import ensure_can_manage_lesson
+from app.modules.course.lesson_scope import lesson_group_ids, visible_to_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson
 from app.modules.organization_structure.model import Group
@@ -103,7 +103,7 @@ class GradebookRepository:
         return cells
 
     async def _lesson_group_ids(self, session: AsyncSession, lesson: Lesson) -> list[int]:
-        # Qoida bitta joyda: `core/utils/lesson_scope.py`. Guruhi yo'q dars —
+        # Qoida bitta joyda: `modules/course/lesson_scope.py`. Guruhi yo'q dars —
         # kursning barcha guruhlariniki (davomat ham shunday hisoblaydi).
         return await lesson_group_ids(session, lesson)
 

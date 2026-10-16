@@ -15,7 +15,7 @@ from sqlalchemy import and_, delete, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.teacher_scope import assigned_subject_ids
+from app.modules.auth.teacher_scope import assigned_subject_ids
 from app.modules.auth.model import User
 from app.modules.course.model import Homework, IndependentTopic, Lesson, Resource
 from app.modules.quiz.model import Question

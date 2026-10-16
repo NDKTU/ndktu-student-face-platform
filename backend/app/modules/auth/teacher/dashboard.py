@@ -24,8 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.course_access import manageable_course_ids
-from app.core.utils.group_scope import teacher_group_ids
+from app.modules.course.access import manageable_course_ids
+from app.modules.auth.group_scope import teacher_group_ids
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import (
     Course,

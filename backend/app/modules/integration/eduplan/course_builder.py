@@ -25,7 +25,7 @@ from collections import defaultdict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.course_access import ROLE_MAIN
+from app.modules.course.access import ROLE_MAIN
 from app.modules.auth.model import Teacher, TeacherAssignment
 from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson, LessonAttendance
 from app.modules.organization_structure.model import Group

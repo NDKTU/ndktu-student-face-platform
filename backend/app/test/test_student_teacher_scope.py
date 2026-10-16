@@ -7,7 +7,7 @@ uni roldan olib tashlash bilan hal qilib boʻlmaydi: seed ruxsat OLIB
 TASHLAMAYDI (`core/lifespan/defaults.py`). Shuning uchun chegara soʻrovning
 oʻzida — `StudentRepository.visible_group_ids`.
 
-Guruhlar ikki manbadan yigʻiladi (`core/utils/group_scope.py`): admin
+Guruhlar ikki manbadan yigʻiladi (`modules/auth/group_scope.py`): admin
 biriktirgani (`teacher_group`) va oʻqituvchining kurslariga biriktirilgani.
 Shu yerda ikkalasi ham tekshiriladi.
 """

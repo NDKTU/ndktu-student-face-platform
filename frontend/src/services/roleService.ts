@@ -6,7 +6,7 @@ export interface RolePermission {
 }
 
 /**
- * Rol kimning ma'lumotini ko'radi (`backend/app/core/utils/data_scope.py`).
+ * Rol kimning ma'lumotini ko'radi (`backend/app/modules/auth/data_scope.py`).
  * Ruxsat sahifani ochadi, doira esa unda qaysi satrlar ko'rinishini belgilaydi.
  */
 export type DataScope = 'all' | 'faculty' | 'kafedra' | 'assigned_groups' | 'own';

@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
-from app.core.utils.data_scope import DataScope, resolve_data_scope
+from app.modules.auth.data_scope import DataScope, resolve_data_scope
 from app.core.dependencies.role_checker import _roles_have_permission
 from app.core.utils.permission_registry import declare_permission
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
@@ -287,7 +287,7 @@ class GeneralTestRepository:
 
     @staticmethod
     async def _sees_all(session: AsyncSession, user: User) -> bool:
-        """Koʻrish doirasi «Butun universitet» (`core/utils/data_scope.py`).
+        """Koʻrish doirasi «Butun universitet» (`modules/auth/data_scope.py`).
 
         Bunday rol hamma fan, test va natijani KOʻRADI, lekin boshqarmaydi:
         tahrirlash, oʻchirish va biriktirishlar egasi va adminda qoladi

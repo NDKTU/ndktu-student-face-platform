@@ -1,7 +1,7 @@
 import logging
 
 from app.core.utils.external_guard import ensure_editable
-from app.core.utils.lesson_guard import ensure_no_lessons
+from app.modules.course.lesson_guard import ensure_no_lessons
 from app.core.utils.sorting import order_by_clause
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError

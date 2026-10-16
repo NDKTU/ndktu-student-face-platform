@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.enums import course_type_label, semester_label
-from app.core.utils.course_access import ROLE_MAIN, can_manage, can_own, manageable_course_ids
+from app.modules.course.access import ROLE_MAIN, can_manage, can_own, manageable_course_ids
 from app.core.utils.sorting import order_by_clause
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson

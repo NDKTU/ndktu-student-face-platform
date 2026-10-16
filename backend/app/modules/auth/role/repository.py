@@ -4,7 +4,7 @@ from sqlalchemy import desc, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.data_scope import ADMIN_ROLE, SCOPE_ALL
+from app.modules.auth.data_scope import ADMIN_ROLE, SCOPE_ALL
 from app.modules.auth.model import Permission, Role, RolePermission
 
 from .schemas import (

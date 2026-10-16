@@ -8,9 +8,9 @@ from sqlalchemy.orm import selectinload
 from app.core.enums import CONTROL_TYPE_TITLES, ControlType, QuizType, semester_label
 from app.core.schemas import TASHKENT_TZ
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
-from app.core.utils.course_access import can_manage, manageable_course_ids
+from app.modules.course.access import can_manage, manageable_course_ids
 from app.core.utils.proctoring import resolve_no_face_finish
-from app.core.utils.lesson_scope import lesson_group_ids, visible_to_group
+from app.modules.course.lesson_scope import lesson_group_ids, visible_to_group
 from app.modules.course.model import Course, CourseGroup, Lesson
 from app.modules.organization_structure.model import Faculty, Group, TeacherGroup
 from app.modules.file.storage import public_url, store_upload

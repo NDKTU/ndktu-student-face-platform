@@ -1,6 +1,6 @@
 import logging
 
-from app.core.utils.lesson_guard import ensure_no_lessons
+from app.modules.course.lesson_guard import ensure_no_lessons
 from app.core.utils.sorting import order_by_clause
 from app.core.utils.password_hash import hash_password_async
 from fastapi import UploadFile

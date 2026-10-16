@@ -14,7 +14,7 @@ import type { DataScopeTarget, UserDataScope } from '@/services/userService';
  * Doira TURI rolda (`RolesPage`), bu yerda esa uning qiymati. Faqat tanlangan
  * rollar talab qiladigan maydonlar ko'rsatiladi: rol `faculty` bo'lsa —
  * fakultetlar va hokazo. Mos kelmagan biriktirma backendda baribir e'tiborga
- * olinmaydi (`core/utils/data_scope.py`).
+ * olinmaydi (`modules/auth/data_scope.py`).
  */
 export const UserDataScopeFields = ({
     scopes,

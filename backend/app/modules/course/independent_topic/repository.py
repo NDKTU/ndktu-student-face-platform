@@ -14,7 +14,7 @@ oʻquv rejasi qismi.
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.course_access import can_manage
+from app.modules.course.access import can_manage
 from app.modules.auth.model import User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, IndependentTopic

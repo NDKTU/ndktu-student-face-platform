@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.course_access import can_manage
+from app.modules.course.access import can_manage
 from app.core.utils.safe_url import UnsafeUrlError, normalize_url
 from app.core.utils.youtube_link import YouTubeLinkError, parse_youtube_link
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link

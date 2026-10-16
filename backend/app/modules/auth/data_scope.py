@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.group_scope import teacher_group_ids
+from app.modules.auth.group_scope import teacher_group_ids
 from app.modules.auth.model import Student, User, UserDataScope
 from app.modules.organization_structure.model import Group, Speciality
 from app.core.utils.roles import user_is_admin

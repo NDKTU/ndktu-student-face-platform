@@ -4,7 +4,7 @@ from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.data_scope import resolve_data_scope
+from app.modules.auth.data_scope import resolve_data_scope
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.organization_structure.model import Group, TeacherGroup
 from app.modules.quiz.model import Quiz, Result
@@ -47,7 +47,7 @@ class ResultRepository:
 
     @staticmethod
     async def _scope_filter(session: AsyncSession, current_user: User):
-        """Natijalarning ko'rish doirasi (`core/utils/data_scope.py`); `None` — hammasi.
+        """Natijalarning ko'rish doirasi (`modules/auth/data_scope.py`); `None` — hammasi.
 
         O'zining natijasi har doim ko'rinadi. Qolgani doira bo'yicha birlashadi:
         fakultet/kafedra/biriktirilgan guruhlar, kafedra o'qituvchilari tuzgan

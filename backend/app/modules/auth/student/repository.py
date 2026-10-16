@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.utils.data_scope import resolve_data_scope
+from app.modules.auth.data_scope import resolve_data_scope
 from app.modules.auth.model import Student, User
 
 from .schemas import (
@@ -40,7 +40,7 @@ class StudentRepository:
     async def visible_group_ids(session: AsyncSession, current_user: User | None) -> list[int] | None:
         """Foydalanuvchi ko'ra oladigan guruhlar; `None` — cheklov yo'q.
 
-        Doira rolda sozlanadi (`core/utils/data_scope.py`): o'qituvchi —
+        Doira rolda sozlanadi (`modules/auth/data_scope.py`): o'qituvchi —
         o'zi dars o'tadigan guruhlar, dekan — o'z fakulteti va hokazo.
         `read:student` ni roldan olib tashlash bilan bu hal bo'lmasdi: seed
         ruxsat OLIB TASHLAMAYDI (`core/lifespan/defaults.py`), shuning uchun

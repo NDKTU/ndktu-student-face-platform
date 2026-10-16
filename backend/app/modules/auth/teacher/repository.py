@@ -1,7 +1,7 @@
 import logging
 
 from app.core.utils.external_guard import ensure_editable
-from app.core.utils.lesson_guard import ensure_no_lessons
+from app.modules.course.lesson_guard import ensure_no_lessons
 from app.core.utils.sorting import order_by_clause
 from fastapi import UploadFile
 from sqlalchemy import Float, asc, case, cast, desc, func, literal, or_, select

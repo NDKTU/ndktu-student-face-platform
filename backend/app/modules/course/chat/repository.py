@@ -12,7 +12,7 @@ O'chirish: muallif o'z xabarini, kurs o'qituvchilari va admin — istalganini
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.course_access import can_manage
+from app.modules.course.access import can_manage
 from app.modules.auth.model import Role, Student, Teacher, User, UserRole
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseMessage, CourseTeacher

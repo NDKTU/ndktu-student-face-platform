@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils.data_scope import resolve_data_scope, sees_user
+from app.modules.auth.data_scope import resolve_data_scope, sees_user
 from app.modules.auth.model import User
 
 from . import stats
@@ -181,7 +181,7 @@ async def submit_test(
 
 
 async def _visible_result(session: AsyncSession, result_id: int, user: User):
-    """Natija — koʻrish doirasida boʻlsa (`core/utils/data_scope.py`).
+    """Natija — koʻrish doirasida boʻlsa (`modules/auth/data_scope.py`).
 
     Talaba — faqat oʻziniki, dekan — oʻz fakultetiniki. Begonasi 404:
     borligi ham bilinmasin.

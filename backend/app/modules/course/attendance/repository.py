@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.course_access import can_manage as can_manage_course
-from app.core.utils.lesson_access import ensure_can_manage_lesson
-from app.core.utils.lesson_scope import visible_to_group
+from app.modules.course.access import can_manage as can_manage_course
+from app.modules.course.lesson_access import ensure_can_manage_lesson
+from app.modules.course.lesson_scope import visible_to_group
 from app.modules.auth.model import Student, User
 from app.modules.course.model import Course, CourseGroup, CourseTeacher, Lesson, LessonAttendance
 from app.modules.organization_structure.model import Group
@@ -43,7 +43,7 @@ class AttendanceRepository:
         """Dars qaysi guruhlarni qamraydi.
 
         `lessons.group_id` bo'sh bo'lsa — dars kursniki va kursning barcha
-        guruhlariga tegishli (`app/core/utils/lesson_scope.py` dagi qoida bilan
+        guruhlariga tegishli (`app/modules/course/lesson_scope.py` dagi qoida bilan
         bir xil).
         """
         if lesson.group_id is not None:

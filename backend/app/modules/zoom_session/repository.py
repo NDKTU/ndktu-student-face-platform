@@ -31,7 +31,7 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.utils.face_absence import FAILED_STATUSES, build_absence_spans, spans_total_seconds
 from app.core.utils.face_service import classify, verify_face
-from app.core.utils.lesson_access import is_admin
+from app.modules.course.lesson_access import is_admin
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
 from app.core.utils.zoom_signature import HOST_ROLE, PARTICIPANT_ROLE, sign_meeting
 from app.modules.auth.model import Student, Teacher, TeacherAssignment, TeacherSubject, User

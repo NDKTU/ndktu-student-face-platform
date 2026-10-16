@@ -333,7 +333,7 @@ async def get_user_data_scope(
     """Foydalanuvchining ko'rish doirasi: biriktirilgan fakultet, kafedra va guruhlar.
 
     Doira turi rolda (`roles.data_scope`), bu yerda esa aynan qaysilari
-    (`core/utils/data_scope.py`).
+    (`modules/auth/data_scope.py`).
     """
     return await get_user_repository.get_data_scope(session=session, user_id=user_id)
 

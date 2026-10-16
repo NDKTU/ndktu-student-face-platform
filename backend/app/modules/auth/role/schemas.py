@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.core.schemas import TashkentDatetime
 
-# `core/utils/data_scope.py::DATA_SCOPES` bilan bir xil.
+# `modules/auth/data_scope.py::DATA_SCOPES` bilan bir xil.
 DataScopeName = Literal["all", "faculty", "kafedra", "assigned_groups", "own"]
 
 

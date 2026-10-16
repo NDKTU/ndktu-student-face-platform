@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.schemas import TASHKENT_TZ
-from app.core.utils.course_access import can_manage, manageable_course_ids
-from app.core.utils.lesson_scope import visible_to_group
+from app.modules.course.access import can_manage, manageable_course_ids
+from app.modules.course.lesson_scope import visible_to_group
 from app.modules.auth.model import Student, Teacher, TeacherSubject, User
 from app.modules.course.course.repository import get_course_repository
 from app.modules.course.model import Course, CourseGroup, Homework, HomeworkSubmission, Lesson

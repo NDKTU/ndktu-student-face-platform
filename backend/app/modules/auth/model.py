@@ -95,7 +95,7 @@ class UserRole(Base, IdIntPk, TimestampMixin):
 # Tizim rollari yaratilganda (bo'sh baza, testlar, `get_or_create_role`) o'sha
 # doirani olsin, `d4a8e1c6b3f2` migratsiyasi mavjud bazaga qanday bergan
 # bo'lsa. Admin yaratgan yangi rol — `own`: doirani u o'zi tanlamaguncha rol
-# hech kimni ko'rmaydi. Satrlar `core/utils/data_scope.py` dagi bilan bir xil;
+# hech kimni ko'rmaydi. Satrlar `modules/auth/data_scope.py` dagi bilan bir xil;
 # u yerdan import qilib bo'lmaydi — u shu modulni import qiladi.
 _SYSTEM_ROLE_SCOPES = {
     "admin": "all",
@@ -142,7 +142,7 @@ class Role(Base, IdIntPk, TimestampMixin):
     #: rollarda bo'sh.
     code: Mapped[str | None] = mapped_column(String(20), nullable=True, default=_default_role_code)
 
-    # Rol qaysi ma'lumotni ko'radi: `core/utils/data_scope.py::DATA_SCOPES`.
+    # Rol qaysi ma'lumotni ko'radi: `modules/auth/data_scope.py::DATA_SCOPES`.
     # Ruxsatlar «nima qilish mumkin»ni, bu esa «kimning ma'lumotini»
     # belgilaydi. Standart qiymat nomdan (`_default_data_scope`).
     data_scope: Mapped[str] = mapped_column(
