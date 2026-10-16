@@ -328,7 +328,7 @@ async def test_group_can_be_hidden_without_unassigning(auth_client, async_client
 async def test_question_image_upload_and_html_question(auth_client, scene, monkeypatch, tmp_path):
     """Savol muharriri rasmni elementar bo'limning o'z manzili orqali yuklaydi
     va HTML matnli savol bankda shundayligicha saqlanadi."""
-    from core.config import settings
+    from app.core.config import settings
 
     monkeypatch.setattr(settings.file_url, "upload_dir", str(tmp_path))
     png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64 + b"gt-question"

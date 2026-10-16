@@ -21,7 +21,7 @@ async def _login(async_client: AsyncClient, username: str) -> dict:
 
 
 async def _user(async_db, role, username: str):
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import User, UserRole
 

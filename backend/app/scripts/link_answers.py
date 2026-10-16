@@ -51,13 +51,13 @@ import sys
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
+sys.path[:0] = [str(BACKEND_ROOT)]
 
 # isort: off
 from sqlalchemy import text  # noqa: E402
 
 import app.core.database.models_registry  # noqa: E402,F401 — modellarni roʻyxatga oladi
-from core.database.db_helper import db_helper  # noqa: E402
+from app.core.database.db_helper import db_helper  # noqa: E402
 
 # isort: on
 

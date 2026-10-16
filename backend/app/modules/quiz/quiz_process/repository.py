@@ -712,7 +712,7 @@ class QuizProcessRepository:
             # Bug#4 fix: use settings.evidence_dir (absolute path mapped to Docker volume)
             # so files survive container restarts. /evidence/ and /uploads/cheating_evidence/
             # are both mounted in main.py.
-            from core.config import settings as app_settings
+            from app.core.config import settings as app_settings
 
             evidence_dir = app_settings.evidence_dir
             evidence_dir.mkdir(parents=True, exist_ok=True)

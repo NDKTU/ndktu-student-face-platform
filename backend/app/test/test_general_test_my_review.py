@@ -12,7 +12,7 @@ oshkor qilardi. Shuningdek:
 from datetime import timedelta
 
 import pytest
-from core.utils.password_hash import hash_password
+from app.core.utils.password_hash import hash_password
 from sqlalchemy import select
 
 from app.core.mixins.time_stamp_mixin import utcnow_naive

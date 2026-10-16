@@ -7,8 +7,8 @@ EduPlan нет ни одной: интеграция односторонняя.
 import logging
 from typing import Annotated
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired, get_current_user_id
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import PermissionRequired, get_current_user_id
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession

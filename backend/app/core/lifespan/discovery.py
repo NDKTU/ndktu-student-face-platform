@@ -1,8 +1,8 @@
 import inspect
 import logging
 
-from core.dependencies.role_checker import PermissionRequired
-from core.utils.permission_registry import DECLARED_PERMISSIONS
+from app.core.dependencies.role_checker import PermissionRequired
+from app.core.utils.permission_registry import DECLARED_PERMISSIONS
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 

@@ -19,7 +19,7 @@ Qoidalar:
 from dataclasses import dataclass
 from typing import Literal
 
-from core.config import settings
+from app.core.config import settings
 from fastapi import HTTPException
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession

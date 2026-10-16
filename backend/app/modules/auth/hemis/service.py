@@ -1,8 +1,8 @@
 import logging
 
 import httpx
-from core.config import settings
-from core.utils.password_hash import verify_and_migrate
+from app.core.config import settings
+from app.core.utils.password_hash import verify_and_migrate
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

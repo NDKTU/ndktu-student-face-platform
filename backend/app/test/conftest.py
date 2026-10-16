@@ -1,10 +1,10 @@
 import pytest_asyncio
 import redis.asyncio as redis
-from core.config import settings
-from core.database.db_helper import db_helper
+from app.core.config import settings
+from app.core.database.db_helper import db_helper
 from fastapi_limiter import FastAPILimiter
 from httpx import ASGITransport, AsyncClient
-from main import app as fastapi_app
+from app.main import app as fastapi_app
 from redis.asyncio import ConnectionPool
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -57,7 +57,7 @@ async def reset_global_redis_pool():
     подмена атрибута модуля до него бы не дошла. Продакшн-код не затронут: там loop
     один на весь процесс.
     """
-    from core.redis_client import redis_client
+    from app.core.redis_client import redis_client
 
     previous_pool = redis_client.connection_pool
     redis_client.connection_pool = ConnectionPool.from_url(

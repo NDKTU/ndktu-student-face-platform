@@ -2,8 +2,8 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
-from core.config import settings
-from core.database.db_helper import db_helper
+from app.core.config import settings
+from app.core.database.db_helper import db_helper
 from fastapi import FastAPI
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
@@ -80,7 +80,7 @@ async def _seed_admin(app: FastAPI) -> None:
     Seed the Admin role/permissions and the bootstrap admin user using dynamic
     route discovery. Teacher/student baselines are also seeded — see defaults.py.
     """
-    from core.redis_client import redis_client
+    from app.core.redis_client import redis_client
 
     acquired = await _hold_seed_lock(redis_client)
     if not acquired:
@@ -164,7 +164,7 @@ def _start_eduplan_schedule() -> "asyncio.Task | None":
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from core.redis_client import redis_client
+    from app.core.redis_client import redis_client
 
     await _connect_database()
     await _connect_redis(redis_client)

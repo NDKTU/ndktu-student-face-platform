@@ -3,9 +3,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from core.config import settings
-from core.redis_client import redis_client
-from core.utils.password_hash import verify_and_migrate
+from app.core.config import settings
+from app.core.redis_client import redis_client
+from app.core.utils.password_hash import verify_and_migrate
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
 from sqlalchemy import func, select

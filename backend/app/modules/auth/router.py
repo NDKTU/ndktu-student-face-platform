@@ -1,9 +1,9 @@
 import json
 import logging
 
-from core.config import settings
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import AdminRequired, PermissionRequired
+from app.core.config import settings
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import AdminRequired, PermissionRequired
 from app.modules.audit import service as audit_service
 from app.modules.audit.model import AuditEvent
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, Response, UploadFile, status

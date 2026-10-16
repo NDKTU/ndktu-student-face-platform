@@ -14,8 +14,8 @@ import uuid
 from collections.abc import Iterable
 from pathlib import Path
 
-from core.config import settings
-from core.utils.image_upload import looks_like_image
+from app.core.config import settings
+from app.core.utils.image_upload import looks_like_image
 from fastapi import UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError

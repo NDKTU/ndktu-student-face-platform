@@ -3,7 +3,7 @@ import os
 import re
 import uuid
 
-from core.config import settings
+from app.core.config import settings
 from fastapi import UploadFile
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession

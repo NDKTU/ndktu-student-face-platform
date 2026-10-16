@@ -14,7 +14,7 @@ from httpx import AsyncClient
 @pytest_asyncio.fixture
 async def course_with_assistant(async_db, auth_client, test_user, test_kafedra, test_group):
     """Kurs, uning asosiy oʻqituvchisi (admin) va bitta assistent."""
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
     from app.modules.quiz.model import Subject

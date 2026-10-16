@@ -9,7 +9,7 @@ tekshiruvidan keyin.
 import time
 
 import jwt
-from core.config import settings
+from app.core.config import settings
 
 # Talaba — ishtirokchi (0). O'qituvchi LMS yaratgan uchrashuvni sahifaning
 # o'zida host (1) bo'lib boshlaydi — bu rol faqat ZAK bilan birga ishlaydi.

@@ -16,8 +16,8 @@ import logging
 import uuid
 from typing import Any, Iterable, Sequence
 
-from core.mixins.time_stamp_mixin import utcnow_naive
-from core.redis_client import redis_client
+from app.core.mixins.time_stamp_mixin import utcnow_naive
+from app.core.redis_client import redis_client
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 

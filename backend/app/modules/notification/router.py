@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import get_current_user_id
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import get_current_user_id
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 

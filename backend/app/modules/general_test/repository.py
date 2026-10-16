@@ -21,8 +21,8 @@ from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.redis_client import redis_client
 from app.core.security import create_face_ws_token
 from app.core.utils.data_scope import DataScope, resolve_data_scope
-from core.dependencies.role_checker import _roles_have_permission
-from core.utils.permission_registry import declare_permission
+from app.core.dependencies.role_checker import _roles_have_permission
+from app.core.utils.permission_registry import declare_permission
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, FACE_ENTRY_TTL_SECONDS, classify, verify_face
 from app.core.utils.proctoring import resolve_no_face_finish
 from app.modules.audit import service as audit_service
@@ -1575,7 +1575,7 @@ class GeneralTestRepository:
         """Qoidabuzarlik kadrini saqlaydi; buzuq yoki bo'sh kadr — `None` (belgi baribir qoladi)."""
         if not image_data:
             return None
-        from core.config import settings as app_settings
+        from app.core.config import settings as app_settings
 
         raw = image_data.split(",", 1)[1] if "," in image_data else image_data
         try:

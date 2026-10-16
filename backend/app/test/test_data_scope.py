@@ -73,7 +73,7 @@ async def _make_role(async_db, name: str, permissions: tuple[str, ...], data_sco
 
 
 async def _make_user(async_db, username: str, role) -> int:
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import User, UserRole
 

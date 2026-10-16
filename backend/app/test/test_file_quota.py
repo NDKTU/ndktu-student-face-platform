@@ -27,7 +27,7 @@ def png(tag: str) -> bytes:
 @pytest.fixture
 def temp_uploads(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp_dir:
-        from core.config import settings
+        from app.core.config import settings
 
         monkeypatch.setattr(settings.file_url, "upload_dir", tmp_dir)
         yield tmp_dir
@@ -39,7 +39,7 @@ async def _make_teacher(async_db, username: str, *, limit: int | None = None):
     Limit bazaga toʻgʻridan-toʻgʻri yoziladi: API 1 MB dan kichik limitni
     qabul qilmaydi, testga esa bir necha baytli chegara kerak.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, Teacher, User, UserRole
 
@@ -170,7 +170,7 @@ async def test_shared_blob_counts_for_each_owner(async_client, async_db, temp_up
 
 @pytest.mark.asyncio
 async def test_custom_limit_wins_over_default(async_client, async_db, temp_uploads, monkeypatch):
-    from core.config import settings
+    from app.core.config import settings
 
     monkeypatch.setattr(settings.file_quota, "default_bytes", 5)
     await _make_teacher(async_db, "q_default")
@@ -185,7 +185,7 @@ async def test_custom_limit_wins_over_default(async_client, async_db, temp_uploa
 
 @pytest.mark.asyncio
 async def test_admin_is_not_limited(auth_client, temp_uploads, monkeypatch):
-    from core.config import settings
+    from app.core.config import settings
 
     monkeypatch.setattr(settings.file_quota, "default_bytes", 1)
 

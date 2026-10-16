@@ -14,9 +14,9 @@ import logging
 import re
 import secrets
 
-from core.mixins.external_ref import SOURCE_EDUPLAN
-from core.mixins.time_stamp_mixin import utcnow_naive
-from core.utils.password_hash import hash_password_async
+from app.core.mixins.external_ref import SOURCE_EDUPLAN
+from app.core.mixins.time_stamp_mixin import utcnow_naive
+from app.core.utils.password_hash import hash_password_async
 from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

@@ -1,8 +1,8 @@
 import logging
 
-from core.utils.lesson_guard import ensure_no_lessons
-from core.utils.sorting import order_by_clause
-from core.utils.password_hash import hash_password_async
+from app.core.utils.lesson_guard import ensure_no_lessons
+from app.core.utils.sorting import order_by_clause
+from app.core.utils.password_hash import hash_password_async
 from fastapi import UploadFile
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import desc, func, select
@@ -356,7 +356,7 @@ class UserRepository:
     _EXTERNAL_SOURCE_LABEL = {"eduplan": "EPOS", "hemis": "HEMIS"}
 
     async def change_my_credentials(self, session: AsyncSession, current_user: User, data) -> User:
-        from core.utils.password_hash import verify_password_async
+        from app.core.utils.password_hash import verify_password_async
 
         # Parolni tashqi tizimdagi hisob uchun bu yerda almashtirib bo'lmaydi:
         # keyingi kirishda u baribir tashqi tizimdagi parol bilan yangilanadi,

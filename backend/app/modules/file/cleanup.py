@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import PurePosixPath
 
-from core.config import settings
+from app.core.config import settings
 from sqlalchemy import delete, exists, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 

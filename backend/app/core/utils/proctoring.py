@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core.utils.permission_registry import declare_permission
+from app.core.utils.permission_registry import declare_permission
 from app.core.utils.roles import user_is_admin
 from app.core.errors import Forbidden
 
@@ -64,7 +64,7 @@ async def resolve_no_face_finish(
     is_admin = user is not None and user_is_admin(user)
     # Kech import: bu modulni sxemalar ham import qiladi (validator), ular esa
     # `role_checker` va modellarni tortib kelmasligi kerak.
-    from core.dependencies.role_checker import _roles_have_permission
+    from app.core.dependencies.role_checker import _roles_have_permission
 
     if user is not None and not is_admin and not await _roles_have_permission(session, user, AUTO_FINISH_PERMISSION):
         raise Forbidden(

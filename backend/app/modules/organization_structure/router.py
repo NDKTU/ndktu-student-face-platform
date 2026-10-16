@@ -1,7 +1,7 @@
 import logging
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import (
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import (
     PermissionRequired,
     PermissionRequiredExceptTeacher,
     user_has_permission,

@@ -18,8 +18,8 @@ import secrets
 from urllib.parse import urlencode
 
 import httpx
-from core.config import settings
-from core.redis_client import redis_client
+from app.core.config import settings
+from app.core.redis_client import redis_client
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,8 +1,8 @@
 import logging
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired, PermissionRequiredExceptStudent
-from core.utils.rate_limit import user_identifier
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import PermissionRequired, PermissionRequiredExceptStudent
+from app.core.utils.rate_limit import user_identifier
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter

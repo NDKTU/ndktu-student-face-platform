@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from core.config import settings
+from app.core.config import settings
 from fastapi import HTTPException, status
 from sqlalchemy import desc, exists, or_, select, union
 from sqlalchemy.dialects.postgresql import insert as pg_insert

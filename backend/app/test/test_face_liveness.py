@@ -7,7 +7,7 @@ etilmaydi, faqat jurnalga yoziladi.
 """
 
 import pytest
-from core.config import settings
+from app.core.config import settings
 
 from app.core.utils.face_absence import FAILED_STATUSES
 from app.core.utils.face_service import FACE_ENTRY_MESSAGES, classify

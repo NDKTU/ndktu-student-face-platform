@@ -28,7 +28,7 @@ async def student_client(async_client, async_db, make_group, test_faculty):
     aynan rol boʻyicha yoqiladi (`is_student = not is_admin and ...`),
     yaʼni admin rolida muammo umuman koʻrinmasdi.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

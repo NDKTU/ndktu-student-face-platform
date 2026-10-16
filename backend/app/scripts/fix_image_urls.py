@@ -31,15 +31,15 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Скрипт запускают по пути, а не как модуль пакета, поэтому корень проекта и
-# каталог app кладём на sys.path сами — импорты в проекте смешанные.
+# Скрипт запускают по пути, а не как модуль пакета, поэтому корень backend
+# кладём на sys.path сами. Только его: все импорты в проекте — `app.*`.
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
+sys.path[:0] = [str(BACKEND_ROOT)]
 
 # isort: off
 from sqlalchemy import text  # noqa: E402
 
-from core.database.db_helper import db_helper  # noqa: E402
+from app.core.database.db_helper import db_helper  # noqa: E402
 
 # isort: on
 

@@ -21,8 +21,8 @@
 import logging
 from collections import defaultdict
 
-from core.mixins.external_ref import SOURCE_EDUPLAN
-from core.mixins.time_stamp_mixin import utcnow_naive
+from app.core.mixins.external_ref import SOURCE_EDUPLAN
+from app.core.mixins.time_stamp_mixin import utcnow_naive
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -18,7 +18,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"soxta png mazmuni"
 def temp_uploads(monkeypatch):
     """Haqiqiy uploads papkasi root'niki — testlar vaqtinchalik papkaga yozadi."""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        from core.config import settings
+        from app.core.config import settings
 
         monkeypatch.setattr(settings.file_url, "upload_dir", tmp_dir)
         yield tmp_dir

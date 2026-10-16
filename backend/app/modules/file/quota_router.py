@@ -1,6 +1,6 @@
-from core.config import settings
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
+from app.core.config import settings
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 

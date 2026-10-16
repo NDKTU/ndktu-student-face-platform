@@ -20,7 +20,7 @@ async def teacher_setup(async_db, auth_client, test_subject):
     Yonida — boshqa fan, unga biriktirilmagan: shunga savol qoʻshib
     koʻrishga urinish taqiqlanishi kerak.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import (
         Permission,

@@ -31,7 +31,7 @@ async def badge_student(async_db, test_faculty, make_group):
 @pytest_asyncio.fixture
 async def reader_headers(async_client: AsyncClient, async_db, badge_student):
     """`read:student` ruxsati bor, lekin admin boʻlmagan foydalanuvchi."""
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

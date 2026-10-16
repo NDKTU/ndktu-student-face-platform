@@ -14,7 +14,7 @@ from types import TracebackType
 from typing import Any
 
 import httpx
-from core.config import EduPlanConfig, settings
+from app.core.config import EduPlanConfig, settings
 from fastapi import status
 from app.core.errors import KIND_BY_STATUS, AppError
 

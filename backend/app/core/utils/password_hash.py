@@ -32,7 +32,7 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 
-from core.config import settings
+from app.core.config import settings
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(

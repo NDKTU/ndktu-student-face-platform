@@ -11,7 +11,7 @@ async def test_quiz_upload_image(auth_client: AsyncClient, monkeypatch):
     # root-owned uploads/questions directory in the real project.
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Patch the upload_dir setting so the repository writes to our temp dir
-        from core.config import settings
+        from app.core.config import settings
 
         monkeypatch.setattr(settings.file_url, "upload_dir", tmp_dir)
 

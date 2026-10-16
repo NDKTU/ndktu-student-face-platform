@@ -18,7 +18,7 @@ from app.modules.psychology.model import PsychologyMethod, PsychologyResult
 async def _make_user(async_db, username: str, role_name: str, permissions: tuple[str, ...]) -> dict:
     from sqlalchemy import select
 
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

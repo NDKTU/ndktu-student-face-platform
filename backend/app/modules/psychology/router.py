@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired, PsychologyStaffOnly
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import PermissionRequired, PsychologyStaffOnly
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession

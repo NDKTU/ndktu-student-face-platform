@@ -13,7 +13,7 @@ import logging
 import random
 
 import jwt
-from core.security import create_guest_quiz_token, decode_guest_quiz_token
+from app.core.security import create_guest_quiz_token, decode_guest_quiz_token
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

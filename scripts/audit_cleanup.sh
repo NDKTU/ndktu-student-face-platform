@@ -18,7 +18,7 @@ mkdir -p "$LOG_DIR"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S%z')] $*" | tee -a "$LOG_FILE"; }
 
 log "Audit tozalash boshlandi: $*"
-if docker exec "$CONTAINER" sh -c "cd /face/app && uv run python -m app.scripts.audit_cleanup $*" 2>&1 | tee -a "$LOG_FILE"; then
+if docker exec "$CONTAINER" sh -c "cd /face && uv run python -m app.scripts.audit_cleanup $*" 2>&1 | tee -a "$LOG_FILE"; then
     log "Bajarildi"
 else
     log "XATO: tozalash bajarilmadi"

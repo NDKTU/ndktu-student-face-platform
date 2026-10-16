@@ -23,17 +23,16 @@ import logging
 import sys
 from pathlib import Path
 
-# Скрипт запускают по пути, а не как модуль пакета, поэтому корень проекта и
-# каталог app кладём на sys.path сами — импорты в проекте смешанные
-# (`from core...` и `from app.modules...`).
+# Скрипт запускают по пути, а не как модуль пакета, поэтому корень backend
+# кладём на sys.path сами. Только его: все импорты в проекте — `app.*`.
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
+sys.path[:0] = [str(BACKEND_ROOT)]
 
 # Блок обязан идти после правки sys.path — сортировка импортов его сломает.
 # isort: off
 import app.core.database.models_registry  # noqa: E402,F401 — регистрирует модели до резолва связей
-from core.database.db_helper import db_helper  # noqa: E402
-from core.redis_client import redis_client  # noqa: E402
+from app.core.database.db_helper import db_helper  # noqa: E402
+from app.core.redis_client import redis_client  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
 from app.core.errors import AppError, error_text  # noqa: E402

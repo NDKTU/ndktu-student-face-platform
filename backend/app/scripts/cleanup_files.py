@@ -24,12 +24,12 @@ import sys
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
+sys.path[:0] = [str(BACKEND_ROOT)]
 
 # isort: off
 import app.core.database.models_registry  # noqa: E402,F401 — bogʻlanishlar resolv boʻlishidan oldin modellarni roʻyxatga oladi
-from core.config import settings  # noqa: E402
-from core.database.db_helper import db_helper  # noqa: E402
+from app.core.config import settings  # noqa: E402
+from app.core.database.db_helper import db_helper  # noqa: E402
 
 from app.modules.file import cleanup  # noqa: E402
 from app.modules.file.quota import format_size  # noqa: E402

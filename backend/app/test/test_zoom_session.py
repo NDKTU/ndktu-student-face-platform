@@ -13,7 +13,7 @@ import httpx
 import jwt
 import pytest
 import pytest_asyncio
-from core.config import settings
+from app.core.config import settings
 from sqlalchemy import select
 
 from app.modules.zoom_session import repository as zoom_repository

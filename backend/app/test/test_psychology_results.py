@@ -151,7 +151,7 @@ async def student_client(async_client, auth_client, async_db, psy_results):
 
     Rollar oynasidan aynan shunday berilgan — talaba oʻz natijasini koʻrsin.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
     from sqlalchemy import select
 
     from app.modules.auth.model import Permission, Role, RolePermission, UserRole

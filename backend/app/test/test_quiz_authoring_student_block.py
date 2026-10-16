@@ -26,7 +26,7 @@ async def _make_user(async_db, username: str, role_name: str) -> dict:
     `PermissionRequired` dan kelardi va tekshiruv «noto'g'ri sabab bilan»
     o'tib ketardi.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

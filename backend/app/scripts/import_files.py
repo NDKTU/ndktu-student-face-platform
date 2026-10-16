@@ -50,14 +50,14 @@ from collections import defaultdict
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(BACKEND_ROOT), str(BACKEND_ROOT / "app")]
+sys.path[:0] = [str(BACKEND_ROOT)]
 
 # isort: off
 from sqlalchemy import select, text  # noqa: E402
 
 import app.core.database.models_registry  # noqa: E402,F401 — bogʻlanishlar resolv boʻlishidan oldin modellarni roʻyxatga oladi
-from core.config import settings  # noqa: E402
-from core.database.db_helper import db_helper  # noqa: E402
+from app.core.config import settings  # noqa: E402
+from app.core.database.db_helper import db_helper  # noqa: E402
 
 from app.modules.file.model import FileBlob, FileUsage, StoredFile  # noqa: E402
 

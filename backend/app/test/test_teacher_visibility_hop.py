@@ -14,7 +14,7 @@ guruhini va testlarini ko'rib qoladi — test qizil bo'ladi.
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from main import app as fastapi_app
+from app.main import app as fastapi_app
 
 pytestmark = pytest.mark.asyncio
 

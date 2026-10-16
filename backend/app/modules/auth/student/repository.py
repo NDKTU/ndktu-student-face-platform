@@ -1,7 +1,7 @@
 import logging
 from datetime import date, datetime
 
-from core.utils.sorting import order_by_clause
+from app.core.utils.sorting import order_by_clause
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

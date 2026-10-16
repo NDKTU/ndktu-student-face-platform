@@ -22,7 +22,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"soxta png mazmuni"
 @pytest.fixture
 def temp_uploads(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp_dir:
-        from core.config import settings
+        from app.core.config import settings
 
         monkeypatch.setattr(settings.file_url, "upload_dir", tmp_dir)
         yield tmp_dir
@@ -30,7 +30,7 @@ def temp_uploads(monkeypatch):
 
 async def _make_user(async_db, username: str, roles: list[str], permissions: list[str]):
     """Berilgan rollar va ruxsatlarga ega foydalanuvchi (rol va ruxsat qayta ishlatiladi)."""
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
     from sqlalchemy import select
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole

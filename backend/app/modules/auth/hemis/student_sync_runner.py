@@ -14,7 +14,7 @@ TTL блокировки — час: полный обход это 49 стра�
 
 import logging
 
-from core.redis_client import redis_client
+from app.core.redis_client import redis_client
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import StudentSyncApplyRequest, StudentSyncApplyResponse

@@ -1,6 +1,6 @@
 import logging
 
-from core.database.db_helper import db_helper
+from app.core.database.db_helper import db_helper
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import select

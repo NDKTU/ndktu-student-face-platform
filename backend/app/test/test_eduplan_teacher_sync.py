@@ -17,7 +17,7 @@
 
 import pytest
 import pytest_asyncio
-from core.mixins.external_ref import SOURCE_EDUPLAN
+from app.core.mixins.external_ref import SOURCE_EDUPLAN
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 

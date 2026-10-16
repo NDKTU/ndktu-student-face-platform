@@ -1,7 +1,7 @@
 import logging
 
-from core.config import settings
-from core.utils.password_hash import hash_password
+from app.core.config import settings
+from app.core.utils.password_hash import hash_password
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -35,7 +35,7 @@ async def control_course(async_db, test_user, test_kafedra):
     Ulardan biri kursga assistent qilib qoʻshiladi, ikkinchisi — begona.
     Ikkalasiga ham fan biriktirilmagan: kurs savollarini kurs huquqi hal qiladi.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

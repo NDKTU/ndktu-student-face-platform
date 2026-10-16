@@ -16,7 +16,7 @@ from app.test.test_student_teacher_scope import _student
 
 
 async def _teacher(async_db, role, username: str):
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Teacher, User, UserRole
 
@@ -231,7 +231,7 @@ async def test_dashboard_without_courses_is_empty_not_error(auth_client):
 
 @pytest.mark.asyncio
 async def test_dashboard_requires_teacher_permission(async_client: AsyncClient, async_db):
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Role, User, UserRole
 

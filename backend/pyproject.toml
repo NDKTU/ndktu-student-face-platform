@@ -25,9 +25,11 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-# Add both the root and the app directory to the python path
+# Faqat backend ildizi: `app/` ni ham qo'shish `core.*` ni ikkinchi nom bilan
+# import qilinadigan qilardi — bitta modul ikki marta yuklanardi
+# (`settings`, `redis_client` ikkitadan). Hamma import `app.` dan boshlanadi.
 pythonpath = [
-  ".", "app"
+  "."
 ]
 # Один event loop на весь прогон, как в продакшне: и SQLAlchemy-движок, и Redis-клиент
 # создаются на уровне модуля при импорте, а их пулы привязываются к тому loop, который
@@ -51,9 +53,16 @@ target-version = "py312"
 line-length = 120
 
 [tool.ruff.lint]
-# E/W = pycodestyle, F = Pyflakes, I = isort (import sorting)
-select = ["E", "W", "F", "I"]
+# E/W = pycodestyle, F = Pyflakes, I = isort (import sorting),
+# TID251 = taqiqlangan importlar (pastda).
+select = ["E", "W", "F", "I", "TID251"]
 ignore = []
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# Bitta ildiz — `app.`. `core.*` va `main` — o'sha modullarning ikkinchi nomi:
+# Python ularni alohida yuklaydi (ikki `settings`, ikki `redis_client`).
+"core".msg = "`app.core` dan import qiling — `core.*` shu modulning ikkinchi nomi"
+"main".msg = "`app.main` dan import qiling"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests often contain long URLs, payloads, fixtures — line length is not useful here.

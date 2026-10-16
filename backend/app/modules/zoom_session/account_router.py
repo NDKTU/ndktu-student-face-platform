@@ -1,5 +1,5 @@
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import PermissionRequired
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import PermissionRequired
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 

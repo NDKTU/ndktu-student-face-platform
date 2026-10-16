@@ -16,7 +16,7 @@ from app.modules.auth.user.service import auth_service
 
 @pytest.mark.asyncio
 async def test_login_finds_user_regardless_of_case(async_client, async_db):
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     async_db.add(
         User(username="MM001", password=hash_password("Parol12345"), is_active=True)
@@ -38,7 +38,7 @@ async def test_login_keeps_username_case_for_external_call(async_db):
     EPMOS uchun "mm001" va "MM001" — boshqa-boshqa login, shuning uchun
     kichik harf bilan kirgan xodim ham o'tishi kerak.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     async_db.add(
         User(username="SIM002", password=hash_password("x"), auth_source="eduplan", is_active=True)

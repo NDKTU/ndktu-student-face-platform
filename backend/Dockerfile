@@ -35,4 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 EXPOSE 8000
 
-CMD ["uv", "run", "--no-dev", "--no-sync", "app/main.py"]
+# Paket sifatida (`-m app.main`), fayl yo'li bilan emas: `app/main.py` Python'ga
+# `app/` papkasini sys.path ga qo'shtirardi va `core.*` ikkinchi nom bo'lib
+# qolardi — bitta modul ikki marta yuklanardi.
+CMD ["uv", "run", "--no-dev", "--no-sync", "python", "-m", "app.main"]

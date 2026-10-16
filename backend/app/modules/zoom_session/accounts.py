@@ -18,7 +18,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 
-from core.config import settings
+from app.core.config import settings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -16,10 +16,10 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from core.config import settings
-from core.database.db_helper import db_helper
-from core.redis_client import redis_client
-from core.schemas import TASHKENT_TZ
+from app.core.config import settings
+from app.core.database.db_helper import db_helper
+from app.core.redis_client import redis_client
+from app.core.schemas import TASHKENT_TZ
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 

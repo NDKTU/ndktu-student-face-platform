@@ -17,7 +17,7 @@ autentifikatsiyasiz endpointlarni.
 """
 
 import jwt
-from core.config import settings
+from app.core.config import settings
 from starlette.requests import Request
 from starlette.websockets import WebSocket
 

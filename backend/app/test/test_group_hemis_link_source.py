@@ -10,7 +10,7 @@ EduPlan молча переписывал это решение, и на бли�
 
 import pytest
 import pytest_asyncio
-from core.mixins.external_ref import SOURCE_EDUPLAN
+from app.core.mixins.external_ref import SOURCE_EDUPLAN
 
 from app.modules.integration.eduplan.repository import eduplan_repository
 from app.modules.organization_structure.model import Faculty, Group

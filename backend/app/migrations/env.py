@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.database.base import Base
 
 # Добавляем родительскую директорию папки app в пути поиска
-sys.path.insert(0, abspath(dirname(dirname(__file__))))
+sys.path.insert(0, abspath(dirname(dirname(dirname(__file__)))))  # backend ildizi: `app.*`
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

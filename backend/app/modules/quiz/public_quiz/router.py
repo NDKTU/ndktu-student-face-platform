@@ -7,7 +7,7 @@ Bu yerdagi hamma narsa tizimga kirmagan odam uchun, shuning uchun:
 - so'rovlar tezligi cheklangan: PIN'ni terib ko'rish qiyin bo'lsin.
 """
 
-from core.database.db_helper import db_helper
+from app.core.database.db_helper import db_helper
 from fastapi import APIRouter, Depends, Header
 from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession

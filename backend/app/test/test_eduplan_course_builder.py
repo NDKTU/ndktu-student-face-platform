@@ -20,7 +20,7 @@ async def workload(async_db, test_faculty, test_kafedra):
     amaliyot ham olib boradi. Ikkinchi oʻqituvchida faqat amaliyot bor —
     ikkinchi va uchinchi guruhlarda. Yaʼni uchta kurs chiqishi kerak.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Teacher, TeacherAssignment, User
     from app.modules.organization_structure.model import Group

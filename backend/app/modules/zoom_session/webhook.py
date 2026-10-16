@@ -20,7 +20,7 @@ import hmac
 import json
 import logging
 
-from core.database.db_helper import db_helper
+from app.core.database.db_helper import db_helper
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 

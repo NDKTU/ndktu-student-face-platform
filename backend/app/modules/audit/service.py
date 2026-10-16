@@ -23,7 +23,7 @@ from starlette.requests import Request
 # deb biladi, ya'ni `db_helper` ham ikkita bo'ladi (ikkita ulanish hovuzi).
 # So'rov yo'lidagi kod va testlar birinchisini ishlatadi — mos kelmasa,
 # yozuv boshqa bazaga tushib ketadi.
-from core.database.db_helper import db_helper
+from app.core.database.db_helper import db_helper
 from app.modules.audit.model import AuditLog
 
 logger = logging.getLogger(__name__)

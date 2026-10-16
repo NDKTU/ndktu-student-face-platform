@@ -1,7 +1,7 @@
 import logging
 import re
 
-from core.utils.external_guard import ensure_editable
+from app.core.utils.external_guard import ensure_editable
 from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -7,8 +7,8 @@ import logging
 import re
 import uuid
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import get_current_user_id
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import get_current_user_id
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter

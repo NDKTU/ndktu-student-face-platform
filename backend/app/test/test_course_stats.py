@@ -169,7 +169,7 @@ async def test_archived_courses_are_excluded(auth_client, async_db, stats_course
 @pytest.mark.asyncio
 async def test_teacher_cannot_read_stats(async_client: AsyncClient, async_db, auth_client, stats_courses):
     """`read:course` yetmaydi: statistika — butun universitet kesimi."""
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, User, UserRole
 

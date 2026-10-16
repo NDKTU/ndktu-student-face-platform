@@ -57,7 +57,7 @@ async def scope_setup(async_db, auth_client, test_faculty, make_group, make_subj
     satri yozilmaydi. Faqat biriktirmaga tayanadigan filtr bu holatda boʻsh
     roʻyxat berardi.
     """
-    from core.utils.password_hash import hash_password
+    from app.core.utils.password_hash import hash_password
 
     from app.modules.auth.model import Permission, Role, RolePermission, Teacher, User, UserRole
     from app.modules.course.model import Course, CourseGroup

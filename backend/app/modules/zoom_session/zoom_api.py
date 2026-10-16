@@ -27,7 +27,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
-from core.config import settings
+from app.core.config import settings
 from fastapi import status
 
 from app.modules.quiz.quiz_process.errors import quiz_error

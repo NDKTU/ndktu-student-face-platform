@@ -1,7 +1,7 @@
 from typing import Literal
 
-from core.database.db_helper import db_helper
-from core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
+from app.core.database.db_helper import db_helper
+from app.core.dependencies.role_checker import FileLibraryExceptStudent, PermissionRequired
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from core.config import settings
+from app.core.config import settings
 from sqlalchemy import func, select
 
 from app.modules.auth.hemis.oauth import HemisOAuthService, hemis_oauth_service
