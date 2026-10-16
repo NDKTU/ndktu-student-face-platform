@@ -97,7 +97,7 @@ async def test_busy_sync_is_recognised_by_code(async_db, monkeypatch):
 #: Repozitoriy/servis qatlamidagi `HTTPException(` soni (2026-10-16). Faqat
 #: kamayishi mumkin: modul `AppError` ga ko'chirilganda shu sonni ham
 #: kamaytiring. HTTP qatlami (router, dependency, middleware) hisobga kirmaydi.
-HTTP_EXCEPTION_BASELINE = 232
+HTTP_EXCEPTION_BASELINE = 180
 
 _HTTP_EXCEPTION = re.compile(r"\bHTTPException\(")
 

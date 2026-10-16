@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from fastapi import HTTPException
+from app.core.errors import AppError
 
 
 async def _create_course(auth_client, test_user, test_subject, test_group) -> int:
@@ -95,7 +95,7 @@ async def test_teacher_and_enrolled_student_share_course_chat(
     assert [m.can_delete for m in seen_by_student.messages] == [False, True]
     assert seen_by_student.has_more is False
 
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(AppError) as error:
         await get_course_chat_repository.delete_message(
             session=async_db, course_id=course_id, message_id=teacher_message["id"], current_user=student
         )
@@ -118,7 +118,7 @@ async def test_student_outside_course_groups_cannot_read_chat(
     course_id = await _create_course(auth_client, test_user, test_subject, test_group)
     outsider = await _make_student(async_db, "chat_student", None)
 
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(AppError) as error:
         await get_course_chat_repository.list_messages(
             session=async_db, course_id=course_id, request=CourseMessageListRequest(), current_user=outsider
         )

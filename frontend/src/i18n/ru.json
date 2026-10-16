@@ -632,5 +632,8 @@
   "Kafedrani qidirish": "Поиск кафедры",
   "Kalendar bitta guruh yoki o'qituvchining jadvalini ko'rsatadi": "Календарь показывает расписание одной группы или преподавателя",
   "Sinxronizatsiya allaqachon ketmoqda — tugashini kuting": "Синхронизация уже выполняется — дождитесь завершения",
-  "Ko'rib chiqish muddati tugagan — preview'ni qaytadan ishga tushiring": "Срок предпросмотра истёк — запустите предпросмотр заново"
+  "Ko'rib chiqish muddati tugagan — preview'ni qaytadan ishga tushiring": "Срок предпросмотра истёк — запустите предпросмотр заново",
+  "Joriy parol noto'g'ri": "Текущий пароль неверен",
+  "Bu foydalanuvchi nomi allaqachon band": "Это имя пользователя уже занято",
+  "Kamida bitta maydon o'zgartirilishi kerak": "Нужно изменить хотя бы одно поле"
 }

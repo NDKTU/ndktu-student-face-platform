@@ -9,7 +9,6 @@ O'chirish: muallif o'z xabarini, kurs o'qituvchilari va admin — istalganini
 (moderatsiya).
 """
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +24,7 @@ from .schemas import (
     CourseMessageResponse,
 )
 from app.core.utils.roles import ROLE_ADMIN
+from app.core.errors import Conflict, Forbidden, NotFound
 
 DELETED_AUTHOR = "O'chirilgan foydalanuvchi"
 
@@ -33,7 +33,7 @@ class CourseChatRepository:
     async def _load_course(self, session: AsyncSession, course_id: int, current_user: User) -> Course:
         course = await session.get(Course, course_id)
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         await get_course_repository._ensure_view_access(session, course, current_user)
         return course
 
@@ -147,10 +147,7 @@ class CourseChatRepository:
         # Arxivdagi kurs faqat o'qish uchun — sahifadagi boshqa bo'limlar
         # bilan bir xil qoida.
         if not course.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Arxivdagi kursga xabar yozib bo'lmaydi",
-            )
+            raise Conflict("course_archived", "Arxivdagi kursga xabar yozib bo'lmaydi")
 
         message = CourseMessage(course_id=course.id, user_id=current_user.id, body=data.body)
         session.add(message)
@@ -170,14 +167,11 @@ class CourseChatRepository:
         course = await self._load_course(session, course_id, current_user)
         message = await session.get(CourseMessage, message_id)
         if not message or message.course_id != course.id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Xabar topilmadi")
+            raise NotFound("message_not_found", "Xabar topilmadi")
 
         own = message.user_id is not None and message.user_id == current_user.id
         if not own and not await can_manage(session, course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Faqat o'z xabaringizni o'chira olasiz",
-            )
+            raise Forbidden("message_not_yours", "Faqat o'z xabaringizni o'chira olasiz")
 
         await session.delete(message)
         await session.commit()

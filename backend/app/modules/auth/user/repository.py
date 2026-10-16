@@ -3,7 +3,7 @@ import logging
 from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.sorting import order_by_clause
 from core.utils.password_hash import hash_password_async
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +35,7 @@ from .schemas import (
     UserUpdateRequest,
 )
 from app.core.utils.roles import SYSTEM_ROLE_CODES
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class UserRepository:
         stmt_check = select(User).where(User.username == data.username)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
+            raise Invalid("user_already_exists", "User already exists")
 
         roles = []
         if data.roles:
@@ -56,10 +57,7 @@ class UserRepository:
             roles = result_roles.scalars().all()
 
             if len(roles) != len(data.roles):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more roles not found",
-                )
+                raise Invalid("roles_not_found", "One or more roles not found")
 
         new_user = User(
             username=data.username,
@@ -78,12 +76,11 @@ class UserRepository:
         try:
             await session.commit()
             await session.refresh(new_user, attribute_names=["roles"])
-        except Exception as e:
+        except Exception:
+            # Asl xato o'z holicha ketadi. Ilgari u «Database error: ...» 500
+            # bo'lib, SQL matni bilan birga mijozga chiqib ketardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            raise
 
         return new_user
 
@@ -93,7 +90,7 @@ class UserRepository:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         return user
 
@@ -170,7 +167,7 @@ class UserRepository:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         # Частичное обновление через Request схему
         if data.username is not None:
@@ -195,7 +192,7 @@ class UserRepository:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         # Удаление пользователя сносит его строку `teachers`, Postgres каскадит
         # в `teacher_subject` и упирается в RESTRICT на
@@ -235,15 +232,11 @@ class UserRepository:
                 if teacher_count > 0:
                     warnings.append("Ushbu foydalanuvchiga tegishli o'qituvchi ma'lumotlari o'chadi")
 
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": (
-                            f"'{user.username}' foydalanuvchisini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:"
-                        ),
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "user_has_related_data",
+                    f"'{user.username}' foydalanuvchisini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True,
+                    warnings=warnings,
                 )
 
         # Aggressive delete
@@ -285,7 +278,7 @@ class UserRepository:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         # 2. Fetch Roles
         if not data.role_ids:
@@ -302,10 +295,7 @@ class UserRepository:
                 # Strict check: all IDs must be valid.
                 found_ids = {r.id for r in roles}
                 missing_ids = set(data.role_ids) - found_ids
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Roles with ids {missing_ids} not found",
-                )
+                raise Invalid("roles_not_found", f"Roles with ids {missing_ids} not found", missing_ids=sorted(missing_ids))
 
             # 3. Assign
             user.roles = list(roles)
@@ -313,15 +303,13 @@ class UserRepository:
         try:
             await session.commit()
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error while assigning roles",
-            )
+            raise
 
     async def get_data_scope(self, session: AsyncSession, user_id: int) -> UserDataScopeResponse:
         if await session.get(User, user_id) is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         async def targets(model, column) -> list[DataScopeTarget]:
             rows = await session.execute(
@@ -343,7 +331,7 @@ class UserRepository:
     ) -> UserDataScopeResponse:
         """Biriktirmalarni to'liq almashtiradi: so'rovda yo'q satr o'chiriladi."""
         if await session.get(User, user_id) is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise NotFound("user_not_found", "User not found")
 
         wanted = (
             (Faculty, "faculty_id", set(data.faculty_ids)),
@@ -355,10 +343,7 @@ class UserRepository:
                 continue
             found = set((await session.execute(select(model.id).where(model.id.in_(ids)))).scalars())
             if missing := ids - found:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"{column} {sorted(missing)} not found",
-                )
+                raise Invalid("related_not_found", f"{column} {sorted(missing)} not found")
 
         await session.execute(sa_delete(UserDataScope).where(UserDataScope.user_id == user_id))
         for _, column, ids in wanted:
@@ -378,29 +363,23 @@ class UserRepository:
         # ya'ni o'zgartirish jimgina yo'qolardi.
         if current_user.auth_source:
             label = self._EXTERNAL_SOURCE_LABEL.get(current_user.auth_source, current_user.auth_source)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Hisobingiz {label} tizimidan — login va parol o'sha yerda o'zgartiriladi",
+            raise Conflict(
+                "external_account_credentials",
+                f"Hisobingiz {label} tizimidan — login va parol o'sha yerda o'zgartiriladi",
             )
 
         # Verify current password
         if not await verify_password_async(data.current_password, current_user.password):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Joriy parol noto'g'ri")
+            raise Invalid("current_password_wrong", "Joriy parol noto'g'ri")
 
         if data.new_username is None and data.new_password is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Kamida bitta maydon o'zgartirilishi kerak",
-            )
+            raise Invalid("nothing_to_update", "Kamida bitta maydon o'zgartirilishi kerak")
 
         # Check username not taken by another user
         if data.new_username is not None:
             stmt_check = select(User).where(User.username == data.new_username, User.id != current_user.id)
             if (await session.execute(stmt_check)).scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Bu foydalanuvchi nomi allaqachon band",
-                )
+                raise Invalid("username_taken", "Bu foydalanuvchi nomi allaqachon band")
             current_user.username = data.new_username
 
         if data.new_password is not None:
@@ -510,7 +489,7 @@ class UserRepository:
             await session.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
         ).scalar_one_or_none()
         if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+            raise NotFound("user_not_found", "Foydalanuvchi topilmadi")
 
         previous = user.avatar_path
         if file is not None:

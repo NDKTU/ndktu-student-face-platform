@@ -1,6 +1,5 @@
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +13,7 @@ from .schemas import (
     RoleListResponse,
     RolePermissionAssignRequest,
 )
+from app.core.errors import Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +24,7 @@ class RoleRepository:
         stmt_check = select(Role).where(Role.name == data.name)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Role '{data.name}' already exists",
-            )
+            raise Invalid("role_already_exists", f"Role '{data.name}' already exists")
 
         # Interfeysda yaratilgan rol hech qachon tizim roli emas: admin
         # «Student» degan rol ochsa ham, kod uni talaba deb tanimasligi kerak.
@@ -67,11 +64,9 @@ class RoleRepository:
             result_reload = await session.execute(stmt_reload)
             new_role = result_reload.scalar_one()
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
         return new_role
 
     async def get_role(self, session: AsyncSession, role_id: int) -> Role:
@@ -80,7 +75,7 @@ class RoleRepository:
         role = result.scalar_one_or_none()
 
         if not role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+            raise NotFound("role_not_found", "Role not found")
 
         return role
 
@@ -107,7 +102,7 @@ class RoleRepository:
         role = result.scalar_one_or_none()
 
         if not role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+            raise NotFound("role_not_found", "Role not found")
 
         # Логика обновления "как в User" (явная проверка полей)
         if data.name is not None:
@@ -115,20 +110,14 @@ class RoleRepository:
             stmt_check = select(Role).where(Role.name == data.name, Role.id != role_id)
             existing_role = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_role:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Role name already taken",
-                )
+                raise Invalid("role_name_taken", "Role name already taken")
             role.name = data.name
 
         if data.data_scope is not None and data.data_scope != role.data_scope:
             # Admin hamma narsani ko'radi — `resolve_data_scope` uni kodidan
             # (`roles.code`) taniydi. Ustunni o'zgartirish natija bermasdi, faqat chalg'itardi.
             if role.code == ADMIN_ROLE and data.data_scope != SCOPE_ALL:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Admin role always sees all data",
-                )
+                raise Invalid("admin_scope_fixed", "Admin role always sees all data")
             role.data_scope = data.data_scope
 
         await session.commit()
@@ -141,15 +130,12 @@ class RoleRepository:
         role = result.scalar_one_or_none()
 
         if not role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+            raise NotFound("role_not_found", "Role not found")
 
         # Tizim rollarini kod kutadi: login, sinxronizatsiya va ruxsatlar shu
         # rollarga tayanadi. Nomini o'zgartirish mumkin, o'chirish — yo'q.
         if role.code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Tizim rolini o'chirib bo'lmaydi",
-            )
+            raise Invalid("system_role_protected", "Tizim rolini o'chirib bo'lmaydi")
 
         await session.delete(role)
         await session.commit()
@@ -161,7 +147,7 @@ class RoleRepository:
         role = result.scalar_one_or_none()
 
         if not role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+            raise NotFound("role_not_found", "Role not found")
 
         # 2. Fetch Permissions
         if not data.permission_ids:
@@ -174,9 +160,10 @@ class RoleRepository:
             if len(permissions) != len(data.permission_ids):
                 found_ids = {p.id for p in permissions}
                 missing_ids = set(data.permission_ids) - found_ids
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Permissions with ids {missing_ids} not found",
+                raise Invalid(
+                    "permissions_not_found",
+                    f"Permissions with ids {missing_ids} not found",
+                    missing_ids=sorted(missing_ids),
                 )
 
             # 3. Assign
@@ -185,11 +172,9 @@ class RoleRepository:
         try:
             await session.commit()
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error while assigning permissions",
-            )
+            raise
 
 
 get_role_repository = RoleRepository()

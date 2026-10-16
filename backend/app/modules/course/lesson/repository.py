@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,6 +21,7 @@ from .schemas import (
     LessonUpdateRequest,
 )
 from app.core.utils.roles import user_has_role
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -40,27 +40,18 @@ class LessonRepository:
     ) -> tuple[Course, TeacherSubject, int | None]:
         course = await get_course_repository.get_course_orm(session, course_id)
         if not is_admin and not await can_manage(session, course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Faqat kurs oʻqituvchilari yoki admin dars qoʻsha oladi",
-            )
+            raise Forbidden("lesson_create_forbidden", "Faqat kurs oʻqituvchilari yoki admin dars qoʻsha oladi")
 
         course_group_stmt = select(CourseGroup.group_id).where(CourseGroup.course_id == course.id)
         course_group_ids = set((await session.execute(course_group_stmt)).scalars().all())
         if not course_group_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Course has no groups: add a group to the Course first",
-            )
+            raise Invalid("course_has_no_groups", "Course has no groups: add a group to the Course first")
         # Guruh so'ralmaydi: dars butun kursniki, ya'ni uning barcha
         # guruhlariniki. Ilgari bir nechta guruhli kursda 400 qaytarilardi va
         # o'qituvchi bir xil darsni har guruhga qayta yozishga majbur edi.
         # Guruh ataylab ko'rsatilsa — faqat o'sha guruhga tegishli bo'ladi.
         if group_id is not None and group_id not in course_group_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="group_id does not belong to this Course",
-            )
+            raise Invalid("group_not_in_course", "group_id does not belong to this Course")
 
         teacher_subject = await get_course_repository.get_or_create_teacher_subject_for_course(session, course)
         return course, teacher_subject, group_id
@@ -100,10 +91,9 @@ class LessonRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error creating lesson: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
 
         return await self.get_lesson(session=session, lesson_id=new_lesson.id)
 
@@ -121,7 +111,7 @@ class LessonRepository:
         lesson = result.scalar_one_or_none()
 
         if not lesson:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+            raise NotFound("lesson_not_found", "Lesson not found")
 
         return lesson
 
@@ -235,10 +225,7 @@ class LessonRepository:
         if not is_admin and not await get_course_repository.user_owns_course(
             session, lesson.course_id, current_user.id
         ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Teacher is not the owner of this Course",
-            )
+            raise Forbidden("course_not_owner", "Teacher is not the owner of this Course")
 
         if data.teacher_subject_id is not None:
             lesson.teacher_subject_id = data.teacher_subject_id
@@ -261,10 +248,9 @@ class LessonRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error updating lesson: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
 
         return await self.get_lesson(session=session, lesson_id=lesson.id)
 
@@ -282,10 +268,7 @@ class LessonRepository:
         if not is_admin and not await get_course_repository.user_owns_course(
             session, lesson.course_id, current_user.id
         ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Teacher is not the owner of this Course",
-            )
+            raise Forbidden("course_not_owner", "Teacher is not the owner of this Course")
 
         # Vazifalar dars bilan birga o'chadi (FK CASCADE). Talabalar ish
         # topshirgan bo'lsa, baholar ham yo'qoladi — bu haqda oldindan
@@ -329,13 +312,11 @@ class LessonRepository:
                     )
 
             if warnings:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu darsni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "lesson_has_related_data",
+                    "Ushbu darsni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True,
+                    warnings=warnings,
                 )
 
         # Test dars bilan o'chmaydi: unga natijalar bog'langan, ular bilan

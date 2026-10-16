@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { User, Calendar, KeyRound, Save, Camera, Loader2, Trash2 } from 'lucide-react';
 import { userService } from '@/services/userService';
 import { formatGpa } from '@/utils/gpa';
+import { apiErrorMessage } from '@/utils/apiError';
 import { useRef, useState } from 'react';
 
 const credentialsSchema = z
@@ -82,7 +83,7 @@ const ProfilePage = () => {
                 window.location.href = '/login';
             }, 3000);
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Xatolik yuz berdi');
+            toast.error(apiErrorMessage(err, 'Xatolik yuz berdi'));
         }
     };
 

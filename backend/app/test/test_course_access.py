@@ -1,7 +1,8 @@
 from datetime import date
 
 import pytest
-from fastapi import HTTPException
+
+from app.core.errors import Forbidden
 
 
 @pytest.mark.asyncio
@@ -106,7 +107,7 @@ async def test_student_cannot_open_course_from_another_group(
     async_db.add_all([student_role, outsider])
     await async_db.commit()
 
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(Forbidden) as error:
         await get_course_repository.get_course(
             session=async_db,
             course_id=course_id,

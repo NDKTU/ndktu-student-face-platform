@@ -68,4 +68,8 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     // Sinxronizatsiyalar (`core/errors.py`): EPMOS, HEMIS talabalar, jadval.
     sync_in_progress: 'Sinxronizatsiya allaqachon ketmoqda — tugashini kuting',
     preview_expired: "Ko'rib chiqish muddati tugagan — preview'ni qaytadan ishga tushiring",
+    // Profil: login va parolni almashtirish (`auth/user/repository.py`).
+    current_password_wrong: "Joriy parol noto'g'ri",
+    username_taken: 'Bu foydalanuvchi nomi allaqachon band',
+    nothing_to_update: "Kamida bitta maydon o'zgartirilishi kerak",
 };

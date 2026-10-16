@@ -25,7 +25,7 @@ async def test_create_role_duplicate(auth_client):
     response = await auth_client.post("/role/", json=payload)
 
     assert response.status_code == 400
-    assert response.json()["detail"] == f"Role '{payload['name']}' already exists"
+    assert response.json()["detail"]["code"] == "role_already_exists"
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_get_role_not_found(auth_client):
     response = await auth_client.get("/role/112")
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Role not found"
+    assert response.json()["detail"]["code"] == "role_not_found"
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_update_role_name(auth_client):
 async def test_update_role_name_not_found(auth_client):
     response = await auth_client.put("/role/113", json={"name": "admin"})
     assert response.status_code == 404
-    assert response.json()["detail"] == "Role not found"
+    assert response.json()["detail"]["code"] == "role_not_found"
 
 
 @pytest.mark.asyncio

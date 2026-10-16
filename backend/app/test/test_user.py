@@ -31,7 +31,7 @@ async def test_get_user_id(auth_client):
 async def test_get_user_not_foud(auth_client):
     response = await auth_client.get("/user/999")
     assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+    assert response.json()["detail"]["code"] == "user_not_found"
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_update_user(auth_client):
 async def test_update_user_user_not_found(auth_client):
     response = await auth_client.put("/user/999", json={"username": "admineer"})
     assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+    assert response.json()["detail"]["code"] == "user_not_found"
 
 
 @pytest.mark.asyncio
@@ -57,7 +57,7 @@ async def test_delete_user(auth_client):
 async def test_delete_user_not_found(auth_client):
     response = await auth_client.delete("/user/1999")
     assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+    assert response.json()["detail"]["code"] == "user_not_found"
 
 
 @pytest.mark.asyncio

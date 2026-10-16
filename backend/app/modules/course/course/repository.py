@@ -1,6 +1,5 @@
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -32,6 +31,7 @@ from .schemas import (
     CourseUpdateRequest,
 )
 from app.core.utils.roles import role_keys
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class CourseRepository:
             if enrollment.scalar_one_or_none() is not None:
                 return
 
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this Course")
+        raise Forbidden("course_access_denied", "You do not have access to this Course")
 
     async def list_teacher_summaries(
         self,
@@ -125,11 +125,11 @@ class CourseRepository:
 
     async def _ensure_user_exists(self, session: AsyncSession, user_id: int) -> None:
         if (await session.execute(select(User.id).where(User.id == user_id))).scalar_one_or_none() is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Teacher user {user_id} not found")
+            raise NotFound("teacher_user_not_found", f"Teacher user {user_id} not found", user_id=user_id)
 
     async def _ensure_subject_exists(self, session: AsyncSession, subject_id: int) -> None:
         if (await session.execute(select(Subject.id).where(Subject.id == subject_id))).scalar_one_or_none() is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Subject {subject_id} not found")
+            raise NotFound("subject_not_found", f"Subject {subject_id} not found", subject_id=subject_id)
 
     async def _build_course_name(
         self,
@@ -257,7 +257,7 @@ class CourseRepository:
         )
         course = (await session.execute(stmt)).scalar_one_or_none()
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         return course
 
     # ------------------------------------------------------------------ #
@@ -302,9 +302,9 @@ class CourseRepository:
         """Assistent qoʻshadi. Faqat asosiy oʻqituvchi yoki admin."""
         course = await self.get_course_orm(session, course_id)
         if not can_own(course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
+            raise Forbidden(
+                "course_teachers_manage_forbidden",
+                "Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
             )
 
         await self._ensure_user_exists(session, data.user_id)
@@ -328,16 +328,16 @@ class CourseRepository:
     ) -> None:
         course = await self.get_course_orm(session, course_id)
         if not can_own(course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
+            raise Forbidden(
+                "course_teachers_manage_forbidden",
+                "Oʻqituvchilar roʻyxatini faqat asosiy oʻqituvchi yoki admin oʻzgartira oladi",
             )
 
         if user_id == course.teacher_id:
             # Asosiy oʻqituvchini olib tashlash kursni egasiz qoldirardi.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Asosiy oʻqituvchini olib tashlab boʻlmaydi — avval boshqasini tayinlang",
+            raise Conflict(
+                "course_main_teacher_required",
+                "Asosiy oʻqituvchini olib tashlab boʻlmaydi — avval boshqasini tayinlang",
             )
 
         await session.execute(
@@ -388,10 +388,9 @@ class CourseRepository:
         except Exception as e:
             await session.rollback()
             logger.error("Error creating Course: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
 
         loaded = await self._load_with_relations(session, course.id)
         return await self._serialize(session, loaded)
@@ -607,10 +606,9 @@ class CourseRepository:
         except Exception as e:
             await session.rollback()
             logger.error("Error updating Course: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
 
         loaded = await self._load_with_relations(session, course.id)
         return await self._serialize(session, loaded)
@@ -694,9 +692,10 @@ class CourseRepository:
         teacher_stmt = select(Teacher).where(Teacher.user_id == course.teacher_id)
         teacher = (await session.execute(teacher_stmt)).scalar_one_or_none()
         if not teacher:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User {course.teacher_id} is not registered as a teacher",
+            raise Invalid(
+                "course_teacher_not_registered",
+                f"User {course.teacher_id} is not registered as a teacher",
+                user_id=course.teacher_id,
             )
 
         ts_stmt = select(TeacherSubject).where(
