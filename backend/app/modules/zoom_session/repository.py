@@ -74,7 +74,7 @@ from .schemas import (
     ZoomTeacherOptionListResponse,
 )
 from .zoom_api import ZoomApiError, api_error, registrant_join_url, registrant_token, zak_token, zoom_api
-from app.core.errors import AppError, error_text
+from app.core.errors import AppError, Invalid, NotFound, error_text
 
 logger = logging.getLogger(__name__)
 
@@ -479,14 +479,14 @@ class ZoomSessionRepository:
             (await session.execute(select(Group.id, Group.name).where(Group.id.in_(group_ids)))).all()
         )
         if set(group_names) != group_ids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guruh topilmadi")
+            raise Invalid("group_not_found", "Guruh topilmadi")
 
         teacher = await self._resolve_teacher(session, user, data.teacher_user_id)
         if data.subject_id is None:
             raise _subject_required()
         subject = await session.get(Subject, data.subject_id)
         if subject is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fan topilmadi")
+            raise Invalid("subject_not_found", "Fan topilmadi")
         if data.subject_id not in await self._teacher_subject_ids(session, teacher.id):
             raise _subject_not_teachers()
 
@@ -1345,11 +1345,11 @@ class ZoomSessionRepository:
         """Surat faqat yaratuvchi va adminga — `/uploads` ochiq statikasi orqali emas."""
         record = await session.get(ZoomFaceCheck, check_id)
         if record is None or not record.image_name:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surat topilmadi")
+            raise NotFound("photo_not_found", "Surat topilmadi")
         await self._get_managed(session, record.session_id, user)
         path = settings.face_check_upload_dir / record.image_name
         if not path.exists():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surat fayli yo'q")
+            raise NotFound("photo_file_missing", "Surat fayli yo'q")
         return path
 
 

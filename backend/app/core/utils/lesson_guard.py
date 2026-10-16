@@ -11,10 +11,10 @@
 удаления остаётся страховкой на случай гонки.
 """
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
+from app.core.errors import Conflict
 
 
 async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject_filters: ColumnElement[bool]) -> None:
@@ -38,10 +38,9 @@ async def ensure_no_lessons(session: AsyncSession, entity: str, *teacher_subject
     ).scalar() or 0
 
     if lesson_count:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"{entity} bo'yicha {lesson_count} ta dars yozilgan. Dars tarixi yo'qolmasligi uchun "
-                f"avval shu darslarni o'chiring, keyin qaytadan urinib ko'ring."
-            ),
+        raise Conflict(
+            "has_lessons",
+            f"{entity} bo'yicha {lesson_count} ta dars yozilgan. Dars tarixi yo'qolmasligi uchun "
+            f"avval shu darslarni o'chiring, keyin qaytadan urinib ko'ring.",
+            lesson_count=lesson_count,
         )

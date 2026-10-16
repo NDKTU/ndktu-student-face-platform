@@ -14,6 +14,7 @@ import pytest_asyncio
 
 from app.core.config import settings
 from app.modules.integration.royd.client import RoydClient, royd_client
+from app.core.errors import AppError
 
 HEMIS_ID = "3052211100123"
 
@@ -161,9 +162,8 @@ async def test_401_refreshes_token_once(monkeypatch):
 @pytest.mark.asyncio
 async def test_disabled_integration_returns_503(monkeypatch):
     monkeypatch.setattr(settings.royd, "client_secret", "")
-    from fastapi import HTTPException
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AppError) as exc:
         await RoydClient().request("GET", "/requests")
     assert exc.value.status_code == 503
 

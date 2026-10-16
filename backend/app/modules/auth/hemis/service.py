@@ -17,6 +17,7 @@ from app.modules.organization_structure.group.repository import get_group_reposi
 from app.modules.quiz.result.repository import get_result_repository
 
 from .schemas import HemisLoginRequest, HemisLoginResponse
+from app.core.errors import AppError, Forbidden, Invalid, Unavailable, UpstreamError
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class HemisLoginService:
 
         try:
             return await self.request_to_hemis(session, data)
-        except HTTPException:
+        except (HTTPException, AppError):
             # Студенческий портал не признал логин. Если настроен сотруднический,
             # пробуем его: это может быть преподаватель.
             if not settings.hemis.employee_login_enabled:
@@ -89,25 +90,20 @@ class HemisLoginService:
                 "Сотруднический Hemis не вернул идентификатор сотрудника. Ключи ответа: %s",
                 sorted(me_data.keys()),
             )
-            raise HTTPException(
-                status_code=502,
-                detail="Hemis не вернул идентификатор сотрудника",
-            )
+            raise UpstreamError("hemis_bad_response", "Hemis не вернул идентификатор сотрудника")
 
         teacher = (await session.execute(select(Teacher).where(Teacher.hemis_id == hemis_id))).scalar_one_or_none()
 
         if teacher is None:
             logger.warning("Вход преподавателя %s: hemis_id %s не найден в зеркале", data.login, hemis_id)
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Сотрудник не найден в системе. Дождитесь синхронизации с EduPlan или обратитесь к администратору."
-                ),
+            raise Forbidden(
+                "employee_not_found",
+                "Сотрудник не найден в системе. Дождитесь синхронизации с EduPlan или обратитесь к администратору.",
             )
 
         user = await session.get(User, teacher.user_id)
         if user is None:
-            raise HTTPException(status_code=403, detail="У сотрудника нет учётной записи")
+            raise Forbidden("employee_no_account", "У сотрудника нет учётной записи")
 
         ensure_user_active(user)
 
@@ -184,7 +180,7 @@ class HemisLoginService:
                         login_resp.status_code,
                         HemisLoginService._body_excerpt(login_resp),
                     )
-                    raise HTTPException(status_code=400, detail="Hemis login failed")
+                    raise Invalid("invalid_credentials", "Hemis login failed")
 
                 try:
                     login_data = login_resp.json()
@@ -197,7 +193,7 @@ class HemisLoginService:
                         login,
                         HemisLoginService._body_excerpt(login_resp),
                     )
-                    raise HTTPException(status_code=502, detail="Hemis вернул неожиданный ответ")
+                    raise UpstreamError("hemis_bad_response", "Hemis вернул неожиданный ответ")
 
                 if not login_data.get("success"):
                     # Самая частая ветка: Hemis не принял пару логин-пароль.
@@ -207,7 +203,7 @@ class HemisLoginService:
                         login,
                         HemisLoginService._body_excerpt(login_resp),
                     )
-                    raise HTTPException(status_code=400, detail="Hemis login returned unsuccessful")
+                    raise Invalid("invalid_credentials", "Hemis login returned unsuccessful")
 
                 token = (login_data.get("data") or {}).get("token")
                 if not token:
@@ -219,7 +215,7 @@ class HemisLoginService:
                         login,
                         sorted((login_data.get("data") or {}).keys()),
                     )
-                    raise HTTPException(status_code=502, detail="Hemis не вернул токен")
+                    raise UpstreamError("hemis_bad_response", "Hemis не вернул токен")
 
                 me_resp = await client.get(
                     me_url,
@@ -236,7 +232,7 @@ class HemisLoginService:
                         me_resp.status_code,
                         HemisLoginService._body_excerpt(me_resp),
                     )
-                    raise HTTPException(status_code=400, detail="Hemis ME endpoint failed")
+                    raise Invalid("hemis_profile_failed", "Hemis ME endpoint failed")
 
                 try:
                     me_result = me_resp.json()
@@ -247,7 +243,7 @@ class HemisLoginService:
                         login,
                         HemisLoginService._body_excerpt(me_resp),
                     )
-                    raise HTTPException(status_code=502, detail="Hemis вернул неожиданный ответ")
+                    raise UpstreamError("hemis_bad_response", "Hemis вернул неожиданный ответ")
 
                 if not me_result.get("success"):
                     logger.error(
@@ -256,7 +252,7 @@ class HemisLoginService:
                         login,
                         HemisLoginService._body_excerpt(me_resp),
                     )
-                    raise HTTPException(status_code=400, detail="Hemis ME returned unsuccessful")
+                    raise Invalid("hemis_profile_failed", "Hemis ME returned unsuccessful")
 
                 data = me_result.get("data")
                 if not isinstance(data, dict):
@@ -266,17 +262,14 @@ class HemisLoginService:
                         login,
                         HemisLoginService._body_excerpt(me_resp),
                     )
-                    raise HTTPException(status_code=502, detail="Hemis не вернул данные профиля")
+                    raise UpstreamError("hemis_bad_response", "Hemis не вернул данные профиля")
 
                 return data
         except httpx.RequestError as e:
             # Сеть: Hemis не ответил вовсе. Это не вина входящего, и код
             # другой — 503, а не 400.
             logger.error("Hemis (%s) недоступен при входе %s: %s", portal, login, e)
-            raise HTTPException(
-                status_code=503,
-                detail=f"Hemis service unavailable: {str(e)}",
-            )
+            raise Unavailable("hemis_unavailable", f"Hemis service unavailable: {str(e)}")
 
     async def request_to_hemis(
         self,

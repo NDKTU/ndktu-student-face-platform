@@ -31,11 +31,13 @@ class AppError(Exception):
     #: Xato turi — HTTP holati shundan `_STATUS` orqali tanlanadi.
     kind = "bad_request"
 
-    def __init__(self, code: str, message: str, **extra):
+    def __init__(self, code: str, message: str, *, headers: dict[str, str] | None = None, **extra):
         super().__init__(message)
         self.code = code
         self.message = message
         self.extra = extra
+        #: Javob sarlavhalari (masalan, `Retry-After` 429 da) — `detail` ga kirmaydi.
+        self.headers = headers
 
     def as_detail(self) -> dict:
         return {"code": self.code, "message": self.message, **self.extra}
@@ -76,6 +78,16 @@ class Unprocessable(AppError):
     kind = "unprocessable"
 
 
+class PayloadTooLarge(AppError):
+    """Hajm chegarasi — fayl kvotadan oshadi (413)."""
+
+    kind = "payload_too_large"
+
+
+class TooManyRequests(AppError):
+    kind = "too_many_requests"
+
+
 class Conflict(AppError):
     """Holat bilan zid: allaqachon ketyapti, tasdiq kerak, ... (409)."""
 
@@ -107,7 +119,9 @@ _STATUS = {
     "not_found": 404,
     "conflict": 409,
     "gone": 410,
+    "payload_too_large": 413,
     "unprocessable": 422,
+    "too_many_requests": 429,
     "upstream": 502,
     "unavailable": 503,
 }
@@ -138,7 +152,11 @@ def error_text(error: BaseException) -> str:
 async def _app_error_handler(_: Request, error: AppError) -> JSONResponse:
     # `jsonable_encoder`: qo'shimcha maydonlarda `set`, sana yoki UUID kelsa
     # ham javob 500 ga aylanmasin.
-    return JSONResponse(status_code=http_status(error), content=jsonable_encoder({"detail": error.as_detail()}))
+    return JSONResponse(
+        status_code=http_status(error),
+        content=jsonable_encoder({"detail": error.as_detail()}),
+        headers=error.headers,
+    )
 
 
 def install_error_handlers(app: FastAPI) -> None:

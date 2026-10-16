@@ -16,7 +16,6 @@
 
 from datetime import date, datetime, timedelta
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +34,7 @@ from .schemas import (
     ScheduleListResponse,
 )
 from app.core.utils.roles import role_keys
+from app.core.errors import Invalid
 
 #: Сколько дней можно запросить в «моём расписании» за раз — семестр с
 #: запасом. Без предела один запрос вытаскивал бы весь год.
@@ -179,11 +179,12 @@ class HemisScheduleRepository:
     ) -> MyScheduleResponse:
         date_from, date_to = _range(request)
         if date_to < date_from:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_to date_from dan oldin bo'lmasin")
+            raise Invalid("date_range_invalid", "date_to date_from dan oldin bo'lmasin")
         if (date_to - date_from).days > MY_RANGE_MAX_DAYS:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise Invalid(
+                "date_range_too_long",
                 f"Oraliq {MY_RANGE_MAX_DAYS} kundan oshmasin",
+                max_days=MY_RANGE_MAX_DAYS,
             )
 
         # Логин EPMOS попадался с ведущими пробелами — без strip такой

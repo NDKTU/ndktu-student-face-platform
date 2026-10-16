@@ -18,7 +18,6 @@ import asyncio
 import logging
 
 import httpx
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -28,6 +27,7 @@ from app.modules.auth.model import Student
 from app.modules.organization_structure.model import Group
 
 from .schemas import StudentBadgeResponse
+from app.core.errors import NotFound, UpstreamError
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def _load_student(session: AsyncSession, student_id: int) -> Student:
     )
     student = (await session.execute(stmt)).scalar_one_or_none()
     if not student:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+        raise NotFound("student_not_found", "Student not found")
     return student
 
 
@@ -138,7 +138,7 @@ async def load_badge_photo(session: AsyncSession, student_id: int) -> tuple[byte
     student = await _load_student(session, student_id)
     image_path = _clean(student.image_path)
     if image_path is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talabaning surati yo'q")
+        raise NotFound("student_photo_missing", "Talabaning surati yo'q")
 
     try:
         if image_path.startswith(LOCAL_PREFIX):
@@ -153,9 +153,6 @@ async def load_badge_photo(session: AsyncSession, student_id: int) -> tuple[byte
             raise _PhotoUnavailable("not an image")
     except _PhotoUnavailable as cause:
         logger.warning("Badge photo unavailable (student %s): %s", student_id, cause)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Talaba suratini yuklab bo'lmadi",
-        ) from cause
+        raise UpstreamError("student_photo_unavailable", "Talaba suratini yuklab bo'lmadi") from cause
 
     return content, media_type

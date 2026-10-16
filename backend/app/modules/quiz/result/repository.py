@@ -1,6 +1,5 @@
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +13,7 @@ from .schemas import (
     ResultListRequest,
     ResultListResponse,
 )
+from app.core.errors import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ResultRepository:
         obj = result.scalar_one_or_none()
 
         if not obj:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+            raise NotFound("result_not_found", "Result not found")
 
         return obj
 
@@ -245,7 +245,7 @@ class ResultRepository:
         obj = result.scalar_one_or_none()
 
         if not obj:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+            raise NotFound("result_not_found", "Result not found")
 
         # Delete associated user answers by user_id + quiz_id.
         # Bug#3 fix: do NOT match by created_at — timestamps between Result and UserAnswers

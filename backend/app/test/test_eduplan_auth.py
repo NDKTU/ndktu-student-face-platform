@@ -1,10 +1,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
 from app.core.config import EduPlanConfig
 from app.modules.integration.eduplan.auth_service import EduPlanAuthService
+from app.core.errors import AppError
 
 
 @pytest.mark.asyncio
@@ -21,11 +21,11 @@ async def test_eduplan_login_invalid_credentials():
         mock_post.return_value = mock_response
 
         session = AsyncMock()
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await service.login(session, "wrong_user", "wrong_pass")
 
         assert exc_info.value.status_code == 401
-        assert "EduPlan: Login yoki parol noto'g'ri" in exc_info.value.detail
+        assert "EduPlan: Login yoki parol noto'g'ri" in exc_info.value.message
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,6 @@
 import logging
 from datetime import date, datetime
 
-from fastapi import HTTPException, status
 from core.utils.sorting import order_by_clause
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +16,7 @@ from .schemas import (
     StudentUpdateRequest,
     StudentWithUserListResponse,
 )
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,7 @@ class StudentRepository:
         stmt = select(Student).where(Student.student_id_number == data.student_id_number)
         result = await session.execute(stmt)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Student with this ID number already exists",
-            )
+            raise Invalid("student_already_exists", "Student with this ID number already exists")
 
         new_student = Student(**data.model_dump())
         session.add(new_student)
@@ -67,13 +64,13 @@ class StudentRepository:
         student = result.scalar_one_or_none()
 
         if not student:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+            raise NotFound("student_not_found", "Student not found")
 
         # Begona talaba uchun ataylab 404, 403 emas: ro'yxatda ko'rinmagan
         # talabaning bor-yo'qligini id bo'yicha bilib olish mumkin bo'lmasin.
         scope = await self.visible_group_ids(session, current_user)
         if scope is not None and student.group_id not in scope:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+            raise NotFound("student_not_found", "Student not found")
 
         return student
 
@@ -261,13 +258,10 @@ class StudentRepository:
                 await session.execute(select(func.count(Result.id)).where(Result.user_id == student.user_id))
             ).scalar() or 0
             if result_count > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu talabani o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
-                        "warnings": [f"{result_count} ta talaba natijalari (ballari) o'chadi"],
-                    },
+                raise Conflict(
+                    "student_has_related_data",
+                    "Ushbu talabani o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True, warnings=[f"{result_count} ta talaba natijalari (ballari) o'chadi"],
                 )
 
         # Aggressive delete results

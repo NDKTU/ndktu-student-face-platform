@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -23,6 +22,7 @@ from .schemas import (
     RegistrationStudentInfo,
 )
 from .schemas import AudienceGroupOption, AudienceOptionsResponse
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class AnnouncementRepository:
             await session.execute(select(Announcement).where(Announcement.id == announcement_id))
         ).scalar_one_or_none()
         if not row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="E'lon topilmadi")
+            raise NotFound("announcement_not_found", "E'lon topilmadi")
         return row
 
     async def _counts(self, session: AsyncSession, announcement_ids: list[int]) -> dict[int, int]:
@@ -145,10 +145,7 @@ class AnnouncementRepository:
         publish_at = data.get("publish_at")
         expires_at = data.get("expires_at")
         if publish_at and expires_at and expires_at <= publish_at:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ko'rsatish muddati boshlanish vaqtidan keyin bo'lishi kerak",
-            )
+            raise Invalid("announcement_dates_invalid", "Ko'rsatish muddati boshlanish vaqtidan keyin bo'lishi kerak")
 
     # ─── management ──────────────────────────────────────────────────────────
 
@@ -184,9 +181,10 @@ class AnnouncementRepository:
         if "capacity" in payload and payload["capacity"] is not None:
             registered = (await self._counts(session, [row.id])).get(row.id, 0)
             if payload["capacity"] < registered:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Joylar soni yozilganlar sonidan kam bo'lishi mumkin emas ({registered} ta yozilgan)",
+                raise Invalid(
+                    "announcement_capacity_below_registered",
+                    f"Joylar soni yozilganlar sonidan kam bo'lishi mumkin emas ({registered} ta yozilgan)",
+                    registered=registered,
                 )
 
         for field, value in payload.items():
@@ -294,7 +292,7 @@ class AnnouncementRepository:
         )
         row = (await session.execute(stmt)).scalar_one_or_none()
         if not row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="E'lon topilmadi")
+            raise NotFound("announcement_not_found", "E'lon topilmadi")
 
         counts = await self._counts(session, [row.id])
         mine = await self._my_registrations(session, user.id, [row.id])
@@ -315,17 +313,13 @@ class AnnouncementRepository:
         # chetlab o'tib to'g'ridan-to'g'ri so'rov yuborish mumkin.
         current = await self.feed_item(session, announcement_id, user)
         if not current.registration_enabled:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Bu e'londa ro'yxatdan o'tish yo'q"
-            )
+            raise Invalid("announcement_no_registration", "Bu e'londa ro'yxatdan o'tish yo'q")
         if current.is_registered:
             return current
 
         row = await self._get_orm(session, announcement_id)
         if row.registration_deadline is not None and row.registration_deadline <= now:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Ro'yxatdan o'tish muddati tugagan"
-            )
+            raise Invalid("announcement_registration_closed", "Ro'yxatdan o'tish muddati tugagan")
 
         existing = (
             await session.execute(
@@ -341,9 +335,7 @@ class AnnouncementRepository:
         if row.capacity is not None:
             registered = (await self._counts(session, [row.id])).get(row.id, 0)
             if registered >= row.capacity:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT, detail="Joylar tugagan"
-                )
+                raise Conflict("announcement_full", "Joylar tugagan")
 
         if existing:
             existing.status = "registered"

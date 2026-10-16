@@ -15,6 +15,7 @@ import type {
     AnnouncementStatus,
     AudienceKind,
 } from '@/services/announcementService';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const STATUSES: AnnouncementStatus[] = ['draft', 'published', 'archived'];
 const AUDIENCES: AudienceKind[] = ['all', 'faculty', 'group', 'level'];
@@ -156,8 +157,7 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
         };
 
         const onError = (cause: unknown) => {
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(typeof detail === 'string' ? detail : 'Saqlashda xatolik');
+            setError(apiErrorMessage(cause, 'Saqlashda xatolik'));
         };
 
         if (editing) {

@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +15,7 @@ from app.modules.organization_structure.model import Kafedra
 
 from .credentials import effective_config
 from app.core.utils.roles import SYSTEM_ROLE_CODES
+from app.core.errors import Unauthorized, Unavailable, UpstreamError
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +48,12 @@ class EduPlanAuthService:
 
                 if token_resp.status_code != 200:
                     logger.warning("EduPlan login failed for %s: HTTP %s", username, token_resp.status_code)
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="EduPlan: Login yoki parol noto'g'ri",
-                    )
+                    raise Unauthorized("invalid_credentials", "EduPlan: Login yoki parol noto'g'ri")
 
                 token_data = token_resp.json()
                 eduplan_token = token_data.get("access_token")
                 if not eduplan_token:
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail="EduPlan javobida access_token topilmadi",
-                    )
+                    raise UpstreamError("eduplan_bad_response", "EduPlan javobida access_token topilmadi")
 
                 # 2. Получение профиля текущего пользователя
                 headers = {
@@ -72,19 +66,16 @@ class EduPlanAuthService:
                 me_resp = await client.get(f"{base_url}/api/v1/users/me", headers=headers)
                 if me_resp.status_code != 200:
                     logger.error("EduPlan /users/me failed: HTTP %s", me_resp.status_code)
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail="EduPlan'dan foydalanuvchi ma'lumotlarini olib bo'lmadi",
+                    raise UpstreamError(
+                        "eduplan_bad_response",
+                        "EduPlan'dan foydalanuvchi ma'lumotlarini olib bo'lmadi",
                     )
 
                 user_data: dict[str, Any] = me_resp.json()
 
         except httpx.RequestError as e:
             logger.exception("EduPlan service connection error for %s: %s", username, e)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"EduPlan xizmati bilan bog'lanib bo'lmadi: {e}",
-            )
+            raise Unavailable("eduplan_unavailable", f"EduPlan xizmati bilan bog'lanib bo'lmadi: {e}")
 
         # 3. Сохранение или обновление пользователя в локальной БД
         user = await self._save_eduplan_user(session, username, password, user_data)

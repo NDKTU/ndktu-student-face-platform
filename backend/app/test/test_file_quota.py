@@ -107,7 +107,8 @@ async def test_exact_limit_passes_one_byte_more_does_not(async_client, async_db,
 
     refused = await _upload(async_client, headers, "b.png", png("b"))
     assert refused.status_code == 413
-    assert refused.json()["detail"] == "Fayl yuklash limitingiz tugagan. Qolgan hajm: 0 MB."
+    assert refused.json()["detail"]["code"] == "file_quota_exceeded"
+    assert refused.json()["detail"]["message"] == "Fayl yuklash limitingiz tugagan. Qolgan hajm: 0 MB."
 
 
 @pytest.mark.asyncio
@@ -120,7 +121,7 @@ async def test_file_larger_than_remaining_names_both_sizes(async_client, async_d
 
     refused = await _upload(async_client, headers, "b.png", png("bbbbbbbbbb"))
     assert refused.status_code == 413
-    assert "qolgan hajmdan" in refused.json()["detail"]
+    assert "qolgan hajmdan" in refused.json()["detail"]["message"]
 
 
 @pytest.mark.asyncio

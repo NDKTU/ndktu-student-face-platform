@@ -94,4 +94,5 @@ async def test_delete_user_blocked_by_lessons_returns_409(
     ):
         response = await auth_client.delete(url)
         assert response.status_code == 409, f"{url} -> {response.status_code}: {response.text}"
-        assert "dars" in response.json()["detail"]
+        assert response.json()["detail"]["code"] == "has_lessons"
+        assert "dars" in response.json()["detail"]["message"]

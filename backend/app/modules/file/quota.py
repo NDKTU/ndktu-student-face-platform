@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from core.config import settings
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,7 @@ from app.modules.auth.model import Role, Teacher, User, UserRole
 from app.modules.file.model import FileBlob, FileQuotaChange, StoredFile
 from app.modules.organization_structure.model import Kafedra
 from app.core.utils.roles import ROLE_ADMIN
+from app.core.errors import NotFound, PayloadTooLarge, Unprocessable
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -151,7 +152,7 @@ def exceeded_error(limit: int, used: int, file_bytes: int) -> HTTPException:
             f"Fayl hajmi ({format_size(file_bytes)}) qolgan hajmdan "
             f"({format_size(remaining)}) katta."
         )
-    return HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=message)
+    return PayloadTooLarge("file_quota_exceeded", message)
 
 
 # ─── Admin: limitni oʻzgartirish ──────────────────────────────────────
@@ -160,15 +161,9 @@ def exceeded_error(limit: int, used: int, file_bytes: int) -> HTTPException:
 def validate_limit(value: int) -> None:
     upper = settings.file_quota.max_bytes
     if value < MIN_LIMIT_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Limit {format_size(MIN_LIMIT_BYTES)} dan kam boʻlmasligi kerak",
-        )
+        raise Unprocessable("quota_limit_too_small", f"Limit {format_size(MIN_LIMIT_BYTES)} dan kam boʻlmasligi kerak")
     if value > upper:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Limit {format_size(upper)} dan oshmasligi kerak",
-        )
+        raise Unprocessable("quota_limit_too_large", f"Limit {format_size(upper)} dan oshmasligi kerak")
 
 
 async def set_default_limit(session: AsyncSession, value: int, actor_id: int) -> None:
@@ -186,7 +181,7 @@ async def set_user_limit(session: AsyncSession, user_id: int, value: int | None,
         validate_limit(value)
     user = await session.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+        raise NotFound("user_not_found", "Foydalanuvchi topilmadi")
     old = user.storage_quota_bytes
     if old != value:
         user.storage_quota_bytes = value

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { groupService } from '@/services/groupService';
 import { formatDate } from '@/utils/date';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /**
  * Takrorlangan guruhlarni birlashtirish — talabalarni import qilishdan
@@ -41,7 +42,7 @@ export const GroupDuplicates = () => {
             queryClient.invalidateQueries({ queryKey: ['groups'] });
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.detail || 'Birlashtirishda xatolik');
+            toast.error(apiErrorMessage(error, 'Birlashtirishda xatolik'));
         },
     });
 

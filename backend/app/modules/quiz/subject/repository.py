@@ -3,7 +3,6 @@ import logging
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.sorting import order_by_clause
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +17,7 @@ from .schemas import (
     SubjectListResponse,
 )
 from app.core.utils.roles import user_is_admin, user_is_teacher
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,7 @@ class SubjectRepository:
         stmt_check = select(Subject).where(Subject.name == data.name)
         result_check = await session.execute(stmt_check)
         if result_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Subject '{data.name}' already exists",
-            )
+            raise Invalid("subject_already_exists", f"Subject '{data.name}' already exists")
 
         new_subject = Subject(name=data.name)
         session.add(new_subject)
@@ -40,10 +37,9 @@ class SubjectRepository:
             await session.refresh(new_subject)
         except Exception:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
         return new_subject
 
     async def get_subject(self, session: AsyncSession, subject_id: int) -> Subject:
@@ -54,7 +50,7 @@ class SubjectRepository:
         subject = result.scalar_one_or_none()
 
         if not subject:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+            raise NotFound("subject_not_found", "Subject not found")
 
         return subject
 
@@ -135,7 +131,7 @@ class SubjectRepository:
         subject = result.scalar_one_or_none()
 
         if not subject:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+            raise NotFound("subject_not_found", "Subject not found")
 
         ensure_editable(subject, "предмета")
 
@@ -143,10 +139,7 @@ class SubjectRepository:
             stmt_check = select(Subject).where(Subject.name == data.name, Subject.id != subject_id)
             existing_subject = (await session.execute(stmt_check)).scalar_one_or_none()
             if existing_subject:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Subject name already taken",
-                )
+                raise Invalid("subject_name_taken", "Subject name already taken")
             subject.name = data.name
 
         await session.commit()
@@ -188,16 +181,11 @@ class SubjectRepository:
                 if quizzes_count > 0:
                     warnings.append(f"{quizzes_count} ta tayyor testlar o'chadi")
 
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": (
-                            "Siz ushbu fanni o'chirishga harakat qilyapsiz. "
-                            "Bu yordamchi qismlarni ham o'chirib yuboradi:"
-                        ),
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "subject_has_related_data",
+                    "Siz ushbu fanni o'chirishga harakat qilyapsiz. "
+                    "Bu yordamchi qismlarni ham o'chirib yuboradi:",
+                    requires_confirmation=True, warnings=warnings,
                 )
 
         # 1. Sever TeacherSubject links. `force` bu to'siqni ochmaydi: bu fan
@@ -221,7 +209,7 @@ class SubjectRepository:
         subject = result.scalar_one_or_none()
 
         if not subject:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+            raise NotFound("subject_not_found", "Subject not found")
 
         await session.delete(subject)
         await session.commit()

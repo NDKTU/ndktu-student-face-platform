@@ -439,7 +439,8 @@ async def test_assign_subjects_cannot_detach_subject_with_lessons(
         json={"teacher_id": test_teacher["id"], "subject_ids": []},
     )
     assert response.status_code == 409
-    assert "dars" in response.json()["detail"]
+    assert response.json()["detail"]["code"] == "has_lessons"
+    assert "dars" in response.json()["detail"]["message"]
 
     assert (await auth_client.get(f"/lesson/{lesson_id}")).status_code == 200
     read_back = await auth_client.get(f"/teacher/assigned_subjects/by-user/{test_teacher['user_id']}")

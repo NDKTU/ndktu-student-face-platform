@@ -1,7 +1,7 @@
 import logging
 from typing import get_args
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,6 +16,7 @@ from app.modules.file.repository import get_file_repository
 from app.modules.file.storage import public_url, store_upload, sync_usages
 
 from .schemas import RESOURCE_TYPES, ResourceCreateRequest, ResourceListRequest, ResourceListResponse, ResourceUpdateRequest
+from app.core.errors import Forbidden, NotFound, Unprocessable
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +30,15 @@ class ResourceRepository:
             return data_course_id
         lesson = (await session.execute(select(Lesson).where(Lesson.id == lesson_id))).scalar_one_or_none()
         if not lesson:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+            raise NotFound("lesson_not_found", "Lesson not found")
         return lesson.course_id
 
     async def _check_access(self, session: AsyncSession, course_id: int, user: User) -> None:
         course = (await session.execute(select(Course).where(Course.id == course_id))).scalar_one_or_none()
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         if not await can_manage(session, course, user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Faqat kurs oʻqituvchilari yoki admin material qoʻsha oladi",
-            )
+            raise Forbidden("resource_create_forbidden", "Faqat kurs oʻqituvchilari yoki admin material qoʻsha oladi")
 
     async def _sync_file_usage(self, session: AsyncSession, resource: Resource, user: User) -> None:
         # Kurs kutubxonasi `file_usages` dan yigʻiladi: yozilmasa, biriktirilgan
@@ -101,7 +99,7 @@ class ResourceRepository:
         stmt = select(Resource).options(*self._eager_load_options()).where(Resource.id == resource_id)
         resource = (await session.execute(stmt)).scalar_one_or_none()
         if not resource:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
+            raise NotFound("resource_not_found", "Resource not found")
         return resource
 
     async def list_resources(self, session: AsyncSession, request: ResourceListRequest) -> ResourceListResponse:
@@ -150,23 +148,17 @@ class ResourceRepository:
                 try:
                     parse_youtube_link(data.link_url)
                 except YouTubeLinkError as cause:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
-                    ) from cause
+                    raise Unprocessable("resource_link_invalid", str(cause)) from cause
             if resource.resource_type == "zoom":
                 try:
                     parse_zoom_link(data.link_url)
                 except ZoomLinkError as cause:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
-                    ) from cause
+                    raise Unprocessable("resource_link_invalid", str(cause)) from cause
             if resource.resource_type == "link":
                 try:
                     data.link_url = normalize_url(data.link_url)
                 except UnsafeUrlError as cause:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(cause)
-                    ) from cause
+                    raise Unprocessable("resource_link_invalid", str(cause)) from cause
             resource.link_url = data.link_url
         if data.text_content is not None:
             resource.text_content = data.text_content

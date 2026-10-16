@@ -4,7 +4,7 @@ import random
 from datetime import datetime
 
 import httpx
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -39,7 +39,7 @@ from .schemas import (
     VerifyEntryFaceResponse,
 )
 from app.core.utils.roles import user_is_admin
-from app.core.errors import AppError
+from app.core.errors import AppError, Invalid
 
 logger = logging.getLogger(__name__)
 
@@ -563,10 +563,9 @@ class QuizProcessRepository:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error finalizing result: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error while finalizing result: {e}",
-            )
+            # Asl xato o'z holicha ketadi: 500 «Database error» uni yashirardi
+            # (va SQL matnini mijozga chiqarardi). `AppError` — o'z javobi bilan.
+            raise
 
         return total_questions, correct_count, wrong_count, grade
 
@@ -647,10 +646,7 @@ class QuizProcessRepository:
         # Обрывать ему ответы посреди экзамена нельзя. Путь удаляется, когда
         # ни одна активная попытка не может быть старше выкатки.
         if data.answer is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either answer_index or answer must be provided",
-            )
+            raise Invalid("answer_required", "Either answer_index or answer must be provided")
 
         is_correct = data.answer == question.get_correct_text()
         reserved.answer = data.answer
@@ -671,7 +667,7 @@ class QuizProcessRepository:
             raise errors.not_your_attempt()
 
         if result_obj.quiz_id != data.quiz_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quiz_id does not match this attempt")
+            raise Invalid("quiz_attempt_mismatch", "quiz_id does not match this attempt")
 
         if result_obj.status != "in_progress":
             raise errors.attempt_already_finished()

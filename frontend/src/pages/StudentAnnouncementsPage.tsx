@@ -10,6 +10,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAnnouncementFeed, useToggleRegistration } from '@/hooks/useAnnouncements';
 import type { Announcement } from '@/services/announcementService';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -31,8 +32,7 @@ export default function StudentAnnouncementsPage() {
                 onSuccess: (data) =>
                     toast.success(data.is_registered ? "Ro'yxatdan o'tdingiz" : "Yozilish bekor qilindi"),
                 onError: (cause) => {
-                    const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                    toast.error(typeof detail === 'string' ? detail : 'Amalni bajarib bo\'lmadi');
+                    toast.error(apiErrorMessage(cause, 'Amalni bajarib bo\'lmadi'));
                 },
             },
         );

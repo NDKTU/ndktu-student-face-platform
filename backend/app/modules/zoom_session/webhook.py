@@ -21,11 +21,12 @@ import json
 import logging
 
 from core.database.db_helper import db_helper
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .accounts import all_credentials
 from .repository import zoom_session_repository as repo
+from app.core.errors import Invalid, Unauthorized, Unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +40,12 @@ def _hmac(secret: str, message: str) -> str:
 def _matching_secret(secrets: list[str], body: bytes, timestamp: str | None, signature: str | None) -> str:
     """Imzosi mos kelgan sir; hech biri mos kelmasa — 401."""
     if not timestamp or not signature:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Imzo ko'rsatilmagan")
+        raise Unauthorized("zoom_webhook_no_signature", "Imzo ko'rsatilmagan")
     message = f"v0:{timestamp}:{body.decode('utf-8', errors='replace')}"
     for secret in secrets:
         if hmac.compare_digest(signature, "v0=" + _hmac(secret, message)):
             return secret
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Imzo mos kelmadi")
+    raise Unauthorized("zoom_webhook_bad_signature", "Imzo mos kelmadi")
 
 
 @router.post("/webhook")
@@ -54,7 +55,7 @@ async def receive_webhook(request: Request, session: AsyncSession = Depends(db_h
         dict.fromkeys(c.webhook_secret for c in await all_credentials(session, active_only=False) if c.webhook_secret)
     )
     if not secrets:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Zoom webhook sozlanmagan")
+        raise Unavailable("zoom_webhook_not_configured", "Zoom webhook sozlanmagan")
     body = await request.body()
     secret = _matching_secret(
         secrets, body, request.headers.get("x-zm-request-timestamp"), request.headers.get("x-zm-signature")
@@ -62,7 +63,7 @@ async def receive_webhook(request: Request, session: AsyncSession = Depends(db_h
     try:
         payload = json.loads(body)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON noto'g'ri") from exc
+        raise Invalid("zoom_webhook_bad_json", "JSON noto'g'ri") from exc
 
     # «Validate» tugmasi: Zoom manzil bizniki ekanini shu javob bilan tekshiradi.
     if payload.get("event") == "endpoint.url_validation":

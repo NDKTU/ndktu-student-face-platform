@@ -1,6 +1,5 @@
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +9,7 @@ from app.modules.auth.model import User
 from app.modules.organization_structure.model import Curriculum
 
 from .schemas import CurriculumListRequest, CurriculumListResponse
+from app.core.errors import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +24,7 @@ class CurriculumRepository:
     async def get_curriculum(self, session: AsyncSession, curriculum_id: int) -> Curriculum:
         row = await session.get(Curriculum, curriculum_id)
         if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="O'quv reja topilmadi",
-            )
+            raise NotFound("curriculum_not_found", "O'quv reja topilmadi")
         return row
 
     async def list_curriculums(

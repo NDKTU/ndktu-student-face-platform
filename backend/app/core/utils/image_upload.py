@@ -16,7 +16,8 @@ SVG намеренно не разрешён: он может содержать
 import uuid
 from pathlib import Path
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
+from app.core.errors import Invalid
 
 #: Разрешённые расширения изображений.
 ALLOWED_IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
@@ -47,34 +48,29 @@ async def save_image(file: UploadFile, upload_dir: Path) -> str:
     для извлечения расширения — так в путь не попадает ничего от клиента.
     """
     if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File name is empty")
+        raise Invalid("file_name_empty", "File name is empty")
 
     if "." not in file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File has no extension")
+        raise Invalid("file_no_extension", "File has no extension")
 
     ext = file.filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_IMAGE_EXTS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported image type: .{ext}. Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTS))}",
+        raise Invalid(
+            "file_type_not_allowed",
+            f"Unsupported image type: .{ext}. Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTS))}",
+            ext=ext,
         )
 
     content = await file.read()
 
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty")
+        raise Invalid("file_empty", "File is empty")
 
     if len(content) > IMAGE_MAX_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Image must not exceed {IMAGE_MAX_BYTES // (1024 * 1024)}MB",
-        )
+        raise Invalid("file_too_large", f"Image must not exceed {IMAGE_MAX_BYTES // (1024 * 1024)}MB")
 
     if not looks_like_image(content, ext):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File content does not match its extension — this is not a valid image",
-        )
+        raise Invalid("file_content_mismatch", "File content does not match its extension — this is not a valid image")
 
     upload_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4()}.{ext}"

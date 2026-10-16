@@ -21,9 +21,9 @@ aniq soʻzlari emas.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
 from app.modules.auth.hemis.service import HemisLoginService
+from app.core.errors import AppError
 
 LOGIN = "319261101580"
 PASSWORD = "sir-parol"
@@ -54,7 +54,7 @@ async def _call(post_resp, get_resp=None):
 async def test_rejected_login_is_logged(caplog):
     """HEMIS 401 bilan rad etdi — logda kod va javob boʻlagi boʻlsin."""
     with caplog.at_level("WARNING"):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await _call(_resp(401, text='{"error":"bad credentials"}'))
 
     assert exc.value.status_code == 400
@@ -66,7 +66,7 @@ async def test_rejected_login_is_logged(caplog):
 async def test_unsuccessful_login_is_logged(caplog):
     """`success: false` — eng koʻp uchraydigan holat, logda alohida."""
     with caplog.at_level("WARNING"):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await _call(_resp(200, {"success": False}, text='{"success":false}'))
 
     assert exc.value.status_code == 400
@@ -83,7 +83,7 @@ async def test_profile_failure_is_separated_from_wrong_password(caplog):
     ok_login = _resp(200, {"success": True, "data": {"token": "t"}}, text="{}")
 
     with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await _call(ok_login, _resp(502, text="Bad Gateway"))
 
     assert exc.value.status_code == 400
@@ -95,7 +95,7 @@ async def test_profile_failure_is_separated_from_wrong_password(caplog):
 async def test_non_json_answer_is_not_a_client_error(caplog):
     """HTML sahifa kelsa — bu bizning emas, ularning nosozligi: 502."""
     with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await _call(_resp(200, None, text="<html>502 Bad Gateway</html>"))
 
     assert exc.value.status_code == 502
@@ -110,7 +110,7 @@ async def test_success_without_token_does_not_crash(caplog):
     deb koʻrinardi, holbuki javob ularniki.
     """
     with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await _call(_resp(200, {"success": True, "data": {}}, text="{}"))
 
     assert exc.value.status_code == 502
@@ -121,11 +121,11 @@ async def test_success_without_token_does_not_crash(caplog):
 async def test_password_never_reaches_the_log(caplog):
     """Parol logga hech qachon tushmaydi — na bir tarmoqda."""
     with caplog.at_level("DEBUG"):
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await _call(_resp(401, text="denied"))
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await _call(_resp(200, {"success": False}, text="{}"))
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await _call(
                 _resp(200, {"success": True, "data": {"token": "t"}}, text="{}"),
                 _resp(500, text="boom"),
@@ -149,7 +149,7 @@ async def test_successful_login_returns_profile():
 async def test_long_body_is_trimmed(caplog):
     """Chet javobi logni bosib ketmasin."""
     with caplog.at_level("WARNING"):
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await _call(_resp(500, text="x" * 5000))
 
     assert "x" * 300 not in caplog.text

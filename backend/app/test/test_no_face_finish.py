@@ -10,13 +10,13 @@
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
 
 from app.core.utils.proctoring import resolve_no_face_finish, validate_no_face_seconds
 from app.core.utils.roles import SYSTEM_ROLE_CODES
 from app.test.test_general_test_access import scene  # noqa: F401 — fixture
 from app.test.test_general_test_proctoring import _prepare
 from app.test.test_student_dashboard import _login
+from app.core.errors import AppError
 
 
 def _user(*role_names: str):
@@ -47,7 +47,7 @@ async def test_only_permitted_role_changes_it(async_db):
     assert await resolve_no_face_finish(async_db, teacher, current=60, requested=None, proctoring_mode="face") == 60
     assert await resolve_no_face_finish(async_db, teacher, current=60, requested=60, proctoring_mode="face") == 60
     for requested in (30, 0):  # yoqish/o'zgartirish ham, o'chirish ham
-        with pytest.raises(HTTPException) as denied:
+        with pytest.raises(AppError) as denied:
             await resolve_no_face_finish(async_db, teacher, current=60, requested=requested, proctoring_mode="face")
         assert denied.value.status_code == 403
         assert denied.value.detail["code"] == "proctoring_auto_finish_forbidden"

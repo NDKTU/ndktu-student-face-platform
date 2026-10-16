@@ -16,6 +16,7 @@ from app.modules.auth.model import Role, Student, Teacher, User
 
 from .active_check import ensure_user_active
 from .schemas import UserLoginRequest, UserLoginResponse
+from app.core.errors import AppError, Unauthorized, Unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +30,10 @@ class UserService:
     def _strip_bearer(header_value: str) -> str:
         """Extract the raw JWT token from an ``Authorization`` header."""
         if not header_value:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing Authorization header",
-            )
+            raise Unauthorized("auth_header_missing", "Missing Authorization header")
         parts = header_value.strip().split(" ", 1)
         if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Authorization header (expected 'Bearer <token>')",
-            )
+            raise Unauthorized("auth_header_invalid", "Invalid Authorization header (expected 'Bearer <token>')")
         return parts[1].strip()
 
     async def create_session_token(self, user_id: int) -> str:
@@ -70,10 +65,7 @@ class UserService:
                 )
         except RedisError:
             logger.exception("Redis unavailable while creating session for user %s", user_id)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication service temporarily unavailable",
-            )
+            raise Unavailable("auth_unavailable", "Authentication service temporarily unavailable")
         return access_token
 
     async def validate_session(self, token: str) -> int:
@@ -88,28 +80,19 @@ class UserService:
         jti = payload.get("jti")
 
         if user_id is None or not jti:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-            )
+            raise Unauthorized("token_invalid", "Invalid token")
 
         try:
             stored_jti = await redis_client.get(self._session_key(user_id))
             if stored_jti != jti:
                 # Ключ отсутствует (logout / idle-expire) или захвачен другим устройством.
                 logger.warning("User %s session invalid (logout/idle or another device).", user_id)
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Boshqa qurilmadan profilga kirilgan. Joriy sessiya yakunlandi.",
-                )
+                raise Unauthorized("session_replaced", "Boshqa qurilmadan profilga kirilgan. Joriy sessiya yakunlandi.")
             # Скользящий idle-таймаут: продлеваем TTL на каждом аутентифицированном запросе.
             await redis_client.expire(self._session_key(user_id), settings.jwt.session_idle_minutes * 60)
         except RedisError:
             logger.exception("Redis unavailable while validating session for user %s", user_id)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication service temporarily unavailable",
-            )
+            raise Unavailable("auth_unavailable", "Authentication service temporarily unavailable")
 
         return user_id
 
@@ -138,7 +121,7 @@ class UserService:
             try:
                 access_token = await eduplan_auth_service.login(session, external_username, data.password)
                 return UserLoginResponse(type="Bearer", access_token=access_token)
-            except HTTPException as exc:
+            except (HTTPException, AppError) as exc:
                 # 401 — parol haqiqatan noto'g'ri, mahalliy xeshga o'tmaymiz.
                 if exc.status_code == status.HTTP_401_UNAUTHORIZED:
                     raise
@@ -169,20 +152,17 @@ class UserService:
         try:
             access_token = await eduplan_auth_service.login(session, external_username, data.password)
             return UserLoginResponse(type="Bearer", access_token=access_token)
-        except HTTPException as exc:
+        except (HTTPException, AppError) as exc:
             # Mahalliy hisob uchun EduPlan xabarini ko'rsatish chalg'itadi:
             # odam «EduPlan qabul qilmadi» ni o'qib, integratsiyani tuzatishga
             # kirishadi, aslida esa oddiy parol xato. EduPlan matni faqat
             # bizda umuman yo'q hisoblar uchun ma'noli.
             if user is not None and user.password:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Login yoki parol noto'g'ri",
-                ) from exc
+                raise Unauthorized("invalid_credentials", "Login yoki parol noto'g'ri") from exc
             raise
         except Exception as e:
             logger.error("EduPlan login fallback failed: %s", e)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
+            raise Unauthorized("invalid_credentials", "Login yoki parol noto'g'ri")
 
     async def get_current_user(self, session: AsyncSession, token: str) -> User:
         # Декод + проверка Single Active Session + продление idle-TTL в одном месте.
@@ -205,10 +185,7 @@ class UserService:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-            )
+            raise Unauthorized("token_invalid", "Invalid authentication credentials")
 
         return user
 
@@ -221,16 +198,10 @@ class UserService:
             )
         except jwt.ExpiredSignatureError:
             logger.info("Token decode: expired")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token expired",
-            )
+            raise Unauthorized("token_expired", "Token expired")
         except jwt.InvalidTokenError as e:
             logger.warning(f"Token decode: invalid ({e.__class__.__name__})")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-            )
+            raise Unauthorized("token_invalid", "Invalid token")
 
     def _create_token(self, data: dict, secret_key: str, expires_delta: timedelta):
         to_encode = data.copy()

@@ -11,7 +11,6 @@ Shuning uchun dars ruxsatlari ishlatiladi: mavzu roʻyxati ham kursning
 oʻquv rejasi qismi.
 """
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +26,7 @@ from .schemas import (
     IndependentTopicResponse,
     IndependentTopicUpdateRequest,
 )
+from app.core.errors import Forbidden, NotFound
 
 
 class IndependentTopicRepository:
@@ -45,21 +45,18 @@ class IndependentTopicRepository:
     async def _load_course(self, session: AsyncSession, course_id: int, current_user: User) -> Course:
         course = await session.get(Course, course_id)
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         await get_course_repository._ensure_view_access(session, course, current_user)
         return course
 
     async def _ensure_can_manage(self, session: AsyncSession, course: Course, current_user: User) -> None:
         if not await can_manage(session, course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bu kurs sizga biriktirilmagan",
-            )
+            raise Forbidden("course_not_assigned", "Bu kurs sizga biriktirilmagan")
 
     async def _load_topic(self, session: AsyncSession, topic_id: int, current_user: User) -> IndependentTopic:
         topic = await session.get(IndependentTopic, topic_id)
         if not topic:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mavzu topilmadi")
+            raise NotFound("topic_not_found", "Mavzu topilmadi")
         course = await self._load_course(session, topic.course_id, current_user)
         await self._ensure_can_manage(session, course, current_user)
         return topic

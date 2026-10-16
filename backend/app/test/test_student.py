@@ -17,7 +17,7 @@ async def test_get_students(auth_client: AsyncClient):
 async def test_get_student_by_id_not_found(auth_client: AsyncClient):
     response = await auth_client.get("/students/99999")
     assert response.status_code == 404
-    assert response.json()["detail"] == "Student not found"
+    assert response.json()["detail"]["code"] == "student_not_found"
 
 
 # Bu test oʻchirilgan endpointni tekshirardi: entity yaratish/oʻzgartirish/

@@ -1,10 +1,10 @@
-from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Permission
 
 from .schemas import PermissionListRequest, PermissionListResponse
+from app.core.errors import NotFound
 
 
 class PermissionRepository:
@@ -21,7 +21,7 @@ class PermissionRepository:
         permission = result.scalar_one_or_none()
 
         if not permission:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permission not found")
+            raise NotFound("permission_not_found", "Permission not found")
 
         return permission
 

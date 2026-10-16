@@ -19,14 +19,14 @@ from typing import Any
 from urllib.parse import unquote
 
 import httpx
-from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.core.errors import KIND_BY_STATUS, TooManyRequests, Unavailable, UpstreamError
 
 logger = logging.getLogger(__name__)
 
 
-class RoydDisabled(HTTPException):
+class RoydDisabled(Unavailable):
     """Integratsiya sozlanmagan.
 
     503, 500 emas: bu nosozlik emas, sozlama yo'q. Frontend shu javobni
@@ -35,8 +35,8 @@ class RoydDisabled(HTTPException):
 
     def __init__(self) -> None:
         super().__init__(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Arizalar tizimi (ROYD) ulanmagan. Administratorga murojaat qiling.",
+            "royd_disabled",
+            "Arizalar tizimi (ROYD) ulanmagan. Administratorga murojaat qiling.",
         )
 
 
@@ -68,29 +68,23 @@ class RoydClient:
                 )
         except httpx.RequestError as exc:
             logger.warning("ROYD token so'rovi muvaffaqiyatsiz: %s", exc)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Arizalar tizimiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",
-            ) from exc
+            raise UpstreamError("royd_unreachable", "Arizalar tizimiga ulanib bo'lmadi. Keyinroq urinib ko'ring.") from exc
 
         if response.status_code != 200:
             # Xato RFC 6749 formatida: {"error": "invalid_client", ...}.
             # Bu talabaning aybi emas — sozlama xatosi, shuning uchun matn
             # umumiy, tafsilot esa jurnalga tushadi.
             logger.error("ROYD token bermadi: %s %s", response.status_code, response.text[:300])
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Arizalar tizimi kalitni qabul qilmadi. Administratorga murojaat qiling.",
+            raise UpstreamError(
+                "royd_rejected_key",
+                "Arizalar tizimi kalitni qabul qilmadi. Administratorga murojaat qiling.",
             )
 
         body = response.json()
         token = body.get("access_token")
         if not token:
             logger.error("ROYD javobida access_token yo'q: %s", str(body)[:200])
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Arizalar tizimi noto'g'ri javob qaytardi.",
-            )
+            raise UpstreamError("royd_bad_response", "Arizalar tizimi noto'g'ri javob qaytardi.")
         expires_in = int(body.get("expires_in") or 3600)
         self._token = token
         self._expires_at = time.monotonic() + max(0, expires_in - settings.royd.token_leeway_seconds)
@@ -166,10 +160,7 @@ class RoydClient:
                 )
         except httpx.RequestError as exc:
             logger.warning("ROYD so'rovi muvaffaqiyatsiz: %s %s — %s", method, path, exc)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Arizalar tizimiga ulanib bo'lmadi. Keyinroq urinib ko'ring.",
-            ) from exc
+            raise UpstreamError("royd_unreachable", "Arizalar tizimiga ulanib bo'lmadi. Keyinroq urinib ko'ring.") from exc
 
     async def download(self, path: str) -> tuple[bytes, str, str | None]:
         """Faylni xom holida oladi: (bayt, mime, fayl nomi).
@@ -214,14 +205,14 @@ class RoydClient:
             # ular yashiriladi, aks holda u «ruxsat yo'q» deb o'ylardi.
             if response.status_code in (401, 403):
                 logger.error("ROYD kalit/scope xatosi: %s %s", response.status_code, response.text[:300])
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="Arizalar tizimi so'rovni qabul qilmadi. Administratorga murojaat qiling.",
+                raise UpstreamError(
+                    "royd_rejected_request",
+                    "Arizalar tizimi so'rovni qabul qilmadi. Administratorga murojaat qiling.",
                 )
             if response.status_code == 429:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Juda ko'p so'rov. Bir daqiqadan keyin urinib ko'ring.",
+                raise TooManyRequests(
+                    "royd_rate_limited",
+                    "Juda ko'p so'rov. Bir daqiqadan keyin urinib ko'ring.",
                     headers={"Retry-After": response.headers.get("Retry-After", "60")},
                 )
             detail: Any
@@ -230,7 +221,15 @@ class RoydClient:
                 detail = body.get("detail") if isinstance(body, dict) else body
             except ValueError:
                 detail = response.text[:300]
-            raise HTTPException(status_code=response.status_code, detail=detail or "Arizalar tizimi xatosi")
+            # ROYD'ning o'z holati saqlanadi (404, 409, 422, ...): bu uning
+            # biznes-javobi, bizniki emas. Xom javob — `upstream` maydonida.
+            error = UpstreamError(
+                "royd_error",
+                detail if isinstance(detail, str) and detail else "Arizalar tizimi xatosi",
+                upstream=detail,
+            )
+            error.kind = KIND_BY_STATUS.get(response.status_code, "upstream")
+            raise error
 
         if not response.content:
             return None

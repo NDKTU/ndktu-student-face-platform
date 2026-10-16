@@ -7,7 +7,6 @@ guruhlaridan, uy vazifasi bahosi `homework_submissions` dan, test bahosi
 
 from collections.abc import Sequence
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +34,7 @@ from .schemas import (
     MyHomeworkGrade,
     MyQuizGrade,
 )
+from app.core.errors import Forbidden, NotFound
 
 
 def _naive(value):
@@ -112,7 +112,7 @@ class GradebookRepository:
     ) -> GradebookResponse:
         lesson = await session.get(Lesson, lesson_id)
         if lesson is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
+            raise NotFound("lesson_not_found", "Dars topilmadi")
         await ensure_can_manage_lesson(
             session, lesson, current_user, detail="Baholash jurnali faqat dars o'qituvchisiga ochiq"
         )
@@ -187,12 +187,9 @@ class GradebookRepository:
         """
         course = await session.get(Course, course_id)
         if course is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kurs topilmadi")
+            raise NotFound("course_not_found", "Kurs topilmadi")
         if not await can_manage_course(session, course, current_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Baholash jurnali faqat kurs o'qituvchilariga ochiq",
-            )
+            raise Forbidden("gradebook_forbidden", "Baholash jurnali faqat kurs o'qituvchilariga ochiq")
 
         groups = (
             await session.execute(
@@ -213,7 +210,7 @@ class GradebookRepository:
         if group_id is None:
             group_id = groups[0][0]
         elif group_id not in {gid for gid, _, _ in groups}:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bu guruh kursga tegishli emas")
+            raise NotFound("group_not_in_course", "Bu guruh kursga tegishli emas")
         response.group_id = group_id
 
         # Guruhga ko'rinadigan darslar: o'zining va butun kursning darslari —
@@ -304,14 +301,14 @@ class GradebookRepository:
         """
         student = await session.scalar(select(Student).where(Student.user_id == current_user.id))
         if student is None or student.group_id is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talaba ma'lumoti topilmadi")
+            raise NotFound("student_profile_missing", "Talaba ma'lumoti topilmadi")
         enrolled = await session.scalar(
             select(CourseGroup.id).where(
                 CourseGroup.course_id == course_id, CourseGroup.group_id == student.group_id
             )
         )
         if enrolled is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu kursda o'qimaysiz")
+            raise Forbidden("course_not_enrolled", "Siz bu kursda o'qimaysiz")
 
         lessons = (
             await session.scalars(

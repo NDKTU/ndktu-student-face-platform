@@ -15,11 +15,11 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from core.config import settings
-from fastapi import HTTPException
 from sqlalchemy import func, select
 
 from app.modules.auth.hemis.oauth import HemisOAuthService, hemis_oauth_service
 from app.modules.auth.user.service import auth_service
+from app.core.errors import AppError
 
 REDIRECT = "https://lms.nsumt.uz/auth/hemis/callback"
 
@@ -241,7 +241,7 @@ async def test_fetch_profile_exchanges_code_and_unwraps_data():
 
 @pytest.mark.asyncio
 async def test_rejected_code_is_logged_without_secret(caplog):
-    with caplog.at_level("ERROR"), pytest.raises(HTTPException) as exc:
+    with caplog.at_level("ERROR"), pytest.raises(AppError) as exc:
         await _fetch(_resp(401, {"error": "invalid_client"}, text='{"error":"invalid_client"}'))
 
     assert exc.value.detail["code"] == "hemis_oauth_token_failed"
@@ -251,7 +251,7 @@ async def test_rejected_code_is_logged_without_secret(caplog):
 
 @pytest.mark.asyncio
 async def test_missing_profile_is_a_separate_error():
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AppError) as exc:
         await _fetch(_resp(200, {"access_token": "tok"}), _resp(500, text="xato"))
 
     assert exc.value.detail["code"] == "hemis_oauth_profile_failed"
@@ -263,7 +263,7 @@ async def test_network_error_is_503():
 
     with (
         patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=httpx.ConnectError("yo'q"))),
-        pytest.raises(HTTPException) as exc,
+        pytest.raises(AppError) as exc,
     ):
         await hemis_oauth_service._fetch_profile("https://student.ndki.uz", "student", "kod")
 

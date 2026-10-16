@@ -16,13 +16,14 @@ from pathlib import Path
 
 from core.config import settings
 from core.utils.image_upload import looks_like_image
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.file import quota
 from app.modules.file.model import FileBlob, FileUsage, StoredFile
+from app.core.errors import Invalid
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,10 @@ CHUNK_SIZE = 1024 * 1024
 
 def _extension(filename: str | None) -> str:
     if not filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl nomi boʻsh")
+        raise Invalid("file_name_empty", "Fayl nomi boʻsh")
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ALLOWED_EXTS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Bu turdagi fayl qabul qilinmaydi: .{ext}",
-        )
+        raise Invalid("file_type_not_allowed", f"Bu turdagi fayl qabul qilinmaydi: .{ext}", ext=ext)
     return ext
 
 
@@ -80,16 +78,10 @@ async def _stream_to_temp(file: UploadFile, ext: str) -> tuple[Path, str, int]:
                     # domenimizdan beriladi. Shuning uchun rasmlar uchun
                     # birinchi baytlardagi imzo ham tekshiriladi.
                     if ext in IMAGE_EXTS and not looks_like_image(chunk, ext):
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Fayl mazmuni kengaytmasiga mos kelmaydi — bu rasm emas",
-                        )
+                        raise Invalid("file_content_mismatch", "Fayl mazmuni kengaytmasiga mos kelmaydi — bu rasm emas")
                 size += len(chunk)
                 if size > max_size:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Fayl hajmi {max_size // (1024 * 1024)}MB dan oshmasligi kerak",
-                    )
+                    raise Invalid("file_too_large", f"Fayl hajmi {max_size // (1024 * 1024)}MB dan oshmasligi kerak")
                 digest.update(chunk)
                 buffer.write(chunk)
     except Exception:
@@ -98,7 +90,7 @@ async def _stream_to_temp(file: UploadFile, ext: str) -> tuple[Path, str, int]:
 
     if size == 0:
         tmp_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl boʻsh")
+        raise Invalid("file_empty", "Fayl boʻsh")
 
     return tmp_path, digest.hexdigest(), size
 

@@ -94,12 +94,14 @@ async def test_busy_sync_is_recognised_by_code(async_db, monkeypatch):
     assert busy.value.code == "sync_in_progress"
 
 
-#: Repozitoriy/servis qatlamidagi `HTTPException(` soni (2026-10-16). Faqat
-#: kamayishi mumkin: modul `AppError` ga ko'chirilganda shu sonni ham
-#: kamaytiring. HTTP qatlami (router, dependency, middleware) hisobga kirmaydi.
-HTTP_EXCEPTION_BASELINE = 111
+#: Repozitoriy/servis qatlamidagi `HTTPException(` soni. 2026-10-16 da 362
+#: tadan modulma-modul 0 ga tushirildi — endi bu taqiq: HTTP qatlamidan
+#: (router, dependency, middleware) pastda faqat `app.core.errors`.
+HTTP_EXCEPTION_BASELINE = 0
 
-_HTTP_EXCEPTION = re.compile(r"\bHTTPException\(")
+#: Chaqiruv ham, voris klass ham (`class Busy(HTTPException)` — `super().__init__`
+#: orqali yaratiladi va `HTTPException(` ko'rinishida uchramaydi).
+_HTTP_EXCEPTION = re.compile(r"\bHTTPException\(|\(HTTPException\)")
 
 
 def _http_exception_count() -> tuple[int, dict[str, int]]:

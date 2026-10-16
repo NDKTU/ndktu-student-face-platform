@@ -6,7 +6,7 @@
 отклоняются явной ошибкой, а не «принимаются» с последующим откатом.
 """
 
-from fastapi import HTTPException, status
+from app.core.errors import Conflict
 
 #: Человекочитаемые названия источников для текста ошибки.
 SOURCE_LABELS = {
@@ -26,10 +26,8 @@ def ensure_editable(row, entity: str) -> None:
         return
 
     label = SOURCE_LABELS.get(source, source)
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail=(
-            f"Запись {entity} синхронизируется из {label} и не редактируется вручную. "
-            f"Измените данные в {label} — они приедут при следующей синхронизации."
-        ),
+    raise Conflict(
+        "external_record_readonly",
+        f"Запись {entity} синхронизируется из {label} и не редактируется вручную. "
+        f"Измените данные в {label} — они приедут при следующей синхронизации.",
     )

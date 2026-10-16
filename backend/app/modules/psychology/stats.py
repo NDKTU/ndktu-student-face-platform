@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
-from fastapi import HTTPException, status
 from sqlalchemy import Select, distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +47,7 @@ from .schemas import (
     TimelineResponse,
     UserHistoryResponse,
 )
+from app.core.errors import NotFound
 
 # Baza sanalarni naive UTC'da saqlaydi, foydalanuvchi esa Toshkent sanasi bilan ishlaydi.
 TASHKENT_OFFSET = timedelta(hours=5)
@@ -196,7 +196,7 @@ async def _fetch_rows(
 async def _get_method(session: AsyncSession, method_id: int) -> PsychologyMethod:
     method = await session.get(PsychologyMethod, method_id)
     if not method:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Psychology method not found")
+        raise NotFound("psychology_method_not_found", "Psychology method not found")
     return method
 
 
@@ -610,7 +610,7 @@ async def timeline(
 async def user_history(session: AsyncSession, user_id: int, method_id: int | None) -> UserHistoryResponse:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFound("user_not_found", "User not found")
     full_name = (
         await session.execute(select(Student.full_name).where(Student.user_id == user_id).limit(1))
     ).scalar_one_or_none()

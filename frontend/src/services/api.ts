@@ -74,8 +74,11 @@ api.interceptors.response.use(
             // Remove token and redirect on 401.
             clearToken();
             // Различаем вытеснение другой сессией, чтобы показать понятное сообщение.
-            const detail: string = error.response?.data?.detail ?? '';
-            const kickedBySession = detail.includes('Joriy sessiya yakunlandi');
+            // `detail` — satr yoki `{code, message}` (`core/errors.py`). Kod
+            // ustun; matn — eski bekend bilan ham ishlashi uchun.
+            const detail = error.response?.data?.detail;
+            const text = typeof detail === 'string' ? detail : (detail?.message ?? '');
+            const kickedBySession = detail?.code === 'session_replaced' || text.includes('Joriy sessiya yakunlandi');
             if (kickedBySession) setLogoutReason('session');
             window.location.href = kickedBySession ? '/login?reason=session' : '/login';
             return Promise.reject(error);

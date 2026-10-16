@@ -9,9 +9,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 
 from app.core.utils.image_upload import IMAGE_MAX_BYTES, save_image
+from app.core.errors import AppError
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -47,7 +48,7 @@ async def test_accepts_real_images(filename, content):
 async def test_rejects_svg():
     """SVG может содержать исполняемый код и раздаётся с домена приложения."""
     with tempfile.TemporaryDirectory() as tmp:
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await save_image(_upload("evil.svg", SVG_WITH_SCRIPT), Path(tmp))
 
         assert exc.value.status_code == 400
@@ -65,7 +66,7 @@ async def test_rejects_svg():
 async def test_rejects_content_that_is_not_an_image(filename, content):
     """Расширение приходит от клиента — решает содержимое."""
     with tempfile.TemporaryDirectory() as tmp:
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await save_image(_upload(filename, content), Path(tmp))
 
         assert exc.value.status_code == 400
@@ -74,10 +75,10 @@ async def test_rejects_content_that_is_not_an_image(filename, content):
 @pytest.mark.asyncio
 async def test_rejects_empty_and_missing_extension():
     with tempfile.TemporaryDirectory() as tmp:
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await save_image(_upload("a.png", b""), Path(tmp))
 
-        with pytest.raises(HTTPException):
+        with pytest.raises(AppError):
             await save_image(_upload("noextension", PNG), Path(tmp))
 
 
@@ -86,7 +87,7 @@ async def test_rejects_oversized_image():
     oversized = PNG[:8] + b"\x00" * IMAGE_MAX_BYTES
 
     with tempfile.TemporaryDirectory() as tmp:
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await save_image(_upload("big.png", oversized), Path(tmp))
 
         assert exc.value.status_code == 400

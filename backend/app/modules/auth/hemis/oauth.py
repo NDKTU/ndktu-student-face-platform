@@ -20,7 +20,6 @@ from urllib.parse import urlencode
 import httpx
 from core.config import settings
 from core.redis_client import redis_client
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +29,7 @@ from app.modules.auth.user.service import auth_service
 
 from .schemas import HemisLoginResponse
 from .service import HemisLoginService
+from app.core.errors import KIND_BY_STATUS, AppError
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,10 @@ STUDENT_ID_KEYS = ("student_id_number", "login", "username")
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
-def _error(status_code: int, code: str, message: str) -> HTTPException:
-    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+def _error(status_code: int, code: str, message: str) -> AppError:
+    error = AppError(code, message)
+    error.kind = KIND_BY_STATUS.get(status_code, "bad_request")
+    return error
 
 
 class HemisOAuthService:

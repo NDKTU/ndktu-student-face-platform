@@ -11,13 +11,13 @@ Ikkalasi ham kerak: kursni ochgan odam o'zi o'tmagan darsning jurnalini ham
 ko'ra olishi lozim.
 """
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.model import Teacher, TeacherSubject, User
 from app.core.utils.roles import user_is_admin
 from app.modules.course.model import Course, CourseTeacher, Lesson
+from app.core.errors import Forbidden
 
 
 def is_admin(user: User) -> bool:
@@ -63,4 +63,4 @@ async def ensure_can_manage_lesson(
     detail: str = "Bu dars sizga tegishli emas",
 ) -> None:
     if not await can_manage_lesson(session, lesson, user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+        raise Forbidden("lesson_not_yours", detail)

@@ -17,8 +17,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from core.utils.permission_registry import declare_permission
-from fastapi import HTTPException, status
 from app.core.utils.roles import user_is_admin
+from app.core.errors import Forbidden
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,11 +67,8 @@ async def resolve_no_face_finish(
     from core.dependencies.role_checker import _roles_have_permission
 
     if user is not None and not is_admin and not await _roles_have_permission(session, user, AUTO_FINISH_PERMISSION):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "code": "proctoring_auto_finish_forbidden",
-                "message": "Yuz ko'rinmasa testni yakunlash sozlamasini faqat ruxsati bor foydalanuvchi o'zgartiradi",
-            },
+        raise Forbidden(
+            "proctoring_auto_finish_forbidden",
+            "Yuz ko'rinmasa testni yakunlash sozlamasini faqat ruxsati bor foydalanuvchi o'zgartiradi",
         )
     return target
