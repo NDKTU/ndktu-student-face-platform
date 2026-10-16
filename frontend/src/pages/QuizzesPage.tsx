@@ -9,23 +9,19 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Plus, Search } from 'lucide-react';
 import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz } from '@/hooks/useQuizzes';
-import { useSubjects } from '@/hooks/useSubjects';
+import { useSubjectFilter } from '@/hooks/useSubjects';
 import { useFaculties } from '@/hooks/useReferenceData';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeacherOptions } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
-import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
 import { RepeatedQuizSuccessModal } from '@/components/quizzes/RepeatedQuizSuccessModal';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
 import { useTranslation } from 'react-i18next';
 import { useUrlState, useUrlNumberState, useUrlOptionalNumberState, useUrlOptionalBoolState } from '@/hooks/useUrlState';
-import { subjectOption } from '@/utils/subject';
 
 const QuizzesPage = () => {
     const { t } = useTranslation();
@@ -88,23 +84,10 @@ const QuizzesPage = () => {
     });
 
     const { data: allFacultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
-    // Ikkita alohida so'rov, ataylab:
-    //  * `allSubjectsData` — jadvalda fan NOMINI ko'rsatish uchun
-    //    (`getSubjectName`). Quiz javobida faqat `subject_id` bor,
-    //    shuning uchun nomlar ro'yxatdan qidiriladi va uni qisqartirib
-    //    bo'lmaydi: qatorlarda «-» chiqib qolardi.
-    //  * `subjectOptionsData` — filtr ro'yxati uchun. Fanlar 2978 ta,
-    //    hammasi yuklanmaydi; qidiruv serverga uzatiladi.
-    const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
-    const [subjectQuery, setSubjectQuery] = useState('');
-    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
-    const { data: subjectOptionsData } = useSubjects(
-        1,
-        FILTER_PAGE_SIZE,
-        debouncedSubjectQuery,
-        undefined,
-        hasPermission('read:subject'),
-    );
+    // Fan filtri — qidiruv serverda; jadvaldagi nomlar javobning o'zidan
+    // (`subject_name`). Ilgari 1000 ta fan yuklanib, qolgan 2254 tasi
+    // jadvalda «-» va filtrda yo'q edi.
+    const subjectFilter = useSubjectFilter(filterSubjectId, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
@@ -115,19 +98,6 @@ const QuizzesPage = () => {
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
     const allFaculties = allFacultiesData?.faculties || [];
-    const allSubjects = useMemo(() => allSubjectsData?.subjects ?? [], [allSubjectsData]);
-    // Tanlangan fan qidiruv natijasidan tushib qolsa, Combobox nom
-    // o'rniga placeholder ko'rsatardi — go'yo filtr olib tashlangandek.
-    const selectedSubjectOption = filterSubjectId
-        ? {
-              value: String(filterSubjectId),
-              label: allSubjects.find((s) => s.id === filterSubjectId)?.name ?? `#${filterSubjectId}`,
-          }
-        : null;
-    const subjectOptions = withSelected(
-        (subjectOptionsData?.subjects || []).map(subjectOption),
-        selectedSubjectOption,
-    );
     const allGroups = useMemo(() => allGroupsData?.groups ?? [], [allGroupsData]);
     const allTeachers = allTeachersData ?? [];
 
@@ -228,18 +198,15 @@ const QuizzesPage = () => {
         });
     };
 
-    // Nomlar avvalo javobning o'zidan olinadi (`subject_name` / `group_name`).
-    // Ro'yxatlar zaxira bo'lib qoladi: ular filtr uchun baribir yuklanadi, lekin
-    // ularga tayanib bo'lmaydi — 2978 fandan faqat 1000 tasi so'raladi va
-    // qolganlari jadvalda «—» bo'lib chiqardi.
+    // Nomlar javobning o'zidan (`subject_name` / `group_name`). Guruhlar
+    // ro'yxati zaxira bo'lib qoladi — u filtr uchun baribir yuklanadi.
     const subjectNameById = useMemo(() => {
         const map = new Map<number, string>();
-        allSubjects.forEach((s: Subject) => map.set(s.id, s.name));
         quizzes.forEach((q) => {
             if (q.subject_id && q.subject_name) map.set(q.subject_id, q.subject_name);
         });
         return map;
-    }, [allSubjects, quizzes]);
+    }, [quizzes]);
 
     const groupNameById = useMemo(() => {
         const map = new Map<number, string>();
@@ -300,9 +267,8 @@ const QuizzesPage = () => {
             />
 
             <QuizFilters
-                subjects={allSubjects}
-                subjectOptions={subjectOptions}
-                onSubjectSearchChange={setSubjectQuery}
+                subjectOptions={subjectFilter.options}
+                onSubjectSearchChange={subjectFilter.onSearch}
                 groups={allGroups}
                 teachers={allTeachers}
                 faculties={canFilterByFaculty ? allFaculties : undefined}

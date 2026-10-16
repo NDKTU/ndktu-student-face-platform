@@ -12,7 +12,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
-import { useSubjects, useTeacherAssignedSubjects } from '@/hooks/useSubjects';
+import { useTeacherAssignedSubjects, useSubject } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeacherOptions, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest, QuizType } from '@/services/quizService';
@@ -101,7 +101,6 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const effectiveUserId = isTeacher ? user?.id?.toString() : selectedLecturerId;
 
-    const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: searchTeachersData } = useTeacherOptions(debouncedTeacherSearch, hasPermission('read:teacher'));
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(
@@ -114,6 +113,15 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
     // Fan va guruh ro'yxati doim tanlangan ma'ruzachiga biriktirilganidan yig'iladi
     // — tashkilotchi ham barcha fanlar orasidan emas, shu ro'yxatdan tanlaydi.
     // Tahrirlashda testning joriy fani/guruhi ro'yxatda bo'lmasa, qo'shib qo'yiladi.
+    // Testning joriy fani ma'ruzachi fanlari orasida bo'lmasa (eski test,
+    // biriktiruv olib tashlangan) — uni id bo'yicha olamiz. Ilgari birinchi
+    // 1000 ta fan yuklanib, undan qidirilardi: qolgan 2254 fanda tahrirlash
+    // oynasi joriy fanni ko'rsatmasdi.
+    const currentSubjectMissing =
+        !!quiz?.subject_id &&
+        !(assignedSubjectsData?.subject_teachers ?? []).some(st => st.subject_id === quiz.subject_id);
+    const { data: currentSubject } = useSubject(currentSubjectMissing && quiz?.subject_id ? quiz.subject_id : 0);
+
     const subjectOptions = useMemo(() => {
         // Bir xil nomli fanlar ko'p (EPMOS ularni har bir o'quv reja uchun
         // alohida beradi), shuning uchun ikkinchi qatorda reja ko'rsatiladi.
@@ -123,17 +131,17 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
             hint: subjectHint(st.subject) || undefined,
         }));
         if (quiz?.subject_id && !options.some(o => o.value === quiz.subject_id!.toString())) {
-            const current = (allSubjectsData?.subjects ?? []).find(s => s.id === quiz.subject_id);
-            if (current) {
+            const label = currentSubject?.name ?? quiz.subject_name;
+            if (label) {
                 options.push({
                     value: quiz.subject_id.toString(),
-                    label: current.name,
-                    hint: subjectHint(current) || undefined,
+                    label,
+                    hint: (currentSubject && subjectHint(currentSubject)) || undefined,
                 });
             }
         }
         return options;
-    }, [assignedSubjectsData, quiz, allSubjectsData]);
+    }, [assignedSubjectsData, quiz, currentSubject]);
 
     const groupOptions = useMemo(() => {
         const options = (assignedGroupsData?.group_teachers ?? []).map(gt => ({

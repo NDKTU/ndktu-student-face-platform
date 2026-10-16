@@ -714,7 +714,6 @@ const ControlQuestions = ({
             <QuestionExcelUploadModal
                 isOpen={excelOpen}
                 onClose={() => setExcelOpen(false)}
-                subjects={[]}
                 defaultSubjectId={subjectId}
                 subjectName={subjectName}
                 lockSubject

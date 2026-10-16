@@ -22,13 +22,12 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useGroups } from '@/hooks/useGroups';
-import { useSubjects } from '@/hooks/useSubjects';
+import { useSubjectFilter } from '@/hooks/useSubjects';
 import { useFaculties, useKafedras } from '@/hooks/useReferenceData';
 import { useQuizzes } from '@/hooks/useQuizzes';
 import { useAuth } from '@/context/AuthContext';
 import { resultService, type Result } from '@/services/resultService';
 import { formatDate, formatDateTime } from '@/utils/date';
-import { subjectOption } from '@/utils/subject';
 import { CheatingEvidence } from '@/components/results/CheatingEvidence';
 import { useTranslation } from 'react-i18next';
 import { roleKey } from '@/utils/roles';
@@ -241,7 +240,8 @@ const ResultsPage = () => {
     const { data: facultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
     const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, canFilterByKafedra);
     const { data: groupsData }   = useGroups(1, 1000, '', undefined, undefined, isAdminOrTeacher);
-    const { data: subjectsData } = useSubjects(1, 1000, '', undefined, isAdminOrTeacher);
+    // Fanlar 3254 ta — filtr qidiruvi serverda; ilgari birinchi 1000 tasi edi.
+    const subjectFilter = useSubjectFilter(parsedSubject, isAdminOrTeacher);
     const { data: quizzesData }  = useQuizzes({ page: 1, limit: 1000 }, isAdminOrTeacher);
 
     const groups        = groupsData?.groups || [];
@@ -249,7 +249,6 @@ const ResultsPage = () => {
     // Кафедры не сужаем по выбранному факультету: общеобразовательные кафедры
     // (математика, физика) ведут тесты у студентов всех факультетов.
     const kafedraOptions = kafedrasData?.kafedras.map(k => ({ value: String(k.id), label: k.name })) || [];
-    const subjectOptions = subjectsData?.subjects.map(subjectOption) || [];
     const quizOptions   = quizzesData?.quizzes.map(q => ({ value: String(q.id), label: q.title })) || [];
 
     const results    = resultsData?.results || [];
@@ -482,7 +481,8 @@ const ResultsPage = () => {
             <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[160px] sm:flex-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Fan')}</label>
                 <Combobox
-                    options={subjectOptions}
+                    options={subjectFilter.options}
+                    onSearchChange={subjectFilter.onSearch}
                     value={selectedSubject}
                     onChange={setSelectedSubject}
                     placeholder={t("Barcha fanlar")}

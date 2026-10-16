@@ -6,16 +6,12 @@ import { Input } from '@/components/ui/Input';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Search } from 'lucide-react';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
-import { useSubjects } from '@/hooks/useSubjects';
+import { useSubjectFilter } from '@/hooks/useSubjects';
 import { useGroups } from '@/hooks/useGroups';
 import { useTeacherOptions } from '@/hooks/useTeachers';
-import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { FILTER_PAGE_SIZE, withSelected } from '@/utils/filterOptions';
-import { subjectOption } from '@/utils/subject';
 
 const ActiveQuizzesPage = () => {
     const { hasPermission } = useAuth();
@@ -49,46 +45,23 @@ const ActiveQuizzesPage = () => {
         sortDir,
     );
 
-    // Ikkita alohida so'rov, ataylab:
-    //  * `allSubjectsData` — jadvalda fan NOMINI ko'rsatish uchun
-    //    (`getSubjectName`). Quiz javobida faqat `subject_id` bor,
-    //    shuning uchun nomlar ro'yxatdan qidiriladi va uni qisqartirib
-    //    bo'lmaydi: qatorlarda «-» chiqib qolardi.
-    //  * `subjectOptionsData` — filtr ro'yxati uchun. Fanlar 2978 ta,
-    //    hammasi yuklanmaydi; qidiruv serverga uzatiladi.
-    const { data: allSubjectsData } = useSubjects(1, 1000, '', undefined, hasPermission('read:subject'));
-    const [subjectQuery, setSubjectQuery] = useState('');
-    const debouncedSubjectQuery = useDebouncedValue(subjectQuery);
-    const { data: subjectOptionsData } = useSubjects(
-        1,
-        FILTER_PAGE_SIZE,
-        debouncedSubjectQuery,
-        undefined,
-        hasPermission('read:subject'),
-    );
+    // Fan filtri — qidiruv serverda; jadvaldagi nomlar javobning o'zidan
+    // (`subject_name`). Ilgari 1000 ta fan yuklanib, qolgan 2254 tasi
+    // jadvalda «-» va filtrda yo'q edi.
+    const subjectFilter = useSubjectFilter(filterSubjectId, hasPermission('read:subject'));
     const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
-    const allSubjects = allSubjectsData?.subjects || [];
-    // Tanlangan fan qidiruv natijasidan tushib qolsa, Combobox nom
-    // o'rniga placeholder ko'rsatardi — go'yo filtr olib tashlangandek.
-    const selectedSubjectOption = filterSubjectId
-        ? {
-              value: String(filterSubjectId),
-              label: allSubjects.find((s) => s.id === filterSubjectId)?.name ?? `#${filterSubjectId}`,
-          }
-        : null;
-    const subjectOptions = withSelected(
-        (subjectOptionsData?.subjects || []).map(subjectOption),
-        selectedSubjectOption,
-    );
     const allGroups = allGroupsData?.groups || [];
     const allTeachers = allTeachersData ?? [];
 
-    const getSubjectName = (id?: number) => allSubjects.find((s: Subject) => s.id === id)?.name || '-';
-    const getGroupName = (id?: number) => allGroups.find((g: Group) => g.id === id)?.name || '-';
+    // Nomlar javobning o'zidan (`subject_name` / `group_name`); guruhlar
+    // ro'yxati — zaxira.
+    const getSubjectName = (id?: number) => quizzes.find((q) => q.subject_id === id)?.subject_name || '-';
+    const getGroupName = (id?: number) =>
+        quizzes.find((q) => q.group_id === id)?.group_name || allGroups.find((g: Group) => g.id === id)?.name || '-';
 
     const clearFilters = () => {
         setFilterSubjectId(undefined);
@@ -124,9 +97,8 @@ const ActiveQuizzesPage = () => {
             />
 
             <QuizFilters
-                subjects={allSubjects}
-                subjectOptions={subjectOptions}
-                onSubjectSearchChange={setSubjectQuery}
+                subjectOptions={subjectFilter.options}
+                onSubjectSearchChange={subjectFilter.onSearch}
                 groups={allGroups}
                 teachers={allTeachers}
                 filterSubjectId={filterSubjectId}

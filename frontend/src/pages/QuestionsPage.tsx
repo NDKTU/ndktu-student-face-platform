@@ -22,7 +22,7 @@ import {
     useBulkDeleteQuestions,
     useDownloadQuestionsExcel,
 } from '@/hooks/useQuestions';
-import { useSubjects } from '@/hooks/useSubjects';
+import { useSubjectFilter } from '@/hooks/useSubjects';
 import { useTeacherOptions } from '@/hooks/useTeachers';
 import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
@@ -35,7 +35,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableEmp
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { formatDate } from '@/utils/date';
-import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
 
 export const QuestionsPage = () => {
@@ -95,7 +94,10 @@ export const QuestionsPage = () => {
         refetch: refetchQuestions,
     } = useQuestions(currentPage, pageSize, debouncedSearch, parsedSubjectId, effectiveOwnerUserId);
 
-    const { data: subjectsData } = useSubjects(1, 500);
+    // Fanlar 3254 ta: filtr qidiruvi serverda, jadvaldagi nom — javobdan
+    // (`question.subject_name`). Ilgari birinchi 500 ta fan yuklanardi —
+    // qolganlari filtrda yo'q, jadvalda «Fan #id» edi.
+    const subjectFilter = useSubjectFilter(parsedSubjectId);
     const { data: teachersData } = useTeacherOptions(undefined, !isTeacher && hasPermission('read:teacher'));
 
     const deleteQuestionMutation = useDeleteQuestion();
@@ -105,7 +107,6 @@ export const QuestionsPage = () => {
     const questions = questionsData?.questions || [];
     const totalPages = questionsData ? Math.ceil(questionsData.total / pageSize) : 1;
     const totalCount = questionsData?.total ?? questions.length;
-    const subjects = subjectsData?.subjects || [];
     const teachers = teachersData ?? [];
 
     const activeFilterCount =
@@ -146,10 +147,10 @@ export const QuestionsPage = () => {
         setSearchParams(nextParams);
     };
 
-    const subjectOptions = useMemo(() => {
-        const list = subjects.map(subjectOption);
-        return [{ value: 'all', label: t('Barcha fanlar') }, ...list];
-    }, [subjects, t]);
+    const subjectOptions = useMemo(
+        () => [{ value: 'all', label: t('Barcha fanlar') }, ...subjectFilter.options],
+        [subjectFilter.options, t],
+    );
 
     const teacherOptions = useMemo(() => {
         const list = teachers.map((t) => ({
@@ -159,10 +160,9 @@ export const QuestionsPage = () => {
         return [{ value: 'all', label: t("Barcha o'qituvchilar") }, ...list];
     }, [teachers, t]);
 
-    const getSubjectName = (subId?: number | null) => {
-        if (!subId) return t('Fan biriktirilmagan');
-        const s = subjects.find((item) => item.id === subId);
-        return s ? s.name : `Fan #${subId}`;
+    const getSubjectName = (question: Pick<Question, 'subject_id' | 'subject_name'>) => {
+        if (!question.subject_id) return t('Fan biriktirilmagan');
+        return question.subject_name || `Fan #${question.subject_id}`;
     };
 
     const handleCreateQuestion = () => navigate('/questions/create');
@@ -291,6 +291,7 @@ export const QuestionsPage = () => {
                         <div className="w-full sm:w-[220px]">
                             <Combobox
                                 options={subjectOptions}
+                                onSearchChange={subjectFilter.onSearch}
                                 value={selectedSubject}
                                 onChange={handleSubjectChange}
                                 placeholder={t("Fan bo'yicha saralash")}
@@ -415,7 +416,7 @@ export const QuestionsPage = () => {
                                     {/* Fan */}
                                     <TableCell className="hidden md:table-cell">
                                         <span className="badge badge-primary text-xs">
-                                            {getSubjectName(question.subject_id)}
+                                            {getSubjectName(question)}
                                         </span>
                                     </TableCell>
 
@@ -469,7 +470,7 @@ export const QuestionsPage = () => {
                     <div className="space-y-4">
                         <div>
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                Fan: {getSubjectName(selectedQuestion.subject_id)}
+                                Fan: {getSubjectName(selectedQuestion)}
                             </span>
                             <div
                                 className="mt-2 text-base font-semibold text-foreground bg-muted/40 p-4 rounded-xl border border-border"
@@ -535,7 +536,6 @@ export const QuestionsPage = () => {
             <QuestionExcelUploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
-                subjects={subjects}
                 onSuccess={() => {
                     setIsUploadModalOpen(false);
                     refetchQuestions();

@@ -7,9 +7,8 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useUploadQuestions, useDownloadQuestionsExcelTemplate } from '@/hooks/useQuestions';
 import { useTranslation } from 'react-i18next';
 import type { ControlType } from '@/services/questionService';
-import type { Subject } from '@/services/subjectService';
-import { subjectOption } from '@/utils/subject';
 import { formatSize } from '@/utils/fileSize';
+import { useSubjectFilter } from '@/hooks/useSubjects';
 
 /**
  * Oynada ko'rsatiladigan namuna. Ustun nomlari serverdagi shablon bilan bir
@@ -27,7 +26,6 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
-    subjects: Subject[];
     defaultSubjectId?: number;
     /**
      * Fan qat'iy belgilangan (dars sahifasidan kelingan) — tanlash o'rniga
@@ -52,7 +50,6 @@ export const QuestionExcelUploadModal = ({
     isOpen,
     onClose,
     onSuccess,
-    subjects,
     defaultSubjectId,
     lockSubject = false,
     subjectName,
@@ -66,6 +63,9 @@ export const QuestionExcelUploadModal = ({
     const uploadMutation = useUploadQuestions();
     const templateMutation = useDownloadQuestionsExcelTemplate();
     const { t } = useTranslation();
+    // Fanlar 3254 ta: ro'yxat serverda qidiriladi. Ilgari sahifa birinchi 500
+    // tasini berardi — qolgan fanlarga Excel'dan savol yuklab bo'lmasdi.
+    const subjectFilter = useSubjectFilter(subjectId ? Number(subjectId) : undefined, isOpen, subjectName);
 
     useEffect(() => {
         setSubjectId(defaultSubjectId ? String(defaultSubjectId) : '');
@@ -93,7 +93,7 @@ export const QuestionExcelUploadModal = ({
     };
 
     const resolvedName =
-        subjectName ?? subjects.find((s) => String(s.id) === subjectId)?.name ?? (subjectId ? `#${subjectId}` : '');
+        subjectName ?? subjectFilter.options.find((o) => o.value === subjectId)?.label ?? (subjectId ? `#${subjectId}` : '');
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Excel dan savollar import qilish">
@@ -106,7 +106,8 @@ export const QuestionExcelUploadModal = ({
                         </p>
                     ) : (
                         <Combobox
-                            options={subjects.map(subjectOption)}
+                            options={subjectFilter.options}
+                            onSearchChange={subjectFilter.onSearch}
                             value={subjectId}
                             onChange={setSubjectId}
                             placeholder="Fan tanlang"

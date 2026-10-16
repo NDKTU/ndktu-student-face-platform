@@ -492,7 +492,6 @@ export default function LessonDetailPage() {
             <QuestionExcelUploadModal
                 isOpen={excelOpen}
                 onClose={() => setExcelOpen(false)}
-                subjects={[]}
                 defaultSubjectId={lessonSubjectId}
                 subjectName={lessonSubjectName}
                 lockSubject

@@ -3,15 +3,12 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Button } from '@/components/ui/Button';
 import { X } from 'lucide-react';
 import PermissionGate from '@/components/auth/PermissionGate';
-import type { Subject } from '@/services/subjectService';
 import type { Group } from '@/services/groupService';
 import type { TeacherOption } from '@/services/teacherService';
 import type { Faculty } from '@/services/facultyService';
-import { subjectOption } from '@/utils/subject';
 import { useTranslation } from 'react-i18next';
 
 interface QuizFiltersProps {
-    subjects: Subject[];
     groups: Group[];
     teachers: TeacherOption[];
     /** Фильтр по факультету — только на странице со сплошным списком тестов. */
@@ -20,11 +17,10 @@ interface QuizFiltersProps {
     onFacultyChange?: (id: number | undefined) => void;
     filterSubjectId: number | undefined;
     onSubjectChange: (id: number | undefined) => void;
-    /** Fanlar 2978 ta — bir sahifaga sig'maydi, shuning uchun qidiruv serverga
-     *  uzatiladi. `subjects` esa jadvalda nom ko'rsatish uchun qoladi.
-     *  Ikkalasi berilmasa Combobox yuklangan ro'yxat ichida filtrlaydi. */
-    subjectOptions?: { value: string; label: string }[];
-    onSubjectSearchChange?: (query: string) => void;
+    /** Fanlar 3254 ta — bir sahifaga sig'maydi: qidiruv serverda
+     *  (`useSubjectFilter`), ro'yxatda faqat natija va tanlangan fan. */
+    subjectOptions: { value: string; label: string }[];
+    onSubjectSearchChange: (query: string) => void;
     filterGroupId: number | undefined;
     onGroupChange: (id: number | undefined) => void;
     filterUserId: number | undefined;
@@ -42,7 +38,6 @@ const selectClassName =
     'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export const QuizFilters = ({
-    subjects,
     groups,
     teachers,
     faculties,
@@ -87,7 +82,7 @@ export const QuizFilters = ({
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">{t("Fan bo'yicha filtri")}</label>
                             <Combobox
-                                options={subjectOptions ?? subjects.map(subjectOption)}
+                                options={subjectOptions}
                                 value={filterSubjectId?.toString()}
                                 onSearchChange={onSubjectSearchChange}
                                 onChange={(val) => onSubjectChange(val ? parseInt(val) : undefined)}
