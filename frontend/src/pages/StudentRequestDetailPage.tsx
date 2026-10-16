@@ -22,6 +22,7 @@ import {
     RequestStatusBadge,
 } from '@/components/royd/RequestStatusBadge';
 import type { RequestStatus } from '@/services/roydService';
+import { formatDateTime } from '@/utils/date';
 
 /**
  * Talaba ko'radigan yo'l. `returned` va `rejected` bu qatorda yo'q: ular
@@ -165,7 +166,7 @@ const StudentRequestDetailPage = () => {
                         )}
                         <p className="text-xs text-muted-foreground">
                             {data.answer.answered_by_name || t('Xodim')} ·{' '}
-                            {new Date(data.answer.answered_at).toLocaleString()}
+                            {formatDateTime(data.answer.answered_at)}
                         </p>
                     </CardContent>
                 </Card>

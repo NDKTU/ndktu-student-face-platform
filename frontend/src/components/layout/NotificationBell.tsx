@@ -10,6 +10,7 @@ import {
     useUnreadCount,
 } from '@/hooks/useNotifications';
 import type { Notification } from '@/services/notificationService';
+import { formatDateTime } from '@/utils/date';
 
 /**
  * Qo'ng'iroqcha: o'qilmagan bildirishnomalar soni va ro'yxati.
@@ -137,7 +138,7 @@ export const NotificationBell = () => {
                                                 </span>
                                             )}
                                             <span className="text-[11px] text-muted-foreground">
-                                                {new Date(notification.created_at).toLocaleString()}
+                                                {formatDateTime(notification.created_at)}
                                             </span>
                                         </button>
                                     </li>

@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCreateRoydRequest, useRoydCatalog, useRoydRequests } from '@/hooks/useRoyd';
 import { apiErrorMessage } from '@/utils/apiError';
 import { REQUEST_STATUS_LABEL, RequestStatusBadge } from '@/components/royd/RequestStatusBadge';
+import { formatDate } from '@/utils/date';
 
 const PAGE_SIZE = 15;
 
@@ -149,7 +150,7 @@ const StudentRequestsPage = () => {
                                         <p className="mt-1 truncate font-medium">{item.title}</p>
                                     </div>
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                        {new Date(item.created_at).toLocaleDateString()}
+                                        {formatDate(item.created_at)}
                                     </span>
                                 </button>
                             ))}
