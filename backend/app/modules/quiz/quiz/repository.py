@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime, timezone
 
-from core.config import settings
-from fastapi import HTTPException, status
 from sqlalchemy import and_, asc, case, desc, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -31,6 +29,7 @@ from .schemas import (
     QuizQuestionAnalytics,
 )
 from app.core.utils.roles import user_is_admin, user_is_student, user_is_teacher
+from app.core.errors import AppError, Conflict, Forbidden, NotFound, Unprocessable
 
 logger = logging.getLogger(__name__)
 
@@ -238,18 +237,12 @@ class QuizRepository:
         )
         return (await session.execute(stmt)).scalar() or 0
 
-    def _not_enough_questions(self, available: int, requested: int) -> HTTPException:
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "not_enough_questions",
-                "available": available,
-                "requested": requested,
-                "message": (
-                    f"Testni faollashtirish uchun savollar yetarli emas: "
-                    f"{available} ta savol mavjud, {requested} ta talab qilingan."
-                ),
-            },
+    def _not_enough_questions(self, available: int, requested: int) -> AppError:
+        return Conflict(
+            "not_enough_questions",
+            f"Testni faollashtirish uchun savollar yetarli emas: "
+            f"{available} ta savol mavjud, {requested} ta talab qilingan.",
+            available=available, requested=requested,
         )
 
     async def build_title(
@@ -309,7 +302,7 @@ class QuizRepository:
             )
         ).first()
         if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+            raise NotFound("lesson_not_found", "Lesson not found")
         group_id, subject_id, lecturer_user_id = row
         # Dars butun kursniki bo'lsa (`group_id` bo'sh), guruhni bu yerdan
         # olib bo'lmaydi — test qaysi guruhga topshirilishini o'qituvchi o'zi
@@ -335,15 +328,12 @@ class QuizRepository:
         if data.quiz_type != QuizType.MIDTERM:
             return data
         if data.course_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Oraliq nazorat kursga biriktirilishi kerak",
-            )
+            raise Unprocessable("midterm_course_required", "Oraliq nazorat kursga biriktirilishi kerak")
         course = await session.get(Course, data.course_id)
         if course is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         if current_user is not None and not await can_manage(session, course, current_user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+            raise Forbidden("course_not_assigned", "Bu kurs sizga biriktirilmagan")
 
         if data.lesson_ids:
             data.lesson_ids = list(dict.fromkeys(data.lesson_ids))
@@ -355,10 +345,7 @@ class QuizRepository:
                 )
             ).scalar() or 0
             if found != len(data.lesson_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Tanlangan darslar bu kursga tegishli emas",
-                )
+                raise Unprocessable("lessons_not_in_course", "Tanlangan darslar bu kursga tegishli emas")
 
         if data.group_id is not None:
             in_course = await session.scalar(
@@ -367,10 +354,7 @@ class QuizRepository:
                 )
             )
             if in_course is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Guruh bu kursga tegishli emas",
-                )
+                raise Unprocessable("group_not_in_course", "Guruh bu kursga tegishli emas")
 
         # Nom turidan yasaladi — o'qituvchi yozgan nom e'tiborga olinmaydi.
         # Tursiz eski testda (tahrirlash) nom o'zgarmaydi.
@@ -521,10 +505,7 @@ class QuizRepository:
         data = await self._fill_from_course(session, data, current_user)
         is_midterm = data.quiz_type == QuizType.MIDTERM
         if is_midterm and data.control_type is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Nazorat turini tanlang",
-            )
+            raise Unprocessable("control_type_required", "Nazorat turini tanlang")
 
         # Проверяем банк только при активации. Неактивный тест организатор вправе
         # подготовить заранее, пока лектор ещё грузит вопросы; экзаменом он
@@ -606,11 +587,9 @@ class QuizRepository:
             await session.commit()
             await session.refresh(new_quiz)
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
         await self._attach_midterm_info(session, [new_quiz])
         return new_quiz
 
@@ -624,7 +603,7 @@ class QuizRepository:
         quiz = result.scalar_one_or_none()
 
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise NotFound("quiz_not_found", "Quiz not found")
 
         self._attach_names([quiz])
         await self._attach_midterm_info(session, [quiz])
@@ -688,7 +667,7 @@ class QuizRepository:
         """
         lesson = await session.get(Lesson, lesson_id)
         if lesson is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
+            raise NotFound("lesson_not_found", "Dars topilmadi")
 
         quizzes = (
             (await session.execute(select(Quiz.id, Quiz.group_id).where(Quiz.lesson_id == lesson_id)))
@@ -915,7 +894,7 @@ class QuizRepository:
         quiz = result.scalar_one_or_none()
 
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise NotFound("quiz_not_found", "Quiz not found")
 
         # Oraliq nazorat turini umumiy tahrirlash oynasi bilmaydi va boshqa
         # tur yuborishi mumkin — u baribir kurs testi bo'lib qoladi.
@@ -948,15 +927,10 @@ class QuizRepository:
         # остался бы собран из банка прежнего. Пересборка набора вопросов затёрла бы
         # уже выданные попытки, поэтому правильный путь — создать тест заново.
         if data.lecturer_id is not None and quiz.lecturer_id is not None and data.lecturer_id != quiz.lecturer_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "lecturer_change_forbidden",
-                    "message": (
-                        "Testni yaratgandan keyin o'qituvchini o'zgartirish mumkin emas: "
-                        "savollar uning bankidan yig'ilgan. Yangi test yarating."
-                    ),
-                },
+            raise Conflict(
+                "lecturer_change_forbidden",
+                "Testni yaratgandan keyin o'qituvchini o'zgartirish mumkin emas: "
+                "savollar uning bankidan yig'ilgan. Yangi test yarating.",
             )
 
         # Заполнить пустого лектора у старого теста можно — это не меняет уже
@@ -1031,14 +1005,14 @@ class QuizRepository:
         """
         quiz = await session.get(Quiz, quiz_id)
         if quiz is None or quiz.quiz_type != QuizType.MIDTERM.value:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oraliq nazorat topilmadi")
+            raise NotFound("midterm_not_found", "Oraliq nazorat topilmadi")
         course = await session.get(Course, quiz.course_id) if quiz.course_id else None
         if course is None or not await can_manage(session, course, current_user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+            raise Forbidden("course_not_assigned", "Bu kurs sizga biriktirilmagan")
 
         question = await session.get(Question, question_id)
         if question is None or question.lesson_id is not None or question.control_type is not None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savol topilmadi")
+            raise NotFound("question_not_found", "Savol topilmadi")
 
         await session.execute(
             QuizQuestion.__table__.delete().where(
@@ -1062,20 +1036,20 @@ class QuizRepository:
         quiz = result.scalar_one_or_none()
 
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise NotFound("quiz_not_found", "Quiz not found")
 
         if not force:
             result_count = (
                 await session.execute(select(func.count(Result.id)).where(Result.quiz_id == quiz_id))
             ).scalar() or 0
             if result_count > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu testni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
-                        "warnings": [f"{result_count} ta talaba natijalari (ballari) butunlay o'chib ketadi"],
-                    },
+                # `requires_confirmation` va `warnings` — `detail` ichida qoladi:
+                # frontend (`CourseAssignments`) ikkinchi bosishda `force` yuboradi.
+                raise Conflict(
+                    "quiz_has_results",
+                    "Ushbu testni o'chirish quyidagi bog'langan ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True,
+                    warnings=[f"{result_count} ta talaba natijalari (ballari) butunlay o'chib ketadi"],
                 )
 
         # Cascade-delete all results linked to this quiz before deleting the quiz
@@ -1096,7 +1070,7 @@ class QuizRepository:
         quiz = result.scalar_one_or_none()
 
         if not quiz:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
+            raise NotFound("quiz_not_found", "Quiz not found")
 
         new_quiz = Quiz(
             title=quiz.title,
@@ -1140,11 +1114,9 @@ class QuizRepository:
             await session.commit()
             await session.refresh(new_quiz)
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
         return new_quiz
 
     async def upload_image(self, session: AsyncSession, file, current_user) -> str:

@@ -4,7 +4,7 @@ import re
 import uuid
 
 from core.config import settings
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -40,6 +40,7 @@ from .schemas import (
     SubmissionUserInfo,
 )
 from app.core.utils.roles import user_is_admin, user_is_student
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound, Unprocessable
 
 logger = logging.getLogger(__name__)
 
@@ -113,11 +114,11 @@ class HomeworkRepository:
         stmt = select(Course).where(Course.id == course_id)
         course = (await session.execute(stmt)).scalar_one_or_none()
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise NotFound("course_not_found", "Course not found")
         if not await can_manage(session, course, user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Faqat kurs oʻqituvchilari yoki admin uy vazifasini boshqara oladi",
+            raise Forbidden(
+                "homework_manage_forbidden",
+                "Faqat kurs oʻqituvchilari yoki admin uy vazifasini boshqara oladi",
             )
         return course
 
@@ -148,7 +149,7 @@ class HomeworkRepository:
         if not await self._is_restricted_student(user):
             return
         if course_id not in await self._visible_course_ids(session, user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not in this Course")
+            raise Forbidden("course_access_denied", "Not in this Course")
 
     async def _bulk_stats(self, session: AsyncSession, items: list[Homework]) -> dict[int, HomeworkStats]:
         """Barcha vazifalar statistikasi ikkita so'rovda.
@@ -320,9 +321,9 @@ class HomeworkRepository:
             stmt = stmt.where(Homework.id != exclude_homework_id)
         existing = (await session.execute(stmt.limit(1))).scalar_one_or_none()
         if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Bu dars uchun uy vazifasi allaqachon mavjud — uni tahrirlang yoki o'chiring",
+            raise Conflict(
+                "homework_exists_for_lesson",
+                "Bu dars uchun uy vazifasi allaqachon mavjud — uni tahrirlang yoki o'chiring",
             )
 
     async def create_homework(
@@ -362,7 +363,7 @@ class HomeworkRepository:
     ) -> HomeworkResponse:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
         if data.lesson_id is not None and data.lesson_id != a.lesson_id:
             await self._ensure_lesson_free(session, data.lesson_id, exclude_homework_id=a.id)
@@ -401,16 +402,13 @@ class HomeworkRepository:
     async def delete_homework(self, session: AsyncSession, homework_id: int, current_user: User) -> None:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
         has_submission = (await session.execute(
             select(HomeworkSubmission.id).where(HomeworkSubmission.homework_id == homework_id).limit(1)
         )).scalar_one_or_none()
         if has_submission is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Talabalar javob yuklagan vazifani o'chirib bo'lmaydi",
-            )
+            raise Conflict("homework_has_submissions", "Talabalar javob yuklagan vazifani o'chirib bo'lmaydi")
         await sync_usages(session, entity_type="homework", entity_id=a.id, urls=[])
         await session.delete(a)
         await session.commit()
@@ -418,7 +416,7 @@ class HomeworkRepository:
     async def get_homework(self, session: AsyncSession, homework_id: int, current_user: User) -> HomeworkResponse:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
 
         await self._ensure_course_access(session, a.course_id, current_user)
 
@@ -555,7 +553,7 @@ class HomeworkRepository:
         """
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._ensure_course_access(session, a.course_id, current_user)
 
         existing = (await session.execute(
@@ -567,28 +565,19 @@ class HomeworkRepository:
         # Rad etilgan yoki qayta topshirishga qaytarilgan ishga yangi fayl
         # yuklash mumkin — qolgan hollarda topshirilgan ish o'zgarmaydi.
         if existing is not None and existing not in REOPENED_STATUSES:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_ALREADY_SUBMITTED)
+            raise Conflict("homework_already_submitted", _ALREADY_SUBMITTED)
 
         if not a.allow_file:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Bu vazifaga fayl biriktirib bo'lmaydi",
-            )
+            raise Invalid("homework_file_not_allowed", "Bu vazifaga fayl biriktirib bo'lmaydi")
         if not file.filename:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File name is empty")
+            raise Invalid("file_name_empty", "File name is empty")
 
         ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
         if ext not in _ALLOWED_EXTS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type: .{ext}",
-            )
+            raise Invalid("file_type_not_supported", f"Unsupported file type: .{ext}", ext=ext)
         allowed = _expand_allowed_types(a.allowed_file_types)
         if allowed and ext not in allowed:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ruxsat etilmagan fayl turi: .{ext}",
-            )
+            raise Invalid("file_type_not_allowed", f"Ruxsat etilmagan fayl turi: .{ext}", ext=ext)
 
         max_size = _SUBMISSION_MAX
         upload_dir = settings.homework_submission_upload_dir
@@ -601,9 +590,9 @@ class HomeworkRepository:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
                     if size > max_size:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Fayl hajmi {max_size // (1024 * 1024)} MB dan oshmasligi kerak",
+                        raise Invalid(
+                            "file_too_large",
+                            f"Fayl hajmi {max_size // (1024 * 1024)} MB dan oshmasligi kerak",
                         )
                     buffer.write(chunk)
         except Exception:
@@ -622,7 +611,7 @@ class HomeworkRepository:
     ) -> SubmissionResponse:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
 
         await self._ensure_course_access(session, a.course_id, current_user)
 
@@ -632,47 +621,29 @@ class HomeworkRepository:
         )
         sub = (await session.execute(existing_stmt)).scalar_one_or_none()
         if sub is not None and sub.status not in REOPENED_STATUSES:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_ALREADY_SUBMITTED)
+            raise Conflict("homework_already_submitted", _ALREADY_SUBMITTED)
 
         text = (data.submitted_text or "").strip() or None
         if text and not a.allow_text:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Bu vazifani matn bilan topshirib bo'lmaydi",
-            )
+            raise Invalid("homework_text_not_allowed", "Bu vazifani matn bilan topshirib bo'lmaydi")
         if data.submitted_files and not a.allow_file:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Bu vazifaga fayl biriktirib bo'lmaydi",
-            )
+            raise Invalid("homework_file_not_allowed", "Bu vazifaga fayl biriktirib bo'lmaydi")
         if not text and not data.submitted_files:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Javob bo'sh: matn yozing yoki fayl biriktiring",
-            )
+            raise Invalid("homework_answer_empty", "Javob bo'sh: matn yozing yoki fayl biriktiring")
         if len(data.submitted_files) > _SUBMISSION_MAX_FILES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Bitta vazifaga faqat bitta fayl biriktirish mumkin",
-            )
+            raise Invalid("homework_single_file_only", "Bitta vazifaga faqat bitta fayl biriktirish mumkin")
         allowed = _expand_allowed_types(a.allowed_file_types)
         if allowed:
             for f in data.submitted_files:
                 ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
                 if ext not in allowed:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Ruxsat etilmagan fayl turi: .{ext}",
-                    )
+                    raise Invalid("file_type_not_allowed", f"Ruxsat etilmagan fayl turi: .{ext}", ext=ext)
 
         # Talaba faylni faqat o'z qurilmasidan yuklaydi — «Fayllar
         # kutubxonasi»dagi yoki begona havola javobga kirmaydi.
         for f in data.submitted_files:
             if not _is_device_upload(f.url):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Faylni o'z qurilmangizdan yuklang",
-                )
+                raise Invalid("homework_file_not_own", "Faylni o'z qurilmangizdan yuklang")
 
         now = _utcnow()
         deadline = a.deadline.replace(tzinfo=None) if a.deadline.tzinfo else a.deadline
@@ -737,7 +708,7 @@ class HomeworkRepository:
     ) -> SubmissionListResponse:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
         stmt = (
@@ -780,7 +751,7 @@ class HomeworkRepository:
     ) -> SubmissionResponse:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
         stmt = select(HomeworkSubmission).where(
@@ -789,13 +760,10 @@ class HomeworkRepository:
         )
         sub = (await session.execute(stmt)).scalar_one_or_none()
         if not sub:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+            raise NotFound("submission_not_found", "Submission not found")
 
         if data.grade > a.max_grade:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Grade exceeds max_grade ({a.max_grade})",
-            )
+            raise Invalid("grade_exceeds_max", f"Grade exceeds max_grade ({a.max_grade})", max_grade=a.max_grade)
 
         sub.grade = data.grade
         sub.feedback = data.feedback
@@ -819,7 +787,7 @@ class HomeworkRepository:
     ) -> tuple[Homework, HomeworkSubmission]:
         a = (await session.execute(select(Homework).where(Homework.id == homework_id))).scalar_one_or_none()
         if not a:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Homework not found")
+            raise NotFound("homework_not_found", "Homework not found")
         await self._check_course_owner(session, a.course_id, current_user)
 
         sub = (
@@ -831,7 +799,7 @@ class HomeworkRepository:
             )
         ).scalar_one_or_none()
         if not sub:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+            raise NotFound("submission_not_found", "Submission not found")
         return a, sub
 
     async def _reload(self, session: AsyncSession, sub_id: int) -> SubmissionResponse:
@@ -876,22 +844,17 @@ class HomeworkRepository:
         """
         a, sub = await self._load_for_review(session, homework_id, user_id, current_user)
         if sub.status not in _HANDED_IN:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Bu ish allaqachon talabaga qaytarilgan",
-            )
+            raise Conflict("submission_already_returned", "Bu ish allaqachon talabaga qaytarilgan")
         used = len(sub.attempts or []) + 1
         if used >= a.max_attempts:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Urinishlar tugagan: {used} / {a.max_attempts}",
+            raise Conflict(
+                "homework_attempts_exhausted",
+                f"Urinishlar tugagan: {used} / {a.max_attempts}",
+                used=used, max_attempts=a.max_attempts,
             )
         comment = (data.comment or "").strip()
         if sub.grade is None and len(comment) < 3:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Baholanmagan ishni qaytarishda sababni yozing",
-            )
+            raise Unprocessable("return_reason_required", "Baholanmagan ishni qaytarishda sababni yozing")
 
         sub.status = "returned"
         if comment:

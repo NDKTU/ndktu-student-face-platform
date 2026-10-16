@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import httpx
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import and_, delete, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -91,6 +91,7 @@ from .schemas import (
     UserListRequest,
 )
 from app.core.utils.roles import user_is_admin
+from app.core.errors import AppError, Conflict, Forbidden, Gone, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,8 @@ IN_PROGRESS = "in_progress"
 COMPLETED = "completed"
 
 
-def _not_found(what: str = "Test") -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} topilmadi")
+def _not_found(what: str = "Test") -> AppError:
+    return NotFound("not_found", f"{what} topilmadi", what=what)
 
 
 #: Redis kalitlari prefiksi: `Result` id lari bilan to'qnashmasin.
@@ -131,12 +132,9 @@ def _face_grant_key(attempt_id: int) -> str:
     return f"gtest:face-ok:{attempt_id}"
 
 
-def _closed_left_page(reason: str) -> HTTPException:
+def _closed_left_page(reason: str) -> AppError:
     """Qat'iy testda urinish yopildi — kod `quiz_process/errors.py` dagi bilan bir xil."""
-    return HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail={"code": "attempt_closed_left_page", "message": f"Test yopildi: {reason.lower()}", "reason": reason},
-    )
+    return Conflict("attempt_closed_left_page", f"Test yopildi: {reason.lower()}", reason=reason)
 
 
 def _new_pin() -> str:
@@ -162,41 +160,27 @@ def _is_expired(attempt: GeneralTestAttempt, test: GeneralTest) -> bool:
 _LOCKED_WHILE_TAKEN = ("option_a", "option_b", "option_c", "option_d", "correct_option")
 
 
-def _question_in_use(count: int) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail={
-            "code": "general_test_question_in_use",
-            "message": f"Bu savol hozir {count} ta talabaning testida — test tugagach o'chiring",
-            "attempts": count,
-        },
+def _question_in_use(count: int) -> AppError:
+    return Conflict(
+        "general_test_question_in_use",
+        f"Bu savol hozir {count} ta talabaning testida — test tugagach o'chiring",
+        attempts=count,
     )
 
 
-def _question_locked(count: int) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail={
-            "code": "general_test_question_locked",
-            "message": (
-                f"Bu savol hozir {count} ta talabaning testida — variantlar va to'g'ri javobni "
-                "test tugagach o'zgartiring. Savol matnini tuzatish mumkin"
-            ),
-            "attempts": count,
-        },
+def _question_locked(count: int) -> AppError:
+    return Conflict(
+        "general_test_question_locked",
+        f"Bu savol hozir {count} ta talabaning testida — variantlar va to'g'ri javobni "
+        "test tugagach o'zgartiring. Savol matnini tuzatish mumkin",
+        attempts=count,
     )
 
 
-def _question_deleted() -> HTTPException:
+def _question_deleted() -> AppError:
     # 410, 409 emas: frontend 409 da butun urinishni yakunlaydi, bu yerda esa
     # faqat shu savol yo'qolgan — qolganlariga javob berishda davom etadi.
-    return HTTPException(
-        status_code=status.HTTP_410_GONE,
-        detail={
-            "code": "general_test_question_deleted",
-            "message": "Bu savol o'qituvchi tomonidan o'chirilgan — u hisobga olinmaydi",
-        },
-    )
+    return Gone("general_test_question_deleted", "Bu savol o'qituvchi tomonidan o'chirilgan — u hisobga olinmaydi")
 
 
 def _question_snapshot(question: GeneralTestQuestion) -> dict:
@@ -316,7 +300,7 @@ class GeneralTestRepository:
     def _ensure_owner(self, obj, user: User, detail: str) -> None:
         if self._is_admin(user) or obj.created_by_user_id == user.id:
             return
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+        raise Forbidden("general_test_not_owner", detail)
 
     #: Barcha fanlarni egasidan qat'i nazar boshqarish: tahrirlash, biriktirish,
     #: test tuzish. Alohida ruxsat — `update:general_test_subject` emas: fan
@@ -368,14 +352,14 @@ class GeneralTestRepository:
             return subject
         if view and await self._sees_all(session, user):
             return subject
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu fan sizniki emas")
+        raise Forbidden("general_test_subject_not_yours", "Bu fan sizniki emas")
 
     async def _ensure_unique_name(self, session: AsyncSession, name: str, exclude_id: int | None = None) -> None:
         stmt = select(GeneralTestSubject.id).where(func.lower(GeneralTestSubject.name) == name.lower())
         if exclude_id is not None:
             stmt = stmt.where(GeneralTestSubject.id != exclude_id)
         if (await session.execute(stmt.limit(1))).scalar_one_or_none() is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bunday nomli fan allaqachon bor")
+            raise Conflict("general_test_subject_name_taken", "Bunday nomli fan allaqachon bor")
 
     async def _subject_counts(
         self, session: AsyncSession, subject_ids: list[int]
@@ -510,9 +494,9 @@ class GeneralTestRepository:
             await session.execute(select(GeneralTest.id).where(GeneralTest.subject_id == subject_id).limit(1))
         ).scalar_one_or_none()
         if has_tests is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Fanda testlar bor. Avval testlarni o'chiring yoki boshqa fanga o'tkazing",
+            raise Conflict(
+                "general_test_subject_has_tests",
+                "Fanda testlar bor. Avval testlarni o'chiring yoki boshqa fanga o'tkazing",
             )
         await session.delete(subject)
         await session.commit()
@@ -633,7 +617,7 @@ class GeneralTestRepository:
         elif data.user_ids:
             source = select(literal(subject_id), User.id).where(User.id.in_(set(data.user_ids)))
         else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Foydalanuvchi tanlanmagan")
+            raise Invalid("general_test_user_required", "Foydalanuvchi tanlanmagan")
 
         result = await session.execute(
             pg_insert(GeneralTestSubjectUser)
@@ -1125,12 +1109,12 @@ class GeneralTestRepository:
             # deb olinmaydi (excel_format.read_question_sheet).
             sheet = read_question_sheet(await file.read())
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Excel faylni o'qib bo'lmadi")
+            raise Invalid("general_test_excel_unreadable", "Excel faylni o'qib bo'lmadi")
 
         if sheet.width < 5:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Faylda kamida 5 ustun bo'lishi kerak: savol, A, B, C, D variantlar",
+            raise Invalid(
+                "general_test_excel_columns",
+                "Faylda kamida 5 ustun bo'lishi kerak: savol, A, B, C, D variantlar",
             )
 
         # Заголовки не узнаны — читаем по позиции, как и банк вопросов.
@@ -1176,7 +1160,7 @@ class GeneralTestRepository:
             order += 1
 
         if not questions:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Faylda savol topilmadi")
+            raise Invalid("general_test_excel_empty", "Faylda savol topilmadi")
 
         session.add_all(questions)
         await audit_service.record(
@@ -1456,14 +1440,14 @@ class GeneralTestRepository:
             raise _not_found()
         if not test.is_active:
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test faol emas")
+            raise Invalid("quiz_not_active", "Test faol emas")
         # PIN — только для новой попытки: вернуться в начатую можно без него.
         if test.pin is not None and (pin or "").strip() != test.pin:
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PIN kod noto'g'ri")
+            raise Forbidden("invalid_pin", "PIN kod noto'g'ri")
         if used_attempts >= test.attempt_limit:
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Urinishlar soni tugagan")
+            raise Invalid("general_test_attempts_exhausted", "Urinishlar soni tugagan")
 
         # Savollar fanning bankidan — shu fanning barcha testlari uchun bitta.
         pool = (
@@ -1473,7 +1457,7 @@ class GeneralTestRepository:
         )
         if not pool:
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu fanda savollar yo'q")
+            raise Invalid("quiz_has_no_questions", "Bu fanda savollar yo'q")
         return list(pool)
 
     # ── Yuz nazorati ─────────────────────────────────────────────────────────
@@ -1613,12 +1597,10 @@ class GeneralTestRepository:
         if attempt.status != IN_PROGRESS:
             return self._result(attempt)
         if attempt.test.proctoring_mode != "face":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda kamera nazorati yo'q")
+            raise Invalid("general_test_no_camera_control", "Bu testda kamera nazorati yo'q")
         if data.kind == "no_face" and not attempt.test.no_face_finish_seconds:
             # Sozlama o'chiq — brauzer yuz yo'qligi uchun yopmasligi kerak edi.
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Bu testda yuz ko'rinmasa yakunlash yoqilmagan"
-            )
+            raise Invalid("general_test_no_face_finish_disabled", "Bu testda yuz ko'rinmasa yakunlash yoqilmagan")
         attempt.cheating_image_url = self._save_evidence(data.image_data, attempt.test_id, user.id)
         attempt.stop_reason = CHEATING_REASONS[data.kind]
         await self._finalize(session, attempt)
@@ -1664,11 +1646,11 @@ class GeneralTestRepository:
     async def get_state(self, session: AsyncSession, attempt_id: int, user: User) -> AttemptState:
         attempt = await self._own_attempt(session, attempt_id, user)
         if attempt.status != IN_PROGRESS:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Urinish yakunlangan")
+            raise Conflict("attempt_already_finished", "Urinish yakunlangan")
         if _is_expired(attempt, attempt.test):
             await self._finalize(session, attempt)
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vaqt tugagan")
+            raise Conflict("attempt_expired", "Vaqt tugagan")
         # Test sahifasi urinishni shu yerdan oladi: ikkinchi ochilish — sahifa
         # yangilangan yoki «Davom ettirish» bosilgan, ya'ni talaba chiqqan.
         if attempt.test.strict_mode:
@@ -1689,14 +1671,14 @@ class GeneralTestRepository:
     async def answer(self, session: AsyncSession, attempt_id: int, data: AnswerRequest, user: User) -> None:
         attempt = await self._own_attempt(session, attempt_id, user)
         if attempt.status != IN_PROGRESS:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Urinish yakunlangan")
+            raise Conflict("attempt_already_finished", "Urinish yakunlangan")
         if _is_expired(attempt, attempt.test):
             await self._finalize(session, attempt)
             await session.commit()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vaqt tugagan")
+            raise Conflict("attempt_expired", "Vaqt tugagan")
         await self._require_alive(session, attempt)
         if data.question_id not in {item["q"] for item in attempt.layout}:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Savol bu urinishga tegishli emas")
+            raise Invalid("question_not_in_attempt", "Savol bu urinishga tegishli emas")
         if await session.get(GeneralTestQuestion, data.question_id) is None:
             raise _question_deleted()
 
@@ -1750,10 +1732,7 @@ class GeneralTestRepository:
         if attempt.status != IN_PROGRESS:
             return self._result(attempt)
         if not attempt.test.strict_mode:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "strict_mode_disabled", "message": "Bu testda qat'iy rejim yoqilmagan"},
-            )
+            raise Invalid("strict_mode_disabled", "Bu testda qat'iy rejim yoqilmagan")
         attempt.stop_reason = strict.leave_reason_text(data.reason)
         await self._finalize(session, attempt)
         await session.commit()
@@ -1764,7 +1743,7 @@ class GeneralTestRepository:
         """Sahifa ochiq. Muddati o'tgan heartbeat'ni tiriltirmaydi (`quiz_process` dagi kabi)."""
         attempt = await self._own_attempt(session, attempt_id, user)
         if attempt.status != IN_PROGRESS:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Urinish yakunlangan")
+            raise Conflict("attempt_already_finished", "Urinish yakunlangan")
         if attempt.test.strict_mode:
             await self._require_alive(session, attempt)
             await strict.touch(attempt.id, STRICT_KIND)

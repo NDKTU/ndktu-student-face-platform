@@ -3,7 +3,7 @@ import logging
 from core.utils.external_guard import ensure_editable
 from core.utils.lesson_guard import ensure_no_lessons
 from core.utils.sorting import order_by_clause
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import Float, asc, case, cast, desc, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,7 @@ from .schemas import (
     TeacherSubjectAssignRequest,
     TeacherUpdateRequest,
 )
+from app.core.errors import Conflict, Invalid, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +182,7 @@ class TeacherRepository:
 
         existing = (await session.execute(select(Teacher).where(Teacher.full_name == full_name))).scalar_one_or_none()
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Teacher '{full_name}' already exists",
-            )
+            raise Invalid("teacher_already_exists", f"Teacher '{full_name}' already exists")
 
         # commit=False: the User insert is part of this same transaction, so a
         # failure creating the Teacher row rolls the User insert back too and
@@ -209,11 +207,9 @@ class TeacherRepository:
         try:
             await session.commit()
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
 
         stmt = select(Teacher).options(*self._eager_load_options()).where(Teacher.id == new_teacher.id)
         result = await session.execute(stmt)
@@ -225,7 +221,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         await self._attach_courses(session, [teacher])
         return teacher
@@ -236,7 +232,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found for this user")
+            raise NotFound("teacher_not_found", "Teacher not found for this user")
 
         await self._attach_courses(session, [teacher])
         return teacher
@@ -320,10 +316,7 @@ class TeacherRepository:
                 await session.execute(select(Teacher).where(Teacher.full_name == full_name, Teacher.id != teacher.id))
             ).scalar_one_or_none()
             if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Teacher name already taken",
-                )
+                raise Invalid("teacher_name_taken", "Teacher name already taken")
 
         teacher.first_name = data.first_name
         teacher.last_name = data.last_name
@@ -337,7 +330,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         ensure_editable(teacher, "преподавателя")
 
@@ -377,7 +370,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         ensure_editable(teacher, "преподавателя")
 
@@ -416,13 +409,11 @@ class TeacherRepository:
                 if question_count > 0:
                     warnings.append(f"{question_count} ta yaratgan savollari o'chadi")
 
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "requires_confirmation": True,
-                        "message": "Ushbu o'qituvchini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
-                        "warnings": warnings,
-                    },
+                raise Conflict(
+                    "teacher_has_related_data",
+                    "Ushbu o'qituvchini o'chirish quyidagi ma'lumotlarga ta'sir qiladi:",
+                    requires_confirmation=True,
+                    warnings=warnings,
                 )
 
         # Aggressive delete
@@ -448,10 +439,7 @@ class TeacherRepository:
         except IntegrityError:
             # Poyga: tekshiruvdan keyin dars qo'shilgan bo'lishi mumkin.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot delete: teacher is referenced by other records",
-            )
+            raise Conflict("teacher_referenced", "Cannot delete: teacher is referenced by other records")
 
     async def assign_groups(self, session: AsyncSession, data: TeacherGroupAssignRequest) -> None:
         # 1. O'qituvchi kartochkasi: `TeacherGroup.teacher_id` endi `teachers.id`,
@@ -461,7 +449,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         # 2. Ro'yxatni farq bo'yicha yangilaymiz — `assign_subjects` dagidek.
         # Bu yerda hech qanday FK `teacher_group.id` ga qaramaydi, lekin jadval
@@ -484,10 +472,7 @@ class TeacherRepository:
             groups = result_groups.scalars().all()
 
             if len(groups) != len(requested):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more group_ids are invalid",
-                )
+                raise Invalid("invalid_group_ids", "One or more group_ids are invalid")
 
             # 4. Create new TeacherGroup entries
             for group_id in added_group_ids:
@@ -496,11 +481,9 @@ class TeacherRepository:
         try:
             await session.commit()
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error while assigning groups",
-            )
+            raise
 
     async def assign_subjects(self, session: AsyncSession, data: TeacherSubjectAssignRequest) -> None:
         # 1. Fetch Teacher (since TeacherSubject uses teacher_id pointing to Teacher.id)
@@ -509,7 +492,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         # 2. Ro'yxatni farq bo'yicha yangilaymiz — hammasini o'chirib qaytadan
         # yozmaymiz. Sabab: `lessons.teacher_subject_id` — RESTRICT, ya'ni
@@ -541,10 +524,7 @@ class TeacherRepository:
             subjects = result_subjects.scalars().all()
 
             if len(subjects) != len(requested):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more subject_ids are invalid",
-                )
+                raise Invalid("invalid_subject_ids", "One or more subject_ids are invalid")
 
             # 4. Create new entries
             for subject_id in added_subject_ids:
@@ -554,16 +534,14 @@ class TeacherRepository:
             await session.commit()
         except IntegrityError:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot detach: subject assignment is referenced by other records",
+            raise Conflict(
+                "subject_assignment_referenced",
+                "Cannot detach: subject assignment is referenced by other records",
             )
         except Exception:
+            # Asl xato o'z holicha ketadi: «Database error» 500 uni yashirardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error while assigning subjects",
-            )
+            raise
 
     async def get_assigned_subjects_by_user(self, session: AsyncSession, user_id: int) -> Teacher:
         stmt = (
@@ -576,10 +554,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Teacher not found for this user",
-            )
+            raise NotFound("teacher_not_found", "Teacher not found for this user")
 
         return teacher
 
@@ -598,10 +573,7 @@ class TeacherRepository:
         teacher = result.scalar_one_or_none()
 
         if not teacher:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Teacher not found for this user",
-            )
+            raise NotFound("teacher_not_found", "Teacher not found for this user")
 
         return teacher
 
@@ -654,7 +626,7 @@ class TeacherRepository:
     ) -> TeacherStudentListResponse:
         teacher = await session.get(Teacher, teacher_id)
         if not teacher:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+            raise NotFound("teacher_not_found", "Teacher not found")
 
         sources = await self._teacher_group_sources(session, teacher)
         if not sources:
@@ -696,10 +668,7 @@ class TeacherRepository:
         selected_ids = visible_ids
         if request.group_id is not None:
             if request.group_id not in visible_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Group is not assigned to this teacher",
-                )
+                raise NotFound("group_not_assigned", "Group is not assigned to this teacher")
             selected_ids = [request.group_id]
 
         conditions = [Student.group_id.in_(selected_ids)]

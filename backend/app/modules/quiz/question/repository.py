@@ -1,11 +1,9 @@
 import logging
 
-from fastapi import HTTPException, status
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import settings
 from app.core.enums import ControlType, QuizType
 from app.core.utils.course_access import can_manage
 from app.core.utils.teacher_scope import assigned_subject_ids
@@ -29,6 +27,7 @@ from .schemas import (
     QuestionTeacherSummary,
 )
 from app.core.utils.roles import user_is_admin, user_is_teacher
+from app.core.errors import Conflict, Forbidden, Invalid, NotFound, Unprocessable
 
 logger = logging.getLogger(__name__)
 
@@ -140,10 +139,7 @@ class QuestionRepository:
         if data.course_id is not None:
             course = await self._course_for_control_questions(session, data.course_id, current_user)
             if course.subject_id != data.subject_id:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Savol fani kurs faniga mos emas",
-                )
+                raise Unprocessable("question_subject_course_mismatch", "Savol fani kurs faniga mos emas")
 
         # Oraliq nazoratga yoki kursga qoʻshilayotgan savolni kurs huquqi
         # hal qiladi: assistentga fan biriktirilmagan boʻlishi mumkin.
@@ -153,9 +149,9 @@ class QuestionRepository:
             # kechikkan boʻlishi mumkin, bu esa ishlashni butunlay toʻxtatardi.
             subject_ids = await assigned_subject_ids(session, current_user)
             if subject_ids and data.subject_id not in subject_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Bu fan sizga biriktirilmagan — unga savol qoʻsholmaysiz",
+                raise Forbidden(
+                    "question_subject_not_assigned",
+                    "Bu fan sizga biriktirilmagan — unga savol qoʻsholmaysiz",
                 )
 
         new_question = Question(
@@ -184,11 +180,11 @@ class QuestionRepository:
             await session.commit()
             await session.refresh(new_question)
         except Exception:
+            # Asl xato o'z holicha ketadi: `AppError` (masalan, nazoratga
+            # bog'lashdagi 4xx) — o'z javobi bilan, qolgani — 500 va logda
+            # trace. Ilgari hammasi «Database error» 500 ga aylanardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
         return new_question
 
     async def _midterm_for_new_question(
@@ -203,15 +199,12 @@ class QuestionRepository:
             return None
         quiz = await session.get(Quiz, data.quiz_id)
         if quiz is None or quiz.quiz_type != QuizType.MIDTERM.value:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oraliq nazorat topilmadi")
+            raise NotFound("midterm_not_found", "Oraliq nazorat topilmadi")
         if quiz.subject_id != data.subject_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Savol fani oraliq nazorat faniga mos emas",
-            )
+            raise Unprocessable("question_subject_midterm_mismatch", "Savol fani oraliq nazorat faniga mos emas")
         course = await session.get(Course, quiz.course_id) if quiz.course_id else None
         if course is None or not await can_manage(session, course, current_user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+            raise Forbidden("course_not_assigned", "Bu kurs sizga biriktirilmagan")
         return quiz
 
     async def _course_for_control_questions(
@@ -220,9 +213,9 @@ class QuestionRepository:
         """Kursning «Test savollari» bilan ishlash huquqi — kursni boshqaruvchilar."""
         course = await session.get(Course, course_id)
         if course is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kurs topilmadi")
+            raise NotFound("course_not_found", "Kurs topilmadi")
         if not await can_manage(session, course, current_user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu kurs sizga biriktirilmagan")
+            raise Forbidden("course_not_assigned", "Bu kurs sizga biriktirilmagan")
         return course
 
     async def control_counts(
@@ -282,17 +275,14 @@ class QuestionRepository:
         question = result.scalar_one_or_none()
 
         if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+            raise NotFound("question_not_found", "Question not found")
 
         # Koʻrish — oʻz savoli yoki oʻzi dars beradigan fanning savoli.
         is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
             subject_ids = await assigned_subject_ids(session, current_user)
             if question.subject_id not in subject_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Bu savol sizning fanlaringizga tegishli emas",
-                )
+                raise Forbidden("question_not_in_your_subjects", "Bu savol sizning fanlaringizga tegishli emas")
 
         return question
 
@@ -422,15 +412,12 @@ class QuestionRepository:
         question = result.scalar_one_or_none()
 
         if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+            raise NotFound("question_not_found", "Question not found")
 
         # Check ownership for teachers
         is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: you can only update your own questions",
-            )
+            raise Forbidden("question_not_yours", "Access denied: you can only update your own questions")
 
         new_question = Question(
             subject_id=data.subject_id,
@@ -471,11 +458,11 @@ class QuestionRepository:
             await session.commit()
             await session.refresh(new_question)
         except Exception:
+            # Asl xato o'z holicha ketadi: `AppError` (masalan, nazoratga
+            # bog'lashdagi 4xx) — o'z javobi bilan, qolgani — 500 va logda
+            # trace. Ilgari hammasi «Database error» 500 ga aylanardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error",
-            )
+            raise
 
         return new_question
 
@@ -485,15 +472,12 @@ class QuestionRepository:
         question = result.scalar_one_or_none()
 
         if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+            raise NotFound("question_not_found", "Question not found")
 
         # Check ownership for teachers
         is_admin = user_is_admin(current_user)
         if not is_admin and question.user_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: you can only delete your own questions",
-            )
+            raise Forbidden("question_not_yours", "Access denied: you can only delete your own questions")
 
         # Testga olingan savol o'chirilmaydi. Soft delete bo'lsa ham, savol
         # testdan tushib qolardi: `start_quiz` faqat `is_active` savollarni
@@ -504,10 +488,7 @@ class QuestionRepository:
             select(QuizQuestion.id).where(QuizQuestion.question_id == question.id).limit(1)
         )
         if used is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Bu savol testga olingan — avval uni testdan chiqaring",
-            )
+            raise Conflict("question_in_quiz", "Bu savol testga olingan — avval uni testdan chiqaring")
 
         # Soft delete: the row stays (it may already be referenced by
         # user_answers) — it's just excluded from future selection.
@@ -560,10 +541,7 @@ class QuestionRepository:
         is_admin = user_is_admin(current_user)
         if not is_admin:
             if data.user_id != current_user.id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied: you can only delete your own questions",
-                )
+                raise Forbidden("question_not_yours", "Access denied: you can only delete your own questions")
 
         stmt = (
             update(Question)
@@ -603,10 +581,7 @@ class QuestionRepository:
         current_user: User | None = None,
     ) -> list[Question]:
         if (course_id is None) != (control_type is None):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Kurs va nazorat turi birga berilishi kerak",
-            )
+            raise Unprocessable("course_and_control_type_required", "Kurs va nazorat turi birga berilishi kerak")
         if course_id is not None:
             course = await self._course_for_control_questions(session, course_id, current_user)
             # Fan kursdan olinadi: savollar boshqa fan bankiga tushib qolmasin.
@@ -619,13 +594,13 @@ class QuestionRepository:
             # deb olinmaydi (excel_format.read_question_sheet).
             sheet = read_question_sheet(contents)
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Excel faylni o'qib bo'lmadi")
+            raise Invalid("excel_unreadable", "Excel faylni o'qib bo'lmadi")
 
         # Verify there are at least 5 columns
         if sheet.width < 5:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Excel file must contain at least 5 columns (question, option A, option B, option C, option D)",
+            raise Invalid(
+                "excel_columns",
+                "Excel file must contain at least 5 columns (question, option A, option B, option C, option D)",
             )
 
         # Ustunlarni avval nomi bo'yicha qidiramiz. Tanilmasa — eski, o'rni
@@ -715,11 +690,11 @@ class QuestionRepository:
                     await get_quiz_repository.link_question_to_midterms(session, question)
             await session.commit()
         except Exception:
+            # Asl xato o'z holicha ketadi: `AppError` (masalan, nazoratga
+            # bog'lashdagi 4xx) — o'z javobi bilan, qolgani — 500 va logda
+            # trace. Ilgari hammasi «Database error» 500 ga aylanardi.
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error during bulk upload",
-            )
+            raise
 
         return {"questions": questions, "warnings": warnings}
 

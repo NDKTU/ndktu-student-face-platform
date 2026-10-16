@@ -143,7 +143,9 @@ async def test_return_limited_by_max_attempts(
         f"/homework/{homework.id}/submission/{student.id}/return", json={"comment": "Yana"}
     )
     assert exhausted.status_code == 409
-    assert "3 / 3" in exhausted.json()["detail"]
+    detail = exhausted.json()["detail"]
+    assert detail["code"] == "homework_attempts_exhausted"
+    assert (detail["used"], detail["max_attempts"]) == (3, 3)
 
     sub = (
         await async_db.execute(select(HomeworkSubmission).where(HomeworkSubmission.homework_id == homework.id))

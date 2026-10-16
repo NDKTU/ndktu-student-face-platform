@@ -10,6 +10,7 @@ import { resourceService } from '@/services/resourceService';
 import { ATTEMPTS_DEFAULT, ATTEMPTS_MAX, ATTEMPTS_MIN, type Assignment, type SubmissionFile } from '@/services/assignmentService';
 import { DeadlinePicker } from '@/components/homework/DeadlinePicker';
 import { toLocalInput } from '@/components/announcement/labels';
+import { apiErrorMessage } from '@/utils/apiError';
 
 interface Props {
     isOpen: boolean;
@@ -99,8 +100,7 @@ export const AssignmentFormModal = ({
             onClose();
         } catch (cause) {
             // Bekend 409 bilan «bu darsda vazifa bor» deyishi mumkin — shu matn ko'rsatiladi.
-            const detail = (cause as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(detail || 'Vazifani saqlashda xatolik yuz berdi');
+            setError(apiErrorMessage(cause, 'Vazifani saqlashda xatolik yuz berdi'));
         } finally {
             setUploading(false);
         }
