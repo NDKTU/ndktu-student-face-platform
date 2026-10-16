@@ -16,7 +16,7 @@ import pytest_asyncio
 from app.core.config import settings
 from sqlalchemy import select
 
-from app.modules.zoom_session import repository as zoom_repository
+from app.modules.zoom_session import join as zoom_join
 from app.modules.zoom_session.model import ZoomFaceCheck
 from app.test.test_student_dashboard import _login, _user
 from app.test.test_student_teacher_scope import _student
@@ -119,7 +119,7 @@ def _fake_face(monkeypatch, *, status: str = "ok", fail: bool = False):
             "different_person": {"face_count": 1, "is_match": False, "reference_ready": True},
         }[status]
 
-    monkeypatch.setattr(zoom_repository, "verify_face", fake_verify)
+    monkeypatch.setattr(zoom_join, "verify_face", fake_verify)
     return calls
 
 
