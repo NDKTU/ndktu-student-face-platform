@@ -238,6 +238,7 @@ const ResultsPage = () => {
         useResults(resultFilters, !isAuthLoading);
 
     const { data: facultiesData } = useFaculties(1, 200, undefined, canFilterByFaculty);
+    // eslint-disable-next-line no-restricted-syntax -- kafedralar 21 ta — to'liq ro'yxat
     const { data: kafedrasData }  = useKafedras(1, 500, undefined, undefined, canFilterByKafedra);
     // Guruh va test filtrlari — qidiruv serverda (ilgari 1000 tadan yuklanardi).
     const groupFilter = useGroupFilter(parsedGroup, isAdminOrTeacher);

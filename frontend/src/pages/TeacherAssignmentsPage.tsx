@@ -43,6 +43,7 @@ export const TeacherAssignmentsPage = () => {
     );
 
     const { data, isLoading, isError, refetch } = useTeacherAssignments(params);
+    // eslint-disable-next-line no-restricted-syntax -- kafedralar 21 ta — to'liq ro'yxat
     const { data: kafedrasData } = useKafedras(1, 500, undefined, undefined, isAdmin);
 
     const kafedraOptions = useMemo(

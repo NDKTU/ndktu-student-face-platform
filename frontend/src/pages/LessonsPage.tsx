@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useLessons';
-import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
+import { useTeacherOptions, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
 import { useGroupFilter } from '@/hooks/useGroups';
 import { Button } from '@/components/ui/Button';
@@ -38,7 +38,11 @@ export default function LessonsPage() {
     const updateMutation = useUpdateLesson();
     const deleteMutation = useDeleteLesson();
 
-    const { data: teachersData } = useTeachers(1, 500, undefined, !!isAdmin && hasPermission('read:teacher'));
+    // Admin avval o'qituvchini tanlaydi (yengil ro'yxat, hammasi), keyin uning
+    // fanlarini. Ilgari `useTeachers(1, 500)` bilan hamma o'qituvchi guruh va
+    // fanlari bilan yuklanardi — 577 tadan 77 tasi ro'yxatga tushmasdi va ularga
+    // dars yaratib bo'lmasdi.
+    const { data: teacherOptionsData } = useTeacherOptions(undefined, !!isAdmin && hasPermission('read:teacher'));
     // Admin uchun guruhlar — server qidiruvi (ilgari 1000 ta yuklanardi).
     // Filtr va forma tanlovi alohida: har birida tanlangan guruh o'zi qoladi.
     const canPickAnyGroup = !(isTeacher && !isAdmin) && hasPermission('read:group');
@@ -51,20 +55,15 @@ export default function LessonsPage() {
         isTeacher && user?.id ? user.id : undefined
     );
 
-    const subjectTeacherOptions = useMemo(() => {
-        if (isTeacher && !isAdmin) {
-            return (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
+    const ownSubjectOptions = useMemo(
+        () =>
+            (assignedSubjectsData?.subject_teachers ?? []).map(st => ({
                 value: st.id.toString(),
                 label: st.subject.name,
-            }));
-        }
-        return (teachersData?.teachers ?? []).flatMap(t =>
-            (t.teacher_subjects ?? []).map(st => ({
-                value: st.id.toString(),
-                label: `${t.full_name ?? ''} / ${st.subject?.name ?? '?'}`,
-            }))
-        );
-    }, [isTeacher, isAdmin, teachersData, assignedSubjectsData]);
+            })),
+        [assignedSubjectsData],
+    );
+    const pickTeacher = !(isTeacher && !isAdmin);
 
     // O'qituvchi faqat o'z guruhlaridan tanlaydi — ro'yxat kichik, to'liq.
     const teacherGroupOptions = useMemo(
@@ -84,6 +83,25 @@ export default function LessonsPage() {
     const [formGroupId, setFormGroupId] = useState('');
     const formGroupSearch = useGroupFilter(formGroupId ? Number(formGroupId) : undefined, canPickAnyGroup);
     const formGroupOptions = canPickAnyGroup ? formGroupSearch.options : teacherGroupOptions;
+    // `teachers.id` — darsning `teacher_subject.teacher_id` bilan bir xil.
+    const [formTeacherId, setFormTeacherId] = useState('');
+    const teacherPickOptions = useMemo(
+        () =>
+            (teacherOptionsData ?? []).map(t => ({
+                value: String(t.id),
+                label: t.full_name || t.username || `#${t.id}`,
+            })),
+        [teacherOptionsData],
+    );
+    const formTeacherUserId =
+        (teacherOptionsData ?? []).find(t => String(t.id) === formTeacherId)?.user_id ?? undefined;
+    const { data: formTeacherSubjects } = useTeacherAssignedSubjects(pickTeacher ? formTeacherUserId : undefined);
+    const subjectTeacherOptions = pickTeacher
+        ? (formTeacherSubjects?.subject_teachers ?? []).map(st => ({
+              value: st.id.toString(),
+              label: st.subject.name,
+          }))
+        : ownSubjectOptions;
     const [formTopic, setFormTopic] = useState('');
     const [formDate, setFormDate] = useState('');
     const [formDescription, setFormDescription] = useState('');
@@ -93,6 +111,7 @@ export default function LessonsPage() {
 
     const openCreate = () => {
         setEditing(null);
+        setFormTeacherId('');
         setFormSubjectTeacherId('');
         setFormGroupId('');
         setFormTopic('');
@@ -104,6 +123,7 @@ export default function LessonsPage() {
 
     const openEdit = (lesson: Lesson) => {
         setEditing(lesson);
+        setFormTeacherId(lesson.teacher_subject?.teacher_id != null ? String(lesson.teacher_subject.teacher_id) : '');
         setFormSubjectTeacherId(lesson.teacher_subject_id.toString());
         // Guruhsiz dars — kursning barcha guruhlariniki; bu forma guruh
         // talab qiladi, shuning uchun bo'sh qoladi va o'qituvchi tanlaydi.
@@ -283,8 +303,22 @@ export default function LessonsPage() {
 
             <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Darsni tahrirlash' : 'Yangi dars qo\'shish'}>
                 <div className="space-y-4">
+                    {pickTeacher && (
+                        <div>
+                            <label className="text-sm font-medium block mb-1">O'qituvchi</label>
+                            <Combobox
+                                options={teacherPickOptions}
+                                value={formTeacherId}
+                                onChange={(v) => {
+                                    setFormTeacherId(v);
+                                    setFormSubjectTeacherId('');
+                                }}
+                                placeholder="Tanlang..."
+                            />
+                        </div>
+                    )}
                     <div>
-                        <label className="text-sm font-medium block mb-1">Fan / O'qituvchi</label>
+                        <label className="text-sm font-medium block mb-1">{pickTeacher ? 'Fan' : 'Fan / O\'qituvchi'}</label>
                         <Combobox
                             options={subjectTeacherOptions}
                             value={formSubjectTeacherId}

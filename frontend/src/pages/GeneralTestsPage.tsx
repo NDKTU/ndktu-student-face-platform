@@ -39,6 +39,7 @@ export default function GeneralTestsPage() {
         debounced,
         subjectId ? Number(subjectId) : undefined,
     );
+    // eslint-disable-next-line no-restricted-syntax -- elementar test fanlari — kichik ro'yxat (hozir 2 ta)
     const { data: subjects } = useGeneralTestSubjects(1, 500);
     const subjectOptions = useMemo(
         () => (subjects?.subjects ?? []).map((s) => ({ value: String(s.id), label: s.name })),

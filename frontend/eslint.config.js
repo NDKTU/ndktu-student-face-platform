@@ -54,6 +54,22 @@ export default defineConfig([
           message:
             "Sanani to'g'ridan-to'g'ri formatlamang: '@/utils/date' dan formatDate / formatDateTime ni ishlating.",
         },
+        {
+          // `useSubjects(1, 1000)` kabi «hammasini yuklab, brauzerda izlash»:
+          // ro'yxat chegaradan oshgach (fanlar 3254 ta edi) filtr va nomlar
+          // jimgina ma'lumot yo'qotadi. Kichik katalog uchun (kafedralar 21 ta)
+          // istisno — sababi bilan `eslint-disable-next-line`.
+          selector: "CallExpression[callee.name=/^use[A-Z]/][arguments.1.type='Literal'][arguments.1.value>=500]",
+          message:
+            "Katta ro'yxatni to'liq yuklamang: server qidiruvi (useSubjectFilter / useGroupFilter / useQuizFilter) yoki `/options` dan foydalaning.",
+        },
+        {
+          // Xuddi shu, parametrlar obyekt bilan berilganda: `useQuizzes({ limit: 1000 })`.
+          selector:
+            "CallExpression[callee.name=/^use[A-Z]/] > ObjectExpression > Property[key.name='limit'][value.type='Literal'][value.value>=500]",
+          message:
+            "Katta ro'yxatni to'liq yuklamang: server qidiruvi (useSubjectFilter / useGroupFilter / useQuizFilter) yoki `/options` dan foydalaning.",
+        },
       ],
     },
   },

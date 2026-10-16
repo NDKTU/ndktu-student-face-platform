@@ -25,6 +25,7 @@ interface Props {
 }
 
 export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSubmit, isPending }: Props) {
+    // eslint-disable-next-line no-restricted-syntax -- elementar test fanlari — o'qituvchi yaratadigan kichik ro'yxat (hozir 2 ta)
     const { data: subjects } = useGeneralTestSubjects(1, 500);
     const subjectOptions = useMemo(
         // Biriktirilgan fanga test tuzib bo'lmaydi — u yerda faqat savol qo'shiladi.

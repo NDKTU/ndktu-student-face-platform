@@ -90,6 +90,7 @@ const HemisSyncPage = () => {
     }, [previewData]);
 
     const { data: facultiesData } = useFaculties(1, 100);
+    // eslint-disable-next-line no-restricted-syntax -- bitta fakultet guruhlari, oddiy select — mingtaga yetmaydi
     const { data: groupsData } = useGroups(1, 1000, '', undefined, selectedFacultyId);
 
     // 2. Sync mutation

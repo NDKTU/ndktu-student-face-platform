@@ -79,6 +79,7 @@ export const CurriculumsPage = () => {
     );
     // …lekin jadvaldagi nomlar uchun hammasi kerak: fakultet bo'yicha
     // filtrlanganda ham reja o'z kafedrasining nomini ko'rsatishi kerak.
+    // eslint-disable-next-line no-restricted-syntax -- kafedralar 21 ta — to'liq ro'yxat
     const { data: allKafedrasData } = useKafedras(1, 500);
 
     const filters = useMemo(

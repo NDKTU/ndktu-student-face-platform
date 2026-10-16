@@ -37,6 +37,7 @@ export default function GeneralTestResultsPage() {
     const [deleting, setDeleting] = useState<ResultRow | null>(null);
     const [exporting, setExporting] = useState(false);
 
+    // eslint-disable-next-line no-restricted-syntax -- elementar test fanlari — kichik ro'yxat (hozir 2 ta)
     const { data: subjects } = useGeneralTestSubjects(1, 500);
     // Fan tanlanganda test ro'yxati o'sha fan testlari bilan cheklanadi.
     const { data: tests } = useGeneralTests(1, 200, '', subjectId ? Number(subjectId) : undefined);
