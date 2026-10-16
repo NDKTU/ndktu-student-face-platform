@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useLessons';
 import { useTeachers, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import { useTeacherAssignedSubjects } from '@/hooks/useSubjects';
-import { useGroups } from '@/hooks/useGroups';
+import { useGroupFilter } from '@/hooks/useGroups';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -39,7 +39,10 @@ export default function LessonsPage() {
     const deleteMutation = useDeleteLesson();
 
     const { data: teachersData } = useTeachers(1, 500, undefined, !!isAdmin && hasPermission('read:teacher'));
-    const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
+    // Admin uchun guruhlar — server qidiruvi (ilgari 1000 ta yuklanardi).
+    // Filtr va forma tanlovi alohida: har birida tanlangan guruh o'zi qoladi.
+    const canPickAnyGroup = !(isTeacher && !isAdmin) && hasPermission('read:group');
+    const filterGroupSearch = useGroupFilter(filterGroupId ? Number(filterGroupId) : undefined, canPickAnyGroup);
 
     const { data: assignedSubjectsData } = useTeacherAssignedSubjects(
         isTeacher && user?.id ? user.id : undefined
@@ -63,24 +66,24 @@ export default function LessonsPage() {
         );
     }, [isTeacher, isAdmin, teachersData, assignedSubjectsData]);
 
-    const groupOptions = useMemo(() => {
-        if (isTeacher && !isAdmin) {
-            return (assignedGroupsData?.group_teachers ?? []).map(gt => ({
+    // O'qituvchi faqat o'z guruhlaridan tanlaydi — ro'yxat kichik, to'liq.
+    const teacherGroupOptions = useMemo(
+        () =>
+            (assignedGroupsData?.group_teachers ?? []).map(gt => ({
                 value: gt.group_id.toString(),
                 label: gt.group.name,
-            }));
-        }
-        return (allGroupsData?.groups ?? []).map(g => ({
-            value: g.id.toString(),
-            label: g.name,
-        }));
-    }, [isTeacher, isAdmin, assignedGroupsData, allGroupsData]);
+            })),
+        [assignedGroupsData],
+    );
+    const groupOptions = canPickAnyGroup ? filterGroupSearch.options : teacherGroupOptions;
 
     // ── Modal state ─────────────────────────────────────────────────────────
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editing, setEditing] = useState<Lesson | null>(null);
     const [formSubjectTeacherId, setFormSubjectTeacherId] = useState('');
     const [formGroupId, setFormGroupId] = useState('');
+    const formGroupSearch = useGroupFilter(formGroupId ? Number(formGroupId) : undefined, canPickAnyGroup);
+    const formGroupOptions = canPickAnyGroup ? formGroupSearch.options : teacherGroupOptions;
     const [formTopic, setFormTopic] = useState('');
     const [formDate, setFormDate] = useState('');
     const [formDescription, setFormDescription] = useState('');
@@ -184,6 +187,7 @@ export default function LessonsPage() {
                     <div className="flex-1">
                         <Combobox
                             options={[{ value: '', label: 'Barchasi' }, ...groupOptions]}
+                            onSearchChange={canPickAnyGroup ? filterGroupSearch.onSearch : undefined}
                             value={filterGroupId}
                             onChange={(v) => { setFilterGroupId(v); setPage(1); }}
                             placeholder="Barchasi"
@@ -291,7 +295,8 @@ export default function LessonsPage() {
                     <div>
                         <label className="text-sm font-medium block mb-1">Guruh</label>
                         <Combobox
-                            options={groupOptions}
+                            options={formGroupOptions}
+                            onSearchChange={canPickAnyGroup ? formGroupSearch.onSearch : undefined}
                             value={formGroupId}
                             onChange={setFormGroupId}
                             placeholder="Tanlang..."

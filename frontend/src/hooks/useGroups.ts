@@ -1,5 +1,8 @@
 import { useQuery, /* useMutation, */ /* useQueryClient */ } from '@tanstack/react-query';
 import { groupService, type GroupListParams } from '@/services/groupService';
+import { useMemo, useState } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 
 export const useGroups = (
     page: number,
@@ -34,6 +37,37 @@ export const useGroupStudents = (groupId: number | undefined, search?: string) =
         enabled: !!groupId,
         placeholderData: (previousData) => previousData,
     });
+};
+
+/**
+ * Guruh tanlash ro'yxati (filtr yoki forma): qidiruv serverda.
+ *
+ * Ilgari sahifalar `useGroups(1, 1000)` bilan hamma guruhni yuklab, nom va
+ * tanlovni shu ro'yxatdan qidirardi. 693 ta guruh hozircha sig'ardi, lekin
+ * 1001-guruhdan boshlab filtrlar jimgina ma'lumot yo'qotardi (fanlarda
+ * aynan shunday bo'lgan: 3254 tadan 1000 tasi). Tanlangan guruh qidiruvga
+ * tushmasa ham id bo'yicha olinadi — yorlig'i to'g'ri qoladi.
+ */
+export const useGroupFilter = (
+    selectedId?: number | null,
+    enabled: boolean = true,
+    fallbackLabel?: string | null,
+) => {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebouncedValue(query);
+    const { data: listData, isFetching } = useGroups(1, FILTER_PAGE_SIZE, debouncedQuery, undefined, undefined, enabled);
+    const list = listData?.groups;
+    const inList = !!selectedId && !!list?.some((group) => group.id === selectedId);
+    const { data: selectedGroup } = useGroup(enabled && selectedId && !inList && !fallbackLabel ? selectedId : 0);
+
+    const options = useMemo<FilterOption[]>(() => {
+        const base = (list ?? []).map((group) => ({ value: String(group.id), label: group.name }));
+        if (!selectedId) return base;
+        const label = selectedGroup?.name ?? fallbackLabel ?? `#${selectedId}`;
+        return withSelected(base, { value: String(selectedId), label });
+    }, [list, selectedId, selectedGroup, fallbackLabel]);
+
+    return { options, onSearch: setQuery, isFetching };
 };
 
 export const useGroup = (id: number) => {

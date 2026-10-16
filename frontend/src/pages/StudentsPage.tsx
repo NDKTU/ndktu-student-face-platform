@@ -22,7 +22,7 @@ import {
 import { Combobox } from '@/components/ui/Combobox';
 import { useStudents, useStudent, /* useDeleteStudent */ } from '@/hooks/useStudents';
 import { useUserResults } from '@/hooks/useResults';
-import { useGroups } from '@/hooks/useGroups';
+import { useGroupFilter } from '@/hooks/useGroups';
 import { useCatalogView } from '@/hooks/useCatalogView';
 import { useAuth } from '@/context/AuthContext';
 // import { /* ConfirmDialog */ } from '@/components/ui/ConfirmDialog';
@@ -131,7 +131,8 @@ export const StudentsPage = () => {
     // Universitetda 850 dan ortiq guruh bor: 200 talik ro'yxatda ko'pchiligi
     // yo'q edi, va `?group_id=N` bilan kelgan guruhning nomi tanlagichda
     // ko'rinmasdi — filtr ishlar, lekin admin qaysi guruh ekanini bilmasdi.
-    const { data: groupsData } = useGroups(1, 1000, '', undefined, undefined, canReadGroup);
+    // Endi qidiruv serverda: 1000 ta guruh ham kafolat emas edi.
+    const groupFilter = useGroupFilter(parsedGroup, canReadGroup);
 
     const students = studentsData?.students || [];
     const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
@@ -141,17 +142,14 @@ export const StudentsPage = () => {
     const detailId = Number(searchParams.get('student')) || 0;
     const { data: detailStudent } = useStudent(detailId);
 
-    // Guruh nomi API javobida yo'q (faqat `group_id`), shuning uchun u
-    // allaqachon yuklangan guruhlar ro'yxatidan olinadi.
-    const groupNameById = useMemo(
-        () => new Map((groupsData?.groups || []).map((g) => [g.id, g.name])),
-        [groupsData],
+    // Guruh nomi talaba javobida keladi (`group_name`).
+    const groupOptions = useMemo(
+        () => [{ value: 'all', label: t('Barcha guruhlar') }, ...groupFilter.options],
+        [groupFilter.options, t],
     );
-
-    const groupOptions = useMemo(() => {
-        const list = (groupsData?.groups || []).map((g) => ({ value: String(g.id), label: g.name }));
-        return [{ value: 'all', label: t('Barcha guruhlar') }, ...list];
-    }, [groupsData, t]);
+    const selectedGroupName = parsedGroup
+        ? groupFilter.options.find((o) => o.value === String(parsedGroup))?.label
+        : undefined;
 
     const handleSort = (field: SortField) => {
         // Tartib o'zgargach birinchi sahifaga qaytamiz: aks holda
@@ -288,7 +286,7 @@ export const StudentsPage = () => {
             return (
                 <StudentDetail
                     student={student}
-                    groupName={groupNameById.get(student.group_id)}
+                    groupName={student.group_name ?? undefined}
                     onBack={handleBackToList}
                 />
             );
@@ -322,7 +320,7 @@ export const StudentsPage = () => {
                     <StudentBadgesDownloadButton
                         search={debouncedSearch}
                         groupId={parsedGroup}
-                        groupName={parsedGroup ? groupNameById.get(parsedGroup) : undefined}
+                        groupName={selectedGroupName}
                         total={totalCount}
                         className="w-full sm:w-auto"
                     />
@@ -332,6 +330,7 @@ export const StudentsPage = () => {
                         <div className="w-full sm:w-[260px]">
                             <Combobox
                                 options={groupOptions}
+                                onSearchChange={groupFilter.onSearch}
                                 value={selectedGroup}
                                 onChange={(val) => {
                                     setSelectedGroup(val);

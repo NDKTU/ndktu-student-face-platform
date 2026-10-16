@@ -1,4 +1,7 @@
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { FILTER_PAGE_SIZE, withSelected, type FilterOption } from '@/utils/filterOptions';
 import { quizService, type QuizCreateRequest, type QuizListParams } from '@/services/quizService';
 
 export const useQuizzes = (params: QuizListParams = {}, enabled = true) => {
@@ -44,6 +47,32 @@ export const useActiveCourseQuizzes = (courseId: number, enabled = true) => {
         queryFn: () => quizService.getActiveCourseQuizzes(courseId),
         enabled,
     });
+};
+
+/**
+ * Test tanlash ro'yxati (filtr): qidiruv nom bo'yicha serverda.
+ *
+ * Ilgari natijalar sahifasi `limit: 1000` bilan testlarni yuklardi — mingdan
+ * oshgach filtr jimgina testlarni yo'qotardi (fanlarda aynan shunday edi).
+ */
+export const useQuizFilter = (selectedId?: number | null, enabled: boolean = true) => {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebouncedValue(query);
+    const { data: listData, isFetching } = useQuizzes(
+        { page: 1, limit: FILTER_PAGE_SIZE, title: debouncedQuery || undefined },
+        enabled,
+    );
+    const list = listData?.quizzes;
+    const inList = !!selectedId && !!list?.some((quiz) => quiz.id === selectedId);
+    const { data: selectedQuiz } = useQuiz(enabled && selectedId && !inList ? selectedId : 0);
+
+    const options = useMemo<FilterOption[]>(() => {
+        const base = (list ?? []).map((quiz) => ({ value: String(quiz.id), label: quiz.title }));
+        if (!selectedId) return base;
+        return withSelected(base, { value: String(selectedId), label: selectedQuiz?.title ?? `#${selectedId}` });
+    }, [list, selectedId, selectedQuiz]);
+
+    return { options, onSearch: setQuery, isFetching };
 };
 
 export const useQuiz = (id: number) => {

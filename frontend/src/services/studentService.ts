@@ -8,6 +8,8 @@ export interface Student {
     third_name: string;
     full_name: string;
     group_id: number;
+    /** Guruh nomi — javobda keladi (ilgari 1000 ta guruh ro'yxatidan qidirilardi). */
+    group_name?: string | null;
     student_id_number: string | null;
     image_path: string | null;
     birth_date: string | null;

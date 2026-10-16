@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.core.schemas import TashkentDatetime
 
@@ -64,10 +64,22 @@ class StudentUpdateRequest(BaseModel):
 
 class StudentResponse(StudentBase):
     id: int
+    #: Guruh nomi javobda. Ilgari «Talabalar» sahifasi uni 1000 ta guruh
+    #: ro'yxatidan qidirardi — guruhlar ro'yxati to'liq bo'lishi kafolatsiz.
+    group_name: Optional[str] = None
     created_at: TashkentDatetime
     updated_at: TashkentDatetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _group_name(cls, data):
+        # Faqat bog'lanish allaqachon yuklangan bo'lsa (`selectinload`):
+        # async sessiyada yalqov yuklash MissingGreenlet bilan yiqiladi.
+        if hasattr(data, "__dict__") and data.__dict__.get("group") is not None:
+            data.group_name = data.group.name
+        return data
 
 
 class StudentBadgeResponse(BaseModel):

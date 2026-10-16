@@ -11,11 +11,10 @@ import { Plus, Search } from 'lucide-react';
 import { useQuizzes, useUpdateQuiz, useDeleteQuiz, useRepeatQuiz } from '@/hooks/useQuizzes';
 import { useSubjectFilter } from '@/hooks/useSubjects';
 import { useFaculties } from '@/hooks/useReferenceData';
-import { useGroups } from '@/hooks/useGroups';
+import { useGroupFilter } from '@/hooks/useGroups';
 import { useTeacherOptions } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest } from '@/services/quizService';
 import { logger } from '@/utils/logger';
-import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 import { QuizModal } from '@/components/quizzes/QuizModal';
@@ -88,7 +87,7 @@ const QuizzesPage = () => {
     // (`subject_name`). Ilgari 1000 ta fan yuklanib, qolgan 2254 tasi
     // jadvalda «-» va filtrda yo'q edi.
     const subjectFilter = useSubjectFilter(filterSubjectId, hasPermission('read:subject'));
-    const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
+    const groupFilter = useGroupFilter(filterGroupId, hasPermission('read:group'));
     const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     const updateQuizMutation = useUpdateQuiz();
@@ -98,7 +97,6 @@ const QuizzesPage = () => {
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
     const allFaculties = allFacultiesData?.faculties || [];
-    const allGroups = useMemo(() => allGroupsData?.groups ?? [], [allGroupsData]);
     const allTeachers = allTeachersData ?? [];
 
     const handleCreateQuiz = () => {
@@ -198,8 +196,7 @@ const QuizzesPage = () => {
         });
     };
 
-    // Nomlar javobning o'zidan (`subject_name` / `group_name`). Guruhlar
-    // ro'yxati zaxira bo'lib qoladi — u filtr uchun baribir yuklanadi.
+    // Nomlar javobning o'zidan (`subject_name` / `group_name`).
     const subjectNameById = useMemo(() => {
         const map = new Map<number, string>();
         quizzes.forEach((q) => {
@@ -210,12 +207,11 @@ const QuizzesPage = () => {
 
     const groupNameById = useMemo(() => {
         const map = new Map<number, string>();
-        allGroups.forEach((g: Group) => map.set(g.id, g.name));
         quizzes.forEach((q) => {
             if (q.group_id && q.group_name) map.set(q.group_id, q.group_name);
         });
         return map;
-    }, [allGroups, quizzes]);
+    }, [quizzes]);
 
     const getSubjectName = (id?: number) => (id ? subjectNameById.get(id) : undefined) || '-';
     const getGroupName = (id?: number) => (id ? groupNameById.get(id) : undefined) || '-';
@@ -269,7 +265,8 @@ const QuizzesPage = () => {
             <QuizFilters
                 subjectOptions={subjectFilter.options}
                 onSubjectSearchChange={subjectFilter.onSearch}
-                groups={allGroups}
+                groupOptions={groupFilter.options}
+                onGroupSearchChange={groupFilter.onSearch}
                 teachers={allTeachers}
                 faculties={canFilterByFaculty ? allFaculties : undefined}
                 filterFacultyId={filterFacultyId}

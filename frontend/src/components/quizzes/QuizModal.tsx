@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRoleView } from '@/hooks/useRoleView';
 import { useAvailableQuestions, useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { useTeacherAssignedSubjects, useSubject } from '@/hooks/useSubjects';
-import { useGroups } from '@/hooks/useGroups';
+import { useGroup } from '@/hooks/useGroups';
 import { useTeacherOptions, useTeacherAssignedGroups } from '@/hooks/useTeachers';
 import type { Quiz, QuizCreateRequest, QuizType } from '@/services/quizService';
 import { QUIZ_TYPE_LABELS } from '@/services/quizService';
@@ -101,7 +101,6 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
     const effectiveUserId = isTeacher ? user?.id?.toString() : selectedLecturerId;
 
-    const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
     const { data: searchTeachersData } = useTeacherOptions(debouncedTeacherSearch, hasPermission('read:teacher'));
     const { data: assignedSubjectsData, isFetching: isFetchingSubjects } = useTeacherAssignedSubjects(
         effectiveUserId ? parseInt(effectiveUserId) : undefined
@@ -143,17 +142,24 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
         return options;
     }, [assignedSubjectsData, quiz, currentSubject]);
 
+    // Testning joriy guruhi ma'ruzachi guruhlarida bo'lmasa — id bo'yicha
+    // (ilgari 1000 ta guruh yuklanib, undan qidirilardi).
+    const currentGroupMissing =
+        !!quiz?.group_id &&
+        !(assignedGroupsData?.group_teachers ?? []).some(gt => gt.group_id === quiz.group_id);
+    const { data: currentGroup } = useGroup(currentGroupMissing && quiz?.group_id ? quiz.group_id : 0);
+
     const groupOptions = useMemo(() => {
         const options = (assignedGroupsData?.group_teachers ?? []).map(gt => ({
             value: gt.group_id.toString(),
             label: gt.group.name,
         }));
         if (quiz?.group_id && !options.some(o => o.value === quiz.group_id!.toString())) {
-            const name = (allGroupsData?.groups ?? []).find(g => g.id === quiz.group_id)?.name;
+            const name = currentGroup?.name ?? quiz.group_name;
             if (name) options.push({ value: quiz.group_id.toString(), label: name });
         }
         return options;
-    }, [assignedGroupsData, quiz, allGroupsData]);
+    }, [assignedGroupsData, quiz, currentGroup]);
 
     const teacherOptions = (searchTeachersData ?? teachers).map(t => ({
         value: (t.user_id ?? '').toString(),

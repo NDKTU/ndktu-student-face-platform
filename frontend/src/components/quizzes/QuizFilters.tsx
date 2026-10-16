@@ -3,13 +3,14 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Button } from '@/components/ui/Button';
 import { X } from 'lucide-react';
 import PermissionGate from '@/components/auth/PermissionGate';
-import type { Group } from '@/services/groupService';
 import type { TeacherOption } from '@/services/teacherService';
 import type { Faculty } from '@/services/facultyService';
 import { useTranslation } from 'react-i18next';
 
 interface QuizFiltersProps {
-    groups: Group[];
+    /** Guruhlar — qidiruv serverda (`useGroupFilter`). */
+    groupOptions: { value: string; label: string }[];
+    onGroupSearchChange: (query: string) => void;
     teachers: TeacherOption[];
     /** Фильтр по факультету — только на странице со сплошным списком тестов. */
     faculties?: Faculty[];
@@ -38,7 +39,8 @@ const selectClassName =
     'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export const QuizFilters = ({
-    groups,
+    groupOptions,
+    onGroupSearchChange,
     teachers,
     faculties,
     filterFacultyId,
@@ -95,7 +97,8 @@ export const QuizFilters = ({
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[200px] sm:flex-1">
                             <label className="text-sm font-medium">{t("Guruh bo'yicha filtri")}</label>
                             <Combobox
-                                options={groups.map(g => ({ value: g.id.toString(), label: g.name }))}
+                                options={groupOptions}
+                                onSearchChange={onGroupSearchChange}
                                 value={filterGroupId?.toString()}
                                 onChange={(val) => onGroupChange(val ? parseInt(val) : undefined)}
                                 placeholder={t("Barcha guruhlar")}

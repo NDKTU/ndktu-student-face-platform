@@ -7,9 +7,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Search } from 'lucide-react';
 import { useActiveQuizzes } from '@/hooks/useQuizzes';
 import { useSubjectFilter } from '@/hooks/useSubjects';
-import { useGroups } from '@/hooks/useGroups';
+import { useGroupFilter } from '@/hooks/useGroups';
 import { useTeacherOptions } from '@/hooks/useTeachers';
-import type { Group } from '@/services/groupService';
 import { QuizFilters } from '@/components/quizzes/QuizFilters';
 import { QuizTable } from '@/components/quizzes/QuizTable';
 
@@ -49,19 +48,17 @@ const ActiveQuizzesPage = () => {
     // (`subject_name`). Ilgari 1000 ta fan yuklanib, qolgan 2254 tasi
     // jadvalda «-» va filtrda yo'q edi.
     const subjectFilter = useSubjectFilter(filterSubjectId, hasPermission('read:subject'));
-    const { data: allGroupsData } = useGroups(1, 1000, '', undefined, undefined, hasPermission('read:group'));
+    const groupFilter = useGroupFilter(filterGroupId, hasPermission('read:group'));
     const { data: allTeachersData } = useTeacherOptions(undefined, hasPermission('read:teacher'));
 
     const quizzes = quizzesData?.quizzes || [];
     const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
-    const allGroups = allGroupsData?.groups || [];
     const allTeachers = allTeachersData ?? [];
 
-    // Nomlar javobning o'zidan (`subject_name` / `group_name`); guruhlar
-    // ro'yxati — zaxira.
+    // Nomlar javobning o'zidan (`subject_name` / `group_name`).
     const getSubjectName = (id?: number) => quizzes.find((q) => q.subject_id === id)?.subject_name || '-';
     const getGroupName = (id?: number) =>
-        quizzes.find((q) => q.group_id === id)?.group_name || allGroups.find((g: Group) => g.id === id)?.name || '-';
+        quizzes.find((q) => q.group_id === id)?.group_name || '-';
 
     const clearFilters = () => {
         setFilterSubjectId(undefined);
@@ -99,7 +96,8 @@ const ActiveQuizzesPage = () => {
             <QuizFilters
                 subjectOptions={subjectFilter.options}
                 onSubjectSearchChange={subjectFilter.onSearch}
-                groups={allGroups}
+                groupOptions={groupFilter.options}
+                onGroupSearchChange={groupFilter.onSearch}
                 teachers={allTeachers}
                 filterSubjectId={filterSubjectId}
                 onSubjectChange={setFilterSubjectId}
