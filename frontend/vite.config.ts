@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -19,6 +20,13 @@ export default defineConfig({
         zoomRoom: path.resolve(__dirname, 'zoom-room.html'),
       },
     },
+  },
+  test: {
+    // Testlar `src/` ichida, tekshiriladigan kod yonida: `*.test.ts(x)`.
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    restoreMocks: true,
   },
   server: {
     proxy: {
