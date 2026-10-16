@@ -216,7 +216,7 @@ async def test_question_number_limits_each_attempt(auth_client, async_client, sc
 
 
 def test_title_is_composed_from_subject_and_groups():
-    from app.modules.general_test.repository import _compose_title
+    from app.modules.general_test.common import _compose_title
 
     assert _compose_title("Fizika", []) == "Fizika"
     assert _compose_title("Fizika", ["B-2", "A-1"]) == "Fizika — A-1, B-2"

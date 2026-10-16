@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.core.redis_client import redis_client
 from app.modules.general_test.model import GeneralTestAttempt
-from app.modules.general_test.repository import STRICT_KIND
+from app.modules.general_test.common import STRICT_KIND
 from app.modules.quiz.quiz_process.strict import _key
 from app.test.test_general_test_access import scene  # noqa: F401 — fixture
 from app.test.test_general_test_timing import _start_as_staff

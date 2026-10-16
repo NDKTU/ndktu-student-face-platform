@@ -11,7 +11,8 @@ import pytest
 from sqlalchemy import select
 
 from app.core.redis_client import redis_client
-from app.modules.general_test import repository as gt_repository
+from app.modules.general_test import attempts as gt_attempts
+from app.modules.general_test.common import _face_grant_key
 from app.modules.general_test.model import GeneralTestAttempt
 from app.test.test_general_test_access import scene  # noqa: F401 — fixture
 from app.test.test_student_dashboard import _login
@@ -39,7 +40,7 @@ def _fake_face(monkeypatch, *, match: bool):
         calls.append(reference_url)
         return {"face_count": 1, "is_match": match, "reference_ready": True}
 
-    monkeypatch.setattr(gt_repository, "verify_face", fake_verify)
+    monkeypatch.setattr(gt_attempts, "verify_face", fake_verify)
     return calls
 
 
@@ -92,7 +93,7 @@ async def test_face_entry_requires_server_side_verification(
 
     # Tasdiqdan keyin sahifa ochiladi; tasdiq muddati o'tgach — yana yuz.
     assert (await async_client.get(f"/general-test/attempt/{attempt_id}", headers=headers)).status_code == 200
-    await redis_client.delete(gt_repository._face_grant_key(attempt_id))
+    await redis_client.delete(_face_grant_key(attempt_id))
     reopened = await async_client.get(f"/general-test/attempt/{attempt_id}", headers=headers)
     assert reopened.status_code == 403
     assert reopened.json()["detail"]["code"] == "face_verification_required"
