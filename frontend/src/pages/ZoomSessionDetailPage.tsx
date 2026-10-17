@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { courseTypeLabel } from '@/services/courseTypes';
 import { Link, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
 import { ArrowLeft, BookOpen, CalendarClock, ClipboardList, ExternalLink, GraduationCap, ScanFace, UsersRound, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -15,8 +14,6 @@ import { ZoomFaceCheckReport } from '@/components/zoom/ZoomFaceCheckReport';
 import { ZoomMeetingBox } from '@/components/zoom/ZoomMeetingBox';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSession } from '@/hooks/useZoomSessions';
-import { zoomSessionService } from '@/services/zoomSessionService';
-import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate, formatTime } from '@/utils/date';
 
 type Tab = 'meeting' | 'report';
@@ -30,7 +27,6 @@ export default function ZoomSessionDetailPage() {
     const { hasPermission, user } = useAuth();
     const { data: session, isLoading, isError, refetch } = useZoomSession(sessionId);
     const [tab, setTab] = useState<Tab>('meeting');
-    const [starting, setStarting] = useState(false);
 
     if (isLoading) return <Skeleton className="h-64 w-full rounded-2xl" />;
     if (isError || !session) {
@@ -56,23 +52,6 @@ export default function ZoomSessionDetailPage() {
     // `repository.py::_is_host`); admin kuzatuvchi bo'lib kiradi.
     const isHost = session.zoom_managed && (session.teacher_user_id ? user?.id === session.teacher_user_id : session.can_manage);
 
-    // Host havolasi har safar yangidan olinadi: ichidagi ZAK ~2 soatda eskiradi.
-    // Oyna avval ochiladi — `await` dan keyin brauzer popup'ni bloklardi.
-    const startAsHost = async () => {
-        const popup = window.open('', '_blank');
-        setStarting(true);
-        try {
-            const { start_url } = await zoomSessionService.start(session.id);
-            if (popup) popup.location.href = start_url;
-            else window.location.href = start_url;
-        } catch (cause) {
-            popup?.close();
-            toast.error(apiErrorMessage(cause, "Uchrashuvni boshlab bo'lmadi"));
-        } finally {
-            setStarting(false);
-        }
-    };
-
     return (
         <div className="space-y-6">
             <Link to="/zoom" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
@@ -83,11 +62,6 @@ export default function ZoomSessionDetailPage() {
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <SessionStatusBadge session={session} />
-                        {session.can_manage && session.zoom_managed && (
-                            <Button size="sm" isLoading={starting} onClick={() => void startAsHost()}>
-                                <ExternalLink className="h-4 w-4" /> Zoom ilovasida boshlash
-                            </Button>
-                        )}
                     </div>
                 }
             />
@@ -171,7 +145,6 @@ export default function ZoomSessionDetailPage() {
                     host={isHost}
                     faceCheckEnabled={studentView && session.face_check_enabled}
                     randomChecks={session.random_face_checks}
-                    appFallback={session.zoom_managed}
                 />
             )}
         </div>

@@ -6,15 +6,19 @@ import { Modal } from '@/components/ui/Modal';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { WEEKDAYS, addDays, monthGrid, toIsoDate, weekdayOf } from '@/components/schedule/scheduleUtils';
 import type { ZoomSession, ZoomSessionStatus } from '@/services/zoomSessionService';
-import { formatDate, formatDayMonth, formatTime } from '@/utils/date';
+import { formatDate, formatDayMonth } from '@/utils/date';
+import { usePairTimes } from '@/hooks/useZoomSessions';
+import type { PairTime } from '@/services/zoomSessionService';
+import { pairRange } from '@/utils/dateTimeInput';
 import { cn } from '@/lib/utils';
 
 /**
  * Zoom seanslari kalendari — hafta va oy.
  *
- * HEMIS jadvalidagi `WeekCalendar`/`MonthCalendar` juftlik va `hemis_id` ga
- * bog'langan, Zoom seansi esa ixtiyoriy vaqtda: shuning uchun setka o'xshash,
- * lekin kun ichida seanslar vaqt bo'yicha ketma-ket turadi.
+ * Hafta — HEMIS dars jadvalidagidek: qatorlar juftliklar (raqami va vaqti
+ * chapda), seans o'z juftligi qatorida. Juftlik setkasiga tushmagan seans
+ * (masalan 10:00 da) — «Boshqa vaqt» qatorida. `WeekCalendar` ning o'zi
+ * ishlatilmaydi: u HEMIS darsiga (`hemis_id`, `lesson_pair`) bog'langan.
  *
  * Seans kuni — Toshkent bo'yicha: API vaqtni `+05:00` bilan beradi, sana
  * satrning boshidan olinadi (brauzer zonasiga o'tkazilmaydi).
@@ -45,7 +49,25 @@ const DOT: Record<ZoomSessionStatus, string> = {
     closed: 'bg-muted-foreground/60',
 };
 
+/** «09:30» — Toshkent vaqti, satrning o'zidan (brauzer zonasiga o'tkazilmaydi). */
+const hhmm = (iso: string) => iso.slice(11, 16);
+
+/**
+ * Seans juftligi: vaqti setkaga to'g'ri kelsa — «2» yoki qo'sh juftlik «2–3»;
+ * faqat boshlanishi mos kelsa ham o'sha juftlik. Aks holda `null`.
+ */
+const sessionPair = (session: ZoomSession, pairs: PairTime[]): { first: number; label: string } | null => {
+    const start = hhmm(session.starts_at);
+    const range = pairRange(pairs, start, hhmm(session.ends_at));
+    if (range) return { first: range[0], label: range[0] === range[1] ? String(range[0]) : `${range[0]}–${range[1]}` };
+    const byStart = pairs.find((pair) => pair.start === start);
+    return byStart ? { first: byStart.pair, label: String(byStart.pair) } : null;
+};
+
 /** «Fizika · Amaliyot» — kalendar katagida sarlavha o'rniga (u uzun). */
+/** Juftlik setkasiga tushmagan seanslar qatori. */
+const OTHER = -1;
+
 const sessionLabel = (session: ZoomSession) =>
     session.subject_name
         ? [session.subject_name, courseTypeLabel(session.training_type)].filter(Boolean).join(' · ')
@@ -54,6 +76,8 @@ const sessionLabel = (session: ZoomSession) =>
 /** Kun ichidagi seans kartochkasi — bosilsa seans sahifasi. */
 const SessionCard = ({ session }: { session: ZoomSession }) => {
     const navigate = useNavigate();
+    const { data: pairs = [] } = usePairTimes();
+    const pair = sessionPair(session, pairs);
     return (
         <button
             type="button"
@@ -67,7 +91,8 @@ const SessionCard = ({ session }: { session: ZoomSession }) => {
         >
             <span className="flex items-center gap-1 font-semibold tabular-nums">
                 {session.status === 'open' && <Radio className="h-3 w-3 shrink-0" />}
-                {formatTime(session.starts_at)}–{formatTime(session.ends_at)}
+                {pair && <span>{pair.label}-juftlik ·</span>}
+                {hhmm(session.starts_at)}–{hhmm(session.ends_at)}
             </span>
             <span className="mt-0.5 line-clamp-2 font-medium leading-snug text-foreground">{sessionLabel(session)}</span>
             {session.groups.length > 0 && (
@@ -107,6 +132,7 @@ export const ZoomWeekCalendar = ({
     today: string;
 }) => {
     const isMobile = useIsMobile();
+    const { data: pairs = [] } = usePairTimes();
     const days = useMemo(() => {
         const grouped = byDay(sessions);
         return WEEKDAYS.map((name, index) => {
@@ -131,28 +157,76 @@ export const ZoomWeekCalendar = ({
         );
     }
 
+    // Qatorlar — shu haftada uchragan juftliklar (HEMIS jadvalidagidek): bo'sh
+    // 9 qator jadvalni cho'zib yuborardi. Setkaga tushmaganlar — oxirgi qatorda.
+    const rowKey = (session: ZoomSession) => sessionPair(session, pairs)?.first ?? OTHER;
+    const used = new Set(days.flatMap((day) => day.sessions.map(rowKey)));
+    const rows = [
+        ...pairs.filter((pair) => used.has(pair.pair)).map((pair) => ({ key: pair.pair, title: String(pair.pair), start: pair.start, end: pair.end })),
+        ...(used.has(OTHER) ? [{ key: OTHER, title: 'Boshqa', start: 'vaqt', end: '' }] : []),
+    ];
+
     return (
+        // Telefon emas, lekin tor oyna — jadval gorizontal suriladi, juftlik ustuni joyida qoladi.
         <div className="overflow-x-auto rounded-2xl border border-border bg-card custom-scrollbar">
-            <div className="grid min-w-[880px]" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-                {days.map((day, index) => {
-                    const isToday = day.iso === today;
-                    return (
-                        <div key={day.iso} className={cn('flex min-h-64 flex-col', index < days.length - 1 && 'border-r border-border')}>
-                            <div className={cn('border-b border-border px-2 py-2', isToday ? 'bg-primary/10' : 'bg-muted/40')}>
-                                <span className={cn('block truncate text-sm font-semibold', isToday ? 'text-primary' : 'text-foreground')}>
-                                    {day.name}
-                                </span>
-                                <span className="block text-xs text-muted-foreground tabular-nums">{formatDayMonth(day.iso)}</span>
-                            </div>
-                            <div className={cn('flex-1 space-y-1.5 p-1.5', isToday && 'bg-primary/5')}>
-                                {day.sessions.map((session) => (
-                                    <SessionCard key={session.id} session={session} />
+            <table className="w-full min-w-[880px] table-fixed border-collapse text-sm">
+                <thead>
+                    <tr className="bg-muted/40">
+                        <th className="sticky left-0 z-10 w-20 border-b border-r border-border bg-muted px-2 py-2 text-left text-xs font-semibold text-muted-foreground">
+                            Para
+                        </th>
+                        {days.map((day) => {
+                            const isToday = day.iso === today;
+                            return (
+                                <th
+                                    key={day.iso}
+                                    className={cn('border-b border-border px-2 py-2 text-left font-semibold', isToday ? 'bg-primary/10 text-primary' : 'text-foreground')}
+                                >
+                                    <span className="block truncate">{day.name}</span>
+                                    <span className="block text-xs font-normal text-muted-foreground tabular-nums">{formatDayMonth(day.iso)}</span>
+                                </th>
+                            );
+                        })}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.length === 0 ? (
+                        <tr>
+                            <td colSpan={days.length + 1} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                Bu haftada seans yo'q
+                            </td>
+                        </tr>
+                    ) : (
+                        rows.map((row) => (
+                            <tr key={row.key} className="align-top">
+                                <th className="sticky left-0 z-10 border-b border-r border-border bg-card px-2 py-2 text-left">
+                                    <span className={cn('block font-bold text-primary', row.key === OTHER ? 'text-xs' : 'text-base')}>{row.title}</span>
+                                    <span className="block text-[11px] font-normal leading-tight text-muted-foreground tabular-nums">
+                                        {row.start}
+                                        {row.end && (
+                                            <>
+                                                <br />
+                                                {row.end}
+                                            </>
+                                        )}
+                                    </span>
+                                </th>
+                                {days.map((day) => (
+                                    <td key={day.iso} className={cn('border-b border-border p-1.5', day.iso === today && 'bg-primary/5')}>
+                                        <div className="space-y-1.5">
+                                            {day.sessions
+                                                .filter((session) => rowKey(session) === row.key)
+                                                .map((session) => (
+                                                    <SessionCard key={session.id} session={session} />
+                                                ))}
+                                        </div>
+                                    </td>
                                 ))}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
         </div>
     );
 };
@@ -161,7 +235,7 @@ export const ZoomWeekCalendar = ({
 const MAX_CHIPS = 3;
 
 /**
- * Oy: kun katagida «09:30 Fan» plashkalari, rangi — holat. Kunga bosilsa,
+ * Oy: kun katagida «2 · Fan» (juftlik) yoki «10:00 · Fan» plashkalari, rangi — holat. Kunga bosilsa,
  * o'sha kunning seanslari oynada; telefonda — rangli nuqtalar va setka ostida ro'yxat.
  */
 export const ZoomMonthCalendar = ({
@@ -176,6 +250,7 @@ export const ZoomMonthCalendar = ({
     const isMobile = useIsMobile();
     const [openDay, setOpenDay] = useState<string | null>(null);
     const [mobileDay, setMobileDay] = useState<string | null>(null);
+    const { data: pairs = [] } = usePairTimes();
     const grouped = useMemo(() => byDay(sessions), [sessions]);
     const { start, weeks } = monthGrid(monthStart);
     const cells = Array.from({ length: weeks * 7 }, (_, i) => addDays(start, i));
@@ -245,7 +320,7 @@ export const ZoomMonthCalendar = ({
                                                     (!inMonth || !session.is_active) && 'opacity-60',
                                                 )}
                                             >
-                                                {formatTime(session.starts_at)} {sessionLabel(session)}
+                                                {sessionPair(session, pairs)?.label ?? hhmm(session.starts_at)} · {sessionLabel(session)}
                                             </span>
                                         ))}
                                         {daySessions.length > MAX_CHIPS && (
