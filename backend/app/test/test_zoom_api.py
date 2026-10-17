@@ -361,6 +361,30 @@ async def test_webhook_rejoin_counts_every_visit(auth_client, async_client, zoom
 
 
 @pytest.mark.asyncio
+async def test_webhook_leave_with_other_key_closes_visit(auth_client, async_client, zoom_cloud):
+    """Kirish `participant_uuid` bilan, chiqish — boshqa kalit bilan: chiqish vaqti yo'qolmaydi."""
+    zs = await _create_managed(auth_client, zoom_cloud, face=False)
+    headers = await _login(async_client, "zm_member")
+    body = (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).json()
+    user_id = int(body["customer_key"].removeprefix("lms-"))
+
+    joined = {"participant_uuid": "p-1", "user_name": "Ali · G1", "registrant_id": f"reg-lms-{user_id}"}
+    # Chiqishda `participant_uuid` yo'q — kalit Zoom'ning uchrashuv ichidagi `user_id` si bo'ladi.
+    left = {"user_id": "16778240", "user_name": "Ali · G1", "customer_key": f"lms-{user_id}"}
+    await _send(
+        async_client,
+        _participant_event("meeting.participant_joined", {**joined, "join_time": _zoom_iso(timedelta(minutes=-10))}),
+        _participant_event("meeting.participant_left", {**left, "leave_time": _zoom_iso(timedelta(minutes=-7))}),
+    )
+
+    report = (await auth_client.get(f"/zoom-sessions/{zs['id']}/report")).json()
+    ali = next(s for s in report["students"] if s["user_id"] == user_id)
+    assert len(ali["zoom_visits"]) == 1
+    assert ali["zoom_visits"][0]["left_at"] is not None
+    assert 170 <= ali["zoom_seconds"] <= 190
+
+
+@pytest.mark.asyncio
 async def test_webhook_back_to_back_sessions_in_one_room(auth_client, async_client, async_db, zoom_cloud):
     """Bir xonada ketma-ket ikki dars: oynalar ustma-ust, lekin birinchi darsdagi
     kirish-chiqish ikkinchisiga o'tib ketmaydi."""

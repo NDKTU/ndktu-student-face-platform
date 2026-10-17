@@ -29,7 +29,7 @@ const formatVisits = (visits: ZoomVisit[]) =>
     visits.map((visit) => `${formatTime(visit.joined_at)}–${visit.left_at ? formatTime(visit.left_at) : 'oxirigacha'}`).join(', ');
 
 /**
- * «Faqat kirishda» seansi: har bir kirish — qachon kirdi, qachon chiqdi.
+ * Har bir kirish — qachon kirdi, qachon chiqdi (barcha turdagi seanslarda).
  *
  * Asosiy manba — Zoom webhook (`zoom_visits`). U kelmagan bo'lsa (qo'lda
  * havola, webhook sozlanmagan) — kirishdagi yuz tasdiqlari: har qayta kirish
@@ -167,12 +167,6 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                         {visits.length > 1 && <span>· {visits.length} marta kirdi</span>}
                     </span>
                 );
-                const visitsLine = visits.length > 1 && (
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Video className="h-3.5 w-3.5 shrink-0" />
-                        Zoom'da: {formatVisits(visits)}
-                    </p>
-                );
                 // Faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q — kirishdagi natija, kirib-chiqishlar va Zoom'dagi vaqt.
                 if (!randomChecks && student.total > 0) {
                     return (
@@ -200,12 +194,15 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                 // Yuz nazoratisiz seans: faqat Zoom'dagi vaqt bor, kuzatuv chizig'i yo'q.
                 if (student.total === 0) {
                     return (
-                        <div key={student.user_id} className="flex items-center gap-3 rounded-xl border border-border/60 px-4 py-3">
-                            <span className="min-w-0 flex-1 truncate font-medium">
-                                {student.user_name || `#${student.user_id}`}
-                                {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
-                            </span>
-                            {zoomBadge}
+                        <div key={student.user_id} className="space-y-1.5 rounded-xl border border-border/60 px-4 py-3">
+                            <div className="flex items-center gap-3">
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                    {student.user_name || `#${student.user_id}`}
+                                    {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
+                                </span>
+                                {zoomBadge}
+                            </div>
+                            <EntryExitList student={student} ended={ended} />
                         </div>
                     );
                 }
@@ -246,8 +243,11 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                             {zoomBadge}
                         </button>
 
-                        <div className="px-4 pb-3">
+                        <div className="space-y-2 px-4 pb-3">
                             <Timeline student={student} />
+                            {/* Zoom'dagi kirib-chiqish — kartani ochmasdan ham. Ilgari u
+                                faqat ikki va undan ko'p kirishda, ochilgan kartada edi. */}
+                            {visits.length > 0 && <EntryExitList student={student} ended={ended} />}
                         </div>
 
                         {isOpen && (
@@ -256,7 +256,6 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                     Kuzatuv: {formatMinutes(student.tracked_seconds)} · {student.total} ta tekshiruv
                                     {' '}({student.passed} tasdiqlandi, {student.failed} muammoli)
                                 </p>
-                                {visitsLine}
 
                                 {student.periods.length === 0 ? (
                                     <p className="text-xs text-emerald-600">Yuz butun davomida kadrda bo'lgan.</p>

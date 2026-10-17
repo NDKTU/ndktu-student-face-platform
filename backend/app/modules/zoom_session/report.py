@@ -310,17 +310,12 @@ class ZoomReportMixin:
             )
         ).scalars().all()
         cutoff = min(utcnow_naive(), zs.ends_at)
+        # 1-o'tish: har bir kalit kimniki (user_id yoki Zoom'dagi ismi).
         tracks: dict[str, _Track] = {}
         for event in events:
             track = tracks.setdefault(event.participant_key, _Track())
             track.user_id = track.user_id or event.user_id
             track.name = track.name or event.participant_name
-            open_visit = track.visits[-1] if track.visits and track.visits[-1][1] is None else None
-            if event.event == "joined":
-                if open_visit is None:
-                    track.visits.append([event.occurred_at, None])
-            elif open_visit is not None:
-                open_visit[1] = max(event.occurred_at, open_visit[0])
 
         # Kimligi aniqlanmagan qayta kirish — Zoom'dagi ismi aynan shu darsdagi
         # bitta talabaniki bilan bir xil bo'lsa, o'shaniki («Ism Familiya · Guruh»).
@@ -332,6 +327,37 @@ class ZoomReportMixin:
             owners = names.get(track.name or "", set())
             if track.user_id is None and len(owners) == 1:
                 track.user_id = next(iter(owners))
+
+        def same_person(a: _Track, b: _Track) -> bool:
+            if a.user_id is not None or b.user_id is not None:
+                return a.user_id == b.user_id
+            return bool(a.name) and a.name == b.name
+
+        # 2-o'tish: vaqt tartibida kirish ochadi, chiqish yopadi.
+        for event in events:
+            track = tracks[event.participant_key]
+            open_visit = track.visits[-1] if track.visits and track.visits[-1][1] is None else None
+            if event.event == "joined":
+                if open_visit is None:
+                    track.visits.append([event.occurred_at, None])
+                continue
+            if open_visit is None:
+                # Chiqish boshqa kalit bilan keldi (Zoom kirishda `participant_uuid`,
+                # chiqishda boshqasini yuborishi mumkin) — o'sha odamning ochiq
+                # kirishini yopadi. Ilgari bunday chiqish jim tashlanardi va
+                # hisobotda chiqish vaqti umuman ko'rinmasdi.
+                candidates = [
+                    other.visits[-1]
+                    for other in tracks.values()
+                    if other is not track
+                    and same_person(other, track)
+                    and other.visits
+                    and other.visits[-1][1] is None
+                    and other.visits[-1][0] <= event.occurred_at
+                ]
+                open_visit = max(candidates, key=lambda visit: visit[0], default=None)
+            if open_visit is not None:
+                open_visit[1] = max(event.occurred_at, open_visit[0])
 
         by_user: dict[int, list[list]] = {}
         outsiders: dict[str, list] = {}
