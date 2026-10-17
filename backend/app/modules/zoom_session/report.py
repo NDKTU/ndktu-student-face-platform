@@ -288,6 +288,7 @@ class ZoomReportMixin:
             zoom_tracked=bool(presence or outsiders),
             outsiders=outsiders,
             random_checks=zs.random_face_checks,
+            ended=now >= zs.ends_at,
         )
 
     @staticmethod
@@ -376,6 +377,7 @@ class ZoomReportMixin:
             first_check=first,
             last_check=last,
             tracked_seconds=int((last - first).total_seconds()),
+            admitted_at=[item.created_at for item in ordered if item.stage == "join" and item.status == "ok"],
             absent_seconds=spans_total_seconds(spans, last),
             periods=[
                 AbsencePeriod(

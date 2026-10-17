@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace, UserX, Video } from 'lucide-react';
+import { ChevronDown, ChevronRight, Image as ImageIcon, LogIn, LogOut, ScanFace, UserX, Video } from 'lucide-react';
 import { useState } from 'react';
 import { zoomSessionService, type AbsencePeriod, type FaceCheckStudentSummary, type ZoomVisit } from '@/services/zoomSessionService';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -27,6 +27,49 @@ const periodReasons = (period: AbsencePeriod) => {
 /** «10:05–10:20, 10:40–hozir»: chiqib, qayta kirgani bir qarashda ko'rinsin. */
 const formatVisits = (visits: ZoomVisit[]) =>
     visits.map((visit) => `${formatTime(visit.joined_at)}–${visit.left_at ? formatTime(visit.left_at) : 'oxirigacha'}`).join(', ');
+
+/**
+ * «Faqat kirishda» seansi: har bir kirish — qachon kirdi, qachon chiqdi.
+ *
+ * Asosiy manba — Zoom webhook (`zoom_visits`). U kelmagan bo'lsa (qo'lda
+ * havola, webhook sozlanmagan) — kirishdagi yuz tasdiqlari: har qayta kirish
+ * yangi tekshiruv, lekin chiqish vaqti shunda noma'lum.
+ */
+const EntryExitList = ({ student, ended }: { student: FaceCheckStudentSummary; ended: boolean }) => {
+    const visits = student.zoom_visits ?? [];
+    const openLabel = ended ? 'dars oxirigacha' : 'hozir darsda';
+    if (visits.length > 0) {
+        return (
+            <ul className="space-y-0.5 text-xs">
+                {visits.map((visit, index) => (
+                    <li key={index} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span className="inline-flex items-center gap-1">
+                            <LogIn className="h-3.5 w-3.5 text-emerald-600" />
+                            Kirdi <span className="font-medium">{formatTime(visit.joined_at)}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                            <LogOut className="h-3.5 w-3.5 text-amber-600" />
+                            {visit.left_at ? (
+                                <>Chiqdi <span className="font-medium">{formatTime(visit.left_at)}</span></>
+                            ) : (
+                                <span className={ended ? 'text-muted-foreground' : 'font-medium text-emerald-600'}>{openLabel}</span>
+                            )}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        );
+    }
+    const admitted = student.admitted_at ?? [];
+    if (admitted.length === 0) return null;
+    return (
+        <p className="flex flex-wrap items-center gap-1 text-xs">
+            <LogIn className="h-3.5 w-3.5 text-emerald-600" />
+            Kirdi <span className="font-medium">{admitted.map(formatTime).join(', ')}</span>
+            <span className="text-muted-foreground">· chiqish vaqti noma'lum — Zoom ma'lumoti kelmagan</span>
+        </p>
+    );
+};
 
 /**
  * Vaqt chizig'i: kuzatuv oynasi bo'ylab yuz ko'ringan va ko'rinmagan qismlar.
@@ -87,6 +130,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
     const zoomTracked = Boolean(query.data?.zoom_tracked);
     const outsiders = query.data?.outsiders ?? [];
     const randomChecks = query.data?.random_checks ?? true;
+    const ended = Boolean(query.data?.ended);
     if (students.length === 0) {
         return <p className="text-sm text-muted-foreground">Seansga guruh talabalari biriktirilmagan.</p>;
     }
@@ -129,7 +173,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                         Zoom'da: {formatVisits(visits)}
                     </p>
                 );
-                // Faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q — kirishdagi natija va Zoom'dagi vaqt.
+                // Faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q — kirishdagi natija, kirib-chiqishlar va Zoom'dagi vaqt.
                 if (!randomChecks && student.total > 0) {
                     return (
                         <div key={student.user_id} className="space-y-1.5 rounded-xl border border-border/60 px-4 py-3">
@@ -149,7 +193,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                 )}
                                 {zoomBadge}
                             </div>
-                            {visitsLine}
+                            <EntryExitList student={student} ended={ended} />
                         </div>
                     );
                 }

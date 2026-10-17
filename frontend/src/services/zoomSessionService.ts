@@ -192,6 +192,8 @@ export interface FaceCheckStudentSummary {
     zoom_first_join?: string | null;
     /** Har bir kirish alohida — chiqib, qayta kirgani ham ko'rinadi. */
     zoom_visits?: ZoomVisit[];
+    /** Kirishdagi tasdiqlangan tekshiruvlar vaqti — Zoom hodisalari bo'lmasa, kirishlar shundan. */
+    admitted_at?: string[];
 }
 
 /** Uchrashuvga bir kirish; `left_at` `null` — hali ichida. */
@@ -215,6 +217,8 @@ export interface FaceCheckReport {
     outsiders: ZoomOutsider[];
     /** `false` — faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q. */
     random_checks: boolean;
+    /** Seans vaqti tugagan. */
+    ended: boolean;
 }
 
 export const zoomSessionService = {

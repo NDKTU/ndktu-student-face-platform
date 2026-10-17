@@ -309,6 +309,9 @@ class FaceCheckStudentSummary(BaseModel):
     zoom_first_join: Optional[TashkentDatetime] = None
     #: Har bir kirish alohida: chiqib, qayta kirgani hisobotda ko'rinsin.
     zoom_visits: List[ZoomVisit] = []
+    #: Kirishdagi (`join`) tasdiqlangan tekshiruvlar vaqti — har qayta kirish
+    #: yangi tekshiruv. Zoom hodisalari kelmasa, kirishlar shundan ko'rinadi.
+    admitted_at: List[TashkentDatetime] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -329,6 +332,8 @@ class FaceCheckReportResponse(BaseModel):
     outsiders: List[ZoomOutsider] = []
     #: `False` — faqat kirishda tekshirilgan: kuzatuv chizig'i va «erta chiqdi» yo'q.
     random_checks: bool = True
+    #: Seans vaqti tugagan: chiqishi kelmagan kirish — «dars oxirigacha», aks holda «hozir darsda».
+    ended: bool = False
 
 
 

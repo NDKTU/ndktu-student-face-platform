@@ -304,9 +304,11 @@ async def test_join_only_face_check(auth_client, async_client, async_db, zoom_sc
     rows[0].created_at -= timedelta(minutes=20)
     await async_db.flush()
     report = (await auth_client.get(f"/zoom-sessions/{zs['id']}/report")).json()
-    assert report["random_checks"] is False
+    assert report["random_checks"] is False and report["ended"] is False
     ali = next(s for s in report["students"] if s["user_name"] == "Ali Talaba T")
     assert ali["joined"] is True and ali["passed"] == 1 and ali["left_early"] is False
+    # Zoom hodisalari yo'q — kirish vaqti yuz tasdig'idan.
+    assert len(ali["admitted_at"]) == 1
 
 
 @pytest.mark.asyncio
