@@ -1,11 +1,13 @@
 """Webhook qatnashuv hodisalari va seans hisoboti (yuz tekshiruvi + Zoom'dagi vaqt)."""
 
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import desc, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.core.utils.face_absence import build_absence_spans, spans_total_seconds
 from app.modules.auth.model import Student, User
@@ -19,8 +21,39 @@ from .schemas import (
     FaceCheckReportResponse,
     FaceCheckStudentSummary,
     ZoomOutsider,
+    ZoomVisit,
 )
 from .common import EARLY_JOIN, LEFT_EARLY_GAP_SECONDS, EVENT_MATCH_BEFORE, EVENT_MATCH_AFTER, CUSTOMER_KEY_PREFIX, _PARTICIPANT_EVENTS, _FAILED, _parse_zoom_time
+
+
+@dataclass
+class _Track:
+    """Bitta Zoom ishtirokchi kaliti bo'yicha yig'ilgan kirish-chiqishlar."""
+
+    user_id: int | None = None
+    name: str | None = None
+    #: `[kirdi, chiqdi]`; `chiqdi` `None` — chiqish hodisasi hali kelmagan.
+    visits: list[list] = field(default_factory=list)
+
+
+def _visit_end(start: datetime, end: datetime | None, cutoff: datetime) -> datetime:
+    return end if end is not None else max(cutoff, start)
+
+
+def _merge_visits(visits: list[list], cutoff: datetime) -> list[list]:
+    """Ustma-ust kirishlarni birlashtiradi: ikki qurilmadan o'tirgan vaqt ikki marta sanalmasin."""
+    merged: list[list] = []
+    for start, end in sorted(visits, key=lambda item: item[0]):
+        if merged and start <= _visit_end(*merged[-1], cutoff):
+            last = merged[-1]
+            last[1] = None if end is None or last[1] is None else max(end, last[1])
+        else:
+            merged.append([start, end])
+    return merged
+
+
+def _visits_seconds(visits: list[list], cutoff: datetime) -> int:
+    return sum(max(0, int((_visit_end(start, end, cutoff) - start).total_seconds())) for start, end in visits)
 
 
 class ZoomReportMixin:
@@ -31,7 +64,8 @@ class ZoomReportMixin:
 
         Ishtirokchi foydalanuvchiga avval registrant orqali bog'lanadi (uni
         server bergan), keyin SDK `customerKey` orqali (qo'lda havola qo'yilgan
-        seanslar uchun). Ikkalasi ham yo'q — LMS'ni chetlab kirgan odam.
+        seanslar uchun), keyin registrantning sun'iy emaili va shu kalitning
+        oldingi hodisasi orqali. Hech biri yo'q — LMS'ni chetlab kirgan odam.
         """
         kind = _PARTICIPANT_EVENTS.get(payload.get("event") or "")
         obj = (payload.get("payload") or {}).get("object") or {}
@@ -49,26 +83,94 @@ class ZoomReportMixin:
         if occurred_at is None:
             return False
 
-        zs = (
-            await session.execute(
-                select(ZoomSession)
-                .where(
-                    ZoomSession.zoom_meeting_id == meeting_id,
-                    ZoomSession.starts_at - EARLY_JOIN - EVENT_MATCH_BEFORE <= occurred_at,
-                    ZoomSession.ends_at + EVENT_MATCH_AFTER >= occurred_at,
+        key = str(
+            participant.get("participant_uuid")
+            or participant.get("user_id")
+            or participant.get("id")
+            or participant.get("user_name")
+            or "unknown"
+        )[:128]
+        candidates = list(
+            (
+                await session.execute(
+                    select(ZoomSession)
+                    .where(
+                        ZoomSession.zoom_meeting_id == meeting_id,
+                        ZoomSession.starts_at - EARLY_JOIN - EVENT_MATCH_BEFORE <= occurred_at,
+                        ZoomSession.ends_at + EVENT_MATCH_AFTER >= occurred_at,
+                    )
+                    .order_by(desc(ZoomSession.starts_at))
                 )
-                .order_by(desc(ZoomSession.starts_at))
-                .limit(1)
             )
-        ).scalar_one_or_none()
-        if zs is None:
+            .scalars()
+            .all()
+        )
+        if not candidates:
             return False
+        zs = await self._event_session(session, candidates, kind, key, occurred_at)
 
         creds = await credentials_by_id(session, zs.zoom_account_id)
         host = (creds.host_user if creds else "").lower()
         if host and (participant.get("email") or "").lower() == host:
             return False  # o'qituvchi host akkaunti orqali — hisobotga kerak emas
 
+        user_id = await self._event_user(session, zs, participant, key)
+        await session.execute(
+            pg_insert(ZoomParticipantEvent)
+            .values(
+                session_id=zs.id,
+                user_id=user_id,
+                event=kind,
+                participant_key=key,
+                participant_name=(participant.get("user_name") or None) and participant["user_name"][:255],
+                occurred_at=occurred_at,
+            )
+            .on_conflict_do_nothing(constraint="uq_zoom_participant_event")
+        )
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def _event_session(
+        session: AsyncSession, candidates: list[ZoomSession], kind: str, key: str, occurred_at: datetime
+    ) -> ZoomSession:
+        """Hodisa qaysi seansniki: bir xonada ketma-ket ikki dars bo'lsa, oynalar ustma-ust tushadi.
+
+        Ilgari doim keyingi seans olinardi — birinchi darsdan chiqib, qayta
+        kirgan talaba ikkinchi darsning hisobotiga tushib qolardi. Endi chiqish
+        — o'sha kalitning kirishi yozilgan seansga; kirish — vaqti seans
+        oynasiga (`starts_at − EARLY_JOIN` … `ends_at`) eng yaqin seansga.
+        """
+        if len(candidates) == 1:
+            return candidates[0]
+        if kind == "left":
+            owner = (
+                await session.execute(
+                    select(ZoomParticipantEvent.session_id)
+                    .where(
+                        ZoomParticipantEvent.session_id.in_([zs.id for zs in candidates]),
+                        ZoomParticipantEvent.participant_key == key,
+                        ZoomParticipantEvent.event == "joined",
+                        ZoomParticipantEvent.occurred_at <= occurred_at,
+                    )
+                    .order_by(desc(ZoomParticipantEvent.occurred_at))
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if owner is not None:
+                return next(zs for zs in candidates if zs.id == owner)
+
+        def distance(zs: ZoomSession) -> timedelta:
+            opens = zs.starts_at - EARLY_JOIN
+            if occurred_at < opens:
+                return opens - occurred_at
+            return max(timedelta(0), occurred_at - zs.ends_at)
+
+        # Teng bo'lsa — keyingisi (`candidates` boshlanishi bo'yicha kamayib boradi, `min` birinchisini oladi).
+        return min(candidates, key=distance)
+
+    @staticmethod
+    async def _event_user(session: AsyncSession, zs: ZoomSession, participant: dict, key: str) -> int | None:
         user_id: int | None = None
         registrant_id = participant.get("registrant_id")
         if registrant_id:
@@ -79,33 +181,34 @@ class ZoomReportMixin:
                     )
                 )
             ).scalar_one_or_none()
+        candidates: list[str] = []
         customer_key = str(participant.get("customer_key") or "")
-        if user_id is None and customer_key.startswith(CUSTOMER_KEY_PREFIX):
-            candidate = customer_key[len(CUSTOMER_KEY_PREFIX):]
+        if customer_key.startswith(CUSTOMER_KEY_PREFIX):
+            candidates.append(customer_key[len(CUSTOMER_KEY_PREFIX):])
+        # Registrant emaili `lms-<user_id>@<domen>` — qayta kirishda Zoom ba'zan
+        # `registrant_id` ni yubormaydi, email esa qoladi.
+        local, _, domain = str(participant.get("email") or "").lower().partition("@")
+        if local.startswith(CUSTOMER_KEY_PREFIX) and domain == settings.zoom.registrant_email_domain.lower():
+            candidates.append(local[len(CUSTOMER_KEY_PREFIX):])
+        for candidate in candidates:
+            if user_id is not None:
+                break
             if candidate.isdigit() and await session.get(User, int(candidate)) is not None:
                 user_id = int(candidate)
-
-        key = str(
-            participant.get("participant_uuid")
-            or participant.get("user_id")
-            or participant.get("id")
-            or participant.get("user_name")
-            or "unknown"
-        )
-        await session.execute(
-            pg_insert(ZoomParticipantEvent)
-            .values(
-                session_id=zs.id,
-                user_id=user_id,
-                event=kind,
-                participant_key=key[:128],
-                participant_name=(participant.get("user_name") or None) and participant["user_name"][:255],
-                occurred_at=occurred_at,
-            )
-            .on_conflict_do_nothing(constraint="uq_zoom_participant_event")
-        )
-        await session.commit()
-        return True
+        if user_id is None:
+            # Shu kalit bilan avval kimligi aniqlangan bo'lsa — o'sha odam.
+            user_id = (
+                await session.execute(
+                    select(ZoomParticipantEvent.user_id)
+                    .where(
+                        ZoomParticipantEvent.session_id == zs.id,
+                        ZoomParticipantEvent.participant_key == key,
+                        ZoomParticipantEvent.user_id.is_not(None),
+                    )
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+        return user_id
 
     # ── Hisobot ──────────────────────────────────────────────────────────────
 
@@ -171,7 +274,7 @@ class ZoomReportMixin:
                     user_id=user_id, user_name=full_name, group_name=group_name, joined=user_id in presence
                 )
             if user_id in presence:
-                summary.zoom_seconds, summary.zoom_first_join = presence[user_id]
+                summary.zoom_seconds, summary.zoom_first_join, summary.zoom_visits = presence[user_id]
             students.append(summary)
 
         # Kirmaganlar va eng ko'p yo'q bo'lganlar yuqorida — o'qituvchi aynan shularni ko'radi.
@@ -186,11 +289,13 @@ class ZoomReportMixin:
     @staticmethod
     async def _zoom_presence(
         session: AsyncSession, zs: ZoomSession
-    ) -> tuple[dict[int, tuple[int, datetime]], list[ZoomOutsider]]:
-        """Webhook hodisalaridan: kim qancha uchrashuvda o'tirgan.
+    ) -> tuple[dict[int, tuple[int, datetime, list[ZoomVisit]]], list[ZoomOutsider]]:
+        """Webhook hodisalaridan: kim qachon kirib-chiqqan va jami qancha o'tirgan.
 
-        Har bir ishtirokchi kaliti bo'yicha «kirdi → chiqdi» juftlari yig'iladi.
-        Chiqishi kelmagan kirish seans oxirigacha (yoki hozirgacha) hisoblanadi.
+        Har bir ishtirokchi kaliti bo'yicha «kirdi → chiqdi» juftlari yig'iladi,
+        so'ng foydalanuvchi bo'yicha birlashtiriladi: qayta kirgan talaba Zoom'dan
+        yangi `participant_uuid` olishi mumkin. Chiqishi kelmagan kirish seans
+        oxirigacha (yoki hozirgacha) hisoblanadi.
         """
         events = (
             await session.execute(
@@ -200,32 +305,50 @@ class ZoomReportMixin:
             )
         ).scalars().all()
         cutoff = min(utcnow_naive(), zs.ends_at)
-        # kalit → (user_id, ism, ochiq kirish, jami soniya, birinchi kirish)
-        tracks: dict[str, list] = {}
+        tracks: dict[str, _Track] = {}
         for event in events:
-            track = tracks.setdefault(event.participant_key, [None, None, None, 0, event.occurred_at])
-            track[0] = track[0] or event.user_id
-            track[1] = track[1] or event.participant_name
+            track = tracks.setdefault(event.participant_key, _Track())
+            track.user_id = track.user_id or event.user_id
+            track.name = track.name or event.participant_name
+            open_visit = track.visits[-1] if track.visits and track.visits[-1][1] is None else None
             if event.event == "joined":
-                if track[2] is None:
-                    track[2] = event.occurred_at
-            elif track[2] is not None:
-                track[3] += max(0, int((event.occurred_at - track[2]).total_seconds()))
-                track[2] = None
-        presence: dict[int, tuple[int, datetime]] = {}
+                if open_visit is None:
+                    track.visits.append([event.occurred_at, None])
+            elif open_visit is not None:
+                open_visit[1] = max(event.occurred_at, open_visit[0])
+
+        # Kimligi aniqlanmagan qayta kirish — Zoom'dagi ismi aynan shu darsdagi
+        # bitta talabaniki bilan bir xil bo'lsa, o'shaniki («Ism Familiya · Guruh»).
+        names: dict[str, set[int]] = {}
+        for track in tracks.values():
+            if track.user_id is not None and track.name:
+                names.setdefault(track.name, set()).add(track.user_id)
+        for track in tracks.values():
+            owners = names.get(track.name or "", set())
+            if track.user_id is None and len(owners) == 1:
+                track.user_id = next(iter(owners))
+
+        by_user: dict[int, list[list]] = {}
         outsiders: dict[str, list] = {}
-        for user_id, name, open_since, seconds, first in tracks.values():
-            if open_since is not None:
-                seconds += max(0, int((max(cutoff, open_since) - open_since).total_seconds()))
-            if user_id is not None:
-                # Bir talaba qayta ulansa — Zoom yangi `participant_uuid` beradi.
-                total, earliest = presence.get(user_id, (0, first))
-                presence[user_id] = (total + seconds, min(earliest, first))
+        for track in tracks.values():
+            if not track.visits:
+                continue
+            if track.user_id is not None:
+                by_user.setdefault(track.user_id, []).extend([list(visit) for visit in track.visits])
             else:
                 # Begonalar ism bo'yicha birlashtiriladi: qayta ulanish ularni ko'paytirmasin.
-                slot = outsiders.setdefault(name or "?", [name, first, 0])
+                first = track.visits[0][0]
+                slot = outsiders.setdefault(track.name or "?", [track.name, first, 0])
                 slot[1] = min(slot[1], first)
-                slot[2] += seconds
+                slot[2] += _visits_seconds(track.visits, cutoff)
+        presence: dict[int, tuple[int, datetime, list[ZoomVisit]]] = {}
+        for user_id, visits in by_user.items():
+            merged = _merge_visits(visits, cutoff)
+            presence[user_id] = (
+                _visits_seconds(merged, cutoff),
+                merged[0][0],
+                [ZoomVisit(joined_at=start, left_at=end) for start, end in merged],
+            )
         return presence, [
             ZoomOutsider(name=name, first_join=first, seconds=seconds)
             for name, first, seconds in sorted(outsiders.values(), key=lambda item: item[1])

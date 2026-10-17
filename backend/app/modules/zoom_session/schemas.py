@@ -278,6 +278,13 @@ class AbsencePeriod(BaseModel):
     image_check_ids: List[int] = []
 
 
+class ZoomVisit(BaseModel):
+    """Uchrashuvga bir kirish; `left_at` `None` — hali ichida (yoki chiqishi kelmagan)."""
+
+    joined_at: TashkentDatetime
+    left_at: Optional[TashkentDatetime] = None
+
+
 class FaceCheckStudentSummary(BaseModel):
     user_id: int
     user_name: Optional[str] = None
@@ -297,6 +304,8 @@ class FaceCheckStudentSummary(BaseModel):
     #: Zoom webhook bo'yicha uchrashuvda o'tirgan vaqt; `None` — hodisa yo'q.
     zoom_seconds: Optional[int] = None
     zoom_first_join: Optional[TashkentDatetime] = None
+    #: Har bir kirish alohida: chiqib, qayta kirgani hisobotda ko'rinsin.
+    zoom_visits: List[ZoomVisit] = []
 
     model_config = ConfigDict(from_attributes=True)
 

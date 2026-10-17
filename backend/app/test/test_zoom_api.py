@@ -323,6 +323,82 @@ async def test_webhook_attendance_in_report(auth_client, async_client, async_db,
     assert report["outsiders"][0]["seconds"] >= 170
 
 
+async def _send(async_client, *events: dict) -> None:
+    for event in events:
+        raw, signed = _signed(event)
+        assert (await async_client.post("/zoom/webhook", content=raw, headers=signed)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_webhook_rejoin_counts_every_visit(auth_client, async_client, zoom_cloud):
+    """Chiqib, qayta kirgan talaba: Zoom yangi `participant_uuid` beradi va
+    `registrant_id` ni har doim ham yubormaydi — kirish baribir o'shaniki."""
+    zs = await _create_managed(auth_client, zoom_cloud, face=False)
+    headers = await _login(async_client, "zm_member")
+    body = (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).json()
+    user_id = int(body["customer_key"].removeprefix("lms-"))
+
+    first = {"participant_uuid": "p-1", "user_name": "Ali · G1", "registrant_id": f"reg-lms-{user_id}"}
+    # Ikkinchi kirish: faqat registrantning sun'iy emaili.
+    second = {"participant_uuid": "p-9", "user_name": "Ali · G1", "email": f"LMS-{user_id}@lms.nsumt.uz"}
+    # Uchinchisi: kimligi umuman yo'q, faqat Zoom'dagi ismi.
+    third = {"participant_uuid": "p-10", "user_name": "Ali · G1"}
+    await _send(
+        async_client,
+        _participant_event("meeting.participant_joined", {**first, "join_time": _zoom_iso(timedelta(minutes=-10))}),
+        _participant_event("meeting.participant_left", {**first, "leave_time": _zoom_iso(timedelta(minutes=-8))}),
+        _participant_event("meeting.participant_joined", {**second, "join_time": _zoom_iso(timedelta(minutes=-6))}),
+        _participant_event("meeting.participant_left", {**second, "leave_time": _zoom_iso(timedelta(minutes=-5))}),
+        _participant_event("meeting.participant_joined", {**third, "join_time": _zoom_iso(timedelta(minutes=-3))}),
+    )
+
+    report = (await auth_client.get(f"/zoom-sessions/{zs['id']}/report")).json()
+    ali = next(s for s in report["students"] if s["user_id"] == user_id)
+    assert report["outsiders"] == []
+    assert len(ali["zoom_visits"]) == 3
+    assert ali["zoom_visits"][-1]["left_at"] is None
+    assert 350 <= ali["zoom_seconds"] <= 370  # 2 + 1 + 3 daqiqa
+
+
+@pytest.mark.asyncio
+async def test_webhook_back_to_back_sessions_in_one_room(auth_client, async_client, async_db, zoom_cloud):
+    """Bir xonada ketma-ket ikki dars: oynalar ustma-ust, lekin birinchi darsdagi
+    kirish-chiqish ikkinchisiga o'tib ketmaydi."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    earlier = await _create_managed(auth_client, zoom_cloud, face=False)
+    later = await _create_managed(
+        auth_client, zoom_cloud, face=False,
+        starts_at=_iso(timedelta(hours=2)), ends_at=_iso(timedelta(hours=3)),
+    )
+    for session_id, starts, ends in (
+        (earlier["id"], timedelta(minutes=-80), timedelta(minutes=-10)),
+        (later["id"], timedelta(minutes=-5), timedelta(hours=1)),
+    ):
+        row = await async_db.get(ZoomSession, session_id)
+        row.starts_at, row.ends_at, row.zoom_meeting_id = now + starts, now + ends, MEETING_ID
+    await async_db.commit()
+    headers = await _login(async_client, "zm_member")
+    user_id = int(
+        (await async_client.post(f"/zoom-sessions/{later['id']}/join", headers=headers)).json()["customer_key"][4:]
+    )
+
+    student = {"participant_uuid": "p-1", "user_name": "Ali", "customer_key": f"lms-{user_id}"}
+    await _send(
+        async_client,
+        # Ikkala seans oynasida (−45 daqiqadan), lekin birinchi dars ketayapti.
+        _participant_event("meeting.participant_joined", {**student, "join_time": _zoom_iso(timedelta(minutes=-40))}),
+        _participant_event("meeting.participant_left", {**student, "leave_time": _zoom_iso(timedelta(minutes=-20))}),
+        # Birinchisi tugadi, ikkinchisiga kirish ochiq.
+        _participant_event("meeting.participant_joined", {**student, "join_time": _zoom_iso(timedelta(minutes=-8))}),
+    )
+
+    stored = {
+        (event.session_id, event.event)
+        for event in (await async_db.execute(select(ZoomParticipantEvent))).scalars().all()
+    }
+    assert stored == {(earlier["id"], "joined"), (earlier["id"], "left"), (later["id"], "joined")}
+
+
 @pytest.mark.asyncio
 async def test_meeting_body_lets_students_in_before_host(monkeypatch):
     """Talaba o'qituvchini kutmaydi; ro'yxatdan o'tish esa qo'lda tasdiqlanadi."""

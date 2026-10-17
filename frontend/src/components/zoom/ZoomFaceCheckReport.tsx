@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Image as ImageIcon, LogOut, ScanFace, UserX, Video } from 'lucide-react';
 import { useState } from 'react';
-import { zoomSessionService, type AbsencePeriod, type FaceCheckStudentSummary } from '@/services/zoomSessionService';
+import { zoomSessionService, type AbsencePeriod, type FaceCheckStudentSummary, type ZoomVisit } from '@/services/zoomSessionService';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatTime } from '@/utils/date';
 
@@ -23,6 +23,10 @@ const periodReasons = (period: AbsencePeriod) => {
     const unique = [...new Set(period.statuses.map((s) => REASON_LABEL[s] ?? s))];
     return unique.join(', ');
 };
+
+/** «10:05–10:20, 10:40–hozir»: chiqib, qayta kirgani bir qarashda ko'rinsin. */
+const formatVisits = (visits: ZoomVisit[]) =>
+    visits.map((visit) => `${formatTime(visit.joined_at)}–${visit.left_at ? formatTime(visit.left_at) : 'oxirigacha'}`).join(', ');
 
 /**
  * Vaqt chizig'i: kuzatuv oynasi bo'ylab yuz ko'ringan va ko'rinmagan qismlar.
@@ -105,14 +109,24 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                         </div>
                     );
                 }
+                const visits = student.zoom_visits ?? [];
                 const zoomBadge = zoomTracked && (
                     <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
-                        title="Zoom ma'lumoti bo'yicha uchrashuvda o'tirgan vaqt"
+                        title={visits.length > 0
+                            ? `Zoom'da: ${formatVisits(visits)}`
+                            : "Zoom ma'lumoti bo'yicha uchrashuvda o'tirgan vaqt"}
                     >
                         <Video className="h-3.5 w-3.5" />
                         {student.zoom_seconds != null ? formatMinutes(student.zoom_seconds) : "Zoom'da yo'q"}
+                        {visits.length > 1 && <span>· {visits.length} marta kirdi</span>}
                     </span>
+                );
+                const visitsLine = visits.length > 1 && (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Video className="h-3.5 w-3.5 shrink-0" />
+                        Zoom'da: {formatVisits(visits)}
+                    </p>
                 );
                 // Yuz nazoratisiz seans: faqat Zoom'dagi vaqt bor, kuzatuv chizig'i yo'q.
                 if (student.total === 0) {
@@ -173,6 +187,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                     Kuzatuv: {formatMinutes(student.tracked_seconds)} · {student.total} ta tekshiruv
                                     {' '}({student.passed} tasdiqlandi, {student.failed} muammoli)
                                 </p>
+                                {visitsLine}
 
                                 {student.periods.length === 0 ? (
                                     <p className="text-xs text-emerald-600">Yuz butun davomida kadrda bo'lgan.</p>

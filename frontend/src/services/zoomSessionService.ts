@@ -187,6 +187,14 @@ export interface FaceCheckStudentSummary {
     /** Zoom webhook bo'yicha uchrashuvda o'tirgan vaqt; `null` — hodisa yo'q. */
     zoom_seconds?: number | null;
     zoom_first_join?: string | null;
+    /** Har bir kirish alohida — chiqib, qayta kirgani ham ko'rinadi. */
+    zoom_visits?: ZoomVisit[];
+}
+
+/** Uchrashuvga bir kirish; `left_at` `null` — hali ichida. */
+export interface ZoomVisit {
+    joined_at: string;
+    left_at?: string | null;
 }
 
 /** Uchrashuvda bo'lgan, lekin LMS orqali kirmagan ishtirokchi. */
