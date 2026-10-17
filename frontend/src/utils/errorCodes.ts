@@ -46,6 +46,7 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     zoom_session_not_open: "Seans hali boshlanmagan",
     zoom_session_closed: "Seans vaqti tugagan — kirib bo'lmaydi",
     zoom_face_check_disabled: "Bu seansda yuz nazorati o'chirilgan",
+    zoom_random_checks_disabled: "Bu seansda faqat kirishda tekshiriladi — dars davomida tekshiruv yo'q",
     zoom_not_configured: "Zoom integratsiyasi sozlanmagan",
     zoom_link_required: "Zoom havolasini qo'ying — avtomatik yaratish sozlanmagan",
     zoom_not_managed: "Uchrashuv LMS orqali yaratilmagan — uni Zoom ilovasida o'zingiz boshlang",

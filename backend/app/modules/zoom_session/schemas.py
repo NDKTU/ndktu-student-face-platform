@@ -34,6 +34,8 @@ class ZoomSessionRequest(BaseModel):
     group_ids: list[int] = Field(min_length=1, max_length=200)
     subject_id: Optional[int] = None
     face_check_enabled: bool = True
+    #: `False` — faqat kirishda tekshiriladi, dars davomida tasodifiy tekshiruv yo'q.
+    random_face_checks: bool = True
     is_active: bool = True
 
     @field_validator("title", "link_url", mode="before")
@@ -137,6 +139,7 @@ class ZoomSessionResponse(BaseModel):
     teacher_name: Optional[str] = None
     groups: List[SessionGroup] = []
     face_check_enabled: bool
+    random_face_checks: bool = True
     is_active: bool
     #: Tahrirlash va hisobot — yaratuvchi va admin.
     can_manage: bool = False
@@ -324,6 +327,8 @@ class FaceCheckReportResponse(BaseModel):
     #: Webhook hodisalari kelganmi — kelmagan bo'lsa Zoom ustunlari ko'rsatilmaydi.
     zoom_tracked: bool = False
     outsiders: List[ZoomOutsider] = []
+    #: `False` — faqat kirishda tekshirilgan: kuzatuv chizig'i va «erta chiqdi» yo'q.
+    random_checks: bool = True
 
 
 

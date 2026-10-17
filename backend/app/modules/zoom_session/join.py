@@ -33,7 +33,16 @@ from .schemas import (
 from .zoom_api import ZoomApiError, api_error, registrant_join_url, registrant_token, zak_token, zoom_api
 from app.core.errors import NotFound
 from .common import EARLY_JOIN, FACE_OK_TTL_SECONDS, MAX_IMAGES_PER_SPAN, CUSTOMER_KEY_PREFIX, _STATUS_MESSAGE, _FAILED, _face_ok_key
-from .errors import _not_your_group, _not_open, _closed, _face_check_disabled, _not_configured, _bad_link, _not_managed
+from .errors import (
+    _bad_link,
+    _closed,
+    _face_check_disabled,
+    _not_configured,
+    _not_managed,
+    _not_open,
+    _not_your_group,
+    _random_checks_disabled,
+)
 from .naming import _readable_name
 
 logger = logging.getLogger(__name__)
@@ -114,6 +123,10 @@ class ZoomJoinMixin:
         zs = await self._get(session, session_id)
         if not zs.face_check_enabled:
             raise _face_check_disabled()
+        if data.stage == "random" and not zs.random_face_checks:
+            # Faqat kirishda tekshiriladigan seans: «yo'q» davrlari va erta
+            # chiqish hisobotda hisoblanmaydi, ortiqcha yozuv uni chalkashtirardi.
+            raise _random_checks_disabled()
         student = await self._admit_student(session, zs, user)
 
         check_status = "no_camera"

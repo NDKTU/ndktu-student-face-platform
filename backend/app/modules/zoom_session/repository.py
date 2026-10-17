@@ -141,6 +141,7 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
                 key=lambda g: g.name,
             ),
             face_check_enabled=zs.face_check_enabled,
+            random_face_checks=zs.random_face_checks,
             is_active=zs.is_active,
             can_manage=manage,
             link_url=zs.link_url if manage else None,
@@ -258,6 +259,7 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
         zs.ends_at = data.ends_at
         zs.subject_id = data.subject_id
         zs.face_check_enabled = data.face_check_enabled
+        zs.random_face_checks = data.random_face_checks
         zs.is_active = data.is_active
         current = {link.group_id: link for link in zs.group_links}
         for group_id, link in current.items():

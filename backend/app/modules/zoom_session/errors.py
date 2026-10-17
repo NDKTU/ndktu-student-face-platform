@@ -43,6 +43,14 @@ def _face_check_disabled() -> AppError:
     return quiz_error(status.HTTP_409_CONFLICT, "zoom_face_check_disabled", "Bu seansda yuz nazorati o'chirilgan")
 
 
+def _random_checks_disabled() -> AppError:
+    return quiz_error(
+        status.HTTP_409_CONFLICT,
+        "zoom_random_checks_disabled",
+        "Bu seansda faqat kirishda tekshiriladi — dars davomida tekshiruv yo'q",
+    )
+
+
 def _not_configured() -> AppError:
     return quiz_error(
         status.HTTP_503_SERVICE_UNAVAILABLE, "zoom_not_configured", "Zoom integratsiyasi sozlanmagan"

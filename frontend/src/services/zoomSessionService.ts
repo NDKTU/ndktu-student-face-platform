@@ -27,6 +27,8 @@ export interface ZoomSession {
     teacher_name?: string | null;
     groups: { id: number; name: string }[];
     face_check_enabled: boolean;
+    /** Yuz nazorati yoqiq bo'lsa: `false` — faqat kirishda, dars davomida tekshiruv yo'q. */
+    random_face_checks: boolean;
     is_active: boolean;
     /** Tahrirlash va hisobot — yaratuvchi va admin. */
     can_manage: boolean;
@@ -104,6 +106,7 @@ export interface ZoomSessionPayload {
     group_ids: number[];
     subject_id: number | null;
     face_check_enabled: boolean;
+    random_face_checks: boolean;
     is_active: boolean;
 }
 
@@ -210,6 +213,8 @@ export interface FaceCheckReport {
     /** Zoom webhook hodisalari kelganmi. */
     zoom_tracked: boolean;
     outsiders: ZoomOutsider[];
+    /** `false` — faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q. */
+    random_checks: boolean;
 }
 
 export const zoomSessionService = {

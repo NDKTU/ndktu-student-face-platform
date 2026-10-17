@@ -191,7 +191,8 @@ export default function ZoomSessionsPage() {
                                     </span>
                                     {session.face_check_enabled && (
                                         <span className="inline-flex items-center gap-1">
-                                            <ScanFace className="h-3.5 w-3.5" /> Yuz nazorati
+                                            <ScanFace className="h-3.5 w-3.5" />
+                                            {session.random_face_checks ? 'Yuz nazorati' : 'Yuz nazorati: faqat kirishda'}
                                         </span>
                                     )}
                                 </div>

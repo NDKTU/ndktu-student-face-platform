@@ -110,6 +110,7 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
         () => new Map((editing?.groups ?? []).map((g) => [g.id, g.name])),
     );
     const [faceCheck, setFaceCheck] = useState(editing?.face_check_enabled ?? true);
+    const [randomChecks, setRandomChecks] = useState(editing?.random_face_checks ?? true);
     const [isActive, setIsActive] = useState(editing?.is_active ?? true);
     const [localError, setLocalError] = useState<string | null>(null);
     // Takrorlash — faqat yangi seansda. «Qachongacha» standart: 8 hafta keyin.
@@ -190,6 +191,7 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
             ends_at: `${date}T${endTime}:00${TASHKENT_OFFSET}`,
             group_ids: [...groups.keys()],
             face_check_enabled: faceCheck,
+            random_face_checks: randomChecks,
             is_active: isActive,
         }, extra);
     };
@@ -449,15 +451,39 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         <p className="text-xs text-muted-foreground">Tanlangan: {[...groups.values()].join(', ')}</p>
                     )}
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
-                    <label htmlFor="zoom-face-check" className="cursor-pointer">
-                        <div className="text-sm font-medium">Yuz nazorati</div>
-                        <div className="text-xs text-muted-foreground">
-                            Kirishda yuz HEMIS surati bilan solishtiriladi (mos kelmasa — kirmaydi), dars davomida
-                            tasodifiy tekshiriladi
+                <div className="space-y-3 rounded-lg border border-border px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-4">
+                        <label htmlFor="zoom-face-check" className="cursor-pointer">
+                            <div className="text-sm font-medium">Yuz nazorati</div>
+                            <div className="text-xs text-muted-foreground">
+                                Kirishda yuz HEMIS surati bilan solishtiriladi — mos kelmasa, talaba kirmaydi
+                            </div>
+                        </label>
+                        <Switch id="zoom-face-check" checked={faceCheck} onCheckedChange={setFaceCheck} />
+                    </div>
+                    {faceCheck && (
+                        <div className="space-y-2 border-t border-border pt-2.5" role="radiogroup" aria-label="Yuz nazorati turi">
+                            {([false, true] as const).map((value) => (
+                                <label key={String(value)} className="flex cursor-pointer items-start gap-2 text-sm">
+                                    <input
+                                        type="radio"
+                                        name="zoom-random-checks"
+                                        checked={randomChecks === value}
+                                        onChange={() => setRandomChecks(value)}
+                                        className="mt-0.5"
+                                    />
+                                    <span>
+                                        {value ? 'Kirishda va dars davomida' : 'Faqat kirishda'}
+                                        <span className="block text-xs text-muted-foreground">
+                                            {value
+                                                ? "Dars davomida ham taxminan daqiqada bir tasodifiy tekshiriladi — hisobotda kim qancha kadrda bo'lgani ko'rinadi"
+                                                : "Shaxs tasdiqlangach boshqa tekshirilmaydi — kamera dars davomida band bo'lmaydi"}
+                                        </span>
+                                    </span>
+                                </label>
+                            ))}
                         </div>
-                    </label>
-                    <Switch id="zoom-face-check" checked={faceCheck} onCheckedChange={setFaceCheck} />
+                    )}
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
                     <label htmlFor="zoom-active" className="cursor-pointer">

@@ -111,7 +111,7 @@ export default function ZoomSessionDetailPage() {
                 </span>
                 {session.face_check_enabled && (
                     <span className="inline-flex items-center gap-1.5">
-                        <ScanFace className="h-4 w-4" /> Yuz nazorati
+                        <ScanFace className="h-4 w-4" /> {session.random_face_checks ? 'Yuz nazorati' : 'Yuz nazorati: faqat kirishda'}
                     </span>
                 )}
                 {session.zoom_account_name && (
@@ -168,6 +168,7 @@ export default function ZoomSessionDetailPage() {
                     sessionId={session.id}
                     host={isHost}
                     faceCheckEnabled={studentView && session.face_check_enabled}
+                    randomChecks={session.random_face_checks}
                     appFallback={session.zoom_managed}
                 />
             )}

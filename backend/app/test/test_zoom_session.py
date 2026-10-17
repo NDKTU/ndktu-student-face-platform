@@ -90,7 +90,9 @@ def _iso(delta: timedelta) -> str:
     return (datetime.now(timezone.utc) + delta).isoformat()
 
 
-async def _create(auth_client, scene: dict, *, start: timedelta, end: timedelta, face: bool = True) -> dict:
+async def _create(
+    auth_client, scene: dict, *, start: timedelta, end: timedelta, face: bool = True, random_checks: bool = True
+) -> dict:
     created = await auth_client.post(
         "/zoom-sessions/",
         json={
@@ -101,6 +103,7 @@ async def _create(auth_client, scene: dict, *, start: timedelta, end: timedelta,
             "group_ids": [scene["group_id"]],
             **_teaching(scene),
             "face_check_enabled": face,
+            "random_face_checks": random_checks,
         },
     )
     assert created.status_code == 201, created.text
@@ -278,6 +281,32 @@ async def test_report_lone_student_who_left_is_not_always_present(
     report = await auth_client.get(f"/zoom-sessions/{zs['id']}/report")
     ali = next(s for s in report.json()["students"] if s["user_name"] == "Ali Talaba T")
     assert ali["left_early"] is True
+
+
+@pytest.mark.asyncio
+async def test_join_only_face_check(auth_client, async_client, async_db, zoom_scene, monkeypatch):
+    """«Faqat kirishda»: kirish yuz tasdig'idan keyin, dars davomida tekshiruv yo'q."""
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-30), end=timedelta(hours=1), random_checks=False)
+    assert zs["face_check_enabled"] is True and zs["random_face_checks"] is False
+    headers = await _login(async_client, "zm_member")
+    assert (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).status_code == 403
+
+    _fake_face(monkeypatch)
+    assert (await _check(async_client, zs["id"], headers)).json()["admitted"] is True
+    assert (await async_client.post(f"/zoom-sessions/{zs['id']}/join", headers=headers)).status_code == 200
+    random = await _check(async_client, zs["id"], headers, stage="random")
+    assert random.status_code == 409
+    assert random.json()["detail"]["code"] == "zoom_random_checks_disabled"
+
+    # Yagona tekshiruv 20 daqiqa oldin — bu «chiqib ketdi» degani emas.
+    rows = (await async_db.execute(select(ZoomFaceCheck).where(ZoomFaceCheck.session_id == zs["id"]))).scalars().all()
+    assert len(rows) == 1
+    rows[0].created_at -= timedelta(minutes=20)
+    await async_db.flush()
+    report = (await auth_client.get(f"/zoom-sessions/{zs['id']}/report")).json()
+    assert report["random_checks"] is False
+    ali = next(s for s in report["students"] if s["user_name"] == "Ali Talaba T")
+    assert ali["joined"] is True and ali["passed"] == 1 and ali["left_early"] is False
 
 
 @pytest.mark.asyncio

@@ -268,7 +268,10 @@ class ZoomReportMixin:
             group_name = group_names.get(group_id) if group_id else None
             items = grouped.get(user_id)
             if items:
-                summary = self._summary(user_id, full_name, group_name, items, last_check)
+                # Faqat kirishda tekshirilgan: tekshiruvlar «to'xtagani» chiqib ketgani emas.
+                summary = self._summary(
+                    user_id, full_name, group_name, items, last_check if zs.random_face_checks else None
+                )
             else:
                 summary = FaceCheckStudentSummary(
                     user_id=user_id, user_name=full_name, group_name=group_name, joined=user_id in presence
@@ -284,6 +287,7 @@ class ZoomReportMixin:
             students=students,
             zoom_tracked=bool(presence or outsiders),
             outsiders=outsiders,
+            random_checks=zs.random_face_checks,
         )
 
     @staticmethod

@@ -55,6 +55,8 @@ interface Props {
     host?: boolean;
     /** Kirishdan oldin yuz tekshiruvi (server talab qiladi) va dars davomida tasodifiy. */
     faceCheckEnabled?: boolean;
+    /** `false` — faqat kirishda tekshiriladi, xonada tasodifiy tekshiruv yo'q. */
+    randomChecks?: boolean;
     /**
      * Zaxira yo'l — Zoom ilovasi (faqat telefonda, LMS yaratgan uchrashuvda).
      * Ilovada tasodifiy yuz tekshiruvi yo'q: sahifa fonda «uxlaydi».
@@ -65,7 +67,13 @@ interface Props {
 // Shaxs tasdiqlanmaguncha imzo berilmaydi — buni server hal qiladi
 // (`zoom_session/repository.py::join`). Urinishlar cheklanmaydi: yomon yorug'lik
 // talabaning aybi emas. Ilgari uch urinishdan keyin talaba baribir kirardi.
-export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = false, appFallback = false }: Props) => {
+export const ZoomMeetingBox = ({
+    sessionId,
+    host = false,
+    faceCheckEnabled = false,
+    randomChecks = true,
+    appFallback = false,
+}: Props) => {
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState('');
     /**
@@ -96,7 +104,7 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                 window.location.href = payload.app_join_url;
                 return;
             }
-            saveZoomRoomTicket(sessionId, { payload, faceCheck: faceCheckEnabled });
+            saveZoomRoomTicket(sessionId, { payload, faceCheck: faceCheckEnabled && randomChecks });
             // Alohida HTML sahifa, to'liq yuklash: Client View va saytning
             // stillari bir-biriga aralashmasin (`zoom-room.html`).
             window.location.assign(`/zoom-room.html?session=${sessionId}`);
@@ -152,8 +160,10 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                     <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
                         {host
                             ? "Zoom butun ekranda host sifatida ochiladi: «Join Audio» ni bosing — mikrofon yoqiq bo'ladi, talabalar ovozini boshqara olasiz."
-                            : faceCheckEnabled
+                            : faceCheckEnabled && randomChecks
                                 ? "Zoom butun ekranda ochiladi. Qo'shilishdan oldin shaxsingiz tekshiriladi, dars davomida ham tasodifiy tekshiriladi."
+                            : faceCheckEnabled
+                                ? "Zoom butun ekranda ochiladi. Qo'shilishdan oldin shaxsingiz bir marta tekshiriladi."
                                 : "Zoom butun ekranda ochiladi — ilova shart emas. Kirgach «Join Audio» ni bosing."}
                     </p>
                 </div>
@@ -170,7 +180,8 @@ export const ZoomMeetingBox = ({ sessionId, host = false, faceCheckEnabled = fal
                 </div>
                 {showAppFallback && (
                     <p className="max-w-md text-xs text-muted-foreground">
-                        Brauzerda Zoom sekin ishlasa — ilovada oching. Ilovada dars davomidagi yuz tekshiruvi ishlamaydi.
+                        Brauzerda Zoom sekin ishlasa — ilovada oching.
+                        {faceCheckEnabled && randomChecks && ' Ilovada dars davomidagi yuz tekshiruvi ishlamaydi.'}
                     </p>
                 )}
             </div>

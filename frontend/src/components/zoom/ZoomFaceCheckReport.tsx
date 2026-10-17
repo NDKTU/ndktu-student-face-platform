@@ -86,6 +86,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
     const students = query.data?.students ?? [];
     const zoomTracked = Boolean(query.data?.zoom_tracked);
     const outsiders = query.data?.outsiders ?? [];
+    const randomChecks = query.data?.random_checks ?? true;
     if (students.length === 0) {
         return <p className="text-sm text-muted-foreground">Seansga guruh talabalari biriktirilmagan.</p>;
     }
@@ -128,6 +129,30 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                         Zoom'da: {formatVisits(visits)}
                     </p>
                 );
+                // Faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q — kirishdagi natija va Zoom'dagi vaqt.
+                if (!randomChecks && student.total > 0) {
+                    return (
+                        <div key={student.user_id} className="space-y-1.5 rounded-xl border border-border/60 px-4 py-3">
+                            <div className="flex items-center gap-3">
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                    {student.user_name || `#${student.user_id}`}
+                                    {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
+                                </span>
+                                {student.passed > 0 ? (
+                                    <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">
+                                        Kirishda tasdiqlandi{student.first_check ? ` · ${formatTime(student.first_check)}` : ''}
+                                    </span>
+                                ) : (
+                                    <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                                        Tasdiqlanmadi · {student.total} urinish
+                                    </span>
+                                )}
+                                {zoomBadge}
+                            </div>
+                            {visitsLine}
+                        </div>
+                    );
+                }
                 // Yuz nazoratisiz seans: faqat Zoom'dagi vaqt bor, kuzatuv chizig'i yo'q.
                 if (student.total === 0) {
                     return (
@@ -259,8 +284,9 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
             )}
             <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
                 <ScanFace className="h-3.5 w-3.5" />
-                Tekshiruv avtomatik va taxminan daqiqada bir marta. Qisqa yo'qolishlar qayd etilmaydi —
-                davr faqat ketma-ket ikki kadrda yuz topilmasa ochiladi. Qaror sizda.
+                {randomChecks
+                    ? "Tekshiruv avtomatik va taxminan daqiqada bir marta. Qisqa yo'qolishlar qayd etilmaydi — davr faqat ketma-ket ikki kadrda yuz topilmasa ochiladi. Qaror sizda."
+                    : "Bu seansda yuz faqat kirishda tekshirilgan — dars davomida kim qancha o'tirgani Zoom ma'lumotidan."}
             </p>
         </div>
     );
