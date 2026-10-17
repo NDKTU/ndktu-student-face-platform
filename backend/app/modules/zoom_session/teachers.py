@@ -1,11 +1,15 @@
 """Seans o'qituvchisi va fani: kim, qaysi fanlari bilan (`teacher_subject` ∪ yuklama)."""
 
 
-from sqlalchemy import select, union
+from datetime import timedelta
+
+from sqlalchemy import func, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.modules.course.lesson_access import is_admin
+from app.modules.organization_structure.model import Group
 from app.modules.auth.model import Teacher, TeacherAssignment, TeacherSubject, User
 from app.modules.quiz.model import Subject
 
@@ -18,6 +22,8 @@ from .schemas import (
     ZoomCapabilitiesResponse,
     ZoomSubjectOption,
     ZoomSubjectOptionListResponse,
+    ZoomTeacherLoadItem,
+    ZoomTeacherLoadResponse,
     ZoomTeacherOption,
     ZoomTeacherOptionListResponse,
 )
@@ -104,6 +110,75 @@ class ZoomTeachersMixin:
             await session.execute(select(Subject.id, Subject.name).where(Subject.id.in_(ids)).order_by(Subject.name))
         ).all()
         return ZoomSubjectOptionListResponse(subjects=[ZoomSubjectOption(id=i, name=n) for i, n in rows])
+
+    @staticmethod
+    def _current_semester() -> str:
+        """EPOS'dagi `semester_type`: avgust–yanvar — «Kuzgi», fevral–iyul — «Bahorgi» (Toshkent bo'yicha)."""
+        month = (utcnow_naive() + timedelta(hours=5)).month
+        return "Kuzgi" if month >= 8 or month == 1 else "Bahorgi"
+
+    async def teacher_load(self, session: AsyncSession, user: User, teacher_user_id: int) -> ZoomTeacherLoadResponse:
+        """O'qituvchining EPOS yuklamasi: qaysi guruhga qaysi fanni, qanday turda o'tadi.
+
+        Formada guruhlar va fanlar shundan tanlanadi — butun universitet
+        ro'yxatidan emas. Oxirgi o'quv yili va joriy semestr; joriy semestrda
+        yuklama bo'lmasa — o'sha yilning hammasi (bo'sh ro'yxatdan yaxshiroq).
+        Juftlik odatda bitta qator (`uq_teacher_subject_group`), turlar ichida;
+        baribir kalit bo'yicha yig'iladi — `academic_year_id` bo'sh qatorlar ham bor.
+        """
+        teacher = await self._resolve_teacher(session, user, teacher_user_id)
+        base = (
+            select(
+                TeacherAssignment.subject_id,
+                Subject.name,
+                TeacherAssignment.group_id,
+                Group.name,
+                TeacherAssignment.load_types,
+                TeacherAssignment.semester_type,
+            )
+            .join(Subject, Subject.id == TeacherAssignment.subject_id)
+            .join(Group, Group.id == TeacherAssignment.group_id)
+            .where(
+                TeacherAssignment.teacher_id == teacher.id,
+                TeacherAssignment.is_active.is_(True),
+                Group.is_active.is_(True),
+            )
+        )
+        latest_year = (
+            await session.execute(
+                select(func.max(TeacherAssignment.academic_year_id)).where(
+                    TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.is_active.is_(True)
+                )
+            )
+        ).scalar_one_or_none()
+        if latest_year is not None:
+            base = base.where(
+                (TeacherAssignment.academic_year_id == latest_year) | TeacherAssignment.academic_year_id.is_(None)
+            )
+        rows = (await session.execute(base)).all()
+
+        semester: str | None = self._current_semester()
+        if any(row[5] == semester for row in rows):
+            current = [row for row in rows if row[5] in (None, semester)]
+        else:
+            # Joriy semestrda yuklama yo'q (yoki semestr ko'rsatilmagan) — yil bo'yicha hammasi.
+            semester, current = None, rows
+
+        merged: dict[tuple[int, int], ZoomTeacherLoadItem] = {}
+        for subject_id, subject_name, group_id, group_name, load_types, _semester in current:
+            item = merged.setdefault(
+                (subject_id, group_id),
+                ZoomTeacherLoadItem(
+                    subject_id=subject_id, subject_name=subject_name, group_id=group_id, group_name=group_name
+                ),
+            )
+            for load_type in load_types or []:
+                if load_type not in item.load_types:
+                    item.load_types.append(load_type)
+        items = sorted(merged.values(), key=lambda item: (item.group_name, item.subject_name))
+        for item in items:
+            item.load_types.sort()
+        return ZoomTeacherLoadResponse(items=items, semester=semester)
 
     # ── Akkaunt tanlash ──────────────────────────────────────────────────────
 

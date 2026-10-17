@@ -1,11 +1,12 @@
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/Select';
+import { SwitchField } from '@/components/ui/SwitchField';
 import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
 import { Combobox } from '@/components/ui/Combobox';
@@ -34,8 +35,6 @@ interface QuizModalProps {
     onSuccess: () => void;
 }
 
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Semestr uchun test jadvalida ustun yo'q — u faqat sarlavhada yashaydi.
@@ -400,26 +399,39 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Nazorat turi</label>
-                    <select className={selectClassName} {...register('quiz_type')}>
-                        {/* Oraliq nazorat kurs ichida («Fan topshiriqlari») tuziladi:
-                            unga kurs va darslar kerak, bu oynada ular yo'q. */}
-                        {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
-                            .filter((value) => value !== 'MIDTERM' || quiz?.quiz_type === 'MIDTERM')
-                            .map((value) => (
-                                <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
-                            ))}
-                    </select>
+                    {/* Oraliq nazorat kurs ichida («Fan topshiriqlari») tuziladi:
+                        unga kurs va darslar kerak, bu oynada ular yo'q. */}
+                    <Controller
+                        name="quiz_type"
+                        control={control}
+                        render={({ field }) => (
+                            <Select
+                                value={String(field.value ?? '')}
+                                onChange={field.onChange}
+                                ariaLabel="Nazorat turi"
+                                options={(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
+                                    .filter((value) => value !== 'MIDTERM' || quiz?.quiz_type === 'MIDTERM')
+                                    .map((value) => ({ value, label: QUIZ_TYPE_LABELS[value] }))}
+                            />
+                        )}
+                    />
                     {errors.quiz_type && <p className="text-sm text-destructive">{errors.quiz_type.message}</p>}
                 </div>
 
                 {!isPublicQuiz && <div className="space-y-2">
                     <label className="text-sm font-medium">Semestr</label>
-                    <select className={selectClassName} {...register('semester_number')}>
-                        <option value="">Tanlanmagan</option>
-                        {SEMESTER_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
+                    <Controller
+                        name="semester_number"
+                        control={control}
+                        render={({ field }) => (
+                            <Select
+                                value={String(field.value ?? '')}
+                                onChange={field.onChange}
+                                ariaLabel="Semestr"
+                                options={[{ value: '', label: 'Tanlanmagan' }, ...SEMESTER_OPTIONS.map((option) => ({ value: String(option.value), label: option.label }))]}
+                            />
+                        )}
+                    />
                     {errors.semester_number && (
                         <p className="text-sm text-destructive">{errors.semester_number.message}</p>
                     )}
@@ -437,17 +449,15 @@ export const QuizModal = ({ isOpen, onClose, quiz, teachers, onSuccess }: QuizMo
 
                 <div className="grid grid-cols-2 gap-4">
                     <Input label="PIN kod" {...register('pin')} error={errors.pin?.message} />
-                    <div className="flex items-center space-x-2 pt-8">
-                        <Switch
-                            id="modal-is-active"
-                            checked={isActive}
-                            onCheckedChange={(checked) => setValue('is_active', checked)}
-                        />
-                        <label htmlFor="modal-is-active" className="text-sm font-medium leading-none cursor-pointer">
-                            Faol
-                        </label>
-                    </div>
                 </div>
+
+                <SwitchField
+                    id="modal-is-active"
+                    title="Faol"
+                    description="Faol test talabalarga ko'rinadi va PIN bilan boshlanadi"
+                    checked={isActive}
+                    onCheckedChange={(checked) => setValue('is_active', checked)}
+                />
 
                 <ProctoringModePicker
                     value={proctoringMode}

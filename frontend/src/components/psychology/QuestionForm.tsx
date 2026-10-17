@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
@@ -133,16 +134,12 @@ export function QuestionForm({ form, onChange, methodCategories }: QuestionFormP
                             {form.category}
                         </span>
                     ) : (
-                        <select
+                        <Select
                             value={form.category}
-                            onChange={e => set({ category: e.target.value })}
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                            <option value="">— Tanlanmagan —</option>
-                            {methodCategories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
+                            onChange={(next) => set({ category: next })}
+                            ariaLabel="Kategoriya"
+                            options={[{ value: '', label: '— Tanlanmagan —' }, ...methodCategories.map((cat) => ({ value: cat, label: cat }))]}
+                        />
                     )}
                 </div>
             )}

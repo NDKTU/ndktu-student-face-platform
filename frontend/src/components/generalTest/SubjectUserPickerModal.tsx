@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
 import { Search, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -18,7 +19,7 @@ import {
 } from '@/hooks/useGeneralTests';
 import type { UserFilter, UserKindFilter } from '@/services/generalTestService';
 import { apiErrorMessage } from '@/utils/apiError';
-import { KIND_LABEL, selectClassName } from './labels';
+import { KIND_LABEL } from './labels';
 
 const PAGE_SIZE = 20;
 const COURSES = [1, 2, 3, 4, 5, 6];
@@ -126,62 +127,44 @@ export function SubjectUserPickerModal({ subjectId, subjectName, onClose }: Prop
                         leftAddon={<Search className="h-4 w-4" />}
                         className="sm:col-span-2 lg:col-span-3"
                     />
-                    <select
-                        aria-label="Foydalanuvchi turi"
-                        className={selectClassName}
+                    <Select
+                        ariaLabel="Foydalanuvchi turi"
                         value={kind}
-                        onChange={(e) => changeFilter(setKind)(e.target.value as UserKindFilter | '')}
-                    >
-                        <option value="">Barcha turlar</option>
-                        <option value="student">Talabalar</option>
-                        <option value="teacher">O'qituvchilar</option>
-                        <option value="other">Boshqa xodimlar</option>
-                    </select>
-                    <select
-                        aria-label="Rol"
-                        className={selectClassName}
+                        onChange={(next) => changeFilter(setKind)(next as UserKindFilter | '')}
+                        options={[
+                            { value: '', label: 'Barcha turlar' },
+                            { value: 'student', label: 'Talabalar' },
+                            { value: 'teacher', label: "O'qituvchilar" },
+                            { value: 'other', label: 'Boshqa xodimlar' },
+                        ]}
+                    />
+                    <Select
+                        ariaLabel="Rol"
                         value={roleId}
-                        onChange={(e) => changeFilter(setRoleId)(e.target.value)}
-                    >
-                        <option value="">Barcha rollar</option>
-                        {options?.roles.map((r) => (
-                            <option key={r.id} value={r.id}>
-                                {r.name}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="Fakultet"
-                        className={selectClassName}
+                        onChange={(next) => changeFilter(setRoleId)(next)}
+                        options={[{ value: '', label: 'Barcha rollar' }, ...(options?.roles ?? []).map((r) => ({ value: String(r.id), label: r.name }))]}
+                    />
+                    <Select
+                        ariaLabel="Fakultet"
                         value={facultyId}
-                        onChange={(e) => {
-                            changeFilter(setFacultyId)(e.target.value);
+                        onChange={(next) => {
+                            changeFilter(setFacultyId)(next);
                             setGroupId('');
                         }}
-                    >
-                        <option value="">Barcha fakultetlar</option>
-                        {options?.faculties.map((f) => (
-                            <option key={f.id} value={f.id}>
-                                {f.name}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="Kurs"
-                        className={selectClassName}
+                        options={[
+                            { value: '', label: 'Barcha fakultetlar' },
+                            ...(options?.faculties ?? []).map((f) => ({ value: String(f.id), label: f.name })),
+                        ]}
+                    />
+                    <Select
+                        ariaLabel="Kurs"
                         value={course}
-                        onChange={(e) => {
-                            changeFilter(setCourse)(e.target.value);
+                        onChange={(next) => {
+                            changeFilter(setCourse)(next);
                             setGroupId('');
                         }}
-                    >
-                        <option value="">Barcha kurslar</option>
-                        {COURSES.map((c) => (
-                            <option key={c} value={c}>
-                                {c}-kurs
-                            </option>
-                        ))}
-                    </select>
+                        options={[{ value: '', label: 'Barcha kurslar' }, ...COURSES.map((c) => ({ value: String(c), label: `${c}-kurs` }))]}
+                    />
                     <div className="sm:col-span-2">
                         <Combobox
                             options={groupOptions}

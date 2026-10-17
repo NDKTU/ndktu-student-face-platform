@@ -1,20 +1,7 @@
 import * as React from "react";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-/**
- * Ayni damda ochiq bo'lgan ro'yxatlar soni.
- *
- * Modal buni Escape bosilganda o'qiydi: ro'yxat ochiq bo'lsa, Escape avval
- * ro'yxatni yopadi, modalni emas. Boshqa yo'l yo'q — Radix `keydown` ni
- * hujjatda ushlash bosqichida tinglaydi va modal ochilganda ro'yxatdan oldin
- * ro'yxatdan o'tadi, ya'ni hodisani undan oldin to'xtatib bo'lmaydi. Radix esa
- * o'z `onEscapeKeyDown` ida `defaultPrevented` ni tekshiradi — modal aynan
- * shu yerda to'xtatiladi.
- */
-let openCount = 0;
-
-export const isComboboxOpen = () => openCount > 0;
+import { trackOpenList } from "./openLists";
 
 export interface ComboboxOption {
     value: string;
@@ -112,10 +99,7 @@ export function Combobox({
     // almashinsa, hisob abadiy o'sib qolardi.
     React.useEffect(() => {
         if (!open) return;
-        openCount += 1;
-        return () => {
-            openCount -= 1;
-        };
+        return trackOpenList();
     }, [open]);
 
     // Handle initial search focus

@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { Button } from '@/components/ui/Button';
 import { X } from 'lucide-react';
@@ -26,8 +27,6 @@ interface CourseFiltersProps {
     showTeacherFilter?: boolean;
 }
 
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export const CourseFilters = ({
     subjects,
@@ -89,19 +88,15 @@ export const CourseFilters = ({
                     </PermissionGate>
                     <div className="flex flex-col gap-2 w-[150px]">
                         <label className="text-sm font-medium">Semestr</label>
-                        <select
-                            className={selectClassName}
+                        <Select
                             value={filterSemesterNumber === undefined ? 'all' : filterSemesterNumber.toString()}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                onSemesterChange(val === 'all' ? undefined : parseInt(val));
-                            }}
-                        >
-                            <option value="all">Barchasi</option>
-                            {SEMESTER_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
+                            onChange={(next) => onSemesterChange(next === 'all' ? undefined : parseInt(next))}
+                            ariaLabel="Semestr"
+                            options={[
+                                { value: 'all', label: 'Barchasi' },
+                                ...SEMESTER_OPTIONS.map((option) => ({ value: String(option.value), label: option.label })),
+                            ]}
+                        />
                     </div>
                     {hasActiveFilters && (
                         <Button variant="ghost" onClick={onClearFilters} className="mb-0.5">

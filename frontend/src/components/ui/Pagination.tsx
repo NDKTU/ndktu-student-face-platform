@@ -5,7 +5,8 @@
  * o'ngda strelkalar va raqamlar. Raqamlar ko'p bo'lsa oraliq "…" bilan
  * qisqartiriladi, birinchi va oxirgi sahifa esa doim ko'rinib turadi.
  */
-import { ArrowLeft, ArrowRight, ChevronDown } from 'lucide-react';
+import { Select } from '@/components/ui/Select';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -100,29 +101,22 @@ export const Pagination = ({
             {showSummary && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                     {showSizeSelect && (
-                        <label className="flex items-center gap-2">
+                        <span className="flex items-center gap-2">
                             <span>{t('Sahifada')}:</span>
-                            <span className="relative inline-flex items-center">
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => {
-                                        onPageSizeChange?.(Number(e.target.value));
-                                        // Hajm o'zgarsa joriy sahifa oralig'dan chiqib ketmasligi uchun.
-                                        onPageChange(1);
-                                    }}
-                                    disabled={isLoading}
-                                    aria-label={t('Sahifada')}
-                                    className="h-9 cursor-pointer appearance-none rounded-lg border border-border bg-card py-0 pl-3 pr-8 text-sm font-semibold text-foreground transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                                >
-                                    {sizeOptions.map((size) => (
-                                        <option key={size} value={size}>
-                                            {size}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-2 h-4 w-4 text-muted-foreground" />
-                            </span>
-                        </label>
+                            <Select
+                                value={String(pageSize)}
+                                onChange={(next) => {
+                                    onPageSizeChange?.(Number(next));
+                                    // Hajm o'zgarsa joriy sahifa oralig'dan chiqib ketmasligi uchun.
+                                    onPageChange(1);
+                                }}
+                                disabled={isLoading}
+                                ariaLabel={t('Sahifada')}
+                                size="sm"
+                                className="w-20"
+                                options={sizeOptions.map((size) => ({ value: String(size), label: String(size) }))}
+                            />
+                        </span>
                     )}
                     {showTotal && (
                         <span>

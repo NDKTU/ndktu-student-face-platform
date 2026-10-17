@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
 import { HardDrive, Pencil, Search, Users } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -47,15 +48,17 @@ const LimitInput = ({ value, unit, onChange, id }: LimitInputProps) => (
             className="w-32"
             aria-label="Limit qiymati"
         />
-        <select
+        <Select
             value={unit}
-            onChange={(event) => onChange(value, event.target.value as SizeUnit)}
-            aria-label="O'lchov birligi"
-            className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
-        >
-            <option value="MB">MB</option>
-            <option value="GB">GB</option>
-        </select>
+            onChange={(next) => onChange(value, next as SizeUnit)}
+            ariaLabel="O'lchov birligi"
+            size="sm"
+            className="w-20"
+            options={[
+                { value: 'MB', label: 'MB' },
+                { value: 'GB', label: 'GB' },
+            ]}
+        />
     </div>
 );
 
@@ -401,21 +404,17 @@ const FileQuotasPage = () => {
                         placeholder="Kafedra"
                         className="w-full sm:w-64"
                     />
-                    <select
+                    <Select
                         value={sort}
-                        onChange={(event) => {
-                            setSort(event.target.value as TeacherQuotaSort);
+                        onChange={(next) => {
+                            setSort(next as TeacherQuotaSort);
                             setPage(1);
                         }}
-                        aria-label="Saralash"
-                        className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                    >
-                        {SORT_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
+                        ariaLabel="Saralash"
+                        size="sm"
+                        className="w-full sm:w-56"
+                        options={SORT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                    />
                 </div>
 
                 <DataTable

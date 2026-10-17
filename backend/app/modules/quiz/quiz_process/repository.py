@@ -239,7 +239,7 @@ class QuizProcessRepository:
     async def verify_entry_face(
         self, session: AsyncSession, data: VerifyEntryFaceRequest, user: User
     ) -> VerifyEntryFaceResponse:
-        """`face_entry` testiga kirishdan oldin yuzni profil surati bilan solishtiradi.
+        """`face_entry` testiga kirishdan oldin yuzni HEMIS surati (`students.image_path`) bilan solishtiradi.
 
         Mos kelsa, Redis'ga qisqa muddatli tasdiq yoziladi va `start_quiz` uni
         talab qiladi. Mos kelmasa, talaba qayta urinadi — urinishlar soni

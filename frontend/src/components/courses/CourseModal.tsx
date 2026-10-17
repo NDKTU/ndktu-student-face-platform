@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/Select';
 import { useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,8 +25,6 @@ interface CourseModalProps {
     onSuccess: () => void;
 }
 
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 const emptyForm: CourseFormValues = {
     teacher_id: '',
@@ -41,7 +40,6 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
 
     const {
         handleSubmit,
-        register,
         reset,
         control,
         setValue,
@@ -224,11 +222,18 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Mashg'ulot turi</label>
-                    <select className={selectClassName} {...register('course_type')}>
-                        {COURSE_TYPE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
+                    <Controller
+                        name="course_type"
+                        control={control}
+                        render={({ field }) => (
+                            <Select
+                                value={String(field.value ?? '')}
+                                onChange={field.onChange}
+                                ariaLabel="Mashg'ulot turi"
+                                options={COURSE_TYPE_OPTIONS.map((option) => ({ value: String(option.value), label: option.label }))}
+                            />
+                        )}
+                    />
                     {errors.course_type && (
                         <p className="text-sm text-destructive">{errors.course_type.message}</p>
                     )}
@@ -240,12 +245,18 @@ export const CourseModal = ({ isOpen, onClose, course, onSuccess }: CourseModalP
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Semestr</label>
-                    <select className={selectClassName} {...register('semester_number')}>
-                        <option value="">Tanlanmagan</option>
-                        {SEMESTER_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
+                    <Controller
+                        name="semester_number"
+                        control={control}
+                        render={({ field }) => (
+                            <Select
+                                value={String(field.value ?? '')}
+                                onChange={field.onChange}
+                                ariaLabel="Semestr"
+                                options={[{ value: '', label: 'Tanlanmagan' }, ...SEMESTER_OPTIONS.map((option) => ({ value: String(option.value), label: option.label }))]}
+                            />
+                        )}
+                    />
                     {errors.semester_number && (
                         <p className="text-sm text-destructive">{errors.semester_number.message}</p>
                     )}

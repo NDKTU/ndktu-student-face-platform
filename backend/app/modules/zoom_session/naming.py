@@ -1,7 +1,8 @@
-"""Seans nomi: «Fan — Familiya I.O. (guruhlar)» (`auto_title`), formada ham shunday."""
+"""Seans nomi: «Fan (tur) — Familiya I.O. (guruhlar)» (`auto_title`), formada ham shunday."""
 
 
 
+from app.core.enums import course_type_label
 from app.modules.auth.model import Teacher
 
 
@@ -29,9 +30,18 @@ def teacher_short_name(teacher: Teacher) -> str:
     return f"{last} {initials}".strip() if last else _readable_name(teacher.full_name)
 
 
-def auto_title(subject_name: str, teacher: Teacher | None, group_names: list[str]) -> str:
-    """«Fan — Familiya I.O. (101-23, 102-23 +2)»."""
+def auto_title(
+    subject_name: str, teacher: Teacher | None, group_names: list[str], training_type: str | None = None
+) -> str:
+    """«Fan (amaliyot) — Familiya I.O. (101-23, 102-23 +2)».
+
+    Tur nomda — bitta fanning ma'ruzasi va amaliyoti ro'yxatda (va kalendarda)
+    bir-biridan ajralib tursin. Kurs nomida ham tur shu so'z bilan yoziladi.
+    """
     title = subject_name.strip()
+    label = course_type_label(training_type)
+    if label:
+        title = f"{title} ({label})"
     if teacher is not None:
         title = f"{title} — {teacher_short_name(teacher)}"
     names = sorted(group_names)

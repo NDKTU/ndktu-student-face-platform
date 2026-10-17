@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/Select';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { logger } from '@/utils/logger';
@@ -522,26 +523,28 @@ const QuestionFormPage = () => {
 
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-foreground">Savol turi</label>
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                                    {...register('question_type')}
-                                    disabled={isEditMode}
-                                >
-                                    <option value="QUIZ">To'rt variant, bitta to'g'ri javob</option>
-                                    <option value="MULTI_SELECT">Bir nechta to'g'ri javob</option>
-                                    {/* Yangi savol faqat yuqoridagi ikki turda yaratiladi. Qolgan
-                                        turlar faqat ilgari yaratilgan savolni tahrirlashda
-                                        ko'rinadi — aks holda select bo'sh qolardi. */}
-                                    {isEditMode && questionType === 'TRUE_FALSE' && (
-                                        <option value="TRUE_FALSE">To'g'ri / Noto'g'ri</option>
+                                <Controller
+                                    name="question_type"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            value={field.value ?? ''}
+                                            onChange={field.onChange}
+                                            disabled={isEditMode}
+                                            ariaLabel="Savol turi"
+                                            options={[
+                                                { value: 'QUIZ', label: "To'rt variant, bitta to'g'ri javob" },
+                                                { value: 'MULTI_SELECT', label: "Bir nechta to'g'ri javob" },
+                                                // Yangi savol faqat yuqoridagi ikki turda yaratiladi. Qolgan turlar
+                                                // faqat ilgari yaratilgan savolni tahrirlashda ko'rinadi — aks holda
+                                                // ro'yxat bo'sh qolardi.
+                                                ...(isEditMode && questionType === 'TRUE_FALSE' ? [{ value: 'TRUE_FALSE', label: "To'g'ri / Noto'g'ri" }] : []),
+                                                ...(isEditMode && questionType === 'TYPE_ANSWER' ? [{ value: 'TYPE_ANSWER', label: 'Javobni matn bilan yozish' }] : []),
+                                                ...(isEditMode && questionType === 'PUZZLE' ? [{ value: 'PUZZLE', label: "To'g'ri tartibda joylashtirish" }] : []),
+                                            ]}
+                                        />
                                     )}
-                                    {isEditMode && questionType === 'TYPE_ANSWER' && (
-                                        <option value="TYPE_ANSWER">Javobni matn bilan yozish</option>
-                                    )}
-                                    {isEditMode && questionType === 'PUZZLE' && (
-                                        <option value="PUZZLE">To'g'ri tartibda joylashtirish</option>
-                                    )}
-                                </select>
+                                />
                                 {isEditMode && (
                                     <p className="text-xs text-muted-foreground">
                                         Mavjud savolning turi o'zgartirilmaydi — yangi savol yarating.

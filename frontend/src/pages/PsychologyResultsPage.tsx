@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
 import { useMyResults, useMethods, useDeleteResult, useResultFilterOptions } from '@/hooks/usePsychology';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
@@ -196,16 +197,17 @@ export default function PsychologyResultsPage() {
 
                     <div className="flex items-center gap-2">
                         <label className="shrink-0 text-xs font-medium text-muted-foreground">Metod:</label>
-                        <select
-                            value={methodFilter ?? ''}
-                            onChange={e => { setMethodFilter(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
-                            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-auto"
-                        >
-                            <option value="">Barchasi</option>
-                            {methodsData?.methods.map(m => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                        </select>
+                        <Select
+                            value={methodFilter == null ? '' : String(methodFilter)}
+                            onChange={(next) => {
+                                setMethodFilter(next ? Number(next) : undefined);
+                                setPage(1);
+                            }}
+                            ariaLabel="Metod"
+                            size="sm"
+                            className="w-full min-w-0 sm:w-56"
+                            options={[{ value: '', label: 'Barchasi' }, ...(methodsData?.methods ?? []).map((m) => ({ value: String(m.id), label: m.name }))]}
+                        />
                     </div>
 
                     {!isStudentView && <>

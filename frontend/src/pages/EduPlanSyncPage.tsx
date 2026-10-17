@@ -417,7 +417,7 @@ const EduPlanSyncPage = () => {
                         <label className="flex items-start gap-2 border-t border-border pt-3 text-sm">
                             <input
                                 type="checkbox"
-                                className="mt-1 accent-primary"
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                                 checked={applyDeactivations}
                                 onChange={(e) => setApplyDeactivations(e.target.checked)}
                             />

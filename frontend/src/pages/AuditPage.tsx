@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useTranslation } from 'react-i18next';
 import { History, LogIn, LogOut, ShieldAlert, XCircle } from 'lucide-react';
 
@@ -172,26 +173,34 @@ const AuditPage = () => {
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                             {t('Sanadan')}
                         </label>
-                        <Input
-                            type="date"
+                        <DatePicker
                             value={dateFrom}
-                            onChange={(e) => {
-                                setDateFrom(e.target.value);
+                            onChange={(next) => {
+                                setDateFrom(next);
                                 setPage(1);
                             }}
+                            clearable
+                            format="short"
+                            placeholder="—"
+                            ariaLabel={t('Sanadan')}
+                            max={dateTo || undefined}
                         />
                     </div>
                     <div className="w-[150px]">
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                             {t('Sanagacha')}
                         </label>
-                        <Input
-                            type="date"
+                        <DatePicker
                             value={dateTo}
-                            onChange={(e) => {
-                                setDateTo(e.target.value);
+                            onChange={(next) => {
+                                setDateTo(next);
                                 setPage(1);
                             }}
+                            clearable
+                            format="short"
+                            placeholder="—"
+                            ariaLabel={t('Sanagacha')}
+                            min={dateFrom || undefined}
                         />
                     </div>
                 </CardContent>

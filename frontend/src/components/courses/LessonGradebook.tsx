@@ -4,6 +4,7 @@
  * kim qolib ketganini ko'radi; baho qo'yish uchun uy vazifasi katagidan
  * to'g'ridan-to'g'ri tekshirish sahifasiga o'tadi.
  */
+import { Select } from '@/components/ui/Select';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -117,15 +118,14 @@ export const LessonGradebook = ({ lessonId, onCreateTask }: { lessonId: number; 
                     />
                 </div>
                 {groups.length > 1 && (
-                    <select
+                    <Select
                         value={group}
-                        onChange={(event) => setGroup(event.target.value)}
-                        aria-label="Guruh"
-                        className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
-                    >
-                        <option value="">Barcha guruhlar</option>
-                        {groups.map((name) => <option key={name} value={name}>{name}</option>)}
-                    </select>
+                        onChange={setGroup}
+                        ariaLabel="Guruh"
+                        size="sm"
+                        className="w-48"
+                        options={[{ value: '', label: 'Barcha guruhlar' }, ...groups.map((name) => ({ value: name, label: name }))]}
+                    />
                 )}
                 <Button size="sm" variant="outline" onClick={() => void exportExcel(data)}>
                     <Download className="mr-2 h-4 w-4" /> Excel

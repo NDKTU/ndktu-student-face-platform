@@ -7,9 +7,6 @@ export const KIND_LABEL: Record<SubjectUser['user_kind'], string> = {
     boshqa: 'Xodim',
 };
 
-export const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-
 /**
  * Savollar soni: «100» yoki, urinishga kamrog'i berilsa, «20 / 100»
  * (urinishda / jami). Sozlangan son savollardan ko'p bo'lsa, bekend borini

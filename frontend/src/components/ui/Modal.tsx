@@ -2,7 +2,7 @@ import React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isComboboxOpen } from './Combobox';
+import { isComboboxOpen } from './openLists';
 
 interface ModalProps {
     isOpen: boolean;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import { useQuery } from '@tanstack/react-query';
 import { Search, UsersRound } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -8,7 +9,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { generalTestService, type GroupOption, type GroupOptionFilter } from '@/services/generalTestService';
 import { cn } from '@/lib/utils';
-import { selectClassName } from './labels';
 
 const COURSES = [1, 2, 3, 4, 5, 6];
 
@@ -71,22 +71,21 @@ export function GroupChecklist({ selected, onToggle, assignedIds = [], className
                     leftAddon={<Search className="h-4 w-4" />}
                     className="sm:col-span-2"
                 />
-                <select aria-label="Fakultet" className={selectClassName} value={facultyId} onChange={(e) => setFacultyId(e.target.value)}>
-                    <option value="">Barcha fakultetlar</option>
-                    {options?.faculties.map((f) => (
-                        <option key={f.id} value={f.id}>
-                            {f.name}
-                        </option>
-                    ))}
-                </select>
-                <select aria-label="Kurs" className={selectClassName} value={course} onChange={(e) => setCourse(e.target.value)}>
-                    <option value="">Barcha kurslar</option>
-                    {COURSES.map((c) => (
-                        <option key={c} value={c}>
-                            {c}-kurs
-                        </option>
-                    ))}
-                </select>
+                <Select
+                    ariaLabel="Fakultet"
+                    value={facultyId}
+                    onChange={setFacultyId}
+                    options={[
+                        { value: '', label: 'Barcha fakultetlar' },
+                        ...(options?.faculties ?? []).map((f) => ({ value: String(f.id), label: f.name })),
+                    ]}
+                />
+                <Select
+                    ariaLabel="Kurs"
+                    value={course}
+                    onChange={setCourse}
+                    options={[{ value: '', label: 'Barcha kurslar' }, ...COURSES.map((c) => ({ value: String(c), label: `${c}-kurs` }))]}
+                />
             </div>
 
             {isLoading ? (

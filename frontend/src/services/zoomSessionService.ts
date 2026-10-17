@@ -1,4 +1,5 @@
 import api from './api';
+import type { CourseType } from './courseTypes';
 import type { GroupOption, GroupOptionFilter } from './generalTestService';
 
 /**
@@ -22,6 +23,8 @@ export interface ZoomSession {
     status: ZoomSessionStatus;
     subject_id?: number | null;
     subject_name?: string | null;
+    /** Mashg'ulot turi — kurslardagi bilan bir xil (`courseTypes.ts`); eski seanslarda bo'sh. */
+    training_type?: CourseType | null;
     /** Darsni olib boradigan o'qituvchi (`users.id`) — yuz tekshiruvisiz kiradi. */
     teacher_user_id?: number | null;
     teacher_name?: string | null;
@@ -105,6 +108,7 @@ export interface ZoomSessionPayload {
     ends_at: string;
     group_ids: number[];
     subject_id: number | null;
+    training_type: CourseType | null;
     face_check_enabled: boolean;
     random_face_checks: boolean;
     is_active: boolean;
@@ -221,9 +225,38 @@ export interface FaceCheckReport {
     ended: boolean;
 }
 
+/** Yuklamaning bitta juftligi: shu guruhga shu fan, shu turlarda. */
+export interface TeacherLoadItem {
+    subject_id: number;
+    subject_name: string;
+    group_id: number;
+    group_name: string;
+    load_types: string[];
+}
+
+export interface ZoomTeacherLoad {
+    items: TeacherLoadItem[];
+    /** «Kuzgi» / «Bahorgi»; `null` — o'quv yili bo'yicha hammasi. */
+    semester: string | null;
+}
+
+/** Juftlik: raqami va vaqti («HH:MM», Toshkent). */
+export interface PairTime {
+    pair: number;
+    start: string;
+    end: string;
+}
+
 export const zoomSessionService = {
     list: async (scope?: ZoomSessionScope) =>
         (await api.get<{ sessions: ZoomSession[] }>('/zoom-sessions/', { params: { scope } })).data.sessions,
+    /** Juftliklar vaqti (HEMIS jadvalidan) — formada vaqtni bir bosishda tanlash uchun. */
+    pairTimes: async () =>
+        (await api.get<{ pairs: PairTime[] }>('/zoom-sessions/pair-times')).data.pairs,
+    /** Kalendar: Toshkent sanalari oralig'idagi seanslar (`YYYY-MM-DD`, ko'pi bilan 62 kun). */
+    calendar: async (dateFrom: string, dateTo: string) =>
+        (await api.get<{ sessions: ZoomSession[] }>('/zoom-sessions/', { params: { date_from: dateFrom, date_to: dateTo } }))
+            .data.sessions,
     get: async (id: number) => (await api.get<ZoomSession>(`/zoom-sessions/${id}`)).data,
     create: async (data: ZoomSessionPayload) => (await api.post<ZoomSession>('/zoom-sessions/', data)).data,
     update: async (id: number, data: ZoomSessionPayload) =>
@@ -251,6 +284,9 @@ export const zoomSessionService = {
             })
         ).data,
     /** Tanlangan o'qituvchining fanlari. */
+    /** O'qituvchining EPOS yuklamasi: fan + guruh + turlar (joriy semestr). */
+    teacherLoad: async (teacherUserId: number) =>
+        (await api.get<ZoomTeacherLoad>('/zoom-sessions/teacher-load', { params: { teacher_user_id: teacherUserId } })).data,
     teacherSubjects: async (teacherUserId: number) =>
         (
             await api.get<{ subjects: { id: number; name: string }[] }>('/zoom-sessions/teacher-subjects', {

@@ -13,6 +13,24 @@ const KEYS = {
     detail: (id: number) => ['zoom-session', id] as const,
 };
 
+/** Juftliklar setkasi o'quv yili davomida o'zgarmaydi — sahifa ochiq turganda qayta so'ralmaydi. */
+export const usePairTimes = () =>
+    useQuery({
+        queryKey: ['zoom-pair-times'],
+        queryFn: () => zoomSessionService.pairTimes(),
+        staleTime: 60 * 60 * 1000,
+    });
+
+/** Kalendar oralig'i. Kalit `KEYS.list` ichida — seans saqlansa/o'chirilsa kalendar ham yangilanadi. */
+export const useZoomCalendar = (dateFrom: string, dateTo: string, enabled: boolean) =>
+    useQuery({
+        queryKey: [...KEYS.list, 'calendar', dateFrom, dateTo],
+        queryFn: () => zoomSessionService.calendar(dateFrom, dateTo),
+        enabled,
+        refetchInterval: 60_000,
+        placeholderData: (prev) => prev,
+    });
+
 export const useZoomSessions = (scope?: ZoomSessionScope) =>
     useQuery({
         queryKey: [...KEYS.list, scope ?? 'all'],
@@ -43,6 +61,13 @@ export const useZoomTeacherOptions = (search: string) =>
         queryKey: ['zoom-session-teacher-options', search],
         queryFn: () => zoomSessionService.teacherOptions(search),
         placeholderData: (prev) => prev,
+    });
+
+export const useZoomTeacherLoad = (teacherUserId: number | null) =>
+    useQuery({
+        queryKey: ['zoom-session-teacher-load', teacherUserId],
+        queryFn: () => zoomSessionService.teacherLoad(teacherUserId!),
+        enabled: teacherUserId != null,
     });
 
 export const useZoomTeacherSubjects = (teacherUserId: number | null) =>

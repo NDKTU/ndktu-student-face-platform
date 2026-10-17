@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SwitchField } from '@/components/ui/SwitchField';
 import { toast } from 'sonner';
 import { CheckCircle2, Copy, Pencil, Plus, ShieldCheck, Trash2, Video, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +11,6 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Switch } from '@/components/ui/Switch';
 import { useAuth } from '@/context/AuthContext';
 import { useCheckZoomAccount, useDeleteZoomAccount, useSaveZoomAccount, useZoomAccounts } from '@/hooks/useZoomAccounts';
 import type { ZoomAccount, ZoomAccountCheck, ZoomAccountPayload } from '@/services/zoomAccountService';
@@ -156,19 +156,13 @@ function ZoomAccountFormModal({ editing, onClose }: FormProps) {
                     </div>
                 </fieldset>
 
-                <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
-                    <label htmlFor="zoom-account-active" className="cursor-pointer">
-                        <div className="text-sm font-medium">Faol</div>
-                        <div className="text-xs text-muted-foreground">
-                            Faolsiz akkauntga yangi seans tushmaydi; eski seanslari ishlashda davom etadi
-                        </div>
-                    </label>
-                    <Switch
-                        id="zoom-account-active"
-                        checked={form.is_active}
-                        onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
-                    />
-                </div>
+                <SwitchField
+                    id="zoom-account-active"
+                    title="Faol"
+                    description="Faolsiz akkauntga yangi seans tushmaydi; eski seanslari ishlashda davom etadi"
+                    checked={form.is_active}
+                    onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
+                />
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2">

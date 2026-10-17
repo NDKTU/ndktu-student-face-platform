@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from app.core.database.db_helper import db_helper
@@ -12,11 +13,13 @@ from app.modules.auth.model import User
 from app.modules.general_test.repository import get_general_test_repository
 from app.modules.general_test.schemas import FilterOptionsResponse, GroupOptionListResponse
 
+from .pairs import pair_times
 from .repository import zoom_session_repository as repo
 from .schemas import (
     FaceCheckReportResponse,
     FaceCheckRequest,
     FaceCheckResponse,
+    PairTimeListResponse,
     ZoomCapabilitiesResponse,
     ZoomJoinResponse,
     ZoomSeriesRequest,
@@ -27,6 +30,7 @@ from .schemas import (
     ZoomSessionResponse,
     ZoomStartResponse,
     ZoomSubjectOptionListResponse,
+    ZoomTeacherLoadResponse,
     ZoomTeacherOptionListResponse,
 )
 
@@ -89,6 +93,16 @@ async def teacher_subjects(
     return await repo.teacher_subjects(session=session, user=user, teacher_user_id=teacher_user_id)
 
 
+@router.get("/teacher-load", response_model=ZoomTeacherLoadResponse)
+async def teacher_load(
+    teacher_user_id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(PermissionRequired("create:zoom_session")),
+):
+    """O'qituvchining yuklamasi (fan + guruh + tur) — formada guruh va fan shundan tanlanadi."""
+    return await repo.teacher_load(session=session, user=user, teacher_user_id=teacher_user_id)
+
+
 @router.get("/capabilities", response_model=ZoomCapabilitiesResponse)
 async def capabilities(
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -96,6 +110,15 @@ async def capabilities(
 ):
     """Formada: «Zoom'da avtomatik yaratish» va akkauntlar ro'yxati (sirlarsiz)."""
     return await repo.capabilities(session)
+
+
+@router.get("/pair-times", response_model=PairTimeListResponse)
+async def list_pair_times(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    _: User = Depends(PermissionRequired("read:zoom_session")),
+):
+    """Juftliklar vaqti — forma vaqtni «2-juftlik» kabi bir bosishda qo'yishi uchun."""
+    return PairTimeListResponse(pairs=await pair_times(session))
 
 
 @router.get("/face-check/{check_id}/image")
@@ -112,10 +135,13 @@ async def face_check_image(
 @router.get("/", response_model=ZoomSessionListResponse)
 async def list_sessions(
     scope: Literal["now", "upcoming", "past"] | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     session: AsyncSession = Depends(db_helper.session_getter),
     user: User = Depends(PermissionRequired("read:zoom_session")),
 ):
-    return await repo.list_sessions(session=session, user=user, scope=scope)
+    """`date_from`/`date_to` — kalendar (Toshkent sanalari, ≤ 62 kun); berilsa `scope` e'tiborga olinmaydi."""
+    return await repo.list_sessions(session=session, user=user, scope=scope, date_from=date_from, date_to=date_to)
 
 
 @router.post("/", response_model=ZoomSessionResponse, status_code=status.HTTP_201_CREATED)

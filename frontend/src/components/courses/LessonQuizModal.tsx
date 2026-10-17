@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Select } from '@/components/ui/Select';
+import { SwitchField } from '@/components/ui/SwitchField';
+import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
 import { QUIZ_TYPE_LABELS } from '@/services/quizService';
 import type { ProctoringMode, Quiz, QuizType } from '@/services/quizService';
 
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 interface Props {
     isOpen: boolean;
@@ -124,17 +124,14 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
                 {quiz && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Nazorat turi</label>
-                        <select
-                            className={selectClassName}
+                        <Select
                             value={quizType}
-                            onChange={(e) => setQuizType(e.target.value as QuizType)}
-                        >
-                            {(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
+                            onChange={(next) => setQuizType(next as QuizType)}
+                            ariaLabel="Nazorat turi"
+                            options={(Object.keys(QUIZ_TYPE_LABELS) as QuizType[])
                                 .filter((value) => (value !== 'PUBLIC_FREE' && value !== 'MIDTERM') || quiz.quiz_type === value)
-                                .map((value) => (
-                                    <option key={value} value={value}>{QUIZ_TYPE_LABELS[value]}</option>
-                                ))}
-                        </select>
+                                .map((value) => ({ value, label: QUIZ_TYPE_LABELS[value] }))}
+                        />
                     </div>
                 )}
 
@@ -156,32 +153,13 @@ export const LessonQuizModal = ({ isOpen, onClose, lessonId, quiz }: Props) => {
                 </div>
 
                 {quiz && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Proktoring</label>
-                        <select
-                            className={selectClassName}
-                            value={proctoringMode}
-                            onChange={(e) => setProctoringMode(e.target.value as ProctoringMode)}
-                        >
-                            <option value="standard">Oddiy</option>
-                            <option value="face">Yuz nazorati (butun test davomida)</option>
-                            <option value="face_entry">Kirishda yuz tekshiruvi</option>
-                        </select>
-                    </div>
+                    <ProctoringModePicker value={proctoringMode} onChange={setProctoringMode} />
                 )}
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
 
-                <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
-                    <div>
-                        <p className="text-sm font-medium">Faol</p>
-                        <p className="text-xs text-muted-foreground">
-                            Faol testda ma'ruzachi bankida yetarli savol bo'lishi shart.
-                        </p>
-                    </div>
-                    <Switch checked={isActive} onCheckedChange={setIsActive} />
-                </div>
+                <SwitchField title="Faol" description="Faol testda ma'ruzachi bankida yetarli savol bo'lishi shart." checked={isActive} onCheckedChange={setIsActive} />
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2 pt-2">

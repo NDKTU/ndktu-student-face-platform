@@ -4,7 +4,16 @@ from datetime import datetime, timedelta, timezone
 
 
 from app.core.utils.face_absence import FAILED_STATUSES
+from app.core.utils.face_service import FACE_ENTRY_MESSAGES
 
+
+
+#: Toshkent — UTC+5, yozgi vaqt yo'q. Kalendar sanalarini naiv UTC ga o'tkazish uchun.
+TASHKENT_OFFSET = timedelta(hours=5)
+
+
+#: Kalendar so'rovi eng ko'pi shuncha kunni oladi: oy setkasi 6 hafta = 42 kun.
+MAX_CALENDAR_DAYS = 62
 
 
 #: Talaba seansga boshlanishdan shuncha oldin kira oladi.
@@ -41,13 +50,10 @@ CUSTOMER_KEY_PREFIX = "lms-"
 _PARTICIPANT_EVENTS = {"meeting.participant_joined": "joined", "meeting.participant_left": "left"}
 
 
+#: Testdagi bilan bir xil matnlar (`FACE_ENTRY_MESSAGES`) + dars davomidagi
+#: tekshiruvning o'z holatlari.
 _STATUS_MESSAGE = {
-    "ok": "Shaxsingiz tasdiqlandi",
-    "no_face": "Kadrda yuz ko'rinmadi — kameraga qarab turing",
-    "multiple_faces": "Kadrda bir nechta odam ko'rindi — yolg'iz qoling",
-    "different_person": "Yuz HEMIS'dagi surat bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
-    "no_reference": "HEMIS suratingizdan yuz aniqlanmadi — dekanatga murojaat qiling",
-    "spoof": "Kamera oldida tirik yuz bo'lishi kerak — rasm yoki telefon ekrani qabul qilinmaydi",
+    **FACE_ENTRY_MESSAGES,
     "no_camera": "Kamera ochilmadi",
     "page_hidden": "Sahifa fonda edi — tekshiruv o'tkazilmadi",
 }

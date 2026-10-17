@@ -50,7 +50,7 @@ const CategoryRow = ({
             checked={checked}
             disabled={count === 0}
             onChange={(e) => onChange(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
         />
         <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
@@ -236,7 +236,7 @@ export const HemisStudentImport = () => {
                                     type="checkbox"
                                     checked={confirmBulk}
                                     onChange={(e) => setConfirmBulk(e.target.checked)}
-                                    className="mt-0.5"
+                                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                                 />
                                 <span>
                                     <span className="font-semibold">

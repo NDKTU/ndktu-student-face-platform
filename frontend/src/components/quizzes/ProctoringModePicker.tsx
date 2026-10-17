@@ -1,10 +1,17 @@
+import { FaceControlPicker, type FaceControlLevel } from '@/components/common/FaceControlPicker';
 import type { ProctoringMode } from '@/services/quizService';
 
-const MODES: { value: ProctoringMode; title: string; hint: string }[] = [
-    { value: 'standard', title: 'Standart', hint: 'Kamerasiz oddiy test' },
-    { value: 'face', title: 'Kamera bilan', hint: 'Yuz orqali kuzatuv' },
-    { value: 'face_entry', title: 'Kirishda yuz', hint: 'Faqat boshlashda tekshiriladi' },
-];
+const TO_LEVEL: Record<ProctoringMode, FaceControlLevel> = {
+    standard: 'off',
+    face_entry: 'entry',
+    face: 'continuous',
+};
+
+const TO_MODE: Record<FaceControlLevel, ProctoringMode> = {
+    off: 'standard',
+    entry: 'face_entry',
+    continuous: 'face',
+};
 
 interface Props {
     value: ProctoringMode;
@@ -12,29 +19,17 @@ interface Props {
     error?: string;
 }
 
-/** «Test rejimi» — oddiy test va elementar test oynalarida bir xil. */
+/**
+ * Test rejimi — oddiy test, dars testi, oraliq nazorat va elementar testda
+ * bir xil. Ko'rinishi Zoom seansidagi bilan umumiy (`FaceControlPicker`).
+ */
 export function ProctoringModePicker({ value, onChange, error }: Props) {
     return (
-        <div className="space-y-2">
-            <label className="text-sm font-medium">Test rejimi</label>
-            <div className="grid gap-3 sm:grid-cols-3">
-                {MODES.map((mode) => (
-                    <button
-                        key={mode.value}
-                        type="button"
-                        onClick={() => onChange(mode.value)}
-                        className={`text-left rounded-lg border px-3 py-2 transition ${
-                            value === mode.value
-                                ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
-                                : 'border-input hover:border-primary/50'
-                        }`}
-                    >
-                        <div className="text-sm font-medium">{mode.title}</div>
-                        <div className="text-xs text-muted-foreground">{mode.hint}</div>
-                    </button>
-                ))}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
+        <FaceControlPicker
+            value={TO_LEVEL[value] ?? 'off'}
+            onChange={(level) => onChange(TO_MODE[level])}
+            hints={{ continuous: "Butun test davomida kamera kuzatadi — begona odam bo'lsa test to'xtaydi" }}
+            error={error}
+        />
     );
 }

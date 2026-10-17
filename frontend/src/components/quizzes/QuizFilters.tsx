@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { Button } from '@/components/ui/Button';
 import { X } from 'lucide-react';
@@ -34,9 +35,6 @@ interface QuizFiltersProps {
     onClearFilters: () => void;
     hideStatusFilter?: boolean;
 }
-
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export const QuizFilters = ({
     groupOptions,
@@ -121,30 +119,29 @@ export const QuizFilters = ({
                     {!hideStatusFilter && (
                         <div className="flex w-full flex-col gap-2 sm:w-[150px]">
                             <label className="text-sm font-medium">{t('Holat')}</label>
-                            <select
-                                className={selectClassName}
+                            <Select
                                 value={filterIsActive === undefined ? 'all' : filterIsActive.toString()}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    onIsActiveChange?.(val === 'all' ? undefined : val === 'true');
-                                }}
-                            >
-                                <option value="all">{t('Barchasi')}</option>
-                                <option value="true">{t('Faol')}</option>
-                                <option value="false">{t('Faol emas')}</option>
-                            </select>
+                                onChange={(next) => onIsActiveChange?.(next === 'all' ? undefined : next === 'true')}
+                                ariaLabel={t('Holat')}
+                                options={[
+                                    { value: 'all', label: t('Barchasi') },
+                                    { value: 'true', label: t('Faol') },
+                                    { value: 'false', label: t('Faol emas') },
+                                ]}
+                            />
                         </div>
                     )}
                     <div className="flex w-full flex-col gap-2 sm:w-[150px]">
                         <label className="text-sm font-medium">{t("Sana bo'yicha")}</label>
-                        <select
-                            className={selectClassName}
+                        <Select
                             value={sortDir}
-                            onChange={(e) => onSortDirChange(e.target.value as 'desc' | 'asc')}
-                        >
-                            <option value="desc">{t('Eng yangilari')}</option>
-                            <option value="asc">{t('Eng eskilari')}</option>
-                        </select>
+                            onChange={(next) => onSortDirChange(next as 'desc' | 'asc')}
+                            ariaLabel={t("Sana bo'yicha")}
+                            options={[
+                                { value: 'desc', label: t('Eng yangilari') },
+                                { value: 'asc', label: t('Eng eskilari') },
+                            ]}
+                        />
                     </div>
                     {hasActiveFilters && (
                         <Button variant="ghost" onClick={onClearFilters} className="mb-0.5">

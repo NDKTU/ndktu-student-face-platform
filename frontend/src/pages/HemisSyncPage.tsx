@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/Select';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -238,19 +239,18 @@ const HemisSyncPage = () => {
                                 <label className="text-sm font-medium flex items-center gap-2 text-foreground/80">
                                     <GraduationCap className="w-4 h-4" /> Fakultetni tanlash
                                 </label>
-                                <select
-                                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
-                                    value={selectedFacultyId || ''}
-                                    onChange={(e) => {
-                                        setSelectedFacultyId(Number(e.target.value) || undefined);
+                                <Select
+                                    value={selectedFacultyId ? String(selectedFacultyId) : ''}
+                                    onChange={(next) => {
+                                        setSelectedFacultyId(Number(next) || undefined);
                                         setSelectedGroupId(undefined);
                                     }}
-                                >
-                                    <option value="">Hemis bo'yicha (avtomatik)</option>
-                                    {facultiesData?.faculties?.map((f: any) => (
-                                        <option key={f.id} value={f.id}>{f.name}</option>
-                                    ))}
-                                </select>
+                                    ariaLabel="Fakultet"
+                                    options={[
+                                        { value: '', label: "Hemis bo'yicha (avtomatik)" },
+                                        ...(facultiesData?.faculties ?? []).map((f: { id: number; name: string }) => ({ value: String(f.id), label: f.name })),
+                                    ]}
+                                />
                                 {!facultyExists && !selectedFacultyId && (
                                     <div className="flex gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning leading-tight">
                                         <Info className="w-4 h-4 shrink-0" />
@@ -263,16 +263,15 @@ const HemisSyncPage = () => {
                                 <label className="text-sm font-medium flex items-center gap-2 text-foreground/80">
                                     <Users className="w-4 h-4" /> Guruhni tanlash
                                 </label>
-                                <select
-                                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 cursor-pointer"
-                                    value={selectedGroupId || ''}
-                                    onChange={(e) => setSelectedGroupId(Number(e.target.value) || undefined)}
-                                >
-                                    <option value="">Hemis bo'yicha (avtomatik)</option>
-                                    {groupsData?.groups?.map((g: any) => (
-                                        <option key={g.id} value={g.id}>{g.name}</option>
-                                    ))}
-                                </select>
+                                <Select
+                                    value={selectedGroupId ? String(selectedGroupId) : ''}
+                                    onChange={(next) => setSelectedGroupId(Number(next) || undefined)}
+                                    ariaLabel="Guruh"
+                                    options={[
+                                        { value: '', label: "Hemis bo'yicha (avtomatik)" },
+                                        ...(groupsData?.groups ?? []).map((g: { id: number; name: string }) => ({ value: String(g.id), label: g.name })),
+                                    ]}
+                                />
                                 {!groupExists && !selectedGroupId && (
                                     <div className="flex gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 text-[11px] text-primary leading-tight">
                                         <Info className="w-4 h-4 shrink-0" />

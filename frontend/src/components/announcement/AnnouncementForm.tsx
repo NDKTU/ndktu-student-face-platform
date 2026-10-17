@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
+import { DateTimeField } from '@/components/ui/DateTimeField';
+import { SwitchField } from '@/components/ui/SwitchField';
 import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
 import { Input } from '@/components/ui/Input';
-import { Switch } from '@/components/ui/Switch';
 import { AUDIENCE_LABELS, STATUS_LABELS, toIsoOrNull, toLocalInput } from './labels';
 import { useAudienceOptions, useCreateAnnouncement, useUpdateAnnouncement } from '@/hooks/useAnnouncements';
 import { normalizeExternalUrl } from '@/utils/url';
@@ -217,32 +218,28 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
                         ))}
                     </div>
                 </div>
-                <div className="flex items-end gap-2 pb-1">
-                    <Switch
-                        checked={form.pinned}
-                        onCheckedChange={(checked) => patch('pinned', checked)}
-                    />
-                    <span className="text-sm font-medium">Tepaga qadash</span>
-                </div>
+                <SwitchField
+                    className="self-end"
+                    title="Tepaga qadash"
+                    description="E'lonlar ro'yxatida eng yuqorida turadi"
+                    checked={form.pinned}
+                    onCheckedChange={(checked) => patch('pinned', checked)}
+                />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label className="mb-1 block text-sm font-medium">Ko'rsatish boshlanishi</label>
-                    <Input
-                        type="datetime-local"
-                        value={form.publishAt}
-                        onChange={(event) => patch('publishAt', event.target.value)}
-                    />
-                </div>
-                <div>
-                    <label className="mb-1 block text-sm font-medium">Ko'rsatish tugashi</label>
-                    <Input
-                        type="datetime-local"
-                        value={form.expiresAt}
-                        onChange={(event) => patch('expiresAt', event.target.value)}
-                    />
-                </div>
+                <DateTimeField
+                    label="Ko'rsatish boshlanishi"
+                    value={form.publishAt}
+                    onChange={(next) => patch('publishAt', next)}
+                    placeholder="Darhol"
+                />
+                <DateTimeField
+                    label="Ko'rsatish tugashi"
+                    value={form.expiresAt}
+                    onChange={(next) => patch('expiresAt', next)}
+                    placeholder="Darhol"
+                />
             </div>
 
             {/* Auditoriya. «Barcha talabalar» dan boshqasida qiymat tanlash shart. */}
@@ -291,24 +288,18 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
                 )}
             </div>
 
-            <div className="rounded-xl border border-border/60 p-3">
-                <div className="flex items-center gap-2">
-                    <Switch
-                        checked={form.registrationEnabled}
-                        onCheckedChange={(checked) => patch('registrationEnabled', checked)}
-                    />
-                    <span className="text-sm font-medium">Tadbir — talaba ro'yxatdan o'tadi</span>
-                </div>
+            <SwitchField
+                title="Tadbir — talaba ro'yxatdan o'tadi"
+                checked={form.registrationEnabled}
+                onCheckedChange={(checked) => patch('registrationEnabled', checked)}
+            >
                 {form.registrationEnabled && (
-                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">Tadbir vaqti</label>
-                            <Input
-                                type="datetime-local"
-                                value={form.eventAt}
-                                onChange={(event) => patch('eventAt', event.target.value)}
-                            />
-                        </div>
+                    <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                        <DateTimeField
+                            label="Tadbir vaqti"
+                            value={form.eventAt}
+                            onChange={(next) => patch('eventAt', next)}
+                        />
                         <div>
                             <label className="mb-1 block text-sm font-medium">Joyi</label>
                             <Input
@@ -327,17 +318,15 @@ export const AnnouncementForm = ({ editing, onDone, onCancel }: Props) => {
                                 placeholder="Cheklanmagan"
                             />
                         </div>
-                        <div>
-                            <label className="mb-1 block text-sm font-medium">Yozilish muddati</label>
-                            <Input
-                                type="datetime-local"
-                                value={form.registrationDeadline}
-                                onChange={(event) => patch('registrationDeadline', event.target.value)}
-                            />
-                        </div>
+                        <DateTimeField
+                            label="Yozilish muddati"
+                            value={form.registrationDeadline}
+                            onChange={(next) => patch('registrationDeadline', next)}
+                            defaultTime="18:00"
+                        />
                     </div>
                 )}
-            </div>
+            </SwitchField>
 
             <div>
                 <label className="mb-1 block text-sm font-medium">Havola (ixtiyoriy)</label>

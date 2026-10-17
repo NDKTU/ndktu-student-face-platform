@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.core.mixins.time_stamp_mixin import to_naive_utc
 from app.core.schemas import TASHKENT_TZ, TashkentDatetime
 
+#: Mashg'ulot turi — kurslardagi bilan bir xil qiymatlar (`core/enums.py::COURSE_TYPE_LABELS`).
+TRAINING_TYPES = Literal["lecture", "practice", "lab", "seminar"]
+
 SessionStatus = Literal["upcoming", "open", "closed"]
 
 
@@ -33,6 +36,8 @@ class ZoomSessionRequest(BaseModel):
     ends_at: datetime
     group_ids: list[int] = Field(min_length=1, max_length=200)
     subject_id: Optional[int] = None
+    #: Ma'ruza / amaliyot / tajriba / seminar. Avtomatik nomga ham kiradi.
+    training_type: Optional[TRAINING_TYPES] = None
     face_check_enabled: bool = True
     #: `False` — faqat kirishda tekshiriladi, dars davomida tasodifiy tekshiruv yo'q.
     random_face_checks: bool = True
@@ -135,6 +140,7 @@ class ZoomSessionResponse(BaseModel):
     status: SessionStatus
     subject_id: Optional[int] = None
     subject_name: Optional[str] = None
+    training_type: Optional[str] = None
     teacher_user_id: Optional[int] = None
     teacher_name: Optional[str] = None
     groups: List[SessionGroup] = []
@@ -178,6 +184,18 @@ class ZoomSessionListResponse(BaseModel):
     sessions: List[ZoomSessionResponse]
 
 
+class PairTime(BaseModel):
+    """Juftlik raqami va vaqti (Toshkent, «HH:MM»)."""
+
+    pair: int
+    start: str
+    end: str
+
+
+class PairTimeListResponse(BaseModel):
+    pairs: List[PairTime]
+
+
 class ZoomTeacherOption(BaseModel):
     user_id: int
     name: str
@@ -197,6 +215,23 @@ class ZoomSubjectOption(BaseModel):
 
 class ZoomSubjectOptionListResponse(BaseModel):
     subjects: List[ZoomSubjectOption]
+
+
+class ZoomTeacherLoadItem(BaseModel):
+    """Yuklamaning bitta juftligi: fan + guruh va u yerdagi mashg'ulot turlari."""
+
+    subject_id: int
+    subject_name: str
+    group_id: int
+    group_name: str
+    #: lecture | practice | lab | seminar — EPOS'dagi `load_types`.
+    load_types: List[str] = []
+
+
+class ZoomTeacherLoadResponse(BaseModel):
+    items: List[ZoomTeacherLoadItem]
+    #: Qaysi semestr yuklamasi: «Kuzgi» / «Bahorgi»; `None` — o'quv yili bo'yicha hammasi.
+    semester: Optional[str] = None
 
 
 class ZoomAccountOption(BaseModel):

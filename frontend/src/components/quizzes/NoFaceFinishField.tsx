@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/Input';
-import { Switch } from '@/components/ui/Switch';
+import { SwitchField } from '@/components/ui/SwitchField';
 import { useAuth } from '@/context/AuthContext';
 import { NO_FACE_FINISH_PERMISSION } from './noFaceFinish';
 
@@ -14,7 +14,7 @@ interface Props {
 }
 
 /**
- * «Yuz ko'rinmasa testni yakunlash» — faqat «Kamera bilan» rejimida.
+ * «Yuz ko'rinmasa testni yakunlash» — faqat «Kirishda va davomida» rejimida.
  *
  * Avtomatik yakunlash jiddiy jazo, shuning uchun uni faqat ruxsati bor
  * foydalanuvchi o'zgartiradi; qolganlar holatni ko'radi, xolos. Ruxsatsiz
@@ -27,23 +27,18 @@ export function NoFaceFinishField({ value, onChange }: Props) {
     const enabled = value != null;
 
     return (
-        <div className="space-y-2 rounded-lg border border-border px-3 py-2.5">
-            <div className="flex items-center justify-between gap-4">
-                <label htmlFor="quiz-no-face-finish" className={canEdit ? 'cursor-pointer' : undefined}>
-                    <div className="text-sm font-medium">Yuz ko'rinmasa testni yakunlash</div>
-                    <div className="text-xs text-muted-foreground">
-                        {canEdit
-                            ? "Kadrda yuz belgilangan vaqtdan ko'p ko'rinmasa — test suratli dalil bilan yakunlanadi. Ogohlantirish (5 soniya) har doim ishlaydi"
-                            : "Bu sozlamani faqat ruxsati bor foydalanuvchi o'zgartiradi"}
-                    </div>
-                </label>
-                <Switch
-                    id="quiz-no-face-finish"
-                    checked={enabled}
-                    disabled={!canEdit}
-                    onCheckedChange={(checked) => onChange(checked ? DEFAULT_SECONDS : null)}
-                />
-            </div>
+        <SwitchField
+            id="quiz-no-face-finish"
+            title="Yuz ko'rinmasa testni yakunlash"
+            description={
+                canEdit
+                    ? "Kadrda yuz belgilangan vaqtdan ko'p ko'rinmasa — test suratli dalil bilan yakunlanadi. Ogohlantirish (5 soniya) har doim ishlaydi"
+                    : "Bu sozlamani faqat ruxsati bor foydalanuvchi o'zgartiradi"
+            }
+            checked={enabled}
+            disabled={!canEdit}
+            onCheckedChange={(checked) => onChange(checked ? DEFAULT_SECONDS : null)}
+        >
             {enabled && (
                 <div className="flex items-center gap-2 text-sm">
                     <Input
@@ -61,6 +56,6 @@ export function NoFaceFinishField({ value, onChange }: Props) {
                     </span>
                 </div>
             )}
-        </div>
+        </SwitchField>
     );
 }

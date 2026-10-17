@@ -221,7 +221,7 @@ export default function GeneralTestTakeListPage({ studentHub = false }: { studen
                     )}
                     {dialogMode === 'face_entry' && !dialog?.faceStep && (
                         <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                            Bu testga kirishda yuzingiz profil suratingiz bilan solishtiriladi. Test davomida kamera ishlamaydi.
+                            Bu testga kirishda yuzingiz tizimdagi suratingiz bilan bir marta solishtiriladi. Test davomida kamera ishlamaydi.
                         </p>
                     )}
                     {dialogMode !== 'standard' && cameraStatus !== 'checking' && cameraStatus !== 'available' && (

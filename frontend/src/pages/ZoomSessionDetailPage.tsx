@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { courseTypeLabel } from '@/services/courseTypes';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, BookOpen, CalendarClock, ClipboardList, ExternalLink, GraduationCap, ScanFace, UsersRound, Video } from 'lucide-react';
@@ -98,6 +99,7 @@ export default function ZoomSessionDetailPage() {
                 {session.subject_name && (
                     <span className="inline-flex items-center gap-1.5">
                         <BookOpen className="h-4 w-4" /> {session.subject_name}
+                        {session.training_type && ` · ${courseTypeLabel(session.training_type)}`}
                     </span>
                 )}
                 {session.teacher_name && (

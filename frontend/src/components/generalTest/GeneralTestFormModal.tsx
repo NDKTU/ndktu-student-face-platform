@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
+import { SwitchField } from '@/components/ui/SwitchField';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
 import { NoFaceFinishField } from '@/components/quizzes/NoFaceFinishField';
@@ -129,26 +129,22 @@ export function GeneralTestFormModal({ editing, defaultSubjectId, onClose, onSub
                         beriladi.
                     </p>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-                    <div>
-                        <p className="text-sm font-medium text-foreground">Faol</p>
-                        <p className="text-xs text-muted-foreground">
-                            Faol test fanga biriktirilgan foydalanuvchilar va testga biriktirilgan guruhlarga ko'rinadi
-                        </p>
-                    </div>
-                    <Switch checked={isActive} onCheckedChange={setIsActive} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-                    <div>
-                        <p className="text-sm font-medium text-foreground">PIN bilan boshlash</p>
-                        <p className="text-xs text-muted-foreground">
-                            {pinRequired && editing?.pin
-                                ? `Joriy PIN: ${editing.pin}. Yangisini test sahifasida yaratish mumkin`
-                                : "PIN avtomatik yaratiladi va test sahifasida ko'rinadi. Talaba testni faqat PIN bilan boshlaydi"}
-                        </p>
-                    </div>
-                    <Switch checked={pinRequired} onCheckedChange={setPinRequired} />
-                </div>
+                <SwitchField
+                    title="Faol"
+                    description="Faol test fanga biriktirilgan foydalanuvchilar va testga biriktirilgan guruhlarga ko'rinadi"
+                    checked={isActive}
+                    onCheckedChange={setIsActive}
+                />
+                <SwitchField
+                    title="PIN bilan boshlash"
+                    description={
+                        pinRequired && editing?.pin
+                            ? `Joriy PIN: ${editing.pin}. Yangisini test sahifasida yaratish mumkin`
+                            : "PIN avtomatik yaratiladi va test sahifasida ko'rinadi. Talaba testni faqat PIN bilan boshlaydi"
+                    }
+                    checked={pinRequired}
+                    onCheckedChange={setPinRequired}
+                />
                 <ProctoringModePicker value={proctoringMode} onChange={setProctoringMode} />
                 {proctoringMode === 'face' && <NoFaceFinishField value={noFaceFinish} onChange={setNoFaceFinish} />}
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />

@@ -14,13 +14,14 @@ Zoom ilovasidan LMS'ni chetlab kirib bo'lmaydi (`zoom_api.py`).
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import desc, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.errors import Invalid
 from app.core.mixins.time_stamp_mixin import utcnow_naive
 from app.modules.course.lesson_access import is_admin
 from app.core.utils.zoom_link import ZoomLinkError, parse_zoom_link
@@ -47,7 +48,7 @@ from .schemas import (
 )
 from .zoom_api import ZoomApiError, api_error, zoom_api
 from app.core.errors import AppError, Invalid
-from .common import EARLY_JOIN
+from .common import EARLY_JOIN, MAX_CALENDAR_DAYS, TASHKENT_OFFSET
 from .errors import _not_found, _not_yours, _bad_link, _link_required, _subject_required, _subject_not_teachers, _reason, _account_busy
 from .naming import _readable_name, auto_title
 from .teachers import ZoomTeachersMixin
@@ -134,6 +135,7 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
             status=self._status(zs, now),  # type: ignore[arg-type]
             subject_id=zs.subject_id,
             subject_name=zs.subject.name if zs.subject else None,
+            training_type=zs.training_type,
             teacher_user_id=zs.teacher_user_id,
             teacher_name=_readable_name(zs.teacher.full_name) if zs.teacher else None,
             groups=sorted(
@@ -179,9 +181,18 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
     # ── Ro'yxat ──────────────────────────────────────────────────────────────
 
     async def list_sessions(
-        self, session: AsyncSession, user: User, scope: str | None = None
+        self,
+        session: AsyncSession,
+        user: User,
+        scope: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> ZoomSessionListResponse:
-        """Admin — hammasi; boshqalar — o'zi yaratgani va o'z guruhining faol seanslari."""
+        """Admin — hammasi; boshqalar — o'zi yaratgani va o'z guruhining faol seanslari.
+
+        `date_from`/`date_to` (Toshkent sanalari, ikkalasi ham kiritiladi) —
+        kalendar uchun: shu kunlarga to'g'ri keladigan seanslar, `scope` o'rniga.
+        """
         stmt = select(ZoomSession).options(
             selectinload(ZoomSession.group_links).selectinload(ZoomSessionGroup.group),
             selectinload(ZoomSession.subject),
@@ -203,6 +214,18 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
             stmt = stmt.where(or_(*visible))
 
         now = utcnow_naive()
+        if date_from is not None or date_to is not None:
+            if date_from is None or date_to is None or date_to < date_from:
+                raise Invalid("zoom_bad_date_range", "Sana oralig'i noto'g'ri")
+            if (date_to - date_from).days > MAX_CALENDAR_DAYS:
+                raise Invalid("zoom_date_range_too_long", "Sana oralig'i juda uzun")
+            # Bazada naiv UTC, sanalar esa Toshkent bo'yicha: kun 00:00 (+05) = oldingi kun 19:00 UTC.
+            start = datetime.combine(date_from, time()) - TASHKENT_OFFSET
+            end = datetime.combine(date_to + timedelta(days=1), time()) - TASHKENT_OFFSET
+            stmt = stmt.where(ZoomSession.starts_at < end, ZoomSession.ends_at > start)
+            rows = (await session.execute(stmt.order_by(ZoomSession.starts_at, ZoomSession.id))).scalars().all()
+            series = await self._series_positions(session, list(rows))
+            return ZoomSessionListResponse(sessions=[self._to_response(zs, user, now, series) for zs in rows])
         if scope == "now":
             stmt = stmt.where(ZoomSession.starts_at - EARLY_JOIN <= now, ZoomSession.ends_at >= now)
         elif scope == "upcoming":
@@ -254,7 +277,8 @@ class ZoomSessionRepository(ZoomTeachersMixin, ZoomAccountChoiceMixin, ZoomJoinM
             raise _subject_not_teachers()
 
         zs.teacher_user_id = teacher.user_id
-        zs.title = data.title or auto_title(subject.name, teacher, list(group_names.values()))
+        zs.training_type = data.training_type
+        zs.title = data.title or auto_title(subject.name, teacher, list(group_names.values()), data.training_type)
         zs.starts_at = data.starts_at
         zs.ends_at = data.ends_at
         zs.subject_id = data.subject_id

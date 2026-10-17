@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { courseTypeLabel } from '@/services/courseTypes';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BookOpen, CalendarClock, GraduationCap, Pencil, Plus, Radio, Repeat, ScanFace, Trash2, UsersRound, Video } from 'lucide-react';
@@ -12,6 +13,10 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { TabBar, type TabDef } from '@/components/ui/TabBar';
 import { ZoomSessionFormModal, type ZoomFormExtra } from '@/components/zoom/ZoomSessionFormModal';
+import { ZoomMonthCalendar, ZoomWeekCalendar } from '@/components/zoom/ZoomCalendar';
+import { MonthNav, ViewToggle, WeekNav } from '@/components/schedule/ScheduleControls';
+import { monthStartOf, mondayOf, toIsoDate, viewRange } from '@/components/schedule/scheduleUtils';
+import { useScheduleView } from '@/hooks/useScheduleView';
 import { SessionStatusBadge } from '@/components/zoom/SessionStatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -19,6 +24,7 @@ import {
     useDeleteZoomSession,
     useSaveZoomSession,
     useUpdateZoomFollowing,
+    useZoomCalendar,
     useZoomSessions,
 } from '@/hooks/useZoomSessions';
 import type {
@@ -29,7 +35,7 @@ import type {
     ZoomSessionScope,
 } from '@/services/zoomSessionService';
 import { apiErrorMessage } from '@/utils/apiError';
-import { formatDate, formatTime } from '@/utils/date';
+import { formatDate, formatDayMonth, formatTime } from '@/utils/date';
 import { cn } from '@/lib/utils';
 
 const TABS: TabDef<ZoomSessionScope>[] = [
@@ -53,7 +59,14 @@ export default function ZoomSessionsPage() {
     const { hasPermission } = useAuth();
     const canCreate = hasPermission('create:zoom_session');
     const [scope, setScope] = useState<ZoomSessionScope>('now');
+    // Ro'yxat (holat bo'yicha yorliqlar) yoki kalendar — tanlov shu brauzerda eslab qolinadi.
+    const [view, setView] = useScheduleView('zoom:view');
+    const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
+    const [monthStart, setMonthStart] = useState(() => monthStartOf(new Date()));
+    const [dateFrom, dateTo] = viewRange(view, weekStart, monthStart);
     const { data: sessions, isLoading, isError, refetch } = useZoomSessions(scope);
+    const calendar = useZoomCalendar(dateFrom, dateTo, view !== 'list');
+    const today = toIsoDate(new Date());
     const save = useSaveZoomSession();
     const createSeries = useCreateZoomSeries();
     const updateFollowing = useUpdateZoomFollowing();
@@ -128,105 +141,149 @@ export default function ZoomSessionsPage() {
                 title="Zoom"
                 description="Jonli darslar — guruhingiz uchun belgilangan vaqtda"
                 actions={
-                    canCreate && (
-                        <Button onClick={() => setEditing('new')}>
-                            <Plus className="h-4 w-4" /> Seans qo'shish
-                        </Button>
-                    )
+                    <>
+                        <ViewToggle view={view} onChange={setView} />
+                        {canCreate && (
+                            <Button onClick={() => setEditing('new')}>
+                                <Plus className="h-4 w-4" /> Seans qo'shish
+                            </Button>
+                        )}
+                    </>
                 }
             />
-            <TabBar tabs={TABS} active={scope} onChange={setScope} />
-
-            {isLoading ? (
-                <div className="space-y-2">
-                    {Array.from({ length: 3 }, (_, i) => (
-                        <Skeleton key={i} className="h-20 w-full rounded-xl" />
-                    ))}
-                </div>
-            ) : isError ? (
-                <ErrorState onRetry={() => refetch()} />
-            ) : !sessions?.length ? (
-                <Card>
-                    <EmptyState icon={<Video className="h-6 w-6" />} title={EMPTY[scope]} description="Seans o'qituvchi tomonidan belgilanadi." />
-                </Card>
-            ) : (
-                <div className="space-y-2">
-                    {sessions.map((session) => (
-                        <div
-                            key={session.id}
-                            className={cn(
-                                'flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-4',
-                                !session.is_active && 'opacity-60',
+            {view !== 'list' ? (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-foreground tabular-nums">
+                            {view === 'week' ? `${formatDayMonth(dateFrom)} – ${formatDate(dateTo)}` : ''}
+                            {calendar.data && (
+                                <span className="ml-2 font-normal text-muted-foreground">· {calendar.data.length} ta seans</span>
                             )}
-                        >
-                            <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-medium text-foreground">{session.title}</p>
-                                    <SessionStatusBadge session={session} />
-                                    {session.series_id && session.series_position && session.series_total && (
-                                        <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                                            <Repeat className="h-3 w-3" /> {session.series_position} / {session.series_total}
-                                        </span>
-                                    )}
-                                    {!session.is_active && <span className="text-xs text-muted-foreground">o'chirilgan</span>}
-                                </div>
-                                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1">
-                                        <CalendarClock className="h-3.5 w-3.5" />
-                                        {formatDate(session.starts_at)}, {formatTime(session.starts_at)}–{formatTime(session.ends_at)}
-                                    </span>
-                                    {session.subject_name && (
-                                        <span className="inline-flex items-center gap-1">
-                                            <BookOpen className="h-3.5 w-3.5" /> {session.subject_name}
-                                        </span>
-                                    )}
-                                    {session.teacher_name && (
-                                        <span className="inline-flex items-center gap-1">
-                                            <GraduationCap className="h-3.5 w-3.5" /> {session.teacher_name}
-                                        </span>
-                                    )}
-                                    <span className="inline-flex items-center gap-1">
-                                        <UsersRound className="h-3.5 w-3.5" />
-                                        {session.groups.map((g) => g.name).join(', ')}
-                                    </span>
-                                    {session.face_check_enabled && (
-                                        <span className="inline-flex items-center gap-1">
-                                            <ScanFace className="h-3.5 w-3.5" />
-                                            {session.random_face_checks ? 'Yuz nazorati' : 'Yuz nazorati: faqat kirishda'}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-end gap-2">
-                                {session.can_manage && (
-                                    <>
-                                        <Button variant="ghost" size="sm" aria-label="Tahrirlash" onClick={() => setEditing(session)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            aria-label="O'chirish"
-                                            onClick={() => {
-                                                setDeleteScope('one');
-                                                setToDelete(session);
-                                            }}
-                                        >
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </>
-                                )}
-                                <Button
-                                    size="sm"
-                                    variant={session.status === 'open' ? 'primary' : 'outline'}
-                                    onClick={() => navigate(`/zoom/${session.id}`)}
-                                >
-                                    {session.status === 'open' && !session.can_manage ? "Qo'shilish" : 'Ochish'}
-                                </Button>
-                            </div>
+                        </span>
+                        {view === 'month' ? (
+                            <MonthNav monthStart={monthStart} onChange={setMonthStart} />
+                        ) : (
+                            <WeekNav weekStart={weekStart} onChange={setWeekStart} />
+                        )}
+                    </div>
+                    {calendar.isLoading ? (
+                        <Skeleton className="h-96 w-full rounded-2xl" />
+                    ) : calendar.isError ? (
+                        <ErrorState onRetry={() => calendar.refetch()} />
+                    ) : (
+                        <div className={cn(calendar.isFetching && 'opacity-60')}>
+                            {view === 'month' ? (
+                                // Oy almashganda tanlangan kun tushib qolsin — `key` bilan qayta chiziladi.
+                                <ZoomMonthCalendar
+                                    key={toIsoDate(monthStart)}
+                                    monthStart={monthStart}
+                                    sessions={calendar.data ?? []}
+                                    today={today}
+                                />
+                            ) : (
+                                <ZoomWeekCalendar weekStart={weekStart} sessions={calendar.data ?? []} today={today} />
+                            )}
                         </div>
-                    ))}
+                    )}
                 </div>
+            ) : (
+                <>
+                <TabBar tabs={TABS} active={scope} onChange={setScope} />
+
+                {isLoading ? (
+                    <div className="space-y-2">
+                        {Array.from({ length: 3 }, (_, i) => (
+                            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                        ))}
+                    </div>
+                ) : isError ? (
+                    <ErrorState onRetry={() => refetch()} />
+                ) : !sessions?.length ? (
+                    <Card>
+                        <EmptyState icon={<Video className="h-6 w-6" />} title={EMPTY[scope]} description="Seans o'qituvchi tomonidan belgilanadi." />
+                    </Card>
+                ) : (
+                    <div className="space-y-2">
+                        {sessions.map((session) => (
+                            <div
+                                key={session.id}
+                                className={cn(
+                                    'flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-4',
+                                    !session.is_active && 'opacity-60',
+                                )}
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-medium text-foreground">{session.title}</p>
+                                        <SessionStatusBadge session={session} />
+                                        {session.series_id && session.series_position && session.series_total && (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                                                <Repeat className="h-3 w-3" /> {session.series_position} / {session.series_total}
+                                            </span>
+                                        )}
+                                        {!session.is_active && <span className="text-xs text-muted-foreground">o'chirilgan</span>}
+                                    </div>
+                                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                        <span className="inline-flex items-center gap-1">
+                                            <CalendarClock className="h-3.5 w-3.5" />
+                                            {formatDate(session.starts_at)}, {formatTime(session.starts_at)}–{formatTime(session.ends_at)}
+                                        </span>
+                                        {session.subject_name && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <BookOpen className="h-3.5 w-3.5" /> {session.subject_name}
+                                                {session.training_type && ` · ${courseTypeLabel(session.training_type)}`}
+                                            </span>
+                                        )}
+                                        {session.teacher_name && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <GraduationCap className="h-3.5 w-3.5" /> {session.teacher_name}
+                                            </span>
+                                        )}
+                                        <span className="inline-flex items-center gap-1">
+                                            <UsersRound className="h-3.5 w-3.5" />
+                                            {session.groups.map((g) => g.name).join(', ')}
+                                        </span>
+                                        {session.face_check_enabled && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <ScanFace className="h-3.5 w-3.5" />
+                                                {session.random_face_checks ? 'Yuz nazorati' : 'Yuz nazorati: faqat kirishda'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-2">
+                                    {session.can_manage && (
+                                        <>
+                                            <Button variant="ghost" size="sm" aria-label="Tahrirlash" onClick={() => setEditing(session)}>
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-label="O'chirish"
+                                                onClick={() => {
+                                                    setDeleteScope('one');
+                                                    setToDelete(session);
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant={session.status === 'open' ? 'primary' : 'outline'}
+                                        onClick={() => navigate(`/zoom/${session.id}`)}
+                                    >
+                                        {session.status === 'open' && !session.can_manage ? "Qo'shilish" : 'Ochish'}
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                </>
             )}
 
             {editing !== null && (

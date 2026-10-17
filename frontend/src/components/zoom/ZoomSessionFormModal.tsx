@@ -1,13 +1,22 @@
 import { useMemo, useState } from 'react';
+import { TeacherLoadGroups } from '@/components/zoom/TeacherLoadGroups';
+import { loadGroups, loadSubjects, loadTypes } from '@/utils/teacherLoad';
+import { cn } from '@/lib/utils';
+import { COURSE_TYPE_OPTIONS, courseTypeNameLabel, type CourseType } from '@/services/courseTypes';
+import { Select } from '@/components/ui/Select';
+import { DatePicker } from '@/components/ui/DatePicker';
+import { TimeField } from '@/components/ui/TimeField';
+import { PairPicker } from '@/components/zoom/PairPicker';
+import { formatLongDate, pairRange } from '@/utils/dateTimeInput';
+import { SwitchField } from '@/components/ui/SwitchField';
+import { FaceControlPicker } from '@/components/common/FaceControlPicker';
 import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Switch } from '@/components/ui/Switch';
 import { GroupChecklist, type GroupSource } from '@/components/generalTest/GroupChecklist';
-import { toggleGroup } from '@/components/generalTest/labels';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useZoomCapabilities, useZoomTeacherOptions, useZoomTeacherSubjects } from '@/hooks/useZoomSessions';
+import { usePairTimes, useZoomCapabilities, useZoomTeacherLoad, useZoomTeacherOptions, useZoomTeacherSubjects } from '@/hooks/useZoomSessions';
 import {
     zoomSessionService,
     type ZoomSeriesOptions,
@@ -44,11 +53,12 @@ const shortTeacherName = (fullName: string) => {
     return [last, initials].filter(Boolean).join(' ');
 };
 
-/** Server `repository.py::auto_title` bilan bir xil: «Fan — Familiya I.O. (101-23, 102-23 +2)». */
+/** Server `naming.py::auto_title` bilan bir xil: «Fan (amaliyot) — Familiya I.O. (101-23, 102-23 +2)». */
 const TITLE_GROUPS_SHOWN = 3;
-const buildAutoTitle = (subject?: string, teacher?: string, groupNames: string[] = []) => {
+const buildAutoTitle = (subject?: string, teacher?: string, groupNames: string[] = [], type?: CourseType | null) => {
     if (!subject) return '';
-    let title = teacher ? `${subject} — ${shortTeacherName(teacher)}` : subject;
+    const typed = type ? `${subject} (${courseTypeNameLabel(type)})` : subject;
+    let title = teacher ? `${typed} — ${shortTeacherName(teacher)}` : typed;
     const names = [...groupNames].sort();
     if (names.length) {
         let shown = names.slice(0, TITLE_GROUPS_SHOWN).join(', ');
@@ -106,6 +116,13 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
     const [date, setDate] = useState(start.date || todayInTashkent());
     const [startTime, setStartTime] = useState(start.time || '12:00');
     const [endTime, setEndTime] = useState(end.time || '13:20');
+    const { data: pairs = [] } = usePairTimes();
+    const range = pairRange(pairs, startTime, endTime);
+    const pairLabel = range ? (range[0] === range[1] ? `${range[0]}-juftlik` : `${range[0]}–${range[1]}-juftlik`) : '';
+    const minutes = (Number(endTime.slice(0, 2)) * 60 + Number(endTime.slice(3, 5))) - (Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5)));
+    const durationLabel = minutes > 0
+        ? [Math.floor(minutes / 60) && `${Math.floor(minutes / 60)} soat`, minutes % 60 && `${minutes % 60} daq`].filter(Boolean).join(' ')
+        : '';
     const [groups, setGroups] = useState<Map<number, string>>(
         () => new Map((editing?.groups ?? []).map((g) => [g.id, g.name])),
     );
@@ -144,13 +161,54 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
         return options;
     }, [teacherData, teacherId, teacherName]);
     const { data: subjects, isFetching: subjectsLoading } = useZoomTeacherSubjects(teacherId);
-    const subjectName = subjects?.find((s) => s.id === subjectId)?.name ?? editing?.subject_name ?? undefined;
-    const autoTitle = buildAutoTitle(subjectName, teacherName, [...groups.values()]);
+    // EPOS yuklamasi: guruhlar, ularda o'tadigan fanlar va turlar shundan tanlanadi.
+    // Yuklama bo'lmasa (yangi xodim, sinxrondan oldin) — avvalgidek butun ro'yxat.
+    const { data: load, isFetching: loadLoading } = useZoomTeacherLoad(teacherId);
+    const loadItems = useMemo(() => load?.items ?? [], [load]);
+    const hasLoad = loadItems.length > 0;
+    const groupsFromLoad = useMemo(() => loadGroups(loadItems), [loadItems]);
+    const [showAllGroups, setShowAllGroups] = useState(false);
+    const subjectChoices = hasLoad ? loadSubjects(loadItems, groups.keys()) : (subjects ?? []);
+    const allowedTypes = hasLoad ? loadTypes(loadItems, subjectId, groups.keys()) : [];
+    const subjectName =
+        subjectChoices.find((s) => s.id === subjectId)?.name
+        ?? subjects?.find((s) => s.id === subjectId)?.name
+        ?? editing?.subject_name
+        ?? undefined;
+
+    /** Fan tanlandi — yuklamada bitta tur bo'lsa, o'zi qo'yiladi; joriy tur yuklamada bo'lmasa — birinchisi. */
+    const pickSubject = (id: number | null, groupIds: number[] = [...groups.keys()]) => {
+        setSubjectId(id);
+        if (!hasLoad || id == null) return;
+        const types = loadTypes(loadItems, id, groupIds) as CourseType[];
+        if (types.length === 1 || (types.length > 0 && (!trainingType || !types.includes(trainingType)))) {
+            setTrainingType(types[0]);
+        }
+    };
+
+    /** Guruh belgilandi — fan tanlangan guruhlarda umumiy bo'lmay qolsa tushadi, yagona variant bo'lsa — o'zi tanlanadi. */
+    const toggleGroupById = (id: number, name: string) => {
+        const next = new Map(groups);
+        if (next.has(id)) next.delete(id);
+        else next.set(id, name);
+        setGroups(next);
+        if (!hasLoad) return;
+        const options = loadSubjects(loadItems, next.keys());
+        if (subjectId != null && !options.some((option) => option.id === subjectId)) {
+            pickSubject(options.length === 1 ? options[0].id : null, [...next.keys()]);
+        } else if (subjectId == null && next.size > 0 && options.length === 1) {
+            pickSubject(options[0].id, [...next.keys()]);
+        }
+    };
+    // Yangi seansda — ma'ruza; eski (tursiz) seansni tahrirlashda tanlanmagan qoladi.
+    const [trainingType, setTrainingType] = useState<CourseType | null>(editing ? editing.training_type ?? null : 'lecture');
+    const autoTitle = buildAutoTitle(subjectName, teacherName, [...groups.values()], trainingType);
     // Yangi seansda — server Zoom API sozlangan bo'lsa, uchrashuvni o'zi
     // yaratishi mumkin. Tahrirda tanlov yo'q: seans qanday yaratilgan bo'lsa, shunday qoladi.
     const { data: capabilities } = useZoomCapabilities(true);
-    const [autoCreateChoice, setAutoCreateChoice] = useState(true);
-    const managed = editing ? editing.zoom_managed : Boolean(capabilities?.auto_create) && autoCreateChoice;
+    // Zoom API sozlangan bo'lsa, uchrashuvni doim LMS o'zi yaratadi (tanlov olib tashlangan):
+    // talaba shaxsiy havola bilan kiradi, raqam va parolni bilgan begona kira olmaydi.
+    const managed = editing ? editing.zoom_managed : Boolean(capabilities?.auto_create);
     // Akkaunt: '' — avtomatik (bo'sh akkaunt yoki havoladan aniqlanadi).
     const [accountId, setAccountId] = useState<string>(
         editing && !editing.zoom_managed && editing.zoom_account_id != null ? String(editing.zoom_account_id) : '',
@@ -185,6 +243,7 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
             title: null,
             teacher_user_id: teacherId,
             subject_id: subjectId,
+            training_type: trainingType,
             link_url: managed ? null : link.trim(),
             zoom_account_id: selectedAccount === '' || editing?.zoom_managed ? null : Number(selectedAccount),
             starts_at: `${date}T${startTime}:00${TASHKENT_OFFSET}`,
@@ -199,54 +258,140 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
     return (
         <Modal isOpen onClose={onClose} title={editing ? 'Seansni tahrirlash' : 'Yangi Zoom seans'} className="md:max-w-2xl">
             <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                        <span className="text-sm font-medium text-foreground">O'qituvchi</span>
-                        <Combobox
-                            options={teacherOptions}
-                            value={teacherId != null ? String(teacherId) : ''}
-                            onChange={(value) => {
-                                const picked = teacherOptions.find((o) => o.value === value);
-                                setTeacherId(value ? Number(value) : null);
-                                setTeacherName(picked?.label ?? '');
-                                // Fan o'qituvchiniki bo'lishi shart — boshqa o'qituvchida u bo'lmasligi mumkin.
-                                setSubjectId(null);
-                            }}
-                            onSearchChange={setTeacherSearch}
-                            placeholder="O'qituvchini tanlang"
-                            searchPlaceholder="F.I.Sh. bo'yicha qidirish..."
-                            disabled={locked}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Darsni olib boradi: yuz tekshiruvisiz kiradi va uchrashuvni host sifatida boshlaydi
+                <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-foreground">O'qituvchi</span>
+                    <Combobox
+                        options={teacherOptions}
+                        value={teacherId != null ? String(teacherId) : ''}
+                        onChange={(value) => {
+                            const picked = teacherOptions.find((o) => o.value === value);
+                            setTeacherId(value ? Number(value) : null);
+                            setTeacherName(picked?.label ?? '');
+                            // Guruh va fan o'qituvchiniki bo'lishi shart — boshqasida ular bo'lmasligi mumkin.
+                            setSubjectId(null);
+                            setGroups(new Map());
+                            setShowAllGroups(false);
+                        }}
+                        onSearchChange={setTeacherSearch}
+                        placeholder="O'qituvchini tanlang"
+                        searchPlaceholder="F.I.Sh. bo'yicha qidirish..."
+                        disabled={locked}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Darsni olib boradi: yuz tekshiruvisiz kiradi va uchrashuvni host sifatida boshlaydi
+                    </p>
+                </div>
+                <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-foreground">Guruhlar</span>
+                    {teacherId == null ? (
+                        <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                            Avval o'qituvchini tanlang — uning guruhlari shu yerda chiqadi
                         </p>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label htmlFor="zoom-subject" className="text-sm font-medium text-foreground">
-                            Fan
-                        </label>
-                        <select
-                            id="zoom-subject"
-                            value={subjectId ?? ''}
-                            onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : null)}
-                            disabled={teacherId == null || subjectsLoading}
-                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60"
-                        >
-                            <option value="">
-                                {teacherId == null
-                                    ? "Avval o'qituvchini tanlang"
-                                    : subjectsLoading
-                                        ? 'Yuklanmoqda...'
-                                        : subjects?.length
-                                            ? 'Fanni tanlang'
-                                            : "O'qituvchiga fan biriktirilmagan"}
-                            </option>
-                            {subjects?.map((subject) => (
-                                <option key={subject.id} value={subject.id}>
-                                    {subject.name}
-                                </option>
-                            ))}
-                        </select>
+                    ) : loadLoading && !load ? (
+                        <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                            Yuklama olinmoqda...
+                        </p>
+                    ) : hasLoad ? (
+                        <>
+                            <p className="text-xs text-muted-foreground">
+                                EPMOS yuklamasi{load?.semester ? ` (${load.semester.toLowerCase()} semestr)` : ''} — o'qituvchi
+                                dars o'tadigan guruhlar. Oqim ma'ruzasi uchun bir nechtasini belgilang.
+                            </p>
+                            <TeacherLoadGroups groups={groupsFromLoad} selected={groups} onToggle={toggleGroupById} />
+                            {showAllGroups ? (
+                                <GroupChecklist
+                                    selected={groups}
+                                    onToggle={(group) => toggleGroupById(group.id, group.name)}
+                                    source={ZOOM_GROUP_SOURCE}
+                                />
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllGroups(true)}
+                                    className="text-xs font-medium text-primary hover:underline"
+                                >
+                                    + Boshqa guruhni qo'shish (yuklamada yo'q)
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-xs text-amber-600">
+                                EPMOS yuklamasi topilmadi — guruhni umumiy ro'yxatdan tanlang
+                            </p>
+                            <GroupChecklist
+                                selected={groups}
+                                onToggle={(group) => toggleGroupById(group.id, group.name)}
+                                source={ZOOM_GROUP_SOURCE}
+                            />
+                        </>
+                    )}
+                    {groups.size > 0 && (
+                        <p className="text-xs text-muted-foreground">Tanlangan: {[...groups.values()].join(', ')}</p>
+                    )}
+                </div>
+                <div className="space-y-1.5">
+                    <label htmlFor="zoom-subject" className="text-sm font-medium text-foreground">
+                        Fan
+                    </label>
+                    <Select
+                        id="zoom-subject"
+                        value={subjectId == null ? '' : String(subjectId)}
+                        onChange={(next) => pickSubject(next ? Number(next) : null)}
+                        disabled={teacherId == null || subjectsLoading || loadLoading}
+                        placeholder={
+                            teacherId == null
+                                ? "Avval o'qituvchini tanlang"
+                                : subjectsLoading || loadLoading
+                                    ? 'Yuklanmoqda...'
+                                    : subjectChoices.length
+                                        ? 'Fanni tanlang'
+                                        : hasLoad
+                                            ? "Tanlangan guruhlarda umumiy fan yo'q"
+                                            : "O'qituvchiga fan biriktirilmagan"
+                        }
+                        options={[
+                            // Saqlangan seansning fani yuklama tanlovida bo'lmasa ham ko'rinib tursin.
+                            ...(subjectId != null && subjectName && !subjectChoices.some((subject) => subject.id === subjectId)
+                                ? [{ value: String(subjectId), label: subjectName }]
+                                : []),
+                            ...subjectChoices.map((subject) => ({ value: String(subject.id), label: subject.name })),
+                        ]}
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-foreground">Mashg'ulot turi</span>
+                    {allowedTypes.length > 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle" />
+                            yuklamada bor
+                        </span>
+                    )}
+                    <div role="radiogroup" aria-label="Mashg'ulot turi" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {COURSE_TYPE_OPTIONS.map((option) => {
+                            const active = trainingType === option.value;
+                            return (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={active}
+                                    onClick={() => setTrainingType(option.value)}
+                                    title={allowedTypes.includes(option.value) ? 'EPMOS yuklamasida bor' : undefined}
+                                    className={cn(
+                                        'relative h-10 rounded-lg border text-sm font-medium transition',
+                                        active
+                                            ? 'border-primary bg-primary/5 text-primary ring-2 ring-primary/30'
+                                            : 'border-input hover:border-primary/50',
+                                    )}
+                                >
+                                    {option.label}
+                                    {allowedTypes.includes(option.value) && (
+                                        <span aria-hidden className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
                 <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
@@ -255,18 +400,6 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         {autoTitle || "Fan, o'qituvchi va guruhlarni tanlang"}
                     </div>
                 </div>
-                {!editing && capabilities?.auto_create && (
-                    <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
-                        <label htmlFor="zoom-auto-create" className="cursor-pointer">
-                            <div className="text-sm font-medium">Zoom'da avtomatik yaratish</div>
-                            <div className="text-xs text-muted-foreground">
-                                Uchrashuvni LMS o'zi yaratadi. Talaba shaxsiy havola bilan kiradi — raqam va parolni
-                                bilgan begona odam kira olmaydi
-                            </div>
-                        </label>
-                        <Switch id="zoom-auto-create" checked={autoCreateChoice} onCheckedChange={setAutoCreateChoice} />
-                    </div>
-                )}
                 {editing?.zoom_managed && (
                     <p className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                         Uchrashuv LMS tomonidan Zoom'da yaratilgan
@@ -279,21 +412,15 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         <label htmlFor="zoom-account" className="text-sm font-medium text-foreground">
                             Zoom akkaunt
                         </label>
-                        <select
+                        <Select
                             id="zoom-account"
                             value={selectedAccount}
-                            onChange={(e) => setAccountId(e.target.value)}
-                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-                        >
-                            <option value="">
-                                {managed ? "Avtomatik — shu vaqtda bo'sh akkaunt" : 'Avtomatik — havoladan aniqlanadi'}
-                            </option>
-                            {accountOptions.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                    {account.name}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setAccountId}
+                            options={[
+                                { value: '', label: managed ? "Avtomatik — shu vaqtda bo'sh akkaunt" : 'Avtomatik — havoladan aniqlanadi' },
+                                ...accountOptions.map((account) => ({ value: String(account.id), label: account.name })),
+                            ]}
+                        />
                         <p className="text-xs text-muted-foreground">
                             {managed
                                 ? 'Bitta litsenziya bir vaqtda bitta uchrashuv: band akkaunt tanlanmaydi.'
@@ -315,44 +442,61 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         </p>
                     </div>
                 )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Input label="Sana" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                    <Input label="Boshlanishi" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                    <Input label="Tugashi" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                    <p className="text-xs text-muted-foreground sm:col-span-3">
+                <div className="space-y-3">
+                    <DatePicker label="Sana" value={date} onChange={setDate} />
+                    <PairPicker
+                        start={startTime}
+                        end={endTime}
+                        onChange={(nextStart, nextEnd) => {
+                            setStartTime(nextStart);
+                            setEndTime(nextEnd);
+                        }}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <TimeField label="Boshlanishi" value={startTime} onChange={setStartTime} />
+                        <TimeField label="Tugashi" value={endTime} onChange={setEndTime} />
+                    </div>
+                    {date && startTime && endTime && (
+                        <p className="rounded-lg bg-muted/60 px-3 py-2 text-sm text-foreground">
+                            {formatLongDate(date)}
+                            {pairLabel && ` · ${pairLabel}`} · {startTime}–{endTime}
+                            {durationLabel && <span className="text-muted-foreground"> ({durationLabel})</span>}
+                        </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
                         Toshkent vaqti. Talaba boshlanishdan 10 daqiqa oldin kira oladi, tugagach — kira olmaydi.
                         Boshqa guruhlar bu seansni ko'rmaydi.
                     </p>
                 </div>
                 {!editing && (
                     <div className="space-y-3 rounded-lg border border-border px-3 py-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {/* «Qachongacha» faqat takrorlashda — ungacha ro'yxat butun kenglikda, yonida bo'sh joy qolmasin. */}
+                        <div className={cn('grid grid-cols-1 gap-3', repeat && 'sm:grid-cols-2')}>
                             <div className="space-y-1.5">
                                 <label htmlFor="zoom-repeat" className="text-sm font-medium text-foreground">
                                     Takrorlash
                                 </label>
-                                <select
+                                <Select
                                     id="zoom-repeat"
                                     value={repeat}
-                                    onChange={(e) => {
-                                        setRepeat(e.target.value as '' | ZoomSeriesRepeat);
+                                    onChange={(next) => {
+                                        setRepeat(next as '' | ZoomSeriesRepeat);
                                         setSkipped(new Set());
                                     }}
-                                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-                                >
-                                    <option value="">Takrorlanmaydi — bitta seans</option>
-                                    <option value="weekly">Har hafta</option>
-                                    <option value="biweekly">Har 2 haftada (numerator / denominator)</option>
-                                </select>
+                                    options={[
+                                        { value: '', label: 'Takrorlanmaydi — bitta seans' },
+                                        { value: 'weekly', label: 'Har hafta' },
+                                        { value: 'biweekly', label: 'Har 2 haftada (numerator / denominator)' },
+                                    ]}
+                                />
                             </div>
                             {repeat && (
-                                <Input
+                                <DatePicker
                                     label="Qachongacha"
-                                    type="date"
                                     value={repeatUntil}
                                     min={date}
-                                    onChange={(e) => {
-                                        setRepeatUntil(e.target.value);
+                                    onChange={(next) => {
+                                        setRepeatUntil(next);
                                         setSkipped(new Set());
                                     }}
                                 />
@@ -440,58 +584,25 @@ export function ZoomSessionFormModal({ editing, onClose, onSubmit, isPending, er
                         ))}
                     </div>
                 )}
-                <div className="space-y-1.5">
-                    <span className="text-sm font-medium text-foreground">Guruhlar</span>
-                    <GroupChecklist
-                        selected={groups}
-                        onToggle={(group) => setGroups((prev) => toggleGroup(prev, group))}
-                        source={ZOOM_GROUP_SOURCE}
-                    />
-                    {groups.size > 0 && (
-                        <p className="text-xs text-muted-foreground">Tanlangan: {[...groups.values()].join(', ')}</p>
-                    )}
-                </div>
-                <div className="space-y-3 rounded-lg border border-border px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-4">
-                        <label htmlFor="zoom-face-check" className="cursor-pointer">
-                            <div className="text-sm font-medium">Yuz nazorati</div>
-                            <div className="text-xs text-muted-foreground">
-                                Kirishda yuz HEMIS surati bilan solishtiriladi — mos kelmasa, talaba kirmaydi
-                            </div>
-                        </label>
-                        <Switch id="zoom-face-check" checked={faceCheck} onCheckedChange={setFaceCheck} />
-                    </div>
-                    {faceCheck && (
-                        <div className="space-y-2 border-t border-border pt-2.5" role="radiogroup" aria-label="Yuz nazorati turi">
-                            {([false, true] as const).map((value) => (
-                                <label key={String(value)} className="flex cursor-pointer items-start gap-2 text-sm">
-                                    <input
-                                        type="radio"
-                                        name="zoom-random-checks"
-                                        checked={randomChecks === value}
-                                        onChange={() => setRandomChecks(value)}
-                                        className="mt-0.5"
-                                    />
-                                    <span>
-                                        {value ? 'Kirishda va dars davomida' : 'Faqat kirishda'}
-                                        <span className="block text-xs text-muted-foreground">
-                                            {value
-                                                ? "Dars davomida ham taxminan daqiqada bir tasodifiy tekshiriladi — hisobotda kim qancha kadrda bo'lgani ko'rinadi"
-                                                : "Shaxs tasdiqlangach boshqa tekshirilmaydi — kamera dars davomida band bo'lmaydi"}
-                                        </span>
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
-                    <label htmlFor="zoom-active" className="cursor-pointer">
-                        <div className="text-sm font-medium">Faol</div>
-                        <div className="text-xs text-muted-foreground">O'chirilgan seans talabalarga ko'rinmaydi</div>
-                    </label>
-                    <Switch id="zoom-active" checked={isActive} onCheckedChange={setIsActive} />
-                </div>
+                <FaceControlPicker
+                    value={!faceCheck ? 'off' : randomChecks ? 'continuous' : 'entry'}
+                    onChange={(level) => {
+                        setFaceCheck(level !== 'off');
+                        setRandomChecks(level === 'continuous');
+                    }}
+                    hints={{
+                        off: "Talaba yuz tekshiruvisiz kiradi",
+                        entry: "Kirishda HEMIS surati bilan solishtiriladi — mos kelmasa, kirmaydi",
+                        continuous: "Kirishda va dars davomida ~daqiqada bir tasodifiy tekshiruv — hisobotda kim qancha kadrda",
+                    }}
+                />
+                <SwitchField
+                    id="zoom-active"
+                    title="Faol"
+                    description="O'chirilgan seans talabalarga ko'rinmaydi"
+                    checked={isActive}
+                    onCheckedChange={setIsActive}
+                />
                 {(localError || error) && <p className="text-sm text-destructive">{localError || error}</p>}
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" onClick={onClose}>

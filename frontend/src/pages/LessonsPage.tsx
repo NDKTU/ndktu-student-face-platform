@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useLessons';
@@ -344,14 +345,7 @@ export default function LessonsPage() {
                             onChange={(e) => setFormTopic(e.target.value)}
                         />
                     </div>
-                    <div>
-                        <label className="text-sm font-medium block mb-1">Sana</label>
-                        <Input
-                            type="date"
-                            value={formDate}
-                            onChange={(e) => setFormDate(e.target.value)}
-                        />
-                    </div>
+                    <DatePicker label="Sana" value={formDate} onChange={setFormDate} />
                     <div>
                         <label className="text-sm font-medium block mb-1">Tavsif (ixtiyoriy)</label>
                         <textarea

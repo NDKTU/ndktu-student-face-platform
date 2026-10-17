@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, ClipboardList, Pencil, Plus, Search, UserMinus, UserPlus, Users } from 'lucide-react';
@@ -18,7 +19,7 @@ import { GeneralTestFormModal } from '@/components/generalTest/GeneralTestFormMo
 import { SubjectFormModal } from '@/components/generalTest/SubjectFormModal';
 import { SubjectQuestionBank } from '@/components/generalTest/SubjectQuestionBank';
 import { SubjectUserPickerModal } from '@/components/generalTest/SubjectUserPickerModal';
-import { ACTIVE_BADGE, INACTIVE_BADGE, KIND_LABEL, questionsLabel, selectClassName } from '@/components/generalTest/labels';
+import { ACTIVE_BADGE, INACTIVE_BADGE, KIND_LABEL, questionsLabel } from '@/components/generalTest/labels';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
     useCreateGeneralTest,
@@ -177,20 +178,21 @@ export default function GeneralTestSubjectDetailPage() {
                                 leftAddon={<Search className="h-4 w-4" />}
                                 className="sm:max-w-sm"
                             />
-                            <select
-                                aria-label="Foydalanuvchi turi"
-                                className={`${selectClassName} sm:w-48`}
+                            <Select
+                                ariaLabel="Foydalanuvchi turi"
+                                className="sm:w-48"
                                 value={kind}
-                                onChange={(e) => {
-                                    setKind(e.target.value as UserKindFilter | '');
+                                onChange={(next) => {
+                                    setKind(next as UserKindFilter | '');
                                     setPage(1);
                                 }}
-                            >
-                                <option value="">Barcha turlar</option>
-                                <option value="student">Talabalar</option>
-                                <option value="teacher">O'qituvchilar</option>
-                                <option value="other">Boshqa xodimlar</option>
-                            </select>
+                                options={[
+                                    { value: '', label: 'Barcha turlar' },
+                                    { value: 'student', label: 'Talabalar' },
+                                    { value: 'teacher', label: "O'qituvchilar" },
+                                    { value: 'other', label: 'Boshqa xodimlar' },
+                                ]}
+                            />
                         </div>
                         <DataTable
                             columns={userColumns}

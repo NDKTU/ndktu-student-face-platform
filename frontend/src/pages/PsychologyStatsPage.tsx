@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 
+import { DatePicker } from '@/components/ui/DatePicker';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { X } from 'lucide-react';
@@ -160,13 +160,13 @@ const PsychologyStatsPage = () => {
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                             Sanadan
                         </label>
-                        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        <DatePicker value={dateFrom} onChange={setDateFrom} clearable format="short" placeholder="—" ariaLabel="Sanadan" max={dateTo || undefined} />
                     </div>
                     <div className="w-[150px]">
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                             Sanagacha
                         </label>
-                        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        <DatePicker value={dateTo} onChange={setDateTo} clearable format="short" placeholder="—" ariaLabel="Sanagacha" min={dateFrom || undefined} />
                     </div>
                     {hasFilters && (
                         <Button variant="ghost" onClick={clear} className="mb-0.5">

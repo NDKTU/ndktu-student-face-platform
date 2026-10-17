@@ -65,6 +65,9 @@ class ZoomSession(Base, IdIntPk, TimestampMixin):
         ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     face_check_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)
+    #: Mashg'ulot turi: lecture | practice | lab | seminar (`core/enums.py::COURSE_TYPE_LABELS`,
+    #: kurslardagi bilan bir xil). Bo'sh — tur kiritilishidan oldingi seanslar.
+    training_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     #: Yuz nazorati yoqiq bo'lsa: `True` — kirishda va dars davomida tasodifiy,
     #: `False` — faqat kirishda (tasdiqlangach talaba boshqa tekshirilmaydi).
     random_face_checks: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)

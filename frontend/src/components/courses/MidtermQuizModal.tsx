@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Select } from '@/components/ui/Select';
+import { SwitchField } from '@/components/ui/SwitchField';
+import { ProctoringModePicker } from '@/components/quizzes/ProctoringModePicker';
 import { toast } from 'sonner';
 import { Loader2, Search } from 'lucide-react';
 
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Switch } from '@/components/ui/Switch';
 import { HoldToRevealSwitch, StrictModeSwitch } from '@/components/quizzes/StrictModeSwitch';
 import { useControlQuestions, useLessonQuestionCounts } from '@/hooks/useQuestions';
 import { useCreateQuiz, useUpdateQuiz } from '@/hooks/useQuizzes';
@@ -16,8 +18,6 @@ import type { ProctoringMode, Quiz, QuizCreateRequest } from '@/services/quizSer
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatDate } from '@/utils/date';
 
-const selectClassName =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 interface Props {
     isOpen: boolean;
@@ -216,22 +216,16 @@ export const MidtermQuizModal = ({
             <div className="space-y-4">
                 <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="control-type">Nazorat</label>
-                    <select
+                    <Select
                         id="control-type"
-                        className={selectClassName}
                         value={controlType}
-                        onChange={(e) => setControlType(e.target.value as ControlType)}
-                    >
-                        {!controlType && <option value="" disabled>Nazorat turini tanlang</option>}
-                        {CONTROL_TYPES.map((item) => (
-                            <option key={item.value} value={item.value}>
-                                {item.title}
-                                {usedControlTypes.includes(item.value) && item.value !== quiz?.control_type
-                                    ? ' — kursda bor'
-                                    : ''}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(next) => setControlType(next as ControlType)}
+                        placeholder="Nazorat turini tanlang"
+                        options={CONTROL_TYPES.map((item) => ({
+                            value: item.value,
+                            label: `${item.title}${usedControlTypes.includes(item.value) && item.value !== quiz?.control_type ? ' — kursda bor' : ''}`,
+                        }))}
+                    />
                     <p className="text-xs text-muted-foreground">Test nomi turidan avtomatik qo'yiladi.</p>
                 </div>
 
@@ -332,12 +326,15 @@ export const MidtermQuizModal = ({
                 {groups.length > 1 && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Guruh</label>
-                        <select className={selectClassName} value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                            <option value="">Kursning barcha guruhlari</option>
-                            {groups.map((group) => (
-                                <option key={group.id} value={group.id}>{group.name}</option>
-                            ))}
-                        </select>
+                        <Select
+                            value={groupId}
+                            onChange={setGroupId}
+                            ariaLabel="Guruh"
+                            options={[
+                                { value: '', label: 'Kursning barcha guruhlari' },
+                                ...groups.map((group) => ({ value: String(group.id), label: group.name })),
+                            ]}
+                        />
                     </div>
                 )}
 
@@ -356,31 +353,12 @@ export const MidtermQuizModal = ({
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Proktoring</label>
-                    <select
-                        className={selectClassName}
-                        value={proctoringMode}
-                        onChange={(e) => setProctoringMode(e.target.value as ProctoringMode)}
-                    >
-                        <option value="standard">Oddiy</option>
-                        <option value="face">Yuz nazorati (butun test davomida)</option>
-                            <option value="face_entry">Kirishda yuz tekshiruvi</option>
-                    </select>
-                </div>
+                <ProctoringModePicker value={proctoringMode} onChange={setProctoringMode} />
 
                 <StrictModeSwitch checked={strictMode} onCheckedChange={setStrictMode} />
                 <HoldToRevealSwitch checked={holdToReveal} onCheckedChange={setHoldToReveal} />
 
-                <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
-                    <div>
-                        <p className="text-sm font-medium">Faol</p>
-                        <p className="text-xs text-muted-foreground">
-                            Faol testda «Savollar soni»dan kam bo'lmagan savol bo'lishi shart.
-                        </p>
-                    </div>
-                    <Switch checked={isActive} onCheckedChange={setIsActive} />
-                </div>
+                <SwitchField title="Faol" description="Faol testda «Savollar soni»dan kam bo'lmagan savol bo'lishi shart." checked={isActive} onCheckedChange={setIsActive} />
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex justify-end gap-2 pt-2">

@@ -28,8 +28,13 @@ const periodReasons = (period: AbsencePeriod) => {
 const formatVisits = (visits: ZoomVisit[]) =>
     visits.map((visit) => `${formatTime(visit.joined_at)}–${visit.left_at ? formatTime(visit.left_at) : 'oxirigacha'}`).join(', ');
 
+/** Talaba necha marta kirgan: Zoom ma'lumoti bo'lsa — undan, aks holda kirishdagi yuz tasdiqlaridan. */
+const entryCount = (student: FaceCheckStudentSummary) =>
+    (student.zoom_visits?.length ?? 0) || (student.admitted_at?.length ?? 0);
+
 /**
- * Har bir kirish — qachon kirdi, qachon chiqdi (barcha turdagi seanslarda).
+ * Har bir kirish alohida qator: qachon kirdi, qachon chiqdi, qancha o'tirdi.
+ * Talaba qatori bosilganda ochiladi.
  *
  * Asosiy manba — Zoom webhook (`zoom_visits`). U kelmagan bo'lsa (qo'lda
  * havola, webhook sozlanmagan) — kirishdagi yuz tasdiqlari: har qayta kirish
@@ -37,37 +42,49 @@ const formatVisits = (visits: ZoomVisit[]) =>
  */
 const EntryExitList = ({ student, ended }: { student: FaceCheckStudentSummary; ended: boolean }) => {
     const visits = student.zoom_visits ?? [];
-    const openLabel = ended ? 'dars oxirigacha' : 'hozir darsda';
-    if (visits.length > 0) {
-        return (
-            <ul className="space-y-0.5 text-xs">
-                {visits.map((visit, index) => (
-                    <li key={index} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                        <span className="inline-flex items-center gap-1">
-                            <LogIn className="h-3.5 w-3.5 text-emerald-600" />
-                            Kirdi <span className="font-medium">{formatTime(visit.joined_at)}</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                            <LogOut className="h-3.5 w-3.5 text-amber-600" />
-                            {visit.left_at ? (
-                                <>Chiqdi <span className="font-medium">{formatTime(visit.left_at)}</span></>
-                            ) : (
-                                <span className={ended ? 'text-muted-foreground' : 'font-medium text-emerald-600'}>{openLabel}</span>
-                            )}
-                        </span>
-                    </li>
-                ))}
-            </ul>
-        );
+    const fromZoom = visits.length > 0;
+    const rows: ZoomVisit[] = fromZoom ? visits : (student.admitted_at ?? []).map((joined_at) => ({ joined_at }));
+    if (rows.length === 0) {
+        return <p className="text-xs text-muted-foreground">Kirish ma'lumoti yo'q.</p>;
     }
-    const admitted = student.admitted_at ?? [];
-    if (admitted.length === 0) return null;
+    const openLabel = ended ? 'dars oxirigacha' : 'hozir darsda';
     return (
-        <p className="flex flex-wrap items-center gap-1 text-xs">
-            <LogIn className="h-3.5 w-3.5 text-emerald-600" />
-            Kirdi <span className="font-medium">{admitted.map(formatTime).join(', ')}</span>
-            <span className="text-muted-foreground">· chiqish vaqti noma'lum — Zoom ma'lumoti kelmagan</span>
-        </p>
+        <div className="space-y-1.5">
+            <ol className="divide-y divide-border/60 rounded-lg border border-border/60 text-xs">
+                {rows.map((visit, index) => {
+                    const seconds = visit.left_at
+                        ? (new Date(visit.left_at).getTime() - new Date(visit.joined_at).getTime()) / 1000
+                        : null;
+                    return (
+                        <li key={index} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
+                            <span className="w-5 shrink-0 text-muted-foreground">{index + 1}.</span>
+                            <span className="inline-flex items-center gap-1">
+                                <LogIn className="h-3.5 w-3.5 text-emerald-600" />
+                                Kirdi <span className="font-medium">{formatTime(visit.joined_at)}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                                <LogOut className="h-3.5 w-3.5 text-amber-600" />
+                                {visit.left_at ? (
+                                    <>Chiqdi <span className="font-medium">{formatTime(visit.left_at)}</span></>
+                                ) : fromZoom ? (
+                                    <span className={ended ? 'text-muted-foreground' : 'font-medium text-emerald-600'}>{openLabel}</span>
+                                ) : (
+                                    <span className="text-muted-foreground">Chiqdi —</span>
+                                )}
+                            </span>
+                            {seconds != null && (
+                                <span className="ml-auto text-muted-foreground">{formatMinutes(Math.max(0, seconds))}</span>
+                            )}
+                        </li>
+                    );
+                })}
+            </ol>
+            {!fromZoom && (
+                <p className="text-xs text-muted-foreground">
+                    Kirishlar yuz tasdig'idan. Chiqish vaqti noma'lum — Zoom ma'lumoti kelmagan.
+                </p>
+            )}
+        </div>
     );
 };
 
@@ -164,18 +181,35 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                     >
                         <Video className="h-3.5 w-3.5" />
                         {student.zoom_seconds != null ? formatMinutes(student.zoom_seconds) : "Zoom'da yo'q"}
-                        {visits.length > 1 && <span>· {visits.length} marta kirdi</span>}
                     </span>
                 );
                 // Faqat kirishda tekshirilgan: kuzatuv chizig'i yo'q — kirishdagi natija, kirib-chiqishlar va Zoom'dagi vaqt.
+                const isOpen = expanded === student.user_id;
+                const toggle = () => setExpanded(isOpen ? null : student.user_id);
+                const chevron = isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />;
+                const nameCell = (
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                        {student.user_name || `#${student.user_id}`}
+                        {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
+                    </span>
+                );
+                const entries = entryCount(student);
+                const entriesBadge = entries > 0 && (
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                        <LogIn className="h-3.5 w-3.5" /> {entries} marta kirdi
+                    </span>
+                );
+                const entriesPanel = isOpen && (
+                    <div className="border-t border-border/60 px-4 py-3">
+                        <EntryExitList student={student} ended={ended} />
+                    </div>
+                );
                 if (!randomChecks && student.total > 0) {
                     return (
-                        <div key={student.user_id} className="space-y-1.5 rounded-xl border border-border/60 px-4 py-3">
-                            <div className="flex items-center gap-3">
-                                <span className="min-w-0 flex-1 truncate font-medium">
-                                    {student.user_name || `#${student.user_id}`}
-                                    {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
-                                </span>
+                        <div key={student.user_id} className="rounded-xl border border-border/60">
+                            <button type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left" onClick={toggle}>
+                                {chevron}
+                                {nameCell}
                                 {student.passed > 0 ? (
                                     <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">
                                         Kirishda tasdiqlandi{student.first_check ? ` · ${formatTime(student.first_check)}` : ''}
@@ -185,43 +219,36 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                         Tasdiqlanmadi · {student.total} urinish
                                     </span>
                                 )}
+                                {entriesBadge}
                                 {zoomBadge}
-                            </div>
-                            <EntryExitList student={student} ended={ended} />
+                            </button>
+                            {entriesPanel}
                         </div>
                     );
                 }
                 // Yuz nazoratisiz seans: faqat Zoom'dagi vaqt bor, kuzatuv chizig'i yo'q.
                 if (student.total === 0) {
                     return (
-                        <div key={student.user_id} className="space-y-1.5 rounded-xl border border-border/60 px-4 py-3">
-                            <div className="flex items-center gap-3">
-                                <span className="min-w-0 flex-1 truncate font-medium">
-                                    {student.user_name || `#${student.user_id}`}
-                                    {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
-                                </span>
+                        <div key={student.user_id} className="rounded-xl border border-border/60">
+                            <button type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left" onClick={toggle}>
+                                {chevron}
+                                {nameCell}
+                                {entriesBadge}
                                 {zoomBadge}
-                            </div>
-                            <EntryExitList student={student} ended={ended} />
+                            </button>
+                            {entriesPanel}
                         </div>
                     );
                 }
-                const isOpen = expanded === student.user_id;
                 const presentRatio = student.tracked_seconds > 0
                     ? Math.round(((student.tracked_seconds - student.absent_seconds) / student.tracked_seconds) * 100)
                     : 100;
 
                 return (
                     <div key={student.user_id} className="rounded-xl border border-border/60">
-                        <button
-                            className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                            onClick={() => setExpanded(isOpen ? null : student.user_id)}
-                        >
-                            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-                            <span className="min-w-0 flex-1 truncate font-medium">
-                                {student.user_name || `#${student.user_id}`}
-                                {student.group_name && <span className="ml-2 text-xs font-normal text-muted-foreground">{student.group_name}</span>}
-                            </span>
+                        <button type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left" onClick={toggle}>
+                            {chevron}
+                            {nameCell}
                             {/* Chiqib ketganini «doim kadrda» yashirmasin: foiz faqat
                                 talabaning o'z oynasi bo'yicha, darsning qolgani unda yo'q. */}
                             {student.left_early && student.last_check && (
@@ -240,14 +267,12 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                 </span>
                             )}
                             <span className="shrink-0 text-xs text-muted-foreground">{presentRatio}%</span>
+                            {(student.zoom_visits?.length ?? 0) > 0 && entriesBadge}
                             {zoomBadge}
                         </button>
 
-                        <div className="space-y-2 px-4 pb-3">
+                        <div className="px-4 pb-3">
                             <Timeline student={student} />
-                            {/* Zoom'dagi kirib-chiqish — kartani ochmasdan ham. Ilgari u
-                                faqat ikki va undan ko'p kirishda, ochilgan kartada edi. */}
-                            {visits.length > 0 && <EntryExitList student={student} ended={ended} />}
                         </div>
 
                         {isOpen && (
@@ -256,6 +281,7 @@ export const ZoomFaceCheckReport = ({ sessionId }: { sessionId: number }) => {
                                     Kuzatuv: {formatMinutes(student.tracked_seconds)} · {student.total} ta tekshiruv
                                     {' '}({student.passed} tasdiqlandi, {student.failed} muammoli)
                                 </p>
+                                {(student.zoom_visits?.length ?? 0) > 0 && <EntryExitList student={student} ended={ended} />}
 
                                 {student.periods.length === 0 ? (
                                     <p className="text-xs text-emerald-600">Yuz butun davomida kadrda bo'lgan.</p>

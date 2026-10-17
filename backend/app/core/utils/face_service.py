@@ -18,13 +18,16 @@ logger = logging.getLogger(__name__)
 #: boshqasi o'tirib olishi mumkin bo'lardi.
 FACE_ENTRY_TTL_SECONDS = 5 * 60
 
-#: `classify` holati → talabaga ko'rsatiladigan matn.
+#: `classify` holati → foydalanuvchiga ko'rsatiladigan matn. Test, elementar
+#: test va Zoom uchun bitta: bir xil holat hamma joyda bir xil aytilsin.
+#: Etalon talabada — HEMIS surati, xodimda — profil surati, shuning uchun
+#: matn qaysi surat ekanini aytmaydi.
 FACE_ENTRY_MESSAGES = {
     "ok": "Shaxsingiz tasdiqlandi",
     "no_face": "Kadrda yuz ko'rinmadi — kameraga to'g'ri qarang va qayta urinib ko'ring",
     "multiple_faces": "Kadrda bir nechta odam bor — yolg'iz qolib, qayta urinib ko'ring",
-    "different_person": "Yuz profil surati bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
-    "no_reference": "Profil suratingizdan yuz aniqlanmadi — o'qituvchiga murojaat qiling",
+    "different_person": "Yuz tizimdagi suratingiz bilan mos kelmadi — yorug' joyda qayta urinib ko'ring",
+    "no_reference": "Tizimdagi suratingizdan yuz aniqlanmadi — dekanat yoki administratorga murojaat qiling",
     "spoof": "Kamera oldida tirik yuz bo'lishi kerak — rasm yoki telefon ekrani qabul qilinmaydi",
 }
 

@@ -1,4 +1,4 @@
-import { Switch } from '@/components/ui/Switch';
+import { SwitchField } from '@/components/ui/SwitchField';
 
 interface Props {
     checked: boolean;
@@ -6,15 +6,7 @@ interface Props {
 }
 
 function SettingRow({ id, title, hint, checked, onCheckedChange }: Props & { id: string; title: string; hint: string }) {
-    return (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
-            <label htmlFor={id} className="cursor-pointer">
-                <div className="text-sm font-medium">{title}</div>
-                <div className="text-xs text-muted-foreground">{hint}</div>
-            </label>
-            <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
-        </div>
-    );
+    return <SwitchField id={id} title={title} description={hint} checked={checked} onCheckedChange={onCheckedChange} />;
 }
 
 /** «Qat'iy rejim» — test, nazorat, dars testi va elementar test oynalarida bir xil. */

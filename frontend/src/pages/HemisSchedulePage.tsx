@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CalendarDays, CalendarSearch, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { ClearFiltersButton } from '@/components/faculty/OrganizationToolbar';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
@@ -296,20 +296,26 @@ const HemisSchedulePage = () => {
                 </div>
                 {!isCalendar && (
                     <div className="flex w-full items-center gap-2 sm:w-auto">
-                        <Input
-                            type="date"
+                        <DatePicker
                             value={dateFrom}
-                            onChange={(e) => resetPage(setDateFrom)(e.target.value)}
-                            aria-label={t('Sanadan')}
-                            className="sm:w-[150px]"
+                            onChange={(next) => resetPage(setDateFrom)(next)}
+                            clearable
+                            format="short"
+                            placeholder={t('Sanadan')}
+                            ariaLabel={t('Sanadan')}
+                            className="w-full sm:w-[150px]"
+                            max={dateTo || undefined}
                         />
                         <span className="text-muted-foreground">–</span>
-                        <Input
-                            type="date"
+                        <DatePicker
                             value={dateTo}
-                            onChange={(e) => resetPage(setDateTo)(e.target.value)}
-                            aria-label={t('Sanagacha')}
-                            className="sm:w-[150px]"
+                            onChange={(next) => resetPage(setDateTo)(next)}
+                            clearable
+                            format="short"
+                            placeholder={t('Sanagacha')}
+                            ariaLabel={t('Sanagacha')}
+                            className="w-full sm:w-[150px]"
+                            min={dateFrom || undefined}
                         />
                     </div>
                 )}

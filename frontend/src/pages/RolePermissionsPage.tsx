@@ -243,6 +243,7 @@ const RolePermissionsPage = () => {
                                             checked={readOn}
                                             disabled={isAdminRole || !actions.read}
                                             onCheckedChange={(v) => toggleResourceVisibility(resource, v)}
+                                            aria-label={`${labelFor(resource)}: sahifa ko'rinadi`}
                                         />
                                     </span>
                                 </CardTitle>

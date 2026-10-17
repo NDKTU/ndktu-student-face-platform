@@ -7,10 +7,11 @@ import type { ControlType } from './questionService';
  */
 export type ProctoringMode = 'face' | 'face_entry' | 'standard';
 
+/** Jadvallarda — tanlovdagi (`FaceControlPicker`) nomlar bilan bir xil. */
 export const PROCTORING_LABELS: Record<ProctoringMode, string> = {
-    standard: 'Standart',
-    face: 'Kamera',
-    face_entry: 'Kirishda yuz',
+    standard: 'Yuz nazoratisiz',
+    face: 'Yuz: kirishda va davomida',
+    face_entry: 'Yuz: faqat kirishda',
 };
 
 /** Nazorat turi — bekenddagi `QuizType` bilan bir xil. */

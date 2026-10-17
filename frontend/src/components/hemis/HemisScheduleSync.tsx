@@ -117,7 +117,7 @@ export const HemisScheduleSync = () => {
                                     type="checkbox"
                                     checked={confirmBulk}
                                     onChange={(e) => setConfirmBulk(e.target.checked)}
-                                    className="mt-0.5 h-4 w-4 shrink-0"
+                                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                                 />
                                 <span>
                                     <span className="font-semibold">

@@ -255,7 +255,7 @@ export const QuizTable = ({
                 header: 'Rejim',
                 hideBelow: 'lg',
                 className: 'text-sm text-muted-foreground',
-                cell: (quiz) => `${PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}${quiz.strict_mode ? " · Qat'iy" : ''}`,
+                cell: (quiz) => `${PROCTORING_LABELS[quiz.proctoring_mode] ?? PROCTORING_LABELS.standard}${quiz.strict_mode ? " · Qat'iy" : ''}`,
             },
             {
                 key: 'is_active',
@@ -267,6 +267,7 @@ export const QuizTable = ({
                                 checked={quiz.is_active}
                                 onCheckedChange={() => onToggleStatus?.(quiz)}
                                 disabled={isUpdatingStatusId === quiz.id || isUpdatePending}
+                                aria-label={quiz.is_active ? "Testni o'chirish" : 'Testni faollashtirish'}
                             />
                         )}
                         <span className={quiz.is_active ? 'text-sm font-medium text-success' : 'text-sm text-muted-foreground'}>
@@ -315,7 +316,7 @@ export const QuizTable = ({
                             <span className="shrink-0 rounded bg-muted px-2 py-1 font-mono text-xs">{quiz.pin}</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {quiz.question_number} savol · {quiz.duration} daqiqa · {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}{quiz.strict_mode && " · Qat'iy"}
+                            {quiz.question_number} savol · {quiz.duration} daqiqa · {PROCTORING_LABELS[quiz.proctoring_mode] ?? PROCTORING_LABELS.standard}{quiz.strict_mode && " · Qat'iy"}
                         </p>
                         <div className="flex items-center justify-between gap-2" onClick={(event) => event.stopPropagation()}>
                             <div className="flex items-center gap-2">
@@ -324,6 +325,7 @@ export const QuizTable = ({
                                         checked={quiz.is_active}
                                         onCheckedChange={() => onToggleStatus?.(quiz)}
                                         disabled={isUpdatingStatusId === quiz.id || isUpdatePending}
+                                        aria-label={quiz.is_active ? "Testni o'chirish" : 'Testni faollashtirish'}
                                     />
                                 )}
                                 <span className={quiz.is_active ? 'text-xs font-medium text-success' : 'text-xs text-muted-foreground'}>
@@ -390,7 +392,7 @@ export const QuizTable = ({
                                     {quiz.is_active ? t('Faol') : t('Yopiq')}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {PROCTORING_LABELS[quiz.proctoring_mode] ?? 'Standart'}
+                                    {PROCTORING_LABELS[quiz.proctoring_mode] ?? PROCTORING_LABELS.standard}
                                     {quiz.strict_mode && " · Qat'iy"}
                                 </p>
                             </div>

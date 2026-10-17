@@ -312,6 +312,144 @@ async def test_join_only_face_check(auth_client, async_client, async_db, zoom_sc
 
 
 @pytest.mark.asyncio
+async def test_calendar_date_range(auth_client, async_client, zoom_scene):
+    """Kalendar: Toshkent sanalari oralig'idagi seanslar; talaba — faqat o'z guruhiniki."""
+    zs = await _create(auth_client, zoom_scene, start=timedelta(minutes=-5), end=timedelta(hours=1))
+    today = (datetime.now(timezone.utc) + timedelta(hours=5)).date()
+    week = {"date_from": (today - timedelta(days=3)).isoformat(), "date_to": (today + timedelta(days=3)).isoformat()}
+
+    listed = await auth_client.get("/zoom-sessions/", params=week)
+    assert [s["id"] for s in listed.json()["sessions"]] == [zs["id"]]
+    member = await _login(async_client, "zm_member")
+    assert [s["id"] for s in (await async_client.get("/zoom-sessions/", params=week, headers=member)).json()["sessions"]] == [zs["id"]]
+    outsider = await _login(async_client, "zm_outsider")
+    assert (await async_client.get("/zoom-sessions/", params=week, headers=outsider)).json()["sessions"] == []
+
+    later = {"date_from": (today + timedelta(days=2)).isoformat(), "date_to": (today + timedelta(days=9)).isoformat()}
+    assert (await auth_client.get("/zoom-sessions/", params=later)).json()["sessions"] == []
+
+    reversed_range = {"date_from": week["date_to"], "date_to": week["date_from"]}
+    bad = await auth_client.get("/zoom-sessions/", params=reversed_range)
+    assert bad.status_code == 400 and bad.json()["detail"]["code"] == "zoom_bad_date_range"
+    too_long = {"date_from": today.isoformat(), "date_to": (today + timedelta(days=90)).isoformat()}
+    assert (await auth_client.get("/zoom-sessions/", params=too_long)).json()["detail"]["code"] == "zoom_date_range_too_long"
+
+
+@pytest.mark.asyncio
+async def test_pair_times_from_hemis_schedule(auth_client, async_db, zoom_scene):
+    """Juftlik vaqti — HEMIS jadvalidagi ko'pchilik vaqti; jadval bo'sh bo'lsa — odatiy setka."""
+    from datetime import date, time
+
+    from app.modules.auth.hemis.model import HemisScheduleLesson
+
+    default = (await auth_client.get("/zoom-sessions/pair-times")).json()["pairs"]
+    assert default[0] == {"pair": 1, "start": "08:00", "end": "09:20"} and len(default) == 9
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = [
+        ("2", time(9, 30), time(10, 50)),
+        ("2", time(9, 30), time(10, 50)),
+        ("2", time(9, 0), time(10, 20)),  # ozchilik — e'tiborga olinmaydi
+        ("3", time(11, 0), time(12, 20)),
+        ("x", time(7, 0), time(8, 0)),  # raqam emas
+    ]
+    for index, (pair, start, end) in enumerate(rows):
+        async_db.add(
+            HemisScheduleLesson(
+                hemis_id=900_000 + index,
+                education_year="2026",
+                lesson_date=date(2026, 10, 15),
+                synced_at=now,
+                lesson_pair=pair,
+                start_time=start,
+                end_time=end,
+            )
+        )
+    await async_db.commit()
+
+    pairs = (await auth_client.get("/zoom-sessions/pair-times")).json()["pairs"]
+    assert pairs == [
+        {"pair": 2, "start": "09:30", "end": "10:50"},
+        {"pair": 3, "start": "11:00", "end": "12:20"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_training_type_in_session_and_title(auth_client, zoom_scene):
+    """Mashg'ulot turi saqlanadi va avtomatik nomga kiradi; noma'lum tur — 422."""
+    body = {
+        "link_url": LINK,
+        "starts_at": _iso(timedelta(hours=1)),
+        "ends_at": _iso(timedelta(hours=2)),
+        "group_ids": [zoom_scene["group_id"]],
+        **_teaching(zoom_scene),
+    }
+    created = await auth_client.post("/zoom-sessions/", json={**body, "training_type": "practice"})
+    assert created.status_code == 201, created.text
+    assert created.json()["training_type"] == "practice"
+    assert created.json()["title"].startswith("Fizika (amaliyot) — ")
+
+    untyped = await auth_client.post(
+        "/zoom-sessions/", json={**body, "starts_at": _iso(timedelta(hours=3)), "ends_at": _iso(timedelta(hours=4))}
+    )
+    assert untyped.json()["training_type"] is None
+    assert untyped.json()["title"].startswith("Fizika — ")
+
+    bad = await auth_client.post("/zoom-sessions/", json={**body, "training_type": "lunch"})
+    assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_teacher_load_for_form(auth_client, async_db, zoom_scene):
+    """Yuklama: joriy semestr, turlar tartiblangan; joriy semestrda yo'q bo'lsa — yil bo'yicha."""
+    from app.modules.auth.model import Teacher, TeacherAssignment
+    from app.modules.zoom_session.repository import zoom_session_repository
+
+    teacher = (
+        await async_db.execute(select(Teacher).where(Teacher.user_id == zoom_scene["teacher_user_id"]))
+    ).scalar_one()
+    current = zoom_session_repository._current_semester()
+    other = "Bahorgi" if current == "Kuzgi" else "Kuzgi"
+    url = f"/zoom-sessions/teacher-load?teacher_user_id={zoom_scene['teacher_user_id']}"
+
+    assert (await auth_client.get(url)).json() == {"items": [], "semester": None}
+
+    def assignment(subject, group, types, semester):
+        return TeacherAssignment(
+            teacher_id=teacher.id,
+            subject_id=zoom_scene[subject],
+            group_id=zoom_scene[group],
+            load_types=types,
+            semester_type=semester,
+            academic_year_id=1,
+        )
+
+    async_db.add_all(
+        [
+            # Bir juftlikdagi bir necha tur bitta qatorda (`uq_teacher_subject_group`).
+            assignment("subject_id", "group_id", ["practice", "lecture"], current),
+            # Boshqa semestr — joriy semestrda yuklama bor ekan, ko'rsatilmaydi.
+            assignment("foreign_subject_id", "other_group_id", ["lab"], other),
+        ]
+    )
+    await async_db.commit()
+
+    body = (await auth_client.get(url)).json()
+    assert body["semester"] == current
+    assert [(i["subject_name"], i["group_name"], i["load_types"]) for i in body["items"]] == [
+        ("Fizika", "ZM-101", ["lecture", "practice"])
+    ]
+
+    # Joriy semestr yuklamasi o'chdi — yil bo'yicha hammasi.
+    for row in (await async_db.execute(select(TeacherAssignment))).scalars().all():
+        row.is_active = row.semester_type == other
+    await async_db.commit()
+    body = (await auth_client.get(url)).json()
+    assert body["semester"] is None
+    assert [(i["subject_name"], i["group_name"]) for i in body["items"]] == [("Kimyo", "ZM-202")]
+
+
+@pytest.mark.asyncio
 async def test_validation_and_ownership(auth_client, async_client, zoom_scene):
     bad_time = await auth_client.post(
         "/zoom-sessions/",
